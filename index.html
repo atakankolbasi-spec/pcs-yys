@@ -440,6 +440,11 @@ html[data-spacing] :is(#app,#modal) :is(td,p,span,label,button,a,li,small,b,stro
 .app-preview-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
 .app-mini{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;cursor:default;width:auto;margin:0}
 .app-actions{position:sticky;bottom:0;background:#fff;padding:14px 0 2px;border-top:1px solid var(--line);margin-top:0}
+/*yazi-kalinligi-tum-sayfa*/
+html[data-weight="ince"] :is(#app,#modal) :not(svg,svg *,h1,h2,h3,.kpi-num,.brand-name,.block-head-name,.side-plate){font-weight:400}
+html[data-weight="bold"] :is(#app,#modal) :not(svg,svg *,h1,h2,h3,.kpi-num,.brand-name,.block-head-name,.side-plate,.eyebrow,.nav-label){font-weight:700}
+html[data-weight="extra"] :is(#app,#modal) :not(svg,svg *){font-weight:800}
+html[data-weight="black"] :is(#app,#modal) :not(svg,svg *){font-weight:900}
 /*kompakt-toplamlar*/
 .kpi-grid{gap:10px;margin-bottom:18px}
 .kpi{padding:11px 14px;border-radius:12px}
@@ -871,7 +876,7 @@ var VIEW_TOKEN=(new URLSearchParams(location.search).get('izle')||'').trim();
 var prioDirty=false,appearanceDirty=false,publicLink='';
 const APP_FONTS={varsayilan:['Varsayılan (Inter / Segoe UI)','Inter,"Segoe UI",Arial,sans-serif'],segoe:['Segoe UI','"Segoe UI",Arial,sans-serif'],segoevar:['Segoe UI Variable','"Segoe UI Variable Text","Segoe UI",sans-serif'],arial:['Arial','Arial,Helvetica,sans-serif'],arialnarrow:['Arial Narrow (dar)','"Arial Narrow",Arial,sans-serif'],verdana:['Verdana','Verdana,Geneva,sans-serif'],tahoma:['Tahoma','Tahoma,Verdana,sans-serif'],trebuchet:['Trebuchet MS','"Trebuchet MS",Arial,sans-serif'],calibri:['Calibri','Calibri,Carlito,Arial,sans-serif'],candara:['Candara','Candara,Calibri,sans-serif'],corbel:['Corbel','Corbel,Calibri,sans-serif'],bahnschrift:['Bahnschrift','Bahnschrift,"Segoe UI",sans-serif'],franklin:['Franklin Gothic','"Franklin Gothic Medium","Franklin Gothic",Arial,sans-serif'],century:['Century Gothic','"Century Gothic",Futura,Arial,sans-serif'],lucida:['Lucida Sans','"Lucida Sans Unicode","Lucida Grande",sans-serif'],gill:['Gill Sans','"Gill Sans MT","Gill Sans",Calibri,sans-serif'],georgia:['Georgia','Georgia,"Times New Roman",serif'],cambria:['Cambria','Cambria,Georgia,serif'],constantia:['Constantia','Constantia,Georgia,serif'],palatino:['Palatino','"Palatino Linotype",Palatino,Georgia,serif'],consolas:['Consolas (eş aralıklı)','Consolas,"Courier New",monospace'],courier:['Courier New (daktilo)','"Courier New",Courier,monospace']};
 const APP_PLATE_FONTS={ayni:['Genel yazı tipiyle aynı',''],...APP_FONTS,arialblack:['Arial Black (çok kalın)','"Arial Black",Arial,sans-serif']};
-const APP_WEIGHTS={normal:'Normal',bold:'Kalın',extra:'Çok kalın'};
+const APP_WEIGHTS={ince:'İnce',normal:'Normal',bold:'Kalın',extra:'Çok kalın',black:'En kalın'};
 const APP_SIZES={cokkucuk:['Çok küçük',0.85],kucuk:['Küçük',0.92],normal:['Normal',1],buyuk:['Büyük',1.08],cokbuyuk:['Çok büyük',1.16],devasa:['En büyük',1.25]};
 const APP_SPACING={dar:['Dar','-0.01em'],normal:['Normal','0'],genis:['Geniş','0.03em'],cokgenis:['Çok geniş','0.06em']};
 const APP_PLATE={normal:['Normal','15px'],buyuk:['Büyük','17px'],cokbuyuk:['Çok büyük','19px'],devasa:['En büyük','22px']};
