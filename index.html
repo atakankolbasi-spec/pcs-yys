@@ -384,6 +384,64 @@ html[data-weight="extra"] :is(#app,#modal) :is(td,p,span,small,label,li,a,button
 .link-row{display:flex;gap:10px;align-items:center}
 .link-row input{flex:1;min-width:0;text-transform:none!important;font-family:ui-monospace,Consolas,monospace;font-size:12px}
 @media(max-width:900px){.app-grid{grid-template-columns:1fr}.link-row{flex-wrap:wrap}}
+/*sira-hucresi-duzeltme*/
+.operations td.num{display:table-cell;white-space:nowrap;vertical-align:middle;padding-left:10px;padding-right:6px}
+.operations td.num>*{vertical-align:middle}
+.operations td.num .row-select{margin:0 6px 0 0}
+/*musteri-basliklari-ortada*/
+.block-head-bar{justify-content:center;gap:12px;padding:13px 18px;background:color-mix(in srgb,var(--bc,#3453d1) 24%,#fff);border-top:3px solid var(--bc,#3453d1);border-bottom:1px solid color-mix(in srgb,var(--bc,#3453d1) 35%,#fff)}
+.block-head-name{font-size:17px;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+.block-head-name:before{width:13px;height:13px;box-shadow:0 0 0 3px #fff}
+.block-head-count{background:#fff;color:var(--ink);font-size:12px;font-weight:800;padding:3px 11px;border-radius:99px;border:1px solid color-mix(in srgb,var(--bc,#3453d1) 45%,#fff)}
+/*ayarlar-detay*/
+:root{--plate-font:var(--ui-font);--plate-size:15px;--row-pad:16px;--tint:15%;--head-mix:24%;--ui-spacing:0;--c-brand:#16233a;--c-brand-fg:#fff;--c-accent:#3453d1;--c-accent-fg:#fff}
+body{background:var(--bg)}
+.operations tr.row-onsite td,.operations tr.row-onsite td.actions-cell{background:color-mix(in srgb,var(--c-onsite) var(--tint),#fff)}
+.operations tr.row-t1 td,.operations tr.row-t1 td.actions-cell{background:color-mix(in srgb,var(--c-t1) var(--tint),#fff)}
+.operations tr.row-done td,.operations tr.row-done td.actions-cell{background:color-mix(in srgb,var(--c-done) var(--tint),#fff)}
+.operations tr.is-selected td,.operations tr.is-selected td.actions-cell{background:color-mix(in srgb,var(--c-accent) 16%,#fff)}
+.operations tr.is-selected td:first-child{box-shadow:inset 3px 0 0 var(--c-accent)}
+.operations tr.is-selected .plate-button{color:color-mix(in srgb,var(--c-accent) 80%,#000)}
+.operations tr:not(.block-head-row) td:not(.check-cell):not(.actions-cell){padding-top:var(--row-pad);padding-bottom:var(--row-pad)}
+.operations td.plate,.operations td.plate .plate-button{font-family:var(--plate-font);font-size:var(--plate-size)}
+.side-plate{font-family:var(--plate-font)}
+.block-head-bar{background:color-mix(in srgb,var(--bc,#3453d1) var(--head-mix),#fff)}
+html[data-head-align="left"] .block-head-bar{justify-content:flex-start}
+html[data-spacing] :is(#app,#modal) :is(td,p,span,label,button,a,li,small,b,strong,select,h1,h2,h3){letter-spacing:var(--ui-spacing)}
+.btn.primary{background:var(--c-brand);border-color:var(--c-brand);color:var(--c-brand-fg)}
+.btn.primary:hover{background:var(--c-brand);border-color:var(--c-brand);filter:brightness(.88)}
+.day-tab.active{background:var(--c-brand);border-color:var(--c-brand);color:var(--c-brand-fg)}
+.day-tab.active strong{color:var(--c-brand-fg)}.day-tab.active small{color:var(--c-brand-fg);opacity:.8}
+.day-tab.active .tab-count{background:var(--c-accent);color:var(--c-accent-fg)}
+.kpi.teal{background:var(--c-brand);border-color:var(--c-brand)}
+.day-date,.avatar{background:var(--c-brand);color:var(--c-brand-fg)}.day-date b{color:var(--c-brand-fg)}
+#toast{background:var(--c-brand);color:var(--c-brand-fg)}
+.nav-item.active{background:color-mix(in srgb,var(--c-accent) 12%,#fff);color:color-mix(in srgb,var(--c-accent) 80%,#000)}
+.brand-mark{background:var(--c-accent);color:var(--c-accent-fg)}
+.eyebrow,.btn.text,a{color:color-mix(in srgb,var(--c-accent) 85%,#000)}
+.sidebar-user small{color:color-mix(in srgb,var(--c-accent) 85%,#000)}
+.chip-prev.brand{background:var(--c-brand);color:var(--c-brand-fg)}
+.chip-prev.accent{background:var(--c-accent);color:var(--c-accent-fg)}
+.app-card{display:flex;flex-direction:column;gap:0}
+.app-section{padding:18px 0;border-top:1px solid var(--line)}
+.app-section h3{font-size:14px;font-weight:800;margin-bottom:12px}
+.app-hint{display:block;margin-top:10px;font-size:12px;color:#4f5d73;line-height:1.6}
+.app-presets{display:flex;flex-wrap:wrap;gap:8px}
+.app-preset-btn{min-width:130px}
+.app-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.app-colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.app-color-item{display:flex;align-items:center;gap:12px;cursor:default}
+.app-color-text{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.app-color-text span{font-size:12px;font-weight:800;color:#3e4c63}
+.app-hex{width:110px;min-height:34px;padding:6px 10px;font-family:ui-monospace,Consolas,monospace;font-size:13px;text-transform:none!important}
+.app-preview .preview-ops{min-width:0!important;width:100%;table-layout:auto}
+.app-preview{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.preview-ops .chk-toggle,.preview-ops .chip-prev{display:inline-flex;white-space:nowrap;padding:6px 10px;min-width:82px;min-height:32px;justify-content:center;align-items:center;font-size:11px;border-radius:8px}
+.app-preview-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.app-mini{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;cursor:default;width:auto;margin:0}
+.app-actions{position:sticky;bottom:0;background:#fff;padding:14px 0 2px;border-top:1px solid var(--line);margin-top:0}
+@media(max-width:1100px){.app-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.app-grid{grid-template-columns:1fr}}
 .side-panel{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
 .side-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:16px}
 .side-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -745,7 +803,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','link-show','link-rotate']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate']);
 const disabledActions=new Set(['toggle-demo','restore','import-reg','raw-backup']);
 const canEdit=()=>!!account&&role==='editor'&&!busy;
 function authScreen(message=''){
@@ -794,16 +852,44 @@ async function mutate(fn){
 function dataView(){return `<section class="card"><h2>Ortak veriler</h2><p style="margin:15px 0">${state.registry.length} plaka · ${state.visits.length} geliş. Veriler Supabase üzerinde ortak saklanır. Günlük ve haftalık Excel dosyalarını Raporlar bölümünden indirebilirsiniz.</p>${button('backup','JSON kopyası indir','download','primary')}<p class="help-note">Bu dosya tüm geçmişin kopyasıdır. Toplu geri yükleme yönetici tarafından yapılır.</p></section>`;}
 var VIEW_TOKEN=(new URLSearchParams(location.search).get('izle')||'').trim();
 var prioDirty=false,appearanceDirty=false,publicLink='';
-const APP_FONTS={varsayilan:['Varsayılan (Inter / Segoe UI)','Inter,"Segoe UI",Arial,sans-serif'],segoe:['Segoe UI','"Segoe UI",Arial,sans-serif'],arial:['Arial','Arial,Helvetica,sans-serif'],verdana:['Verdana','Verdana,Geneva,sans-serif'],tahoma:['Tahoma','Tahoma,Verdana,sans-serif'],trebuchet:['Trebuchet MS','"Trebuchet MS",Arial,sans-serif'],calibri:['Calibri','Calibri,Carlito,Arial,sans-serif'],bahnschrift:['Bahnschrift','Bahnschrift,"Segoe UI",sans-serif'],georgia:['Georgia','Georgia,"Times New Roman",serif']};
+const APP_FONTS={varsayilan:['Varsayılan (Inter / Segoe UI)','Inter,"Segoe UI",Arial,sans-serif'],segoe:['Segoe UI','"Segoe UI",Arial,sans-serif'],segoevar:['Segoe UI Variable','"Segoe UI Variable Text","Segoe UI",sans-serif'],arial:['Arial','Arial,Helvetica,sans-serif'],arialnarrow:['Arial Narrow (dar)','"Arial Narrow",Arial,sans-serif'],verdana:['Verdana','Verdana,Geneva,sans-serif'],tahoma:['Tahoma','Tahoma,Verdana,sans-serif'],trebuchet:['Trebuchet MS','"Trebuchet MS",Arial,sans-serif'],calibri:['Calibri','Calibri,Carlito,Arial,sans-serif'],candara:['Candara','Candara,Calibri,sans-serif'],corbel:['Corbel','Corbel,Calibri,sans-serif'],bahnschrift:['Bahnschrift','Bahnschrift,"Segoe UI",sans-serif'],franklin:['Franklin Gothic','"Franklin Gothic Medium","Franklin Gothic",Arial,sans-serif'],century:['Century Gothic','"Century Gothic",Futura,Arial,sans-serif'],lucida:['Lucida Sans','"Lucida Sans Unicode","Lucida Grande",sans-serif'],gill:['Gill Sans','"Gill Sans MT","Gill Sans",Calibri,sans-serif'],georgia:['Georgia','Georgia,"Times New Roman",serif'],cambria:['Cambria','Cambria,Georgia,serif'],constantia:['Constantia','Constantia,Georgia,serif'],palatino:['Palatino','"Palatino Linotype",Palatino,Georgia,serif'],consolas:['Consolas (eş aralıklı)','Consolas,"Courier New",monospace'],courier:['Courier New (daktilo)','"Courier New",Courier,monospace']};
+const APP_PLATE_FONTS={ayni:['Genel yazı tipiyle aynı',''],...APP_FONTS,arialblack:['Arial Black (çok kalın)','"Arial Black",Arial,sans-serif']};
 const APP_WEIGHTS={normal:'Normal',bold:'Kalın',extra:'Çok kalın'};
-const APP_SIZES={kucuk:['Küçük',0.92],normal:['Normal',1],buyuk:['Büyük',1.08],cokbuyuk:['Çok büyük',1.16]};
-const APP_DEFAULT={font:'varsayilan',weight:'normal',size:'normal',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d'}};
+const APP_SIZES={cokkucuk:['Çok küçük',0.85],kucuk:['Küçük',0.92],normal:['Normal',1],buyuk:['Büyük',1.08],cokbuyuk:['Çok büyük',1.16],devasa:['En büyük',1.25]};
+const APP_SPACING={dar:['Dar','-0.01em'],normal:['Normal','0'],genis:['Geniş','0.03em'],cokgenis:['Çok geniş','0.06em']};
+const APP_PLATE={normal:['Normal','15px'],buyuk:['Büyük','17px'],cokbuyuk:['Çok büyük','19px'],devasa:['En büyük','22px']};
+const APP_DENSITY={sikisik:['Sıkışık','7px'],normal:['Normal','16px'],genis:['Geniş','22px']};
+const APP_TINT={yok:['Renksiz','0%'],hafif:['Hafif','8%'],normal:['Normal','15%'],guclu:['Güçlü','26%'],cokguclu:['Çok güçlü','40%']};
+const APP_BG={gri:['Açık gri','#f5f7fa'],beyaz:['Beyaz','#ffffff'],sicak:['Sıcak (krem)','#faf8f3'],mavi:['Açık mavi','#f1f5fc'],yesil:['Açık yeşil','#f3f8f5']};
+const APP_HALIGN={center:'Ortada',left:'Solda'};
+const APP_HSTR={hafif:['Hafif','12%'],normal:['Normal','24%'],koyu:['Koyu','45%'],cokkoyu:['Çok koyu','65%']};
+const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
+const APP_PRESETS={klasik:['Klasik',{}],canli:['Canlı',{weight:'bold',tint:'guclu',headStrength:'koyu',colors:{onsite:'#f97316',t1:'#2563eb',done:'#16a34a',brand:'#1e3a8a',accent:'#2563eb'}}],sade:['Sade',{tint:'hafif',headStrength:'hafif',bg:'beyaz',colors:{onsite:'#d97706',t1:'#3b82f6',done:'#059669',brand:'#334155',accent:'#475569'}}],kontrast:['Yüksek kontrast',{weight:'extra',size:'buyuk',plateSize:'buyuk',tint:'cokguclu',headStrength:'koyu',bg:'beyaz',colors:{onsite:'#b45309',t1:'#1e40af',done:'#166534',brand:'#000000',accent:'#1e40af'}}]};
+const APP_COLOR_LABELS=[['onsite','TESİSTE işaretli'],['t1','T1 işaretli'],['done','BİTTİ işaretli'],['brand','Ana renk (düğmeler, seçili gün)'],['accent','Vurgu rengi (menü, seçili satır)']];
 let appearance=structuredClone(APP_DEFAULT);
 function textOn(hex){const m=/^#?([0-9a-f]{6})$/i.exec(hex||'');if(!m)return '#fff';const n=parseInt(m[1],16),ch=[n>>16&255,n>>8&255,n&255].map(c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);});const L=0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2];return L>0.179?'#1b1300':'#ffffff';}
-function applyAppearance(){const r=document.documentElement,a=appearance;r.style.setProperty('--ui-font',(APP_FONTS[a.font]||APP_FONTS.varsayilan)[1]);r.style.setProperty('--ui-scale',String((APP_SIZES[a.size]||APP_SIZES.normal)[1]));r.dataset.weight=APP_WEIGHTS[a.weight]?a.weight:'normal';for(const k of ['onsite','t1','done']){const c=/^#[0-9a-f]{6}$/i.test(a.colors?.[k]||'')?a.colors[k]:APP_DEFAULT.colors[k];r.style.setProperty('--c-'+k,c);r.style.setProperty('--c-'+k+'-fg',textOn(c));}}
+function applyAppearance(){const r=document.documentElement,a=appearance,pick=(obj,k,d)=>(obj[k]||obj[d]),set=(n,v)=>r.style.setProperty(n,v);
+ const font=pick(APP_FONTS,a.font,'varsayilan')[1];set('--ui-font',font);const pf=pick(APP_PLATE_FONTS,a.plateFont,'ayni')[1];set('--plate-font',pf||font);
+ set('--ui-scale',String(pick(APP_SIZES,a.size,'normal')[1]));r.dataset.weight=APP_WEIGHTS[a.weight]?a.weight:'normal';
+ const sp=pick(APP_SPACING,a.spacing,'normal')[1];set('--ui-spacing',sp);if(sp==='0')delete r.dataset.spacing;else r.dataset.spacing='1';
+ set('--plate-size',pick(APP_PLATE,a.plateSize,'normal')[1]);set('--row-pad',pick(APP_DENSITY,a.density,'normal')[1]);set('--tint',pick(APP_TINT,a.tint,'normal')[1]);
+ set('--bg',pick(APP_BG,a.bg,'gri')[1]);r.dataset.headAlign=APP_HALIGN[a.headAlign]?a.headAlign:'center';set('--head-mix',pick(APP_HSTR,a.headStrength,'normal')[1]);
+ for(const [k] of APP_COLOR_LABELS){const c=/^#[0-9a-f]{6}$/i.test(a.colors?.[k]||'')?a.colors[k]:APP_DEFAULT.colors[k];set('--c-'+k,c);set('--c-'+k+'-fg',textOn(c));}}
 function applySettings(s){if(!prioDirty&&Array.isArray(s.customer_priority)&&s.customer_priority.length)custPriorityList=s.customer_priority;if(!appearanceDirty){const a=s.appearance&&typeof s.appearance==='object'?s.appearance:{};appearance={...APP_DEFAULT,...a,colors:{...APP_DEFAULT.colors,...(a.colors||{})}};applyAppearance();}}
-function appearanceEditor(){const a=appearance,opt=(obj,cur,lab)=>Object.entries(obj).map(([k,v])=>`<option value="${k}" ${k===cur?'selected':''}>${esc(lab(v))}</option>`).join('');
- return `<section class="card"><div class="card-header"><div><h2>Görünüm</h2><p>Yazı stili ve durum renkleri tüm kullanıcılarda ve görüntüleme linkinde aynı görünür. Değişiklikleri hemen görürsünüz; kalıcı olması için Kaydet'e basın.</p></div></div><div class="app-grid"><div class="field"><label for="app-font">Yazı tipi</label><select id="app-font" class="app-set" data-k="font">${opt(APP_FONTS,a.font,v=>v[0])}</select></div><div class="field"><label for="app-weight">Yazı kalınlığı</label><select id="app-weight" class="app-set" data-k="weight">${opt(APP_WEIGHTS,a.weight,v=>v)}</select></div><div class="field"><label for="app-size">Yazı boyutu</label><select id="app-size" class="app-set" data-k="size">${opt(APP_SIZES,a.size,v=>v[0])}</select></div></div><h3 class="app-sub">İşaretlenince görünen durum renkleri</h3><div class="app-colors">${[['onsite','TESİSTE'],['t1','T1'],['done','BİTTİ']].map(([k,l])=>`<label class="app-color-item"><input type="color" class="app-set" data-k="color-${k}" value="${esc(a.colors[k])}" aria-label="${l} rengi"><span class="chip-prev ${k}">✓ ${l}</span></label>`).join('')}</div><div class="actions" style="margin-top:16px">${button('app-reset','Varsayılana dön','refresh')}${button('app-save','Kaydet','check','primary')}</div></section>`;}
+function appearanceEditor(){const a=appearance;
+ const sel=(key,label,obj,lab=v=>v[0],hint='')=>`<div class="field"><label for="app-${key}">${label}</label><select id="app-${key}" class="app-set" data-k="${key}">${Object.entries(obj).map(([k,v])=>`<option value="${k}" ${k===a[key]?'selected':''}>${esc(lab(v))}</option>`).join('')}</select>${hint?`<small>${hint}</small>`:''}</div>`;
+ const pc=custPriorityList[0]||{match:'ÖRNEK MÜŞTERİ',color:'#0f766e'};
+ const chip=(k,l,on)=>on?`<span class="chip-prev ${k}">✓ ${l}</span>`:`<span class="chk-toggle">${l}</span>`;
+ const row=(n,cls,st,decl,plate,car)=>`<tr class="${cls}"><td class="num"><span>${n}</span></td><td class="check-cell">${chip('onsite','TESİSTE',st[0])}</td><td class="check-cell">${chip('t1','T1',st[1])}</td><td class="check-cell">${chip('done','BİTTİ',st[2])}</td><td class="info declaration">${decl}</td><td class="info plate"><span class="plate-button">${plate}</span></td><td class="info">${car}</td></tr>`;
+ const preview=`<div class="table-scroll app-preview"><table class="operations preview-ops"><tbody><tr class="block-head-row"><td colspan="7"><div class="block-head-bar" style="--bc:${esc(pc.color||'#0f766e')}"><span class="block-head-name">${esc(pc.match||'ÖRNEK MÜŞTERİ')}</span><span class="block-head-count">3 araç</span></div></td></tr>${row('01','row-onsite',[1,0,0],'ÖRNEK GIDA','34 ABC 101','ÖRNEK NAKLİYAT')}${row('02','row-t1',[1,1,0],'ÖRNEK TEKSTİL','CA 4821 KM - CA 1190 EK','ÖRNEK TRANS SRL')}${row('03','row-done',[1,1,1],'ÖRNEK METAL','X 5530 BM','ÖRNEK LOJİSTİK')}</tbody></table></div><div class="app-preview-bar"><span class="day-tab active app-mini"><strong>SEÇİLİ GÜN</strong></span><span class="btn primary">Ana düğme</span><span class="nav-item active app-mini">Seçili menü</span></div>`;
+ return `<section class="card app-card"><div class="card-header"><div><h2>Görünüm</h2><p>Yaptığınız değişiklikler anında görünür; herkeste ve görüntüleme linkinde kalıcı olması için en alttaki Kaydet'e basın.</p></div></div>
+ <div class="app-section"><h3>Hazır temalar</h3><div class="app-presets">${Object.entries(APP_PRESETS).map(([k,[l]])=>`<button type="button" class="btn app-preset-btn" data-action="app-preset" data-p="${k}">${l}</button>`).join('')}</div><small class="app-hint">Bir temaya tıklayınca tüm ayarlar ona göre dolar; sonra istediğiniz ayarı tek tek değiştirebilirsiniz.</small></div>
+ <div class="app-section"><h3>Yazı</h3><div class="app-grid">${sel('font','Yazı tipi',APP_FONTS)}${sel('weight','Yazı kalınlığı',APP_WEIGHTS,v=>v)}${sel('size','Yazı boyutu',APP_SIZES,v=>v[0],'Tüm sayfayı büyütür veya küçültür.')}${sel('spacing','Harf aralığı',APP_SPACING)}${sel('plateFont','Plaka yazı tipi',APP_PLATE_FONTS)}${sel('plateSize','Plaka yazı boyutu',APP_PLATE)}</div><small class="app-hint">Yazılar her zaman BÜYÜK HARF gösterilir. Yazı tipleri bilgisayarda yüklü olanlardan seçilir; yüklü olmayan bir yazı tipi seçilirse benzeri kullanılır.</small></div>
+ <div class="app-section"><h3>Tablo</h3><div class="app-grid">${sel('density','Satır yüksekliği',APP_DENSITY)}${sel('tint','Satır rengi yoğunluğu',APP_TINT,v=>v[0],'Tesiste, T1 ve Bitti satırlarının arka plan tonu.')}${sel('bg','Sayfa arka planı',APP_BG)}</div></div>
+ <div class="app-section"><h3>Müşteri başlıkları</h3><div class="app-grid">${sel('headAlign','Başlık hizası',APP_HALIGN,v=>v)}${sel('headStrength','Başlık rengi yoğunluğu',APP_HSTR)}</div><small class="app-hint">Her müşterinin rengi aşağıdaki "Öncelikli müşteri sıralaması" bölümünden seçilir.</small></div>
+ <div class="app-section"><h3>Renkler</h3><div class="app-colors">${APP_COLOR_LABELS.map(([k,l])=>`<div class="app-color-item"><input type="color" class="app-set" data-k="color-${k}" value="${esc(a.colors[k])}" aria-label="${l}"><div class="app-color-text"><span>${l}</span><input type="text" class="app-set app-hex" data-k="color-${k}" value="${esc(a.colors[k])}" maxlength="7" spellcheck="false" aria-label="${l} kodu"></div>${['onsite','t1','done'].includes(k)?`<span class="chip-prev ${k}">✓ ${k==='onsite'?'TESİSTE':k==='t1'?'T1':'BİTTİ'}</span>`:`<span class="chip-prev ${k}">Örnek</span>`}</div>`).join('')}</div><small class="app-hint">Renk kodunu (örneğin #0f766e) yazı kutusuna yapıştırabilirsiniz. Kutunun içindeki yazı rengi otomatik olarak okunaklı seçilir.</small></div>
+ <div class="app-section"><h3>Önizleme</h3>${preview}</div>
+ <div class="actions app-actions">${button('app-reset','Varsayılana dön','refresh')}${button('app-save','Kaydet','check','primary')}</div></section>`;}
 function linkEditor(){if(role!=='editor'||VIEW_TOKEN)return '';return `<section class="card" style="margin-top:16px"><div class="card-header"><div><h2>Sadece görüntüleme linki</h2><p>Bu linki açan kişi giriş yapmadan panoyu, bekleyenleri ve raporları görür; hiçbir şeyi değiştiremez. Link kalıcıdır ve 15 saniyede bir kendiliğinden güncellenir.</p></div></div><div class="link-row"><input id="public-link" type="text" readonly value="${esc(publicLink)}" placeholder="Linki görmek için “Linki göster”e basın" aria-label="Görüntüleme linki">${publicLink?button('link-copy','Kopyala','doc'):button('link-show','Linki göster','search','primary')}</div><p class="help-note" style="margin-top:10px">Linki alan herkes kayıtları görebilir; yalnızca güvendiğiniz kişilerle paylaşın. Link yanlış ellere geçerse “Yeni link oluştur” deyin, eski link o an çalışmaz olur.</p><div class="actions" style="margin-top:12px">${button('link-rotate','Yeni link oluştur','refresh','danger')}</div></section>`;}
 function settingsView(){return appearanceEditor()+linkEditor()+priorityEditor();}
 function displayName(email){const e=String(email||'').toLowerCase();return ({'atakankolbasi@gmail.com':'Atakan Kolbaşı'})[e]||e.split('@')[0];}
@@ -899,10 +985,12 @@ document.addEventListener('dragend',()=>{dragId=null;dropClear();});setInterval(
 window.addEventListener('online',()=>syncData());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncData();});
 
-document.addEventListener('input',e=>{const t=e.target;if(!t.classList?.contains('app-set')||!t.dataset.k?.startsWith('color-'))return;appearance.colors[t.dataset.k.slice(6)]=t.value;appearanceDirty=true;applyAppearance();});
-document.addEventListener('change',e=>{const t=e.target;if(t.classList?.contains('prio-color')||t.classList?.contains('prio-match')){prioDirty=true;return;}if(!t.classList?.contains('app-set'))return;const k=t.dataset.k;if(k.startsWith('color-'))appearance.colors[k.slice(6)]=t.value;else appearance[k]=t.value;appearanceDirty=true;applyAppearance();});
+function setAppColor(t){const k=t.dataset.k;let v=String(t.value||'').trim();if(t.classList.contains('app-hex')){if(!/^#?[0-9a-f]{6}$/i.test(v))return;v=(v[0]==='#'?v:'#'+v).toLowerCase();const p=document.querySelector(`input[type=color][data-k="${k}"]`);if(p)p.value=v;}else{const h=document.querySelector(`.app-hex[data-k="${k}"]`);if(h)h.value=v;}appearance.colors[k.slice(6)]=v;appearanceDirty=true;applyAppearance();}
+document.addEventListener('input',e=>{const t=e.target;if(t.classList?.contains('app-set')&&t.dataset.k?.startsWith('color-'))setAppColor(t);});
+document.addEventListener('change',e=>{const t=e.target;if(t.classList?.contains('prio-color')||t.classList?.contains('prio-match')){prioDirty=true;return;}if(!t.classList?.contains('app-set'))return;const k=t.dataset.k;if(k.startsWith('color-')){setAppColor(t);if(t.classList.contains('app-hex')&&!/^#?[0-9a-f]{6}$/i.test(t.value.trim())){t.value=appearance.colors[k.slice(6)];toast('Renk kodu #RRGGBB biçiminde olmalı, örneğin #0f766e.',true);}return;}appearance[k]=t.value;appearanceDirty=true;applyAppearance();});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;
  if(['prio-up','prio-down','prio-del','prio-add'].includes(a)){prioDirty=true;return;}
+ if(a==='app-preset'){const p=APP_PRESETS[b.dataset.p];if(!p)return;const d=structuredClone(APP_DEFAULT);appearance={...d,...p[1],colors:{...d.colors,...(p[1].colors||{})}};appearanceDirty=true;applyAppearance();render();toast(`“${p[0]}” teması uygulandı. Kalıcı olması için Kaydet’e basın.`);return;}
  if(a==='app-reset'){appearance=structuredClone(APP_DEFAULT);appearanceDirty=true;applyAppearance();render();toast('Varsayılan görünüm yüklendi. Kalıcı olması için Kaydet’e basın.');return;}
  if(a==='app-save'){if(!canEdit())return;busy=true;onlineUI();try{const {error}=await client.from('app_settings').upsert({key:'appearance',value:appearance,updated_at:new Date().toISOString()}).select();if(error)throw error;appearanceDirty=false;toast('Görünüm ayarları kaydedildi.');}catch(err){toast(friendly(err),true);}finally{busy=false;onlineUI();}return;}
  if(a==='link-show'||a==='link-rotate'){if(!canEdit())return;if(a==='link-rotate'&&!window.confirm('Yeni link oluşturulsun mu? Eski link hemen çalışmaz olur; yeni linki tekrar paylaşmanız gerekir.'))return;busy=true;onlineUI();try{const {data,error}=await client.rpc(a==='link-show'?'get_public_link':'rotate_public_link');if(error)throw error;if(!data)throw new Error('Aktif link bulunamadı. “Yeni link oluştur” ile oluşturun.');publicLink=location.origin+location.pathname+'?izle='+encodeURIComponent(data);busy=false;render();if(a==='link-rotate')toast('Yeni link oluşturuldu; eski link artık çalışmıyor.');}catch(err){toast(err.code==='PGRST202'?'Önce gorunum-linki-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
