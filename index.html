@@ -794,7 +794,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
   if(!canEdit())return;
   const clean=custPriorityList.map(e=>({match:String(e.match||'').trim(),color:e.color||'#2dd4bf'})).filter(e=>e.match);
   busy=true;onlineUI();
-  try{const {error}=await client.from('app_settings').update({value:clean,updated_at:new Date().toISOString()}).eq('key','customer_priority').select();if(error)throw error;custPriorityList=clean;generation++;prioDirty=false;busy=false;render();syncData();toast('Öncelik listesi kaydedildi.');}
+  try{let {error}=await client.rpc('save_app_setting',{p_key:'customer_priority',p_value:clean});if(error&&error.code==='PGRST202')({error}=await client.from('app_settings').update({value:clean,updated_at:new Date().toISOString()}).eq('key','customer_priority').select());if(error)throw error;custPriorityList=clean;generation++;prioDirty=false;busy=false;render();syncData();toast('Öncelik listesi kaydedildi.');}
   catch(err){toast(err.code==='PGRST116'||/relation .app_settings. does not exist/i.test(err.message||'')?'Önce siralama-kurulumu SQL dosyasını çalıştırın (musteri-onceligi-kurulumu.sql).':friendly(err),true);}
   finally{busy=false;onlineUI();}
   return;
@@ -848,7 +848,7 @@ async function syncData(){
  role='viewer';state=realState={...emptyState(),registry:[],visits:(data?.visits||[]).map(r=>mapRow(r,'visits')),updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();applySettings(data?.settings||{});
  }else{const [{data:nextRole,error},registry,visits]=await Promise.all([client.rpc('current_app_role'),fetchAll('registry'),fetchAll('visits')]);if(error)throw error;if(stamp!==generation)return;
  role=nextRole==='editor'?'editor':'viewer';state=realState={...emptyState(),registry,visits,updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();
- try{const {data:sRows}=await client.from('app_settings').select('*');applySettings(Object.fromEntries((sRows||[]).map(s=>[s.key,s.value])));}catch(e){}}
+ try{const {data:sRows,error:sErr}=await client.from('app_settings').select('*');if(!sErr&&Array.isArray(sRows))applySettings(Object.fromEntries(sRows.map(s=>[s.key,s.value])));else if(sErr)console.warn('Ayarlar okunamadı (ayar-okuma-duzeltmesi.sql çalıştırılmalı):',sErr.message);}catch(e){}}
  render();
  }catch(e){if(stamp===generation){storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
  finally{loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor')maybeCarry();}
