@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#087d79">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#16233a">
+<meta name="color-scheme" content="light">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://ollrccfqiqilbflanuik.supabase.co wss://ollrccfqiqilbflanuik.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
@@ -149,126 +149,208 @@ body{font-size:15px;color:var(--ink);line-height:1.5}
 .operations tr.dragging{opacity:.4}
 .operations tr.drop-before td{box-shadow:inset 0 3px 0 var(--teal)}
 .operations tr.drop-after td{box-shadow:inset 0 -3px 0 var(--teal)}.acct-email{display:block;text-transform:none!important;font-size:12px;letter-spacing:0;overflow-wrap:anywhere}
-/*tema-koyu*/
-:root{color-scheme:dark;--bg:#0a1117;--surface:#121c25;--ink:#ffffff;--muted:#cbd7e0;--line:#2b3b48;--teal:#2dd4bf;--teal-pale:#0f3a38;--shadow:0 2px 14px #00000070}
-body{background:var(--bg);color:#fff;font-weight:600}
-h1,h2,h3,h4,strong,b{color:#fff}
-a{color:#5eead4}
-.muted,.small{color:#cbd7e0}
-.sidebar{background:#0e161d;border-right-color:var(--line)}
-.topbar{background:#0e161dee;border-bottom-color:var(--line)}
-.brand-name{color:#fff}.brand-sub{color:#b8c7d3}
-.nav-label{color:#b8c7d3}
-.nav-item{color:#eaf1f6;font-weight:700}
-.nav-item:hover{background:#17232d}
-.nav-item.active{background:#0f3d3a;color:#5eead4}
-.nav-count{background:#1e2d39;color:#eaf1f6}
-.local-card{background:#101a22;border-color:var(--line);color:#fff}
-.local-card p{color:#cbd7e0}.local-card svg{color:#5eead4}
-.sidebar-user,.sidebar-user span{color:#fff}.sidebar-user small{color:#cbd7e0}
-.avatar{background:#1e2d39;color:#eaf1f6}
-.breadcrumb,.breadcrumb strong,.date-label,.save-status{color:#fff}
-.heading p,.card-header p,.notice,.help-note{color:#dbe6ee}
-.footnote{color:#cbd7e0}
-.eyebrow{color:#5eead4}
-.btn{background:#17232d;border-color:#3a4e5f;color:#fff;font-weight:700}
-.btn:hover{background:#1f2f3c;border-color:#5a7386}
-.btn.primary{background:#0d9488;border-color:#0d9488;color:#fff}
-.btn.primary:hover{background:#0f766e}
-.btn.soft{background:#0f3d3a;color:#5eead4;border-color:transparent}
-.btn.text{background:transparent;border-color:transparent;color:#5eead4}
-.btn.danger{background:#3b1717;border-color:#7a2f2f;color:#fecaca}
-.icon-btn{color:#cbd7e0}.icon-btn:hover{background:#22333f;color:#5eead4}.icon-btn.danger:hover{background:#3b1717;color:#fecaca}
-input,select,textarea{background:#0e161d;border-color:#405568;color:#fff;font-weight:600}
-input::placeholder,textarea::placeholder{color:#8ea3b4}
-.period-panel,.card,.kpi,.day-block,.registry-wrap,.empty-state{background:var(--surface);border-color:var(--line)}
-.calendar-icon{background:#17232d;border-color:var(--line);color:#cbd7e0}
-.period-panel select,.range-label{color:#fff}
-.day-tabs{border-top-color:var(--line)}
-.day-tab{background:#17232d;color:#eaf1f6;border-color:transparent}
-.day-tab small{color:#bccad6}
-.day-tab:hover{background:#1e2e3a}
-.day-tab.active{background:#0f3d3a;border-color:#2dd4bf;color:#5eead4}
-.day-tab.active small{color:#a7ebe4}
-.day-tab .tab-count{color:#fff}.day-tab.active .tab-count{background:#0a1117;color:#5eead4}
-.section-label h2{color:#fff}.section-label span{color:#cbd7e0}
-.kpi-top,.kpi-num{color:#fff}.kpi-note{color:#cbd7e0}
-.kpi-icon{background:#1e2d39;color:#cbd7e0}
-.kpi.teal .kpi-icon{background:#0f3d3a;color:#5eead4}
-.kpi.amber .kpi-icon{background:#4a3208;color:#fbbf24}
-.kpi.blue .kpi-icon{background:#132f57;color:#8bbcff}
-.kpi.green .kpi-icon{background:#0f3a26;color:#4ade80}
-.kpi.green .kpi-num{color:#4ade80}
-.kpi-progress{background:#1f2f3b}.kpi-progress span{background:#4ade80}
-.badge{background:#22333f;color:#eaf1f6}
-.board-title h2{color:#fff}
-.legend,.board-meta{color:#dbe6ee}
-.legend i{background:#8ea3b4}.legend .amber{background:#f59e0b}.legend .blue{background:#60a5fa}.legend .green{background:#4ade80}
-.search svg{color:#8ea3b4}
-.daily-summary{background:#0f3d3a;border-color:#1f7a73;color:#e6fffb}.daily-summary strong{color:#fff}
-.day-header{background:var(--surface)}
-.day-date{background:#1e2d39;color:#eaf1f6}
-.day-name h3{color:#fff}.day-name p{color:#cbd7e0}
-.day-stats,.day-stats b{color:#fff}
-.day-stats .done-count,.day-stats .done-count b{color:#4ade80}
-.operations thead{background:#0e161d}
-.operations th{background:#0e161d;color:#dbe6ee;border-color:var(--line);font-weight:800}
-.operations td{color:#fff;font-weight:700;border-bottom-color:#22323f}
-.operations td.num{color:#b8c7d3;font-weight:700}
-.operations td.plate,.plate-button{color:#fff;font-weight:800}
-.operations td.declaration,.operations td.note{color:#fff}
-.operations tr.row-onsite td{background:#4a3308}
-.operations tr.row-t1 td{background:#12305c}
-.operations tr.row-done td{background:#0d4a2c}
-.operations tr.row-onsite td.declaration{border-left-color:#f59e0b}
-.operations tr.row-t1 td.declaration{border-left-color:#3b82f6}
-.operations tr.row-done td.declaration{border-left-color:#22c55e}
-.operations tr.row-done td.declaration,.operations tr.row-done td.plate{color:#fff}
-.operations tr:hover td{filter:brightness(1.18)}
-.check{background:#0e161d;border-color:#8ea3b4}
-.check.onsite:checked{background:#f59e0b;border-color:#f59e0b}
-.check.t1:checked{background:#3b82f6;border-color:#3b82f6}
-.check.done:checked{background:#22c55e;border-color:#22c55e}
-.operations td.actions-cell{background:#121c25;box-shadow:-10px 0 10px -10px #000000aa}
-.operations th:last-child{background:#0e161d}
-.operations tr.row-onsite td.actions-cell{background:#4a3308}
-.operations tr.row-t1 td.actions-cell{background:#12305c}
-.operations tr.row-done td.actions-cell{background:#0d4a2c}
-.empty-day{background:#0e161d;border-top-color:var(--line);color:#dbe6ee}
-.empty-day button{color:#5eead4}
-.empty-state p,.empty-state h2{color:#dbe6ee}
-.empty-icon{background:#0f3d3a;color:#5eead4}
-.registry-table th,.report-table th{background:#0e161d;color:#dbe6ee;border-bottom-color:var(--line);font-weight:800}
-.registry-table td,.report-table td{color:#fff;font-weight:700;border-bottom-color:#22323f}
-.registry-table td:first-child,.registry-table td:nth-child(2){color:#fff}
-.report-table tfoot td{background:#0e161d;color:#fff}
-.notice{background:#0f3d3a;border-color:#1f7a73;color:#e6fffb}
+/*tema-acik-v3*/
+:root{color-scheme:light;--bg:#f5f7fa;--surface:#fff;--ink:#16233a;--muted:#6b7a90;--line:#e6eaf0;--teal:#3453d1;--teal-pale:#eef1fd;--navy:#16233a;--shadow:0 1px 2px #16233a0a;--radius:14px}
+body{background:var(--bg);color:var(--ink);font-weight:500}
+h1,h2,h3,h4,strong,b{color:var(--ink)}
+a{color:var(--teal)}
+.muted,.small{color:var(--muted)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:#3453d1}
+.sidebar{background:#fff;border-right-color:var(--line)}
+.brand-mark{background:#3453d1;width:40px;height:40px;border-radius:10px}
+.brand-name{color:var(--ink);font-weight:800}.brand-sub{color:#7a879b}
+.nav-label{color:#8a96a8;font-weight:800}
+.nav-item{color:#3e4c63;font-weight:600;border-radius:10px}
+.nav-item:hover{background:#f3f5f9}
+.nav-item.active{background:#eef1fd;color:#2a43b8;font-weight:800}
+.nav-item.active:before{display:none}
+.nav-count{background:#eef1f5;color:#5c6a80;border-radius:99px;padding:2px 8px;font-weight:800}
+.nav-item[data-page="pending"] .nav-count{background:#fdf1de;color:#9a5b0c}
+.local-card{background:#f7f8fb;border-color:var(--line);color:var(--ink);border-radius:12px}
+.local-card p{color:var(--muted)}.local-card svg{color:#3453d1}
+.sidebar-user,.sidebar-user span{color:var(--ink)}.sidebar-user small{color:#3453d1;font-weight:700}
+.avatar{background:#16233a;color:#fff}
+.topbar{background:#fff;border-bottom-color:var(--line);height:60px}
+.breadcrumb{color:#7a879b}.breadcrumb strong{color:var(--ink);font-weight:800}
+.date-label{color:#7a879b}
+.save-status{color:#2e6b4a;font-weight:700}.local-dot{background:#22a061}
+.demo-pill{background:#fff;border-color:#d8dee7;color:#3e4c63}
+.eyebrow{color:#3453d1;font-weight:800;letter-spacing:.16em}
+.heading h1{font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+.heading p,.card-header p,.help-note{color:var(--muted)}
+.footnote{color:#8a96a8}
+.btn{background:#fff;border:1px solid #d8dee7;color:var(--ink);font-weight:700;border-radius:10px}
+.btn:hover{background:#f7f8fb;border-color:#c5cedb}
+.btn.primary{background:#16233a;border-color:#16233a;color:#fff;box-shadow:none}
+.btn.primary:hover{background:#0e1829;border-color:#0e1829}
+.btn.soft{background:#eef1fd;color:#2a43b8;border-color:transparent}
+.btn.text{background:transparent;border-color:transparent;color:#3453d1}
+.btn.danger{background:#fff4f4;border-color:#f1c9cd;color:#b3261e}
+.icon-btn{color:#5c6a80}.icon-btn:hover{background:#eef1fd;color:#2a43b8}
+.icon-btn.danger{color:#c2434f}.icon-btn.danger:hover{background:#fdecee;color:#b3261e}
+input,select,textarea{background:#fff;border-color:#d8dee7;color:var(--ink);font-weight:500;border-radius:10px}
+input::placeholder,textarea::placeholder{color:#8a96a8}
+.period-panel,.card,.kpi,.day-block,.registry-wrap,.empty-state{background:#fff;border-color:var(--line);box-shadow:var(--shadow);border-radius:14px}
+.calendar-icon{background:#f3f5f9;border-color:var(--line);color:#5c6a80}
+.period-panel select,.range-label{color:var(--ink)}
+.day-tabs{border-top-color:#edf0f5}
+.day-tab{background:#fff;border:1px solid #e1e6ed;color:var(--ink);border-radius:10px}
+.day-tab small{color:#6b7a90}
+.day-tab:hover{background:#f7f8fb}
+.day-tab.active{background:#16233a;border-color:#16233a;color:#fff}
+.day-tab.active strong{color:#fff}.day-tab.active small{color:#c9d2e3}
+.day-tab .tab-count{background:#eef1f5;color:#3e4c63;border-radius:99px;padding:2px 8px;font-weight:800}
+.day-tab.active .tab-count{background:#3453d1;color:#fff;padding:2px 8px}
+.section-label h2{color:var(--ink);font-weight:800}.section-label span{color:var(--muted)}
+.kpi{padding:18px 20px}
+.kpi-top{color:#6b7a90;font-size:11px;font-weight:800;letter-spacing:.1em}
+.kpi-num{color:var(--ink);font-weight:800;letter-spacing:-.02em}
+.kpi-note{color:#6b7a90}
+.kpi-icon{background:#f3f5f9;color:#5c6a80}
+.kpi.teal{background:#16233a;border-color:#16233a}
+.kpi.teal .kpi-top,.kpi.teal .kpi-note{color:#b9c3d6}
+.kpi.teal .kpi-num{color:#fff}
+.kpi.teal .kpi-icon{background:#2a3953;color:#fff}
+.kpi.amber .kpi-icon{background:#fdf1de;color:#9a5b0c}
+.kpi.blue .kpi-icon{background:#eaf0fd;color:#2446b8}
+.kpi.green .kpi-icon{background:#e6f5ec;color:#17774a}
+.kpi.green .kpi-num{color:#17774a}
+.kpi-progress{background:#eef1f5;height:4px}.kpi-progress span{background:#1f9a5c}
+.badge{background:#eef1f5;color:#3e4c63;font-weight:800}
+.board-title h2{color:var(--ink);font-weight:800}
+.legend,.board-meta{color:#6b7a90}
+.legend i{background:#b9c3d3}.legend .amber{background:#d08a1c}.legend .blue{background:#3462d8}.legend .green{background:#1f9a5c}
+.search svg{color:#8a96a8}
+.daily-summary{background:#eef1fd;border-color:#d5ddfa;color:#2a43b8}.daily-summary strong{color:var(--ink)}
+.day-header{background:#fff;border-bottom:1px solid var(--line)}
+.day-date{background:#16233a;color:#fff;border-radius:10px}.day-date b{color:#fff}.day-date small{color:#c9d2e3}
+.day-name h3{color:var(--ink);font-weight:800}.day-name p{color:#6b7a90}
+.day-name .badge{background:#eef1fd;color:#2a43b8;letter-spacing:.1em}
+.day-stats{color:#6b7a90}.day-stats b{color:var(--ink)}
+.day-stats .done-count,.day-stats .done-count b{color:#1f8a55}
+.operations thead{background:#f8f9fc}
+.operations th{background:#f8f9fc;color:#7a879b;border-color:var(--line);font-weight:800;letter-spacing:.1em}
+.operations td{background:#fff;color:#2b3850;font-weight:600;border-bottom-color:#edf0f5}
+.operations td.num{color:#8a96a8;font-weight:700}
+.operations td.plate,.plate-button{color:var(--ink);font-weight:800}
+.operations td.declaration,.operations td.note{color:#2b3850}
+.operations tr.row-onsite td{background:#fffcf6}
+.operations tr.row-t1 td{background:#f8faff}
+.operations tr.row-done td{background:#f5fbf8}
+.operations tr.row-onsite td.declaration{border-left-color:#efcb8e}
+.operations tr.row-t1 td.declaration{border-left-color:#afc3f2}
+.operations tr.row-done td.declaration{border-left-color:#9bd3b3}
+.operations tr.row-done td.declaration,.operations tr.row-done td.plate{color:#2b3850}
+.operations tr:hover td{filter:none}
+.operations tbody tr:not(.block-head-row):hover td{background:#f3f5fb}
+.operations tr.is-selected td,.operations tr.is-selected:hover td{background:#eef1fd}
+.operations tr.is-selected td:first-child{box-shadow:inset 3px 0 0 #3453d1}
+.operations tr.is-selected .plate-button{color:#2a43b8}
+.chk-toggle{background:#fff;border:1px solid #dce1e8;color:#8a96a8}
+.chk-toggle:hover{border-color:#b9c3d3;color:#3e4c63}
+.check-native:checked+.chk-toggle:before{content:"\2713";margin-right:4px;font-weight:900}
+.check-native:checked+.chk-toggle.amber{background:#fdf1de;border-color:#efcb8e;color:#9a5b0c}
+.check-native:checked+.chk-toggle.blue{background:#eaf0fd;border-color:#afc3f2;color:#2446b8}
+.check-native:checked+.chk-toggle.green{background:#e6f5ec;border-color:#9bd3b3;color:#17774a}
+.check{background:#fff;border-color:#b9c3d3}
+.check.onsite:checked{background:#d08a1c;border-color:#d08a1c}
+.check.t1:checked{background:#3462d8;border-color:#3462d8}
+.check.done:checked{background:#1f9a5c;border-color:#1f9a5c}
+.operations td.actions-cell{background:#fff;box-shadow:-10px 0 10px -10px #16233a1f}
+.operations th:last-child{background:#f8f9fc}
+.operations tr.row-onsite td.actions-cell{background:#fffcf6}
+.operations tr.row-t1 td.actions-cell{background:#f8faff}
+.operations tr.row-done td.actions-cell{background:#f5fbf8}
+.operations tr.is-selected td.actions-cell{background:#eef1fd}
+.block-head-bar{margin:0;padding:11px 18px;border-radius:0;border-left:0;background:#f7f8fb;background:color-mix(in srgb,var(--bc,#3453d1) 7%,#fff);border-bottom:1px solid #edf0f5;justify-content:flex-start}
+.operations tbody tr.block-head-row:first-child .block-head-bar{margin-top:0}
+.block-head-name{display:inline-flex;align-items:center;gap:10px;font-size:14px;color:var(--ink)}
+.block-head-name:before{content:"";width:10px;height:10px;border-radius:99px;background:var(--bc,#3453d1);flex:none}
+.block-head-count{background:transparent;color:#6b7a90;padding:0;font-size:12px}
+.row-select{accent-color:#3453d1}
+.empty-day{background:#fbfcfd;border-top-color:var(--line);color:#6b7a90}
+.empty-day button{color:#3453d1}
+.empty-state p,.empty-state h2{color:#3e4c63}
+.empty-icon{background:#eef1fd;color:#3453d1}
+.registry-table th,.report-table th{background:#f8f9fc;color:#7a879b;border-bottom-color:var(--line);font-weight:800}
+.registry-table td,.report-table td{color:#2b3850;font-weight:600;border-bottom-color:#edf0f5}
+.registry-table td:first-child,.registry-table td:nth-child(2){color:var(--ink)}
+.report-table tfoot td{background:#f8f9fc;color:var(--ink)}
+.notice{background:#eef1fd;border-color:#d5ddfa;color:#2a43b8}
 .bar-chart{border-bottom-color:var(--line)}
-.bar{background:#2dd4bf}.bar.complete{background:#4ade80}
-.bar span,.bar-label,.ring-legend{color:#dbe6ee}
-.progress-ring{background:conic-gradient(#4ade80 calc(var(--p)*1%),#1f2f3b 0)}
-.ring-inner{background:var(--surface)}.ring-inner strong{color:#4ade80}.ring-inner span{color:#cbd7e0}
-.storage-stats span{color:#cbd7e0}
-.file-input-card{background:#0e161d;border-color:#405568}
-.card-icon{background:#0f3d3a;color:#5eead4}
-dialog{background:#121c25;color:#fff;border-color:#3a4e5f}
-.modal-header{border-bottom-color:var(--line)}.modal-header p{color:#cbd7e0}
-.modal-footer{background:#0e161d;border-top-color:var(--line)}
-.field label{color:#eaf1f6}.field small,.field .optional{color:#bccad6}
-.match-hint{color:#cbd7e0}.match-hint.matched{color:#4ade80}.match-hint.unmatched{color:#fbbf24}
-.form-note{background:#0f3d3a;border-color:#1f7a73;color:#d5f5f1}
-.form-error{background:#3b1717;color:#fecaca}
-.form-status label{color:#eaf1f6}
-.import-stat div{background:#0e161d;border-color:var(--line)}.import-stat span{color:#cbd7e0}
-.confirm-text{color:#dbe6ee}.keycap{background:#1e2d39;border-color:#3a4e5f;color:#fff}
-#toast{background:#0d9488;color:#fff}#toast.error{background:#b42318}
-.warning-banner{background:#3f2114;color:#fdba74;border-color:#7a4020}
-.demo-banner{background:#3f3210;color:#fde68a;border-color:#7a6320}
-.auth-card .lead{color:#dbe6ee}
-.auth-note{background:#0f3d3a;color:#d5f5f1}
-.auth-msg{color:#fecaca}
-.auth-divider{color:#b8c7d3}.auth-divider:before,.auth-divider:after{background:var(--line)}
-.auth-card .btn.alt{background:#17232d;color:#fff}
+.bar{background:#3453d1}.bar.complete{background:#1f9a5c}
+.bar span,.bar-label,.ring-legend{color:#3e4c63}
+.progress-ring{background:conic-gradient(#1f9a5c calc(var(--p)*1%),#eef1f5 0)}
+.ring-inner{background:#fff}.ring-inner strong{color:#17774a}.ring-inner span{color:#6b7a90}
+.storage-stats span{color:#6b7a90}
+.file-input-card{background:#fbfcfd;border-color:#d8dee7}
+.card-icon{background:#eef1fd;color:#3453d1}
+dialog{background:#fff;color:var(--ink);border-color:var(--line)}
+.modal-header{border-bottom-color:var(--line)}.modal-header p{color:#6b7a90}
+.modal-footer{background:#f8f9fc;border-top-color:var(--line)}
+.field label{color:#3e4c63}.field small,.field .optional{color:#6b7a90}
+.match-hint{color:#6b7a90}.match-hint.matched{color:#17774a}.match-hint.unmatched{color:#9a5b0c}
+.form-note{background:#f3f5f9;border-color:#e6eaf0;color:#5c6a80}
+.form-error{background:#fdecee;color:#b3261e}
+.form-status label{color:#3e4c63}
+.import-stat div{background:#fff;border-color:var(--line)}.import-stat span{color:#6b7a90}
+.confirm-text{color:#3e4c63}.keycap{background:#f3f5f9;border-color:#d8dee7;color:var(--ink)}
+#toast{background:#16233a;color:#fff}#toast.error{background:#b3261e}
+.warning-banner{background:#fff8ec;color:#6e4a0e;border-color:#f3ddb5}
+.demo-banner{background:#fff8ec;color:#6e4a0e;border-color:#f3ddb5}
+.bulk-bar{background:#eef1fd;border-color:#d5ddfa}.bulk-bar strong{color:#2a43b8}
+.age-badge.ok{background:#eef1f5;color:#5c6a80}
+.age-badge.warn{background:#fdf1de;color:#9a5b0c}
+.age-badge.bad{background:#fdecee;color:#b3261e}
+.prio-row{border-top-color:var(--line)}
+.auth-hero{background:linear-gradient(160deg,#0f1b2d,#1f3150)}
+.auth-card .lead{color:#6b7a90}
+.auth-card input:focus{border-color:#3453d1;box-shadow:0 0 0 3px #eef1fd}
+.auth-note{background:#eef1fd;color:#2a43b8}
+.auth-msg{color:#b3261e}
+.auth-divider{color:#8a96a8}.auth-divider:before,.auth-divider:after{background:var(--line)}
+.auth-card .btn.alt{background:#fff;color:var(--ink)}
+/* pano + sağ panel */
+.board-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.board-main{min-width:0}
+.board-main .operations{min-width:880px}
+.board-main .operations col:nth-child(9){width:56px!important}
+.board-main .operations td.plate{white-space:nowrap}
+.side-panel{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
+.side-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:16px}
+.side-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.side-eyebrow{font-size:11px;font-weight:800;letter-spacing:.14em;color:#6b7a90}
+.side-cust{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;font-size:12px;font-weight:800;color:var(--ink);cursor:pointer;text-align:right}
+.side-cust:before{content:"";width:8px;height:8px;border-radius:99px;background:var(--bc,#3453d1);flex:none}
+.side-cust:hover{text-decoration:underline}
+.side-plate{font-size:26px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.2;overflow-wrap:anywhere}
+.side-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;padding:14px;border-radius:12px;background:#f7f8fb}
+.side-info div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.side-info span{font-size:10px;font-weight:800;letter-spacing:.12em;color:#8a96a8}
+.side-info b{font-size:13px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.side-flow h3,.side-card>h3{font-size:14px;font-weight:800;margin-bottom:2px}
+.side-flow{display:flex;flex-direction:column;gap:6px}
+.flow-step{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;user-select:none}
+.flow-step:hover{border-color:#c5cedb}
+.flow-step i{width:24px;height:24px;border-radius:99px;background:#eef1f6;color:#6b7a90;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:800;flex:none}
+.flow-step i svg{width:13px;height:13px;stroke-width:3}
+.flow-step span{flex:1;font-size:13px;font-weight:700;color:#6b7a90}
+.flow-step small{font-size:11px;color:#8a96a8}
+.check-native:checked+.flow-step{background:#f6fbf8;border-color:#cdebd9}
+.check-native:checked+.flow-step i{background:#1f9a5c;color:#fff}
+.check-native:checked+.flow-step span{color:var(--ink)}
+.check-native:disabled+.flow-step{cursor:not-allowed;opacity:.75}
+.check-native:focus-visible+.flow-step{outline:2px solid #3453d1;outline-offset:2px}
+.side-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.side-actions .btn{width:100%;font-size:12px}
+.side-empty{font-size:13px;color:#6b7a90;line-height:1.7}
+.activity{display:flex;align-items:flex-start;gap:10px;border:0;background:none;padding:4px 0;text-align:left;cursor:pointer;width:100%}
+.activity i{width:8px;height:8px;margin-top:6px;border-radius:99px;flex:none}
+.activity span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.activity b{font-size:12px;font-weight:800}
+.activity small{font-size:11px;color:#6b7a90}
+.activity:hover b{text-decoration:underline}
+@media(max-width:1439px){.board-layout{grid-template-columns:minmax(0,1fr)}.side-panel{display:none}}
 
 }
 </style>
@@ -480,8 +562,8 @@ function periodPanel(){
  return `<section class="period-panel" aria-label="Hafta ve g\u00fcn se\u00e7imi"><div class="period-top"><div class="week-controls"><span class="calendar-icon">${icon('calendar')}</span><button type="button" class="icon-btn" data-action="prev-week" aria-label="\u00d6nceki hafta">${icon('left')}</button><select id="year-select" aria-label="Y\u0131l">${yearList.map(y=>`<option ${y===ui.year?'selected':''} value="${y}">${y}</option>`).join('')}</select><select id="week-select" class="week-select" aria-label="Hafta">${Array.from({length:weekInfo(`${ui.year}-12-28`).week},(_,i)=>`<option value="${i+1}" ${i+1===ui.week?'selected':''}>${i+1}. Hafta</option>`).join('')}</select><button type="button" class="icon-btn" data-action="next-week" aria-label="Sonraki hafta">${icon('chevron')}</button><span class="range-label">${fmt(ds[0])} \u2013 ${fmt(ds[5],{day:'numeric',month:'long',year:'numeric'})}</span></div><div class="period-tools">${button('this-week','Bu hafta','','text small')}<select id="day-select" aria-label="G\u00fcn se\u00e7"><option value="all">G\u00fcn se\u00e7: T\u00fcm hafta</option>${ds.map((d,i)=>`<option value="${d}" ${ui.day===d?'selected':''}>${DAYS[i]} \u00b7 ${fmt(d,{day:'2-digit',month:'2-digit'})}</option>`).join('')}</select></div></div><div class="day-tabs" role="group" aria-label="Se\u00e7ili haftan\u0131n g\u00fcnleri"><button type="button" data-action="day" data-date="all" class="day-tab ${ui.day==='all'?'active':''}" aria-pressed="${ui.day==='all'}"><div><strong>Haftan\u0131n tamam\u0131</strong><small>6 i\u015f g\u00fcn\u00fc</small></div><span class="tab-count">${wv.length}</span></button>${ds.map((d,i)=>`<button type="button" data-action="day" data-date="${d}" class="day-tab ${ui.day===d?'active':''}" aria-pressed="${ui.day===d}"><div><strong>${DAYS[i]}</strong><small>${fmt(d,{day:'2-digit',month:'short'})}</small></div><span class="tab-count">${wv.filter(v=>v.date===d).length}</span></button>`).join('')}</div></section>`;
 }
 function kpis(a,weekly=true){const s=stats(a);const items=[['Toplam ara\u00e7',s.total,'Kay\u0131tl\u0131 geli\u015f say\u0131s\u0131','truck','teal'],['Tesiste i\u015faretli',s.onsite,'TES\u0130STE kutusu i\u015faretli','building','amber'],['T1 yaz\u0131ld\u0131',s.t1,'T1 i\u015flemi i\u015faretli','doc','blue'],['\u0130\u015flemleri bitti',s.done,`%${s.percent} tamamlanma oran\u0131`,'check','green'],['Bekleyen i\u015flem',s.pending,'Hen\u00fcz tamamlanmayan','clock','']];return `<div class="section-label"><h2>${weekly?`${ui.week}. hafta toplamlar\u0131`:'Se\u00e7ili g\u00fcn\u00fcn toplamlar\u0131'}</h2><span>${weekly?'G\u00fcn ve arama filtresinden ba\u011f\u0131ms\u0131z':'Yaln\u0131zca se\u00e7ili tarihin geli\u015fleri'}</span></div><section class="kpi-grid" aria-label="${weekly?'Haftal\u0131k':'G\u00fcnl\u00fck'} \u00f6zet">${items.map(([label,n,note,i,color])=>`<div class="kpi ${color}"><div class="kpi-top"><span>${label}</span><span class="kpi-icon">${icon(i)}</span></div><div class="kpi-num">${n.toLocaleString('tr-TR')}</div><div class="kpi-note">${note}</div>${color==='green'?`<div class="kpi-progress"><span style="width:${s.percent}%"></span></div>`:''}</div>`).join('')}</section>`;}
-function panoView(){const gq=ui.search.trim();if(gq)return searchToolbar()+searchResultsSection(gq);const wv=weekVisits();const ds=ui.day==='all'?dates():[ui.day];const shown=wv.filter(v=>(ui.day==='all'||v.date===ui.day)&&searchMatch(v,ui.search));const dayStat=ui.day==='all'?null:stats(wv.filter(v=>v.date===ui.day));
- return periodPanel()+kpis(wv)+(!state.registry.length&&!state.visits.length?`<section class="empty-state"><div class="empty-icon">${icon('truck')}</div><h2>\u0130lk plaka kayd\u0131n\u0131zla ba\u015flay\u0131n</h2><p>M\u00fc\u015fteri, plaka, beyanname, nakliyeci ve ruhsat bilgilerini bir kez kaydedin. Panoda plaka se\u00e7ti\u011finizde bilgiler otomatik gelsin.</p><div class="actions">${button('add-reg','\u0130lk plakay\u0131 kaydet','plus','primary')}${button('import-reg','Excel\u2019den plaka al','upload')}</div></section>`:'')+`<div class="board-toolbar"><div class="board-title"><h2>${ui.day==='all'?'Haftal\u0131k operasyon ak\u0131\u015f\u0131':`${DAYS[weekday(ui.day)-1]} operasyonu`}</h2><span class="badge">${ui.day==='all'?'6 G\u00dcN':'1 G\u00dcN'}</span></div><div class="search">${icon('search')}<input id="board-search" type="search" aria-label="Kay\u0131tlarda ara" placeholder="Plaka, m\u00fc\u015fteri veya nakliyeci ara... (t\u00fcm tarihlerde arar)" value="${esc(ui.search)}"></div></div>${selectedIds.size?`<div class="bulk-bar"><strong>${selectedIds.size} araç seçili</strong>${button('bulk-onsite','Tesiste yap','','small')}${button('bulk-t1','T1 yazıldı yap','','small')}${button('bulk-done','İşlemler bitti yap','','small primary')}${button('bulk-clear','Seçimi temizle','','small text')}</div>`:''}<div class="board-meta"><div class="legend"><span><i class="amber"></i>Tesiste</span><span><i class="blue"></i>T1 yaz\u0131ld\u0131</span><span><i class="green"></i>\u0130\u015flemler bitti</span></div><span>${shown.length} geli\u015f g\u00f6steriliyor \u00b7 Durum kutular\u0131na t\u0131klayarak g\u00fcncelleyin</span></div>${dayStat?`<div class="daily-summary"><strong>${fmt(ui.day)} g\u00fcnl\u00fck \u00f6zet</strong><span>${dayStat.total} ara\u00e7</span><span>${dayStat.t1} T1 yaz\u0131ld\u0131</span><span>${dayStat.done} tamamland\u0131</span><span>${dayStat.pending} bekleyen</span></div>`:''}${ds.map(d=>dayBlock(d,shown.filter(v=>v.date===d),wv.filter(v=>v.date===d))).join('')}`;
+function panoView(){const gq=ui.search.trim();if(gq)return searchToolbar()+searchResultsSection(gq);const wv=weekVisits();const ds=ui.day==='all'?dates():[ui.day];const shown=wv.filter(v=>(ui.day==='all'||v.date===ui.day)&&searchMatch(v,ui.search));const dayStat=ui.day==='all'?null:stats(wv.filter(v=>v.date===ui.day));const pool=ds.flatMap(d=>sortRows(shown.filter(v=>v.date===d)));panelId=ui.selected&&state.visits.some(x=>x.id===ui.selected)?ui.selected:(pool.find(v=>v.date===TODAY)||pool[0])?.id||null;
+ return periodPanel()+kpis(wv)+(!state.registry.length&&!state.visits.length?`<section class="empty-state"><div class="empty-icon">${icon('truck')}</div><h2>\u0130lk plaka kayd\u0131n\u0131zla ba\u015flay\u0131n</h2><p>M\u00fc\u015fteri, plaka, beyanname, nakliyeci ve ruhsat bilgilerini bir kez kaydedin. Panoda plaka se\u00e7ti\u011finizde bilgiler otomatik gelsin.</p><div class="actions">${button('add-reg','\u0130lk plakay\u0131 kaydet','plus','primary')}${button('import-reg','Excel\u2019den plaka al','upload')}</div></section>`:'')+`<div class="board-layout"><div class="board-main"><div class="board-toolbar"><div class="board-title"><h2>${ui.day==='all'?'Haftal\u0131k operasyon ak\u0131\u015f\u0131':`${DAYS[weekday(ui.day)-1]} operasyonu`}</h2><span class="badge">${ui.day==='all'?'6 G\u00dcN':'1 G\u00dcN'}</span></div><div class="search">${icon('search')}<input id="board-search" type="search" aria-label="Kay\u0131tlarda ara" placeholder="Plaka, m\u00fc\u015fteri veya nakliyeci ara... (t\u00fcm tarihlerde arar)" value="${esc(ui.search)}"></div></div>${selectedIds.size?`<div class="bulk-bar"><strong>${selectedIds.size} araç seçili</strong>${button('bulk-onsite','Tesiste yap','','small')}${button('bulk-t1','T1 yazıldı yap','','small')}${button('bulk-done','İşlemler bitti yap','','small primary')}${button('bulk-clear','Seçimi temizle','','small text')}</div>`:''}<div class="board-meta"><div class="legend"><span><i class="amber"></i>Tesiste</span><span><i class="blue"></i>T1 yaz\u0131ld\u0131</span><span><i class="green"></i>\u0130\u015flemler bitti</span></div><span>${shown.length} geli\u015f g\u00f6steriliyor \u00b7 Durum kutular\u0131na t\u0131klayarak g\u00fcncelleyin</span></div>${dayStat?`<div class="daily-summary"><strong>${fmt(ui.day)} g\u00fcnl\u00fck \u00f6zet</strong><span>${dayStat.total} ara\u00e7</span><span>${dayStat.t1} T1 yaz\u0131ld\u0131</span><span>${dayStat.done} tamamland\u0131</span><span>${dayStat.pending} bekleyen</span></div>`:''}${ds.map(d=>dayBlock(d,shown.filter(v=>v.date===d),wv.filter(v=>v.date===d))).join('')}</div>${sidePanel()}</div>`;
 }
 function pendingView(){
  const rows=state.visits.filter(v=>!v.done).slice().sort((a,b)=>a.date.localeCompare(b.date)||custPriority(a.customer||'')-custPriority(b.customer||'')||(a.customer||'').localeCompare(b.customer||'','tr'));
@@ -514,7 +596,7 @@ function sortRows(rows){
   return (!a.customer)-(!b.customer)||(pa-pb)||(ba<bb?-1:ba>bb?1:0)||(ka!==kb?ka.localeCompare(kb,'tr'):0)||statusTier(a)-statusTier(b)||(a.time||'99:99').localeCompare(b.time||'99:99')||a.createdAt.localeCompare(b.createdAt);};
  return rows.slice().sort((a,b)=>so(a)===so(b)?auto(a,b):so(a)-so(b));
 }
-function moveButtons(v){return `<button type="button" class="icon-btn" data-action="move-up" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} yukar\u0131 ta\u015f\u0131" title="Yukar\u0131 ta\u015f\u0131">${icon('up')}</button><button type="button" class="icon-btn" data-action="move-down" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} a\u015fa\u011f\u0131 ta\u015f\u0131" title="A\u015fa\u011f\u0131 ta\u015f\u0131">${icon('down')}</button>`;}function operationsTable(rows){const headers=['#','TES\u0130STE','T1<br>YAZILDI','\u0130\u015eLEMLER<br>B\u0130TT\u0130','BEYANNAME','PLAKA','NAKL\u0130YEC\u0130','RUHSAT',''];const sorted=sortRows(rows);const counts={};sorted.forEach(v=>{const k=v.customer||'';counts[k]=(counts[k]||0)+1;});return `<div class="table-scroll"><table class="operations"><colgroup>${headers.map(()=>'<col>').join('')}</colgroup><thead><tr>${headers.map((h,i)=>`<th scope="col" class="${i>=1&&i<=3?'status-head':''}">${h}</th>`).join('')}</tr></thead><tbody>${sorted.map((v,i,arr)=>{const newBlock=i===0||(arr[i-1].customer||'')!==(v.customer||'');const bc=custColor(v.customer);const head=newBlock?`<tr class="block-head-row" aria-hidden="true"><td colspan="${headers.length}"><div class="block-head-bar" style="border-left-color:${bc};background:linear-gradient(90deg,${bc}33,${bc}00 75%)"><button type="button" class="block-head-name" data-action="customer-profile" data-name="${esc(v.customer)}" style="color:${bc}">${esc(v.customer||'M\u00dc\u015eTER\u0130S\u0130Z')}</button><span class="block-head-count">${counts[v.customer||'']} ara\u00e7</span></div></td></tr>`:'';return `${head}<tr class="${v.done?'row-done':v.t1?'row-t1':v.onsite?'row-onsite':''}" data-row-id="${esc(v.id)}"${orderReady()?' draggable="true"':''}><td class="num"><input type="checkbox" class="row-select" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} satırını seç" ${selectedIds.has(v.id)?'checked':''}><span>${String(i+1).padStart(2,'0')}</span></td>${[['onsite','TES\u0130STE','Tesiste','amber'],['t1','T1 YAZILDI','T1','blue'],['done','\u0130\u015eLEMLER B\u0130TT\u0130','Bitti','green']].map(([k,l,short,color])=>{const cid=`chk-${esc(v.id)}-${k}`;return `<td class="check-cell"><input class="check-native" id="${cid}" type="checkbox" data-check="${k}" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} ${v.date} ${l}" ${v[k]?'checked':''}><label class="chk-toggle ${color}" for="${cid}">${short}</label></td>`;}).join('')}<td class="info declaration" title="${esc(v.declaration)}">${esc(v.declaration)||'\u2014'}</td><td class="info plate"><button type="button" class="plate-button" data-action="edit-visit" data-id="${esc(v.id)}" title="Geli\u015fi d\u00fczenle">${esc(v.plate)}</button></td><td class="info" title="${esc(v.carrier)}">${esc(v.carrier)||'\u2014'}</td><td class="info" title="${esc(v.registration)}">${esc(v.registration)||'\u2014'}</td><td class="info actions-cell">${orderReady()?moveButtons(v):''}<button type="button" class="icon-btn" data-action="edit-visit" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} geli\u015fini d\u00fczenle">${icon('edit')}</button><button type="button" class="icon-btn danger" data-action="delete-visit" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} geli\u015fini sil">${icon('trash')}</button></td></tr>`;}).join('')}</tbody></table></div>`;}
+function moveButtons(v){return `<button type="button" class="icon-btn" data-action="move-up" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} yukar\u0131 ta\u015f\u0131" title="Yukar\u0131 ta\u015f\u0131">${icon('up')}</button><button type="button" class="icon-btn" data-action="move-down" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} a\u015fa\u011f\u0131 ta\u015f\u0131" title="A\u015fa\u011f\u0131 ta\u015f\u0131">${icon('down')}</button>`;}function operationsTable(rows){const headers=['#','TES\u0130STE','T1<br>YAZILDI','\u0130\u015eLEMLER<br>B\u0130TT\u0130','BEYANNAME','PLAKA','NAKL\u0130YEC\u0130','RUHSAT',''];const sorted=sortRows(rows);const counts={};sorted.forEach(v=>{const k=v.customer||'';counts[k]=(counts[k]||0)+1;});return `<div class="table-scroll"><table class="operations"><colgroup>${headers.map(()=>'<col>').join('')}</colgroup><thead><tr>${headers.map((h,i)=>`<th scope="col" class="${i>=1&&i<=3?'status-head':''}">${h}</th>`).join('')}</tr></thead><tbody>${sorted.map((v,i,arr)=>{const newBlock=i===0||(arr[i-1].customer||'')!==(v.customer||'');const bc=custColor(v.customer);const head=newBlock?`<tr class="block-head-row" aria-hidden="true"><td colspan="${headers.length}"><div class="block-head-bar" style="--bc:${bc}"><button type="button" class="block-head-name" data-action="customer-profile" data-name="${esc(v.customer)}">${esc(v.customer||'M\u00dc\u015eTER\u0130S\u0130Z')}</button><span class="block-head-count">${counts[v.customer||'']} ara\u00e7</span></div></td></tr>`:'';return `${head}<tr class="${v.done?'row-done':v.t1?'row-t1':v.onsite?'row-onsite':''}${v.id===panelId?' is-selected':''}" data-row-id="${esc(v.id)}"${orderReady()?' draggable="true"':''}><td class="num"><input type="checkbox" class="row-select" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} satırını seç" ${selectedIds.has(v.id)?'checked':''}><span>${String(i+1).padStart(2,'0')}</span></td>${[['onsite','TES\u0130STE','Tesiste','amber'],['t1','T1 YAZILDI','T1','blue'],['done','\u0130\u015eLEMLER B\u0130TT\u0130','Bitti','green']].map(([k,l,short,color])=>{const cid=`chk-${esc(v.id)}-${k}`;return `<td class="check-cell"><input class="check-native" id="${cid}" type="checkbox" data-check="${k}" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} ${v.date} ${l}" ${v[k]?'checked':''}><label class="chk-toggle ${color}" for="${cid}">${short}</label></td>`;}).join('')}<td class="info declaration" title="${esc(v.declaration)}">${esc(v.declaration)||'\u2014'}</td><td class="info plate"><button type="button" class="plate-button" data-action="select-visit" data-id="${esc(v.id)}" title="Ara\u00e7 bilgilerini g\u00f6ster">${esc(v.plate)}</button></td><td class="info" title="${esc(v.carrier)}">${esc(v.carrier)||'\u2014'}</td><td class="info" title="${esc(v.registration)}">${esc(v.registration)||'\u2014'}</td><td class="info actions-cell"><button type="button" class="icon-btn danger" data-action="delete-visit" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} geli\u015fini sil">${icon('trash')}</button></td></tr>`;}).join('')}</tbody></table></div>`;}
 function registryView(){const rows=state.registry.filter(r=>searchMatch(r,ui.regSearch)).sort((a,b)=>a.customer.localeCompare(b.customer,'tr')||a.plate.localeCompare(b.plate));return `<div class="notice">${icon('info')}<div>Yeni m\u00fc\u015fteri ve plakalar\u0131 bu b\u00f6l\u00fcmde siz kaydedersiniz. Pano, buradaki bilgilerle dolar; kendili\u011finden yeni plaka kayd\u0131 olu\u015fturmaz. Beyanname bilgisini her yeni geli\u015fte kontrol edin.</div></div><div class="board-toolbar"><div class="board-title"><h2>Kay\u0131tl\u0131 ara\u00e7lar</h2><span class="badge">${state.registry.length} PLAKA</span></div><div class="actions">${button('template','Excel \u015fablonu','download','small')}${button('export-reg','Kay\u0131tlar\u0131 aktar','download','small')}<div class="search">${icon('search')}<input id="registry-search" type="search" aria-label="Plaka kay\u0131tlar\u0131nda ara" placeholder="Plaka veya m\u00fc\u015fteri ara..." value="${esc(ui.regSearch)}"></div></div></div>${rows.length?`<div class="registry-wrap"><div class="table-scroll"><table class="registry-table"><thead><tr><th>PLAKA</th><th>M\u00dc\u015eTER\u0130</th><th>BEYANNAME</th><th>NAKL\u0130YEC\u0130</th><th>RUHSAT</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.plate)}</td><td title="${esc(r.customer)}">${esc(r.customer)}</td><td title="${esc(r.declaration)}">${esc(r.declaration)||'\u2014'}</td><td title="${esc(r.carrier)}">${esc(r.carrier)||'\u2014'}</td><td title="${esc(r.registration)}">${esc(r.registration)||'\u2014'}</td><td style="width:80px"><button type="button" class="icon-btn" data-action="edit-reg" data-id="${esc(r.id)}" aria-label="${esc(r.plate)} kayd\u0131n\u0131 d\u00fczenle">${icon('edit')}</button><button type="button" class="icon-btn danger" data-action="delete-reg" data-id="${esc(r.id)}" aria-label="${esc(r.plate)} kayd\u0131n\u0131 sil">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`:`<div class="empty-state"><div class="empty-icon">${icon('registry')}</div><h2>${ui.regSearch?'E\u015fle\u015fen plaka bulunamad\u0131':'Plaka kay\u0131tlar\u0131n\u0131z burada yer alacak'}</h2><p>${ui.regSearch?'Aramay\u0131 de\u011fi\u015ftirin veya yeni bir plaka kaydedin.':'Yeni plaka kayd\u0131 ekleyin ya da Excel \u015fablonunu doldurup toplu olarak i\u00e7eri al\u0131n.'}</p>${button('add-reg','Yeni plaka kayd\u0131','plus','primary')}</div>`}<p class="help-note" style="margin-top:16px">Plaka e\u015fle\u015fmesi tam kay\u0131t \u00fczerinden yap\u0131l\u0131r. B\u00fcy\u00fck/k\u00fc\u00e7\u00fck harf, bo\u015fluk ve tire farklar\u0131 e\u015fle\u015fmeyi engellemez. Ayn\u0131 plaka ikinci kez kaydedilemez.</p>`;}
 function reportsView(){const trend=lastWeeks(8),tmax=Math.max(1,...trend.map(w=>w.total));const wv=weekVisits(),rows=ui.day==='all'?wv:wv.filter(v=>v.date===ui.day);const st=stats(rows),ds=ui.day==='all'?dates():[ui.day],max=Math.max(1,...ds.map(d=>rows.filter(v=>v.date===d).length));const map=new Map();for(const v of rows){if(!map.has(v.customer))map.set(v.customer,[]);map.get(v.customer).push(v);}const groups=[...map.entries()].sort((a,b)=>b[1].length-a[1].length);
  return periodPanel()+kpis(rows,ui.day==='all')+`<div class="report-grid"><section class="card"><div class="card-header"><div><h2>${ui.day==='all'?'G\u00fcnlere g\u00f6re ara\u00e7 ak\u0131\u015f\u0131':'Se\u00e7ili g\u00fcn\u00fcn ara\u00e7 ak\u0131\u015f\u0131'}</h2><p>${ui.day==='all'?`${fmt(weekStart())} \u2013 ${fmt(dates()[5])}`:fmt(ui.day)}</p></div><span class="badge">${ui.day==='all'?'HAFTALIK':'G\u00dcNL\u00dcK'}</span></div><div class="bar-chart" role="img" aria-label="G\u00fcnl\u00fck toplam ve tamamlanan geli\u015f say\u0131lar\u0131">${ds.map(d=>{const s=stats(rows.filter(v=>v.date===d));return `<div class="bar-group" title="${DAYS[weekday(d)-1]}: ${s.total} ara\u00e7, ${s.done} tamamland\u0131"><div class="bar" style="height:${s.total/max*85}%"><span>${s.total}</span></div><div class="bar complete" style="height:${s.done/max*85}%"><span>${s.done}</span></div><span class="bar-label">${SHORT_DAYS[weekday(d)-1]} \u00b7 ${d.slice(8)}</span></div>`;}).join('')}</div><div class="legend" style="justify-content:center"><span><i style="background:#65a6a0"></i>Toplam ara\u00e7</span><span><i style="background:#bbdccc"></i>Tamamlanan</span></div></section><section class="card"><div class="card-header"><div><h2>\u0130\u015flem tamamlanma oran\u0131</h2><p>${st.total} geli\u015fin ${st.done} tanesi tamamland\u0131</p></div></div><div class="progress-ring" style="--p:${st.percent}"><div class="ring-inner"><strong>%${st.percent}</strong><span>${st.total?'tamamland\u0131':'hen\u00fcz kay\u0131t yok'}</span></div></div><div class="ring-legend"><span>${st.done} tamamlanan</span><span>${st.pending} bekleyen</span></div></section></div>`+`<section class="card"><div class="card-header"><div><h2>Haftalık trend</h2><p>Son 8 hafta · araç sayısı ve tamamlanma</p></div></div><div class="bar-chart" role="img" aria-label="Haftalık araç sayısı ve tamamlanan trend">${trend.map(w=>`<div class="bar-group" title="${w.week}. hafta ${w.year}: ${w.total} araç, ${w.done} tamamlandı"><div class="bar" style="height:${w.total/tmax*85}%"><span>${w.total}</span></div><div class="bar complete" style="height:${w.done/tmax*85}%"><span>${w.done}</span></div><span class="bar-label">${w.week}.${w.year!==weekNow.year?`'${String(w.year).slice(2)}`:''}</span></div>`).join('')}</div><div class="legend" style="justify-content:center"><span><i style="background:#65a6a0"></i>Toplam araç</span><span><i style="background:#bbdccc"></i>Tamamlanan</span></div></section>`+`<section class="card"><div class="card-header"><div><h2>M\u00fc\u015fteri bazl\u0131 \u00f6zet</h2><p>Her geli\u015f bir ara\u00e7 kayd\u0131 olarak say\u0131l\u0131r; ayn\u0131 plakan\u0131n farkl\u0131 geli\u015fleri ayr\u0131d\u0131r.</p></div></div><div class="table-scroll"><table class="report-table"><thead><tr><th>M\u00dc\u015eTER\u0130</th><th>ARA\u00c7</th><th>TES\u0130STE \u0130\u015eARETL\u0130</th><th>T1 YAZILDI</th><th>TAMAMLANAN</th><th>BEKLEYEN</th></tr></thead><tbody>${groups.length?groups.map(([name,a])=>{const s=stats(a);return `<tr><td><button type="button" class="plate-button" data-action="customer-profile" data-name="${esc(name)}">${esc(name)}</button></td><td>${s.total}</td><td>${s.onsite}</td><td>${s.t1}</td><td>${s.done}</td><td>${s.pending}</td></tr>`;}).join(''):'<tr><td colspan="6" class="muted">Bu d\u00f6nemde kay\u0131t bulunmuyor.</td></tr>'}</tbody><tfoot><tr><td>TOPLAM</td><td>${st.total}</td><td>${st.onsite}</td><td>${st.t1}</td><td>${st.done}</td><td>${st.pending}</td></tr></tfoot></table></div></section><p class="help-note" style="margin-top:15px">\u201cTesiste i\u015faretli\u201d bir i\u015flem kutusu say\u0131s\u0131d\u0131r; tesisten \u00e7\u0131k\u0131\u015f kayd\u0131 anlam\u0131na gelmez. Durum kutular\u0131 birbirinden ba\u011f\u0131ms\u0131zd\u0131r.</p>`;
@@ -552,6 +634,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
   return;
  }
  if(a==='nav'){ui.page=b.dataset.page;render();return;}
+ if(a==='select-visit'){if(window.innerWidth<1440&&canEdit()){pendingVisit=null;return openVisitForm(id);}ui.selected=id;render();return;}
  if(a==='prev-week')return changeWeek(-1);if(a==='next-week')return changeWeek(1);
  if(a==='this-week'){ui.year=weekNow.year;ui.week=weekNow.week;ui.day='all';ui.collapsed.clear();return render();}
  if(a==='day'){ui.day=b.dataset.date;return render();}
@@ -639,6 +722,13 @@ async function mutate(fn){
 }
 function dataView(){return `<section class="card"><h2>Ortak veriler</h2><p style="margin:15px 0">${state.registry.length} plaka · ${state.visits.length} geliş. Veriler Supabase üzerinde ortak saklanır. Günlük ve haftalık Excel dosyalarını Raporlar bölümünden indirebilirsiniz.</p>${button('backup','JSON kopyası indir','download','primary')}<p class="help-note">Bu dosya tüm geçmişin kopyasıdır. Toplu geri yükleme yönetici tarafından yapılır.</p></section>${priorityEditor()}`;}
 function priorityEditor(){return `<section class="card" style="margin-top:16px"><div class="card-header"><div><h2>Öncelikli müşteri sıralaması</h2><p>Panoda blok sırasını ve rengini belirler. Listede olmayan müşteriler sona, teal renkte eklenir.</p></div></div><div id="prio-list">${custPriorityList.map((e,i)=>`<div class="prio-row"><input type="color" class="prio-color" data-i="${i}" value="${esc(e.color||'#2dd4bf')}" aria-label="${i+1}. sıra rengi"><input type="text" class="prio-match" data-i="${i}" value="${esc(e.match||'')}" placeholder="Müşteri adında geçen kelime, örn. BULTRANS" aria-label="${i+1}. sıra eşleşme metni"><button type="button" class="icon-btn" data-action="prio-up" data-i="${i}" aria-label="Yukarı taşı" ${i===0?'disabled':''}>${icon('up')}</button><button type="button" class="icon-btn" data-action="prio-down" data-i="${i}" aria-label="Aşağı taşı" ${i===custPriorityList.length-1?'disabled':''}>${icon('down')}</button><button type="button" class="icon-btn danger" data-action="prio-del" data-i="${i}" aria-label="Kaldır">${icon('trash')}</button></div>`).join('')||'<p class="help-note">Henüz öncelikli müşteri eklenmedi.</p>'}</div><div class="actions" style="margin-top:14px">${button('prio-add','Müşteri ekle','plus')}${button('prio-save','Kaydet','check','primary')}</div><p class="help-note" style="margin-top:10px">Eşleşme kelimesi, müşteri adının içinde geçen herhangi bir parçadır (büyük/küçük harf önemli değil). Aynı adı iki farklı şoför/şube için ayırmak istersen daha uzun bir parça yazın, örn. "ETL LOJ - ERVİN".</p></section>`;}
+var panelId=null;
+function ago(ts){const m=Math.max(0,Math.round((Date.now()-new Date(ts).getTime())/60000));if(!ts||isNaN(m))return '';return m<1?'az önce':m<60?m+' dk önce':m<1440?Math.round(m/60)+' sa önce':Math.round(m/1440)+' gün önce';}
+function sidePanel(){const v=panelId?state.visits.find(x=>x.id===panelId):null;
+ const stamp=x=>String(x.updated_at||x.createdAt||'');const recent=state.visits.slice().sort((a,b)=>stamp(b).localeCompare(stamp(a))).slice(0,4);
+ const sText=x=>x.done?'İşlemler tamamlandı':x.t1?'T1 yazıldı':x.onsite?'Tesiste':'Araç gelişi eklendi';const sColor=x=>x.done?'#1f9a5c':x.t1?'#3462d8':x.onsite?'#d08a1c':'#8a96a8';
+ const card=v?`<section class="side-card" aria-label="Seçili araç"><div class="side-top"><span class="side-eyebrow">Seçili araç</span><button type="button" class="side-cust" data-action="customer-profile" data-name="${esc(v.customer)}" style="--bc:${custColor(v.customer)}">${esc(v.customer)||'Müşterisiz'}</button></div><div class="side-plate">${esc(v.plate)}</div><div class="side-info"><div><span>Beyanname</span><b>${esc(v.declaration)||'—'}</b></div><div><span>Nakliyeci</span><b>${esc(v.carrier)||'—'}</b></div><div><span>Ruhsat</span><b>${esc(v.registration)||'—'}</b></div><div><span>Geliş</span><b>${fmt(v.date)}${v.time?' · '+esc(v.time):''}</b></div></div><div class="side-flow"><h3>İşlem akışı</h3>${[['onsite','Tesiste','Sahada'],['t1','T1 yazıldı','Evrak'],['done','İşlemler bitti','Kapanış']].map(([k,l,h],i)=>{const cid=`side-${esc(v.id)}-${k}`;return `<input class="check-native" id="${cid}" type="checkbox" data-check="${k}" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} ${l}" ${v[k]?'checked':''}><label class="flow-step" for="${cid}"><i>${v[k]?icon('check'):i+1}</i><span>${l}</span><small>${h}</small></label>`;}).join('')}</div><div class="side-actions"><button type="button" class="btn" data-action="edit-visit" data-id="${esc(v.id)}">Kaydı düzenle</button><button type="button" class="btn" data-action="customer-profile" data-name="${esc(v.customer)}">Müşteri geçmişi</button></div></section>`:`<section class="side-card"><span class="side-eyebrow">Seçili araç</span><p class="side-empty">Listeden bir plakaya tıklayın; aracın bilgileri burada açılır.</p></section>`;
+ return `<aside class="side-panel">${card}${recent.length?`<section class="side-card" aria-label="Son hareketler"><h3>Son hareketler</h3>${recent.map(x=>`<button type="button" class="activity" data-action="select-visit" data-id="${esc(x.id)}"><i style="background:${sColor(x)}"></i><span><b>${sText(x)}</b><small>${esc(x.plate)}${ago(stamp(x))?' · '+ago(stamp(x)):''}</small></span></button>`).join('')}</section>`:''}</aside>`;}
 function footer(){return `<footer class="footnote"><span>Supabase ortak veri tabanı · ${role==='editor'?'Düzenleyici':'Salt görüntüleme'}</span><span>Pazartesi — Cumartesi</span></footer>`;}
 document.addEventListener('click',async e=>{
  const b=e.target.closest('[data-action]');if(!b)return;const action=b.dataset.action;
