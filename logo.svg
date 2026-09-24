@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#16233a"/>
+  <g transform="translate(0 22)">
+    <!-- hız çizgileri -->
+    <path d="M22 196h22M12 226h32M22 256h22" stroke="#4f7cff" stroke-width="12" stroke-linecap="round"/>
+    <!-- dorse -->
+    <rect x="56" y="140" width="262" height="146" rx="12" fill="#ffffff"/>
+    <text x="187" y="232" text-anchor="middle" font-family="'Arial Black','Segoe UI Black','Segoe UI',Arial,sans-serif" font-weight="900" font-size="74" fill="#16233a">PCS</text>
+    <rect x="70" y="248" width="58" height="28" rx="5" fill="#1d4ed8"/>
+    <rect x="73" y="251" width="52" height="22" rx="3" fill="none" stroke="#ffffff" stroke-width="2"/>
+    <text x="99" y="269" text-anchor="middle" font-family="'Arial Black','Segoe UI Black',Arial,sans-serif" font-weight="900" font-size="17" fill="#ffffff">TIR</text>
+    <rect x="56" y="286" width="262" height="12" rx="4" fill="#ffffff"/>
+    <!-- çekici şasi -->
+    <rect x="300" y="290" width="164" height="14" rx="6" fill="#ffffff"/>
+    <!-- egzoz -->
+    <rect x="336" y="104" width="10" height="64" rx="5" fill="#ffffff"/>
+    <!-- rüzgar deflektörü -->
+    <path d="M334 142h36l24 30h-60z" fill="#7d9bff"/>
+    <!-- kabin -->
+    <path d="M334 172h80a14 14 0 0 1 12 7l30 52a16 16 0 0 1 2 8v51H334z" fill="#4f7cff"/>
+    <path d="M392 188h24l26 44h-50z" fill="#16233a"/>
+    <rect x="382" y="188" width="4" height="98" rx="2" fill="#16233a" opacity=".55"/>
+    <rect x="440" y="272" width="26" height="18" rx="4" fill="#ffffff"/>
+    <!-- tekerlekler: dorse üçlü dingil -->
+    <circle cx="90" cy="318" r="24" fill="#ffffff"/><circle cx="90" cy="318" r="9" fill="#16233a"/>
+    <circle cx="142" cy="318" r="24" fill="#ffffff"/><circle cx="142" cy="318" r="9" fill="#16233a"/>
+    <circle cx="194" cy="318" r="24" fill="#ffffff"/><circle cx="194" cy="318" r="9" fill="#16233a"/>
+    <!-- çekici: arka ve ön -->
+    <circle cx="336" cy="318" r="26" fill="#ffffff"/><circle cx="336" cy="318" r="10" fill="#16233a"/>
+    <circle cx="428" cy="318" r="26" fill="#ffffff"/><circle cx="428" cy="318" r="10" fill="#16233a"/>
+  </g>
+</svg>
