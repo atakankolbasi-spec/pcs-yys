@@ -1040,8 +1040,9 @@ html:not(.is-editor) .vc-next:not(.finished),html:not(.is-editor) .vcard .row-se
 
 
 /*giris-cikis-raporu*/
-.side-actions .copy-btn{grid-column:auto}
-.side-actions .gate-btn{gap:7px}.side-actions .gate-btn svg{width:15px;height:15px}
+.side-actions .copy-btn,.side-actions .gate-btn{grid-column:1/-1}
+.side-actions .btn{padding-inline:12px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-content:center}
+.side-actions .gate-btn{gap:8px}.side-actions .gate-btn svg{width:15px;height:15px}
 .gate-body{display:flex;flex-direction:column;gap:14px}
 .gate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .gate-stat{border:1px solid #e3e8f0;border-radius:12px;padding:12px 14px;background:#f8f9fc;border-top:3px solid #cfd6e2}
