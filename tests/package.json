@@ -1,0 +1,11 @@
+{
+  "name": "pcs-yys-tests",
+  "private": true,
+  "description": "PCS TRANSIT YYS tarayıcı testleri (Playwright). Site dosyalarına dahil değildir.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
