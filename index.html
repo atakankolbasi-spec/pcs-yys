@@ -1039,6 +1039,64 @@ html:not(.is-editor) .vc-next:not(.finished),html:not(.is-editor) .vcard .row-se
 
 
 
+/*giris-cikis-raporu*/
+.side-actions .copy-btn{grid-column:auto}
+.side-actions .gate-btn{gap:7px}.side-actions .gate-btn svg{width:15px;height:15px}
+.gate-body{display:flex;flex-direction:column;gap:14px}
+.gate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.gate-stat{border:1px solid #e3e8f0;border-radius:12px;padding:12px 14px;background:#f8f9fc;border-top:3px solid #cfd6e2}
+.gate-stat.in{border-top-color:var(--c-onsite)}.gate-stat.out{border-top-color:var(--c-done)}.gate-stat.dur{border-top-color:var(--c-accent)}
+.gate-stat span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.1em;color:#6b7a90;text-transform:uppercase}
+.gate-stat b{display:block;margin-top:5px;font-size:16px;color:#16233a;font-variant-numeric:tabular-nums;white-space:pre}
+.gate-sub{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#3e4c63;margin-top:4px}
+.gate-pre{margin:0;padding:14px 16px;border-radius:12px;background:#f1f8f3;border:1px solid #cfe8d6;font:600 13.5px/1.7 var(--ui-font,inherit);color:#16233a;white-space:pre-wrap;word-break:break-word}
+.log-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:280px;overflow:auto}
+.log-item{display:grid;grid-template-columns:10px 1fr;gap:10px;align-items:start;padding:8px 6px;border-bottom:1px solid #eef1f6}
+.log-item:last-child{border-bottom:0}
+.log-item>i{width:9px;height:9px;border-radius:50%;margin-top:4px;background:#94a3b8}
+.log-item.k-onsite>i{background:var(--c-onsite)}.log-item.k-t1>i{background:var(--c-t1)}.log-item.k-done>i{background:var(--c-done)}.log-item.k-off>i{background:#dc2626}
+.log-item b{display:block;font-size:12.5px;color:#16233a;text-transform:uppercase}
+.log-item small{display:block;font-size:11.5px;color:#6b7a90;margin-top:2px;text-transform:uppercase}
+.gate-card{margin-top:18px}
+.gate-card .card-header .actions{display:flex;gap:8px;flex-wrap:wrap}
+.gate-card .gate-wa,.modal-footer .gate-wa{grid-column:auto;width:auto;display:inline-flex;align-items:center;gap:8px}
+.btn.gate-wa{background:#16a34a;border-color:#16a34a;color:#fff}.btn.gate-wa:hover{background:#15803d;border-color:#15803d}.btn.gate-wa:disabled{opacity:.5}
+.gate-card .btn svg,.modal-footer .btn svg{width:16px;height:16px}
+.gate-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.gate-filters label{display:flex;flex-direction:column;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.1em;color:#6b7a90;text-transform:uppercase}
+.gate-filters input,.gate-filters select{min-height:40px;font-size:13px;font-weight:600;text-transform:uppercase}
+.gate-summary{display:flex;flex-wrap:wrap;gap:8px 22px;margin:14px 0 6px;font-size:12px;font-weight:600;color:#5b6b82;text-transform:uppercase}
+.gate-summary b{color:#16233a;font-size:15px;margin-right:3px}
+.gate-table{width:100%;border-collapse:collapse;min-width:760px}
+.gate-table th{text-align:left;font-size:11px;letter-spacing:.09em;color:#56657d;background:#f8f9fc;padding:11px 12px;border-bottom:1px solid #e3e8f0}
+.gate-table td{padding:9px 12px;border-bottom:1px solid #eef1f6;font-size:13px;font-weight:600;color:#1f2a44;text-transform:uppercase;vertical-align:middle}
+.gate-table tr:last-child td{border-bottom:0}
+.gate-ts{font-variant-numeric:tabular-nums;white-space:pre}
+.gate-dur{white-space:nowrap;color:#3453d1}
+.gate-table .actions-cell{text-align:right;white-space:nowrap}
+.gate-edit{border:1px solid #e3e8f0;border-radius:12px;padding:0;background:#f8f9fc}
+.gate-edit summary{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#3e4c63;list-style:none}
+.gate-edit summary::-webkit-details-marker{display:none}
+.gate-edit summary svg{width:16px;height:16px}
+.gate-edit summary small{margin-left:auto;font-size:11px;font-weight:600;color:#6b7a90;letter-spacing:0;white-space:pre}
+.gate-edit[open] summary{border-bottom:1px solid #e3e8f0}
+.gate-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 14px 0}
+.gate-edit-grid label{display:flex;flex-direction:column;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.1em;color:#6b7a90;text-transform:uppercase}
+.gate-edit .help-note{padding:0 14px}
+.gate-edit>.btn{margin:4px 14px 14px;display:inline-flex;align-items:center;gap:7px}
+.backup-card{margin-top:16px}
+.backup-list{display:flex;flex-direction:column;margin-top:10px;max-height:420px;overflow:auto}
+.backup-row{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid #eef1f6}
+.backup-row:last-child{border-bottom:0}
+.backup-dot{width:9px;height:9px;border-radius:50%;background:#cbd5e1}.backup-dot.last{background:#16a34a;box-shadow:0 0 0 4px #16a34a22}
+.backup-row b{display:block;font-size:13px;color:#16233a;white-space:pre;font-variant-numeric:tabular-nums}
+.backup-row small{display:block;font-size:11px;color:#6b7a90;text-transform:uppercase;margin-top:2px}
+.backup-row .btn{display:inline-flex;align-items:center;gap:6px}.backup-row .btn svg{width:15px;height:15px}
+@media (max-width:760px){.gate-grid{grid-template-columns:1fr}.gate-filters{grid-template-columns:1fr 1fr}.gate-edit-grid{grid-template-columns:1fr}.gate-edit summary{flex-wrap:wrap}.gate-edit summary small{margin-left:24px;width:100%}}
+
+
+
+
 /*gece-modu-uretilen*/
 html[data-theme="dark"]{color-scheme:dark}
 html[data-theme="dark"]{--bg:#22262f;--surface:#1c1f26;--ink:#b3c6d6;--muted:#788295;--line:#2a303a;--teal:#4bd2ce;--teal-pale:#272b35;--blue:#538ccb;--amber:#d2a34b;--green:#54ca9f;color:var(--ink)}
@@ -1789,6 +1847,43 @@ html[data-theme="dark"] .saha-step.done.on{background:var(--c-done);border-color
 html[data-theme="dark"] .saha-empty{color:#8291a8}
 html[data-theme="dark"] .saha-empty svg{color:#9ac9ac}
 html[data-theme="dark"] .saha-empty b{color:#bec9dc}
+html[data-theme="dark"] .gate-stat{border:1px solid #232f42;background:#1f232b;border-top:3px solid #303c50}
+html[data-theme="dark"] .gate-stat.in{border-top-color:var(--c-onsite)}
+html[data-theme="dark"] .gate-stat.out{border-top-color:var(--c-done)}
+html[data-theme="dark"] .gate-stat.dur{border-top-color:var(--c-accent)}
+html[data-theme="dark"] .gate-stat span{color:#77859a}
+html[data-theme="dark"] .gate-stat b{color:#bec9dc}
+html[data-theme="dark"] .gate-sub{color:#9aa8c0}
+html[data-theme="dark"] .gate-pre{background:#232730;border:1px solid #285334;color:#bec9dc}
+html[data-theme="dark"] .log-item{border-bottom:1px solid #252933}
+html[data-theme="dark"] .log-item:last-child{border-bottom:0}
+html[data-theme="dark"] .log-item>i{background:#53657d}
+html[data-theme="dark"] .log-item.k-onsite>i{background:var(--c-onsite)}
+html[data-theme="dark"] .log-item.k-t1>i{background:var(--c-t1)}
+html[data-theme="dark"] .log-item.k-done>i{background:var(--c-done)}
+html[data-theme="dark"] .log-item.k-off>i{background:#dd2f2f}
+html[data-theme="dark"] .log-item b{color:#bec9dc}
+html[data-theme="dark"] .log-item small{color:#77859a}
+html[data-theme="dark"] .btn.gate-wa{background:#16a34a;border-color:#16a34a;color:#fff}
+html[data-theme="dark"] .btn.gate-wa:hover{background:#257041;border-color:#257041}
+html[data-theme="dark"] .gate-filters label{color:#77859a}
+html[data-theme="dark"] .gate-summary{color:#8291a8}
+html[data-theme="dark"] .gate-summary b{color:#bec9dc}
+html[data-theme="dark"] .gate-table th{color:#8694ac;background:#1f232b;border-bottom:1px solid #232f42}
+html[data-theme="dark"] .gate-table td{border-bottom:1px solid #252933;color:#b4bfd7}
+html[data-theme="dark"] .gate-table tr:last-child td{border-bottom:0}
+html[data-theme="dark"] .gate-dur{color:#606fa9}
+html[data-theme="dark"] .gate-edit{border:1px solid #232f42;background:#1f232b}
+html[data-theme="dark"] .gate-edit summary{color:#9aa8c0}
+html[data-theme="dark"] .gate-edit summary small{color:#77859a}
+html[data-theme="dark"] .gate-edit[open] summary{border-bottom:1px solid #232f42}
+html[data-theme="dark"] .gate-edit-grid label{color:#77859a}
+html[data-theme="dark"] .backup-row{border-bottom:1px solid #252933}
+html[data-theme="dark"] .backup-row:last-child{border-bottom:0}
+html[data-theme="dark"] .backup-dot{background:#304054}
+html[data-theme="dark"] .backup-dot.last{background:#16a34a;box-shadow:0 0 0 4px rgba(0,0,0,0.39)}
+html[data-theme="dark"] .backup-row b{color:#bec9dc}
+html[data-theme="dark"] .backup-row small{color:#77859a}
 /*gece-modu-son*/
 </style>
 </head>
@@ -2613,6 +2708,107 @@ document.addEventListener('click',async e=>{
 });
 try{if(localStorage.getItem(SAHA_KEY)==='1'){ui.page='saha';keepAwake(true);}}catch(_){}
 applyTheme();
+
+/* giriş-çıkış saatleri */
+const timesReady=()=>state.visits.some(v=>'onsite_at' in v);
+const payloadBase=payload;
+payload=function(r,table){const p=payloadBase(r,table);if(table==='visits'&&r&&'onsite_at' in r){p.onsite_at=r.onsite_at||null;p.done_at=r.done_at||null;}return p;};
+UNDO_FIELDS.visits.push('onsite_at','done_at');
+const pad2=n=>String(n).padStart(2,'0');
+function tsText(iso){if(!iso)return '—';const d=new Date(iso);if(isNaN(d))return '—';return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}  ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;}
+function toLocalInput(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;}
+function fromLocalInput(val){if(!val)return null;const d=new Date(val);return isNaN(d)?null:d.toISOString();}
+function plateCompact(p){const parts=splitPlate(p).map(x=>x.replace(/\s+/g,'')).filter(Boolean);return parts.length?parts.join(' / '):String(p||'').replace(/\s+/g,'');}
+function stayMinutes(v){if(!v.onsite_at||!v.done_at)return null;const m=Math.round((new Date(v.done_at)-new Date(v.onsite_at))/60000);return m>=0?m:null;}
+function stayText(v){const m=stayMinutes(v);if(m==null)return v.onsite_at&&!v.done_at?'İçeride':'—';return m<60?`${m} dk`:`${Math.floor(m/60)} sa ${pad2(m%60)} dk`;}
+function gateText(v){return `${plateCompact(v.plate)}\nTESİS GİRİŞ TARİH SAAT : ${tsText(v.onsite_at)}\nTESİS ÇIKIŞ TARİH SAAT : ${tsText(v.done_at)}\nMÜŞTERİ : ${String(v.customer||'—').toLocaleUpperCase('tr-TR')}`;}
+function gateShare(list){if(!list.length)return;const text=list.map(gateText).join('\n\n');const custs=[...new Set(list.map(v=>v.customer||''))];const num=custs.length===1?waNumber(custs[0]):'';
+ window.open((num?`https://wa.me/${num}`:'https://wa.me/')+'?text='+encodeURIComponent(text),'_blank','noopener');if(!num&&custs.length===1)toast(`${custs[0]||'Bu müşteri'} için numara kayıtlı değil; WhatsApp'ta kişiyi seçin.`);}
+function gateCopy(list){if(list.length)copyOut(list.map(gateText).join('\n\n'),'',`${list.length} aracın giriş-çıkış bilgisi kopyalandı.`);}
+const SQL_NOTE='Bu özellik için Supabase’de “giris-cikis-gecmis-yedek-kurulumu.sql” bir kez çalıştırılmalı.';
+
+/* işlem geçmişi */
+const LOG_TEXT={insert:'Kayıt oluşturuldu',delete:'Kayıt silindi',onsite_on:'TESİSTE işaretlendi',onsite_off:'TESİSTE işareti kaldırıldı',t1_on:'T1 YAZILDI işaretlendi',t1_off:'T1 işareti kaldırıldı',done_on:'İŞLEMLER BİTTİ işaretlendi',done_off:'BİTTİ işareti kaldırıldı',onsite_time:'Giriş saati düzeltildi',done_time:'Çıkış saati düzeltildi',move:'Gün değiştirildi',edit:'Bilgiler düzenlendi'};
+const LOG_FIELDS={plate:'plaka',customer:'müşteri',declaration:'beyanname',carrier:'nakliyeci',registration:'ruhsat',note:'not',visit_time:'geliş saati'};
+function logLine(l){let t=LOG_TEXT[l.action]||l.action;const d=l.detail||{};
+ if(l.action==='move'&&d.to)t=`${fmt(d.from)} → ${fmt(d.to)} gününe taşındı`;
+ if(l.action==='edit'&&Array.isArray(d.fields))t+=': '+d.fields.map(f=>LOG_FIELDS[f]||f).join(', ');
+ if((l.action==='onsite_time'||l.action==='done_time')&&d.at)t+=` (${tsText(d.at)})`;
+ const who=l.actor_email?displayName(l.actor_email):'Sistem';
+ const k=l.action.startsWith('onsite')?'onsite':l.action.startsWith('t1')?'t1':l.action.startsWith('done')?'done':l.action==='delete'||l.action.endsWith('_off')?'off':'edit';
+ return `<li class="log-item k-${k}"><i></i><div><b>${esc(t)}</b><small>${esc(tsText(l.at))} · ${esc(who)}</small></div></li>`;}
+async function loadHistory(id){const box=document.getElementById('gate-history');if(!box)return;
+ try{const {data,error}=await client.rpc('visit_history',{p_visit_id:id});if(error)throw error;if(document.getElementById('gate-history')!==box)return;
+  box.innerHTML=Array.isArray(data)&&data.length?`<ul class="log-list">${data.map(logLine).join('')}</ul>`:'<p class="help-note">Bu araç için henüz kayıtlı işlem yok. Kurulumdan sonraki işlemler burada görünür.</p>';}
+ catch(e){box.innerHTML=`<p class="help-note">${esc(/visit_history|function|schema/i.test(e?.message||'')?SQL_NOTE:friendly(e))}</p>`;}}
+
+/* tek araç raporu */
+function gateReport(id){const v=state.visits.find(x=>x.id===id);if(!v)return;const ready='onsite_at' in v;
+ openModal(`${modalHeader('Giriş – çıkış raporu',`${esc(v.plate)} · ${esc(v.customer||'Müşterisiz')}`)}<div class="modal-body gate-body">
+ ${ready?`<div class="gate-grid"><div class="gate-stat in"><span>Tesis giriş</span><b>${tsText(v.onsite_at)}</b></div><div class="gate-stat out"><span>Tesis çıkış</span><b>${tsText(v.done_at)}</b></div><div class="gate-stat dur"><span>Tesiste kalma</span><b>${esc(stayText(v))}</b></div></div>
+ <h3 class="gate-sub">WhatsApp mesajı</h3><pre class="gate-pre">${esc(gateText(v))}</pre>`:`<div class="notice">${icon('info')}<div>${esc(SQL_NOTE)}</div></div>`}
+ ${VIEW_TOKEN?'':`<h3 class="gate-sub">İşlem geçmişi</h3><div id="gate-history"><p class="help-note">Yükleniyor…</p></div>`}</div>
+ <div class="modal-footer">${ready?`<button type="button" class="btn" data-action="gate-copy" data-id="${esc(v.id)}">${icon('copy')}Kopyala</button><button type="button" class="btn wa-full gate-wa" data-action="gate-wa" data-id="${esc(v.id)}">${icon('wa')}WhatsApp’ta paylaş</button>`:''}${button('close-modal','Kapat')}</div>`);
+ if(!VIEW_TOKEN)loadHistory(v.id);}
+
+/* raporlar sayfası: toplu giriş-çıkış raporu */
+function gateRows(){const from=ui.gateFrom||TODAY,to=ui.gateTo||from,c=ui.gateCust||'',st=ui.gateSt||'';
+ return state.visits.filter(v=>v.date>=from&&v.date<=to&&(!c||v.customer===c)&&(!st||(st==='out'?!!v.done_at:st==='in'?!!v.onsite_at&&!v.done_at:!v.onsite_at))).sort((a,b)=>a.date.localeCompare(b.date)||String(a.onsite_at||'~').localeCompare(String(b.onsite_at||'~'))||a.plate.localeCompare(b.plate));}
+function gateSection(){if(VIEW_TOKEN)return '';const ready=timesReady();const from=ui.gateFrom||TODAY,to=ui.gateTo||from;
+ const custs=[...new Set(state.visits.map(v=>v.customer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+ const rows=ready?gateRows():[];const mins=rows.map(stayMinutes).filter(m=>m!=null);const avg=mins.length?Math.round(mins.reduce((a,b)=>a+b,0)/mins.length):null;
+ return `<section class="card gate-card" id="gate-report"><div class="card-header"><div><h2>Giriş – çıkış raporu</h2><p>TESİSTE işaretlendiği an giriş, BİTTİ işaretlendiği an çıkış olarak otomatik kaydedilir.</p></div>${ready?`<div class="actions"><button type="button" class="btn" data-action="gate-copy-all" ${rows.length?'':'disabled'}>${icon('copy')}Kopyala</button><button type="button" class="btn wa-full gate-wa" data-action="gate-wa-all" ${rows.length?'':'disabled'}>${icon('wa')}WhatsApp’ta paylaş</button></div>`:''}</div>
+ ${ready?`<div class="gate-filters"><label>Başlangıç<input type="date" id="gate-from" value="${esc(from)}"></label><label>Bitiş<input type="date" id="gate-to" value="${esc(to)}"></label><label>Müşteri<select id="gate-cust"><option value="">Tüm müşteriler</option>${custs.map(c=>`<option ${c===ui.gateCust?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>Durum<select id="gate-st">${[['','Hepsi'],['out','Çıkış yapanlar'],['in','Hâlâ içeride'],['none','Giriş kaydı olmayan']].map(([k,l])=>`<option value="${k}" ${k===(ui.gateSt||'')?'selected':''}>${l}</option>`).join('')}</select></label></div>
+ <div class="gate-summary"><span><b>${rows.length}</b> araç</span><span><b>${rows.filter(v=>v.done_at).length}</b> çıkış yaptı</span><span><b>${rows.filter(v=>v.onsite_at&&!v.done_at).length}</b> içeride</span><span>Ortalama kalma <b>${avg==null?'—':avg<60?avg+' dk':Math.floor(avg/60)+' sa '+pad2(avg%60)+' dk'}</b></span></div>
+ ${rows.length?`<div class="table-scroll"><table class="gate-table"><thead><tr><th>PLAKA</th><th>MÜŞTERİ</th><th>TESİS GİRİŞ</th><th>TESİS ÇIKIŞ</th><th>KALMA</th><th></th></tr></thead><tbody>${rows.map(v=>`<tr><td><button type="button" class="plate-button" data-action="gate-report" data-id="${esc(v.id)}" title="Raporu aç">${plateHTML(v.plate,'sm')}</button></td><td>${esc(v.customer)}</td><td class="gate-ts">${tsText(v.onsite_at)}</td><td class="gate-ts">${tsText(v.done_at)}</td><td class="gate-dur">${esc(stayText(v))}</td><td class="actions-cell"><button type="button" class="icon-btn wa-btn" data-action="gate-wa" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} giriş-çıkış bilgisini WhatsApp ile paylaş" title="WhatsApp ile paylaş">${icon('wa')}</button><button type="button" class="icon-btn" data-action="gate-report" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} raporu ve işlem geçmişi" title="Rapor ve işlem geçmişi">${icon('clock')}</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="help-note" style="margin-top:14px">Seçilen aralıkta araç yok.</p>`}`
+ :`<div class="notice">${icon('info')}<div>${esc(SQL_NOTE)}</div></div>`}</section>`;}
+const reportsViewBase=reportsView;
+reportsView=function(){return reportsViewBase()+gateSection();};
+
+/* araç formunda saat düzeltme */
+const openVisitFormBase=openVisitForm;
+openVisitForm=function(id=null,d=null,preset=null){openVisitFormBase(id,d,preset);const v=id&&state.visits.find(x=>x.id===id);const grid=document.querySelector('#visit-form .form-grid');if(!v||!grid||!('onsite_at' in v))return;
+ grid.insertAdjacentHTML('beforeend',`<details class="field full gate-edit"><summary>${icon('clock')}Giriş – çıkış saatleri <small>${v.onsite_at?tsText(v.onsite_at):'giriş yok'} · ${v.done_at?tsText(v.done_at):'çıkış yok'}</small></summary><div class="gate-edit-grid"><label>Tesis giriş<input type="datetime-local" name="onsite_at" value="${toLocalInput(v.onsite_at)}"></label><label>Tesis çıkış<input type="datetime-local" name="done_at" value="${toLocalInput(v.done_at)}"></label></div><p class="help-note">Saatler TESİSTE ve BİTTİ işaretlenince otomatik yazılır. Yalnızca yanlış kaldıysa düzeltin.</p><button type="button" class="btn small" data-action="gate-report" data-id="${esc(v.id)}">${icon('wa')}Rapor ve işlem geçmişi</button></details>`);};
+const visitFieldsBase=visitFields;
+visitFields=function(form){const o=visitFieldsBase(form);const a=form.elements.onsite_at,b=form.elements.done_at;if(a&&b){o.onsite_at=fromLocalInput(a.value);o.done_at=fromLocalInput(b.value);}return o;};
+
+/* yan panel ve kartlara rapor düğmesi */
+const sidePanelBase=sidePanel;
+sidePanel=function(...args){return sidePanelBase(...args).replace(/(<button type="button" class="btn copy-btn" data-action="copy-visit" data-id="([^"]*)"[^>]*>[\s\S]*?<\/button>)/,(m,btn,id)=>`${btn}<button type="button" class="btn gate-btn" data-action="gate-report" data-id="${id}" title="Giriş-çıkış saatleri, WhatsApp raporu ve işlem geçmişi">${icon('clock')}Giriş-çıkış raporu</button>`);};
+const vehicleCardBase=vehicleCard;
+vehicleCard=function(v){return vehicleCardBase(v).replace('<button type="button" class="icon-btn wa-btn"',`<button type="button" class="icon-btn" data-action="gate-report" data-id="${esc(v.id)}" aria-label="${esc(v.plate)} giriş-çıkış raporu" title="Giriş-çıkış raporu ve işlem geçmişi">${icon('clock')}</button><button type="button" class="icon-btn wa-btn"`);};
+
+/* otomatik sunucu yedeği */
+const srvBackup={state:'unknown',last:null,list:[],checked:0};
+async function checkBackups(force=false){if(VIEW_TOKEN||role!=='editor')return;if(!force&&Date.now()-srvBackup.checked<3600000)return;srvBackup.checked=Date.now();
+ try{const {data,error}=await client.rpc('list_backups');if(error)throw error;srvBackup.list=Array.isArray(data)?data:[];srvBackup.state='ready';srvBackup.last=srvBackup.list[0]?.taken_at||null;}
+ catch(_){srvBackup.state='missing';srvBackup.list=[];}
+ if(ui.page==='data'||ui.notifOpen)render();else{const b=document.querySelector('.notif-btn');if(b){const tr=document.querySelector('.hdr-tools');if(tr){tr.outerHTML=headerTools();}}}}
+const noticesBase=notices;
+notices=function(){let l=noticesBase();if(srvBackup.state==='ready'){const age=srvBackup.last?(Date.now()-new Date(srvBackup.last).getTime())/3600000:Infinity;l=l.filter(x=>x.act!=='backup');if(age>36)l.unshift({lvl:'bad',t:'Otomatik yedek gecikti',d:srvBackup.last?`Son sunucu yedeği ${tsText(srvBackup.last)}.`:'Henüz sunucu yedeği alınmadı.',act:'backup-now',btn:'Şimdi yedekle'});}return l;};
+function backupsSection(){if(VIEW_TOKEN)return '';const s=srvBackup;
+ return `<section class="card backup-card"><div class="card-header"><div><h2>Otomatik sunucu yedekleri</h2><p>Her gece 03:00’te tüm veriler sunucuda otomatik yedeklenir; son 30 gün saklanır.</p></div>${s.state==='ready'&&role==='editor'?`<button type="button" class="btn" data-action="backup-now">${icon('refresh')}Şimdi yedekle</button>`:''}</div>
+ ${s.state==='unknown'?'<p class="help-note">Yükleniyor…</p>':s.state==='missing'?`<div class="notice">${icon('info')}<div>${esc(SQL_NOTE)}</div></div>`:s.list.length?`<div class="backup-list">${s.list.slice(0,30).map((b,i)=>`<div class="backup-row"><span class="backup-dot${i===0?' last':''}"></span><div><b>${esc(tsText(b.taken_at))}</b><small>${b.visit_count??'?'} geliş · ${b.registry_count??'?'} plaka${i===0?' · en son':''}</small></div><button type="button" class="btn small" data-action="backup-dl" data-id="${esc(b.id)}">${icon('download')}İndir</button></div>`).join('')}</div>`:'<p class="help-note">Henüz yedek yok. İlk yedek bu gece alınacak ya da “Şimdi yedekle”ye basabilirsiniz.</p>'}</section>`;}
+const dataViewBase=dataView;
+dataView=function(){if(srvBackup.state==='unknown')setTimeout(()=>checkBackups(true),0);return dataViewBase()+backupsSection();};
+async function downloadServerBackup(id){try{const {data,error}=await client.rpc('get_backup',{p_id:Number(id)});if(error)throw error;if(!data)throw new Error('Yedek bulunamadı.');
+ const snap={schemaVersion:1,revision:0,updatedAt:data.taken_at,registry:(data.registry||[]).map(r=>mapRow(r,'registry')),visits:(data.visits||[]).map(r=>mapRow(r,'visits'))};
+ const file={app:'PCS TRANSIT YYS',schemaVersion:1,mode:'real',source:'sunucu-yedegi',exportedAt:data.taken_at,settings:data.settings||{},data:snap};
+ const d=new Date(data.taken_at);downloadBlob(new Blob([JSON.stringify(file,null,2)],{type:'application/json;charset=utf-8'}),`PCS_SUNUCU_YEDEGI_${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}_${pad2(d.getHours())}-${pad2(d.getMinutes())}.json`);toast('Sunucu yedeği indirildi.');}
+ catch(e){toast(friendly(e),true);}}
+async function backupNow(){if(!canEdit())return;try{const {error}=await client.rpc('take_backup_now');if(error)throw error;toast('Sunucuda yeni yedek alındı.');await checkBackups(true);}catch(e){toast(friendly(e),true);}}
+
+/* olaylar */
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,id=b.dataset.id;
+ if(a==='gate-report'){e.stopPropagation();return gateReport(id);}
+ if(a==='gate-wa'){const v=state.visits.find(x=>x.id===id);if(v)gateShare([v]);return;}
+ if(a==='gate-copy'){const v=state.visits.find(x=>x.id===id);if(v)gateCopy([v]);return;}
+ if(a==='gate-wa-all')return gateShare(gateRows());
+ if(a==='gate-copy-all')return gateCopy(gateRows());
+ if(a==='backup-dl')return downloadServerBackup(id);
+ if(a==='backup-now'){ui.notifOpen=false;return backupNow();}});
+document.addEventListener('change',e=>{const t=e.target;const k={'gate-from':'gateFrom','gate-to':'gateTo','gate-cust':'gateCust','gate-st':'gateSt'}[t.id];if(!k)return;ui[k]=t.value;if(k==='gateFrom'&&(!ui.gateTo||ui.gateTo<t.value))ui.gateTo=t.value;if(k==='gateTo'&&ui.gateFrom&&t.value<ui.gateFrom)ui.gateFrom=t.value;render();document.getElementById('gate-report')?.scrollIntoView({block:'start'});});
+setTimeout(()=>checkBackups(),4000);setInterval(()=>checkBackups(),300000);
 
 if(VIEW_TOKEN){account={id:'public-view',email:''};role='viewer';syncData();}else authScreen();
 })();
