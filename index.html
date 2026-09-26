@@ -25,4 +25,606 @@ dialog{border:1px solid #e0e8eb;padding:0;border-radius:17px;width:min(620px,cal
 
 /* YENİ EKLENEN AKILLI PLAKA, KARTLAR VE WHATSAPP TASARIMLARI */
 .tr-plate {
-  display: inline-
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #1e293b;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  vertical-align: middle;
+  line-height: 1;
+  transition: transform .15s, box-shadow .15s;
+  user-select: none;
+  text-transform: uppercase!important;
+}
+.tr-plate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.18);
+}
+.tr-plate .tr-flag {
+  background: #1d4ed8;
+  color: #ffffff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 8.5px;
+  font-weight: 900;
+  padding: 5px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+.tr-plate .tr-num {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 800;
+  font-size: 13.5px;
+  letter-spacing: 1px;
+  color: #0f172a;
+  padding: 5px 8px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.view-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eef2f5;
+  padding: 3px;
+  border-radius: 8px;
+}
+.view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  border: 0;
+  background: transparent;
+}
+.view-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  background: #f8fafc;
+}
+.vehicle-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: transform .15s, box-shadow .15s;
+}
+.vehicle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.vehicle-card.row-done { border-left: 5px solid #16a34a; }
+.vehicle-card.row-t1 { border-left: 5px solid #2f5fd0; }
+.vehicle-card.row-onsite { border-left: 5px solid #f59e0b; }
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.customer-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 0;
+  cursor: pointer;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.customer-badge:hover { text-decoration: underline; }
+
+.card-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 12px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #edf2f7;
+}
+.detail-item { display: flex; flex-direction: column; gap: 2px; }
+.detail-item span { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+.detail-item b { font-size: 12px; color: #1e293b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.card-status-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.card-status-col .chk-toggle {
+  width: 100%;
+  text-align: center;
+  min-height: 34px;
+}
+
+.card-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.whatsapp-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+.whatsapp-btn svg { width: 14px; height: 14px; }
+
+@media (max-width: 850px) {
+  .operations { display: none; }
+  .table-scroll { overflow: visible; }
+}
+
+.auth-wrap{min-height:100vh;display:grid;grid-template-columns:1.05fr 1fr}
+.auth-hero{background:linear-gradient(160deg,#0f1b2d,#1f3150);color:#fff;padding:56px 60px;display:flex;flex-direction:column;justify-content:space-between;gap:36px}
+.auth-brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.02em;font-size:17px}
+.auth-brand i{width:40px;height:40px;border-radius:11px;background:#ffffff26;display:grid;place-items:center}
+.auth-brand svg{width:24px;height:24px}
+.auth-panel{display:grid;place-items:center;padding:32px 24px}
+.auth-card{width:100%;max-width:420px;padding:34px}
+.auth-card input{font-size:14px;padding:12px 14px;min-height:44px}
+.auth-card .btn.primary{width:100%;min-height:44px;font-size:14px}
+.auth-msg{min-height:20px;margin-top:14px;font-size:12px;line-height:1.7;color:#b3261e}
+@media(max-width:860px){.auth-wrap{grid-template-columns:1fr}.auth-hero{padding:26px 22px}.auth-card{padding:24px}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">&#304;&#231;eri&#287;e ge&#231;</a>
+<div id="app"></div>
+<dialog id="modal" aria-labelledby="modal-title"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="registry-file" accept=".xlsx,.csv,.tsv" hidden>
+<input type="file" id="backup-file" accept=".json" hidden>
+<script src="vendor.js"></script>
+<script>
+(() => {
+'use strict';
+const STORE = 'pcs-transit-yys.v1';
+const DAY = 86400000;
+const DAYS = ['Pazartesi','Sal\u0131','\u00c7ar\u015famba','Per\u015fembe','Cuma','Cumartesi'];
+const SHORT_DAYS = ['Pzt','Sal','\u00c7ar','Per','Cum','Cmt'];
+const I = {
+truck:'<path d="M3 6h11v12H3zM14 10h4l3 4v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+table:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>',
+cards:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
+whatsapp:'<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+registry:'<path d="M4 5h16v14H4zM8 5V3m8 2V3M4 10h16"/><path d="M8 14h3m3 0h2"/>',
+chart:'<path d="M4 4v16h17M8 16v-5m5 5V7m5 9v-8"/>',
+calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>',
+chevron:'<path d="M9 5l7 7-7 7"/>',left:'<path d="M15 5l-7 7 7 7"/>',down:'<path d="M6 9l6 6 6-6"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',download:'<path d="M12 3v12m-5-5l5 5 5-5M4 16v5h16v-5"/>',
+check:'<path d="M5 12l4 4L19 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',doc:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h6"/>',
+search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16l5 5"/>',edit:'<path d="M14 5l5 5M4 20l4-1L20 7a2.1 2.1 0 00-3-3L5 16z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
+close:'<path d="M6 6l12 12M6 18L18 6"/>',building:'<path d="M4 21V3h11v18m0-12h5v12M2 21h20M8 7h3m-3 4h3m-3 4h3"/>'
+};
+const icon = (n,cls='') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]||I.doc}</svg>`;
+const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = p => String(p||'').normalize('NFKC').toUpperCase().replace(/\u0130/g,'I').replace(/[\s.-]+/g,'');
+const plateText = p => String(p||'').trim().toUpperCase().replace(/\s+/g,' ');
+const uid = () => globalThis.crypto?.randomUUID?.() || ('id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+const dateObj = s => new Date(s+'T12:00:00Z');
+const iso = d => d.toISOString().slice(0,10);
+const addDays = (s,n) => iso(new Date(dateObj(s).getTime()+n*DAY));
+const weekday = s => dateObj(s).getUTCDay();
+
+function localToday(){
+  const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const x=t=>p.find(a=>a.type===t).value;
+  return `${x('year')}-${x('month')}-${x('day')}`;
+}
+const TODAY = localToday();
+function weekInfo(s){let d=dateObj(s);d.setUTCHours(0,0,0,0);d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));const y=d.getUTCFullYear();return {year:y,week:Math.ceil((((d-new Date(Date.UTC(y,0,1)))/DAY)+1)/7)};}
+function monday(y,w){const d=new Date(Date.UTC(y,0,4,12));d.setUTCDate(d.getUTCDate()-(d.getUTCDay()||7)+1+(w-1)*7);return iso(d);}
+const fmt = (s,opt={day:'numeric',month:'long'}) => new Intl.DateTimeFormat('tr-TR',{timeZone:'UTC',...opt}).format(dateObj(s));
+const timeNow = () => new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
+const weekNow=weekInfo(TODAY);
+
+let ui={
+  page:'pano',
+  viewMode: localStorage.getItem('pcs_view') || (window.innerWidth < 850 ? 'cards' : 'table'),
+  year:weekNow.year,
+  week:weekNow.week,
+  day:(weekday(TODAY)>=1&&weekday(TODAY)<=6)?TODAY:'all',
+  search:'',
+  regSearch:'',
+  collapsed:new Set(),
+  demo:false
+};
+
+let state={schemaVersion:1,registry:[],visits:[]};
+
+/* 1. AKILLI ÜLKE TESPİTİ */
+function detectPlateCountry(p) {
+  const s = String(p || '').toUpperCase().replace(/[\s.-]+/g, '');
+  if (!s) return 'TR';
+  if (/^(0[1-9]|[1-7][0-9]|8[01])[A-Z]{1,3}\d{2,4}$/.test(s)) return 'TR';
+  if (/^[A-Z]{1,2}\d{2,3}[A-Z]{3}$/.test(s)) return 'RO';
+  const bg = '(A|B|BT|BH|BP|EB|TX|K|KH|OB|M|PA|PK|EH|PB|PP|P|CC|CH|CM|CO|C|CA|CB|CT|T|X|Y)';
+  if (new RegExp('^' + bg + '\\d{3,4}[A-Z]{1,2}$').test(s)) return 'BG';
+  if (/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(s)) return 'IT';
+  if (/^[A-Z]{2}\d{2}[A-Z]{3}$/.test(s)) return 'UK';
+  if (/^[A-Z]{1,3}[A-Z]{1,2}\d{1,4}$/.test(s)) return 'D';
+  return 'TR';
+}
+
+function renderPlate(p) {
+  const clean = plateText(p);
+  const country = detectPlateCountry(clean);
+  return `<span class="tr-plate" title="${country} Plakası"><span class="tr-flag">${country}</span><span class="tr-num">${esc(clean)}</span></span>`;
+}
+
+/* 2. WHATSAPP HIZLI BİLGİLENDİRME */
+function sendWhatsApp(v) {
+  const st = v.done ? 'gümrük ve T1 işlemleri tamamlanmıştır. Araç tesisten çıkış yapabilir.' : 
+             (v.t1 ? 'T1 beyannamesi yazılmıştır, gümrük kontrolleri devam etmektedir.' : 
+             (v.onsite ? 'aracı tesisimize giriş yapmıştır, evrak sırasına alınmıştır.' : 'araç geliş kaydı alınmıştır.'));
+  const txt = `*PCS TRANSİT YYS BİLGİLENDİRME*\n\nSayın Yetkili,\n*${v.plate}* plakalı ${v.customer ? v.customer + ' ' : ''}aracınızın ${st}\n\nBeyanname: ${v.declaration || '—'}\nTarih: ${fmt(v.date)}\nİyi çalışmalar dileriz.`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank');
+}
+
+const weekStart = () => monday(ui.year,ui.week);
+const dates = () => Array.from({length:6},(_,i)=>addDays(weekStart(),i));
+const weekVisits = () => {const ds=dates();return state.visits.filter(v=>v.date>=ds[0]&&v.date<=ds);};
+const defaultDate = () => ui.day!=='all'?ui.day:(dates().includes(TODAY)?TODAY:weekStart());
+const stats = a => ({total:a.length,onsite:a.filter(v=>v.onsite).length,t1:a.filter(v=>v.t1).length,done:a.filter(v=>v.done).length,pending:a.filter(v=>!v.done).length,percent:a.length?Math.round(a.filter(v=>v.done).length/a.length*100):0});
+const searchMatch = (v,q) => !q || [v.plate,v.customer,v.carrier,v.declaration].some(x=>norm(x).includes(norm(q)));
+let toastTimer;
+function toast(text,error=false){clearTimeout(toastTimer);const el=document.getElementById('toast');el.textContent=text;el.className='show'+(error?' error':'');toastTimer=setTimeout(()=>el.className='',error?7000:3500);}
+
+function render(){
+ if(!account){authScreen();return;}
+ const pages={pano:['Pano','Araç operasyon panosu','Gelişleri, evrakları ve işlem durumlarını takip edin.'],pending:['Bekleyenler','Bekleyen araçlar','İşlemleri henüz bitmemiş araçlar.'],registry:['Plaka Kayıtları','Plaka kayıtları','Kayıtlı plakaları yönetin.'],reports:['Raporlar','Operasyon raporları','Günün ve haftanın istatistikleri.']};
+ const p=pages[ui.page]||pages.pano;
+ const pendingCount=state.visits.filter(v=>!v.done).length;
+ const nav=[['pano','grid','Pano'],['pending','clock','Bekleyenler'],['registry','registry','Plaka Kayıtları'],['reports','chart','Raporlar']];
+
+ document.getElementById('app').innerHTML=`
+ <aside class="sidebar"><div class="brand"><div class="brand-mark"><img src="logo.svg" alt=""></div><div class="brand-text"><div class="brand-name">PCS TRANSİT</div><div class="brand-sub">YYS OPERASYON</div></div></div><div class="nav-label">ÇALIŞMA ALANI</div><nav aria-label="Ana gezinme">${nav.map(([key,i,label])=>`<button type="button" title="${label}" data-action="nav" data-page="${key}" class="nav-item ${ui.page===key?'active':''}" ${ui.page===key?'aria-current="page"':''}>${icon(i)}<span class="nav-text">${label}</span>${key==='registry'?`<span class="nav-count">${state.registry.length}</span>`:key==='pending'&&pendingCount?`<span class="nav-count">${pendingCount}</span>`:''}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="sidebar-user"><div class="avatar">AK</div><span>Atakan Kolbaşı<small>Yetkili Tesis Yöneticisi</small></span></div></div></aside>
+ <div class="shell">
+  <header class="topbar"><div class="breadcrumb">${icon('building')}<span>Yetkili Tesis</span>${icon('chevron')}<strong>${p[0]}</strong></div><div class="topbar-right"><span class="date-label">${fmt(TODAY,{day:'numeric',month:'long',year:'numeric'})}</span><span class="save-status"><i class="local-dot"></i>Canlı Sistem</span><button type="button" class="btn small" data-action="signout">Çıkış</button></div></header>
+  <main id="main">
+    <div class="heading"><div><div class="eyebrow">TESİS OPERASYON YÖNETİMİ</div><h1>${p}</h1><p>${p}</p></div><div class="actions"><button type="button" class="btn primary" data-action="add-visit">${icon('plus')}Araç ekle</button></div></div>
+    ${ui.page==='pano'?panoView():ui.page==='pending'?pendingView():ui.page==='registry'?registryView():reportsView()}
+    <footer class="footnote"><span>PCS TRANSİT YYS · Ortak Çalışma Alanı</span><span>Pazartesi — Cumartesi</span></footer>
+  </main>
+ </div>`;
+}
+
+function periodPanel(){
+ const ds=dates(),wv=weekVisits();
+ return `<section class="period-panel"><div class="period-top"><div class="week-controls"><span class="calendar-icon">${icon('calendar')}</span><button type="button" class="icon-btn" data-action="prev-week">${icon('left')}</button><span style="font-weight:700; margin:0 6px;">${ui.week}. Hafta · ${ui.year}</span><button type="button" class="icon-btn" data-action="next-week">${icon('chevron')}</button><span class="range-label">${fmt(ds[0])} – ${fmt(ds)}</span></div><div class="period-tools"><button type="button" class="btn text small" data-action="this-week">Bu hafta</button></div></div><div class="day-tabs"><button type="button" data-action="day" data-date="all" class="day-tab ${ui.day==='all'?'active':''}"><div><strong>Haftanın tamamı</strong><small>6 iş günü</small></div><span class="tab-count">${wv.length}</span></button>${ds.map((d,i)=>`<button type="button" data-action="day" data-date="${d}" class="day-tab ${ui.day===d?'active':''}"><div><strong>${DAYS[i]}</strong><small>${fmt(d,{day:'2-digit',month:'short'})}</small></div><span class="tab-count">${wv.filter(v=>v.date===d).length}</span></button>`).join('')}</div></section>`;
+}
+
+function kpis(a){
+ const s=stats(a);
+ const items=[['Toplam araç',s.total,'Kayıtlı geliş','truck','teal'],['Tesiste',s.onsite,'Sahadaki araçlar','calendar','amber'],['T1 yazıldı',s.t1,'Evrağı hazır','doc','blue'],['İşlemleri bitti',s.done,`%${s.percent} tamamlanma`,'check','green'],['Bekleyen',s.pending,'Tamamlanmayan','clock','']];
+ return `<section class="kpi-grid">${items.map(([label,n,note,i,color])=>`<div class="kpi ${color}"><div class="kpi-top"><span>${label}</span><span class="kpi-icon">${icon(i)}</span></div><div class="kpi-num">${n}</div><div class="kpi-note">${note}</div></div>`).join('')}</section>`;
+}
+
+function panoView(){
+ const wv=weekVisits();
+ const ds=ui.day==='all'?dates():[ui.day];
+ const shown=wv.filter(v=>(ui.day==='all'||v.date===ui.day)&&searchMatch(v,ui.search));
+ 
+ return periodPanel()+kpis(wv)+`
+ <div class="board-layout">
+   <div class="board-main">
+     <div class="board-toolbar">
+       <div class="board-title">
+         <h2>${ui.day==='all'?'Haftalık Operasyon Akışı':`${DAYS[weekday(ui.day)-1]} Operasyonu`}</h2>
+         <span class="badge">${shown.length} ARAÇ</span>
+       </div>
+       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+         <div class="view-toggles">
+           <button type="button" class="view-btn ${ui.viewMode==='table'?'active':''}" data-action="toggle-view" data-mode="table">${icon('table')}Tablo</button>
+           <button type="button" class="view-btn ${ui.viewMode==='cards'?'active':''}" data-action="toggle-view" data-mode="cards">${icon('cards')}Kartlar</button>
+         </div>
+         <div class="search">${icon('search')}<input id="board-search" type="search" placeholder="Plaka, müşteri, evrak ara..." value="${esc(ui.search)}"></div>
+       </div>
+     </div>
+     ${ds.map(d=>dayBlock(d,shown.filter(v=>v.date===d),wv.filter(v=>v.date===d))).join('')}
+   </div>
+ </div>`;
+}
+
+function dayBlock(d,shown,all){
+ const st=stats(all),collapsed=ui.collapsed.has(d);
+ return `<section class="day-block">
+   <header class="day-header">
+     <div class="day-name">
+       <button type="button" class="icon-btn" data-action="collapse" data-date="${d}">${icon(collapsed?'chevron':'down')}</button>
+       <div class="day-date"><b>${d.slice(8)}</b><small>${fmt(d,{month:'short'})}</small></div>
+       <div><h3>${DAYS[weekday(d)-1]}${d===TODAY?' <span class="badge">BUGÜN</span>':''}</h3><p>${d} · ${shown.length} Araç</p></div>
+     </div>
+     <div class="day-header-right">
+       <div class="day-stats"><span><b>${st.total}</b> araç</span><span><b>${st.t1}</b> T1</span><span class="done-count"><b>${st.done}</b> bitti</span></div>
+       <button type="button" class="btn text small" data-action="add-visit" data-date="${d}">${icon('plus')}Araç ekle</button>
+     </div>
+   </header>
+   ${collapsed?'':shown.length?(ui.viewMode==='cards'?operationsCards(shown):operationsTable(shown)):`<div class="empty-day">${all.length?'Aramanıza uygun kayıt bulunamadı.':'Bu gün için henüz araç kaydı yok.'}</div>`}
+ </section>`;
+}
+
+/* 3. KARTLAR GÖRÜNÜMÜ */
+function operationsCards(rows){
+  const sorted = rows.slice().sort((a,b)=>a.time.localeCompare(b.time));
+  return `<div class="cards-grid">${sorted.map(v => `
+    <div class="vehicle-card ${v.done?'row-done':v.t1?'row-t1':v.onsite?'row-onsite':''}" data-row-id="${esc(v.id)}">
+      <div class="card-header-row">
+        <button type="button" class="plate-button" data-action="edit-visit" data-id="${esc(v.id)}">
+          ${renderPlate(v.plate)}
+        </button>
+        <span class="customer-badge">${esc(v.customer || 'MÜŞTERİSİZ')}</span>
+      </div>
+      <div class="card-details-grid">
+        <div class="detail-item"><span>Beyanname</span><b title="${esc(v.declaration)}">${esc(v.declaration || '—')}</b></div>
+        <div class="detail-item"><span>Nakliyeci</span><b title="${esc(v.carrier)}">${esc(v.carrier || '—')}</b></div>
+        <div class="detail-item"><span>Ruhsat</span><b title="${esc(v.registration)}">${esc(v.registration || '—')}</b></div>
+        <div class="detail-item"><span>Saat</span><b>${esc(v.time || '—')}</b></div>
+      </div>
+      ${v.note ? `<div style="font-size:11px; color:#64748b; background:#f8fafc; padding:6px 10px; border-radius:6px;">📝 ${esc(v.note)}</div>` : ''}
+      <div class="card-status-bar">
+        ${[['onsite','TESİSTE','Tesiste','amber'],['t1','T1 YAZILDI','T1','blue'],['done','İŞLEMLER BİTTİ','Bitti','green']].map(([k,l,short,color])=>{
+          const cid=`cchk-${esc(v.id)}-${k}`;
+          return `<div class="card-status-col"><input class="check-native" id="${cid}" type="checkbox" data-check="${k}" data-id="${esc(v.id)}" ${v[k]?'checked':''}><label class="chk-toggle ${color}" for="${cid}">${short}</label></div>`;
+        }).join('')}
+      </div>
+      <div class="card-actions-row">
+        <button type="button" class="whatsapp-btn" data-action="whatsapp" data-id="${esc(v.id)}" title="Şoföre WhatsApp ile bildir">${icon('whatsapp')}WhatsApp</button>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="icon-btn" data-action="edit-visit" data-id="${esc(v.id)}" aria-label="Düzenle">${icon('edit')}</button>
+          <button type="button" class="icon-btn danger" data-action="delete-visit" data-id="${esc(v.id)}" aria-label="Sil">${icon('trash')}</button>
+        </div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function operationsTable(rows){
+  const headers=['#','TESİSTE','T1<br>YAZILDI','İŞLEMLER<br>BİTTİ','PLAKA','MÜŞTERİ','BEYANNAME','NAKLİYECİ','RUHSAT','SAAT','BİLDİRİM',''];
+  const sorted = rows.slice().sort((a,b)=>a.time.localeCompare(b.time));
+  return `<div class="table-scroll"><table class="operations"><thead><tr>${headers.map((h,i)=>`<th scope="col" class="${i>=1&&i<=3?'status-head':''}">${h}</th>`).join('')}</tr></thead><tbody>
+  ${sorted.map((v,i)=>`
+    <tr class="${v.done?'row-done':v.t1?'row-t1':v.onsite?'row-onsite':''}" data-row-id="${esc(v.id)}">
+      <td class="num"><span>${String(i+1).padStart(2,'0')}</span></td>${[['onsite','TESİSTE','Tesiste','amber'],['t1','T1 YAZILDI','T1','blue'],['done','İŞLEMLER BİTTİ','Bitti','green']].map(([k,l,short,color])=>{
+        const cid=`chk-${esc(v.id)}-${k}`;
+        return `<td class="check-cell"><input class="check-native" id="${cid}" type="checkbox" data-check="${k}" data-id="${esc(v.id)}" ${v[k]?'checked':''}><label class="chk-toggle ${color}" for="${cid}">${short}</label></td>`;
+      }).join('')}
+      <td class="info plate"><button type="button" class="plate-button" data-action="edit-visit" data-id="${esc(v.id)}">${renderPlate(v.plate)}</button></td>
+      <td class="info declaration">${esc(v.customer||'—')}</td>
+      <td class="info" title="${esc(v.declaration)}">${esc(v.declaration||'—')}</td>
+      <td class="info" title="${esc(v.carrier)}">${esc(v.carrier||'—')}</td>
+      <td class="info" title="${esc(v.registration)}">${esc(v.registration||'—')}</td>
+      <td class="info mono">${esc(v.time||'—')}</td>
+      <td class="info"><button type="button" class="whatsapp-btn" data-action="whatsapp" data-id="${esc(v.id)}" title="Şoföre WhatsApp ile bildir">${icon('whatsapp')}<span>WhatsApp</span></button></td>
+      <td class="info actions-cell"><button type="button" class="icon-btn danger" data-action="delete-visit" data-id="${esc(v.id)}" aria-label="Sil">${icon('trash')}</button></td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function pendingView(){
+ const rows=state.visits.filter(v=>!v.done).slice().sort((a,b)=>a.date.localeCompare(b.date));
+ return `<div class="table-scroll"><table class="operations"><thead><tr><th>PLAKA</th><th>MÜŞTERİ</th><th>BEYANNAME</th><th>NAKLİYECİ</th><th>TARİH</th><th>TESİSTE</th><th>T1</th><th>BİLDİRİM</th></tr></thead><tbody>
+ ${rows.map(v=>`<tr>
+   <td class="plate">${renderPlate(v.plate)}</td>
+   <td>${esc(v.customer)}</td>
+   <td>${esc(v.declaration||'—')}</td>
+   <td>${esc(v.carrier||'—')}</td>
+   <td>${fmt(v.date)}</td>
+   <td>${v.onsite?'✓ EVET':'HAYIR'}</td>
+   <td>${v.t1?'✓ EVET':'HAYIR'}</td>
+   <td><button type="button" class="whatsapp-btn" data-action="whatsapp" data-id="${esc(v.id)}">${icon('whatsapp')}<span>WhatsApp</span></button></td>
+ </tr>`).join('')}</tbody></table></div>`;
+}
+
+function registryView(){
+ const rows=state.registry.filter(r=>searchMatch(r,ui.regSearch));
+ return `<div class="board-toolbar"><div class="board-title"><h2>Kayıtlı Araçlar</h2><span class="badge">${state.registry.length} PLAKA</span></div><div class="actions"><button type="button" class="btn primary" data-action="add-reg">${icon('plus')}Yeni Plaka Kaydı</button></div></div>
+ <div class="table-scroll"><table class="registry-table"><thead><tr><th>PLAKA</th><th>MÜŞTERİ</th><th>BEYANNAME</th><th>NAKLİYECİ</th><th>RUHSAT</th></tr></thead><tbody>
+ ${rows.map(r=>`<tr><td>${renderPlate(r.plate)}</td><td>${esc(r.customer)}</td><td>${esc(r.declaration||'—')}</td><td>${esc(r.carrier\vert{}\vert{}'—')}</td><td>${esc(r.registration||'—')}</td></tr>`).join('')}
+ </tbody></table></div>`;
+}
+
+function reportsView(){ return `<div class="card"><h2>Raporlar</h2><p>Haftalık ve aylık özetler.</p></div>`; }
+
+function modalHeader(title){return `<div class="modal-header"><h2>${title}</h2><button type="button" class="icon-btn" data-action="close-modal">${icon('close')}</button></div>`;}
+function openModal(html){const m=document.getElementById('modal');m.innerHTML=html;if(!m.open)m.showModal();}
+function closeModal(){document.getElementById('modal').close();}
+
+function openVisitForm(id=null,d=null){
+  let v=id?state.visits.find(x=>x.id===id):{plate:'',customer:'',declaration:'',carrier:'',registration:'',date:d||defaultDate(),time:timeNow(),note:'',onsite:false,t1:false,done:false};
+  openModal(`${modalHeader(id?'Gelişi Düzenle':'Yeni Araç Gelişi')}<form id="visit-form" data-id="${id?esc(id):''}"><div class="modal-body"><div class="form-grid">
+    <div class="field full"><label>Plaka</label><input name="plate" class="plate-input" value="${esc(v.plate)}" required autofocus></div>
+    <div class="field"><label>Geliş Tarihi</label><input name="date" type="date" value="${v.date}" required></div>
+    <div class="field"><label>Saat</label><input name="time" type="time" value="${v.time}"></div>
+    <div class="field full"><label>Müşteri</label><input name="customer" value="${esc(v.customer)}" required></div>
+    <div class="field"><label>Beyanname</label><input name="declaration" value="${esc(v.declaration)}"></div>
+    <div class="field"><label>Nakliyeci</label><input name="carrier" value="${esc(v.carrier)}"></div>
+    <div class="field full"><label>Operasyon Notu</label><textarea name="note">${esc(v.note)}</textarea></div>
+  </div><div class="form-status" style="margin-top:15px; display:flex; gap:15px;">
+    <label><input type="checkbox" name="onsite" ${v.onsite?'checked':''}> TESİSTE</label>
+    <label><input type="checkbox" name="t1" ${v.t1?'checked':''}> T1 YAZILDI</label>
+    <label><input type="checkbox" name="done" ${v.done?'checked':''}> İŞLEMLER BİTTİ</label>
+  </div></div><div class="modal-footer"><button type="button" class="btn" data-action="close-modal">Vazgeç</button><button class="btn primary" type="submit">Kaydet</button></div></form>`);
+}
+
+function openRegistryForm(){
+  openModal(`${modalHeader('Yeni Plaka Kaydı')}<form id="registry-form"><div class="modal-body"><div class="form-grid">
+    <div class="field full"><label>Plaka</label><input name="plate" class="plate-input" required autofocus></div>
+    <div class="field full"><label>Müşteri</label><input name="customer" required></div>
+    <div class="field"><label>Beyanname</label><input name="declaration"></div>
+    <div class="field"><label>Nakliyeci</label><input name="carrier"></div>
+  </div></div><div class="modal-footer"><button type="button" class="btn" data-action="close-modal">Vazgeç</button><button class="btn primary" type="submit">Kaydet</button></div></form>`);
+}
+
+/* Supabase & Kimlik Doğrulama */
+const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
+let account=null, role='viewer', busy=false;
+const canEdit=()=>!!account&&(role==='editor'||account?.email?.toLowerCase()==='atakankolbasi@gmail.com')&&!busy;
+
+function authScreen(){
+ document.getElementById('app').innerHTML=`<div class="auth-wrap"><section class="auth-hero"><div class="auth-brand"><i class="auth-logo"><img src="logo.svg" alt=""></i>PCS TRANSİT YYS</div><div><h2>Araç geliş ve gümrük işlemlerini tek panelden takip edin.</h2></div></section><section class="auth-panel"><div class="card auth-card"><div class="eyebrow">ORTAK ÇALIŞMA</div><h1>Giriş Yap</h1><form id="auth-form"><div class="field"><label>E-posta</label><input id="email" name="email" type="email" required value="atakankolbasi@gmail.com"></div><div class="field" style="margin-top:10px;"><label>Parola</label><input id="password" name="password" type="password" required></div><button class="btn primary" style="width:100%; margin-top:15px;" type="submit">Giriş Yap</button><p id="auth-message" class="auth-msg"></p></form></div></section></div>`;
+}
+
+async function syncData(){
+  if(!account) return;
+  try{
+    const [{data:nextRole}, {data:rData}, {data:vData}] = await Promise.all([
+      client.rpc('current_app_role'),
+      client.from('registry').select('*').order('id'),
+      client.from('visits').select('*').order('id')
+    ]);
+    role = (nextRole==='editor'||account?.email?.toLowerCase()==='atakankolbasi@gmail.com') ? 'editor' : 'viewer';
+    state.registry = (rData||[]).map(r=>({...r, customer:r.customer||''}));
+    state.visits = (vData||[]).map(r=>({...r, date:r.visit_date, time:(r.visit_time||'').slice(0,5), customer:r.customer||'', note:r.note||''}));
+    render();
+  }catch(e){
+    console.warn('Sync hatası:', e);
+    render();
+  }
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-action]');
+  if(!b) return;
+  const a = b.dataset.action;
+  
+  if(a==='toggle-view'){
+    ui.viewMode = b.dataset.mode;
+    localStorage.setItem('pcs_view', ui.viewMode);
+    render();
+    return;
+  }
+  if(a==='whatsapp'){
+    const v = state.visits.find(x => x.id === b.dataset.id);
+    if(v) sendWhatsApp(v);
+    return;
+  }
+  if(a==='nav'){ ui.page = b.dataset.page; render(); return; }
+  if(a==='day'){ ui.day = b.dataset.date; render(); return; }
+  if(a==='prev-week'){ ui.week = Math.max(1, ui.week-1); render(); return; }
+  if(a==='next-week'){ ui.week = ui.week+1; render(); return; }
+  if(a==='this-week'){ ui.year=weekNow.year; ui.week=weekNow.week; ui.day='all'; render(); return; }
+  if(a==='collapse'){ ui.collapsed.has(b.dataset.date)?ui.collapsed.delete(b.dataset.date):ui.collapsed.add(b.dataset.date); render(); return; }
+  if(a==='add-visit'){ openVisitForm(null, b.dataset.date); return; }
+  if(a==='add-reg'){ openRegistryForm(); return; }
+  if(a==='edit-visit'){ openVisitForm(b.dataset.id); return; }
+  if(a==='close-modal'){ closeModal(); return; }
+  if(a==='signout'){ await client.auth.signOut(); account=null; authScreen(); return; }
+  if(a==='delete-visit'){
+    if(!canEdit()) return;
+    if(confirm('Bu geliş kaydı silinsin mi?')){
+      await client.from('visits').delete().eq('id', b.dataset.id);
+      await syncData();
+      toast('Araç silindi.');
+    }
+    return;
+  }
+});
+
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if(t.dataset.check){
+    if(!canEdit()){ toast('Düzenleme yetkiniz yok.', true); return; }
+    const key = t.dataset.check, id = t.dataset.id, val = t.checked;
+    await client.from('visits').update({[key]: val}).eq('id', id);
+    await syncData();
+    toast('Durum güncellendi.');
+    return;
+  }
+});
+
+document.addEventListener('input', e => {
+  if(e.target.id==='board-search'){ ui.search = e.target.value; render(); }
+});
+
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  if(e.target.id==='auth-form'){
+    const f=e.target;
+    try{
+      const {error, data} = await client.auth.signInWithPassword({email: f.elements.email.value.trim(), password: f.elements.password.value});
+      if(error) throw error;
+      account = data.user;
+      await syncData();
+    }catch(err){ document.getElementById('auth-message').textContent = err.message || 'Giriş yapılamadı.'; }
+    return;
+  }
+  if(e.target.id==='visit-form'){
+    const f=e.target, fd=new FormData(f), id=f.dataset.id;
+    const v={
+      plate: plateText(fd.get('plate')),
+      customer: String(fd.get('customer')||'').trim(),
+      declaration: String(fd.get('declaration')||'').trim(),
+      carrier: String(fd.get('carrier')||'').trim(),
+      visit_date: fd.get('date'),
+      visit_time: fd.get('time') || null,
+      note: String(fd.get('note')||'').trim(),
+      onsite: fd.has('onsite'),
+      t1: fd.has('t1'),
+      done: fd.has('done')
+    };
+    if(id){ await client.from('visits').update(v).eq('id', id); }
+    else { await client.from('visits').insert({id: uid(), ...v}); }
+    closeModal();
+    await syncData();
+    toast('Araç kaydedildi.');
+    return;
+  }
+});
+
+/* Açılış Tetikleyicisi */
+client.auth.getSession().then(({data:{session}})=>{
+  account = session?.user || null;
+  if(account) syncData();
+  else authScreen();
+}).catch(()=>authScreen());
+
+})();
+</script>
+</body>
+</html>
