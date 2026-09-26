@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<meta name="theme-color" content="#0f172a">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<title>PCS TRANSİT YYS | Akıllı Operasyon Portalı</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --bg-app: #f8fafc;
+  --surface: #ffffff;
+  --surface-subtle: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  
+  --brand-navy: #0f172a;
+  --brand-navy-light: #1e293b;
+  --brand-blue: #2563eb;
+  --brand-blue-pale: #eff6ff;
+  
+  --status-onsite: #f59e0b;
+  --status-onsite-bg: #fffbeb;
+  --status-onsite-border: #fde68a;
+  --status-onsite-text: #92400e;
+
+  --status-t1: #2563eb;
+  --status-t1-bg: #eff6ff;
+  --status-t1-border: #bfdbfe;
+  --status-t1-text: #1e40af;
+
+  --status-done: #10b981;
+  --status-done-bg: #ecfdf5;
+  --status-done-border: #a7f3d0;
+  --status-done-text: #065f46;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+  
+  --sidebar-w: 240px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-main);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font-family: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+a { color: var(--brand-blue); text-decoration: none; }
+svg { width: 18px; height: 18px; vertical-align: middle; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Gerçek Türk Plakası Rozeti */
+.tr-plate {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #1e293b;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  vertical-align: middle;
+  line-height: 1;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+.tr-plate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+}
+.tr-plate .tr-flag {
+  background: #1d4ed8;
+  color: #ffffff;
+  font-family: var(--font-main);
+  font-size: 8.5px;
+  font-weight: 900;
+  padding: 5px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.5px;
+}
+.tr-plate .tr-num {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 13.5px;
+  letter-spacing: 1.2px;
+  color: #0f172a;
+  padding: 5px 9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* App Shell Layout */
+.app-layout { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.app-sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  padding: 24px 16px;
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.brand-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+}
+.brand-icon-box img { width: 28px; height: 28px; object-fit: contain; }
+.brand-titles { display: flex; flex-direction: column; }
+.brand-title-main { font-weight: 800; font-size: 15px; letter-spacing: -0.3px; color: var(--text-main); }
+.brand-title-sub { font-size: 10px; font-weight: 700; color: var(--brand-blue); letter-spacing: 1.2px; }
+
+.sidebar-nav-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--text-subtle);
+  padding: 0 10px 8px;
+  text-transform: uppercase;
+}
+.sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 13.5px;
+  transition: all 0.15s ease;
+}
+.sidebar-link:hover { background: var(--surface-subtle); color: var(--text-main); }
+.sidebar-link.active { background: var(--brand-blue-pale); color: var(--brand-blue); font-weight: 700; }
+.sidebar-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+}
+.sidebar-link.active .sidebar-badge { background: #dbeafe; color: var(--brand-blue); }
+
+.sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+.user-pill { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface-subtle); }
+.user-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--brand-navy); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+.user-details { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.user-name { font-size: 12.5px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { font-size: 10.5px; font-weight: 600; color: var(--brand-blue); }
+
+/* Main Content Area */
+.app-main { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
+
+/* Header Topbar */
+.topbar {
+  height: 64px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.page-title-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; padding: 4px 10px; border-radius: 99px; background: var(--surface-subtle); color: var(--text-muted); text-transform: uppercase; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.live-sync-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #059669; background: #ecfdf5; padding: 5px 11px; border-radius: 99px; }
+.live-pulse { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+/* Page Container */
+.page-container { padding: 28px 32px 60px; max-width: 1720px; width: 100%; margin: 0 auto; }
+
+/* Hero Section */
+.hero-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+.hero-title-area h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.6px; margin: 0 0 6px; color: var(--text-main); }
+.hero-title-area p { margin: 0; font-size: 13.5px; color: var(--text-muted); }
+.hero-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; border-radius: var(--radius-md); font-size: 13px; font-weight: 700; line-height: 1.2; transition: all 0.15s ease; white-space: nowrap; border: 1px solid var(--border); background: var(--surface); color: var(--text-main); }
+.btn:hover { background: var(--surface-subtle); border-color: var(--border-strong); }
+.btn.btn-primary { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2); }
+.btn.btn-primary:hover { background: var(--brand-navy-light); border-color: var(--brand-navy-light); transform: translateY(-1px); }
+.btn.btn-blue { background: var(--brand-blue); color: #fff; border-color: var(--brand-blue); }
+.btn.btn-blue:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.btn.btn-soft { background: var(--brand-blue-pale); color: var(--brand-blue); border-color: transparent; }
+.btn.btn-soft:hover { background: #dbeafe; }
+.btn.btn-sm { padding: 6px 11px; font-size: 12px; border-radius: var(--radius-sm); }
+.btn-icon { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: var(--radius-sm); }
+
+/* KPI Stats Dashboard */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.stat-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+.stat-icon-wrapper { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
+.stat-card.total .stat-icon-wrapper { background: #f1f5f9; color: #475569; }
+.stat-card.onsite .stat-icon-wrapper { background: var(--status-onsite-bg); color: var(--status-onsite); }
+.stat-card.t1 .stat-icon-wrapper { background: var(--status-t1-bg); color: var(--status-t1); }
+.stat-card.done .stat-icon-wrapper { background: var(--status-done-bg); color: var(--status-done); }
+.stat-card.pending .stat-icon-wrapper { background: #fef2f2; color: #ef4444; }
+
+.stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1.1; color: var(--text-main); margin-bottom: 6px; font-family: var(--font-mono); }
+.stat-desc { font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+
+/* Control Bar (Week, Day Tabs, View Switcher) */
+.controls-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; box-shadow: var(--shadow-card); margin-bottom: 24px; }
+.controls-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.week-navigator { display: flex; align-items: center; gap: 8px; }
+.week-label { font-weight: 800; font-size: 16px; color: var(--text-main); margin: 0 4px; }
+.week-dates { font-size: 12.5px; color: var(--text-muted); font-weight: 600; margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--border); }
+.view-toggles { display: flex; align-items: center; gap: 6px; background: var(--surface-subtle); padding: 4px; border-radius: 10px; }
+.view-toggle-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 7px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.view-toggle-btn.active { background: #ffffff; color: var(--text-main); box-shadow: var(--shadow-sm); }
+
+/* Day Selector Tabs */
+.day-tabs-row { display: grid; grid-template-columns: 1.2fr repeat(6, 1fr); gap: 8px; padding-top: 14px; }
+.day-tab-btn { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: var(--radius-md); background: var(--surface-subtle); border: 1.5px solid transparent; text-align: left; transition: all 0.15s ease; }
+.day-tab-btn:hover { background: #e2e8f0; }
+.day-tab-btn.active { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15); }
+.day-tab-info { display: flex; flex-direction: column; }
+.day-tab-name { font-size: 13px; font-weight: 700; }
+.day-tab-date { font-size: 11px; opacity: 0.75; font-weight: 500; }
+.day-tab-count { font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 99px; background: rgba(0,0,0,0.06); }
+.day-tab-btn.active .day-tab-count { background: var(--brand-blue); color: #fff; }
+
+/* Quick Filter Bar */
+.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.search-wrapper { position: relative; width: 320px; max-width: 100%; }
+.search-wrapper svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-subtle); }
+.search-input { width: 100%; padding: 9px 12px 9px 38px; border-radius: var(--radius-md); border: 1px solid var(--border); background: #fff; font-size: 13px; outline: none; transition: border-color 0.15s; }
+.search-input:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+.filter-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-chip { padding: 6px 12px; border-radius: 99px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: #fff; color: var(--text-muted); transition: all 0.15s ease; }
+.filter-chip:hover { background: var(--surface-subtle); color: var(--text-main); }
+.filter-chip.active { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); }
+
+/* Day Block Section */
+.day-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-card); }
+.day-section-header { padding: 16px 24px; background: #ffffff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.day-header-left { display: flex; align-items: center; gap: 14px; }
+.day-date-badge { width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--brand-navy); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--font-mono); }
+.day-date-badge b { font-size: 17px; line-height: 1; }
+.day-date-badge small { font-size: 9px; text-transform: uppercase; font-weight: 700; opacity: 0.8; }
+.day-title-text h3 { font-size: 16px; font-weight: 800; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+.day-title-text p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+.today-pill { font-size: 10px; font-weight: 800; background: #dbeafe; color: #1d4ed8; padding: 2px 7px; border-radius: 99px; letter-spacing: 0.5px; }
+.day-header-right { display: flex; align-items: center; gap: 10px; }
+
+/* Table View */
+.table-responsive { width: 100%; overflow-x: auto; }
+.ops-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
+.ops-table th { padding: 12px 16px; background: var(--surface-subtle); font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.6px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ops-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; transition: background 0.15s ease; }
+.ops-table tr:last-child td { border-bottom: 0; }
+.ops-table tbody tr:hover td { background-color: #f8fafc; }
+
+/* Status Interactive Pills (Table & Cards) */
+.status-pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border-radius: 99px; font-size: 11.5px; font-weight: 800; cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text-muted); transition: all 0.15s ease; user-select: none; }
+.status-pill:hover { transform: scale(1.02); }
+.status-pill.active.onsite { background: var(--status-onsite-bg); border-color: var(--status-onsite-border); color: var(--status-onsite-text); }
+.status-pill.active.t1 { background: var(--status-t1-bg); border-color: var(--status-t1-border); color: var(--status-t1-text); }
+.status-pill.active.done { background: var(--status-done-bg); border-color: var(--status-done-border); color: var(--status-done-text); }
+
+/* Smart Flow Advance Button */
+.step-advance-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 700; border: 1px solid #e2e8f0; background: #f8fafc; color: #334155; transition: all 0.15s ease; }
+.step-advance-btn:hover { background: #e2e8f0; color: #0f172a; }
+.step-advance-btn.stage-0 { background: #f1f5f9; color: #475569; }
+.step-advance-btn.stage-1 { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.step-advance-btn.stage-2 { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.step-advance-btn.stage-3 { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+
+/* Visual Kanban / Card View */
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 20px; background: #fafafa; }
+.vehicle-card { background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 14px; transition: all 0.2s ease; position: relative; }
+.vehicle-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: #cbd5e1; }
+.vehicle-card.status-done { border-left: 4px solid var(--status-done); }
+.vehicle-card.status-t1 { border-left: 4px solid var(--status-t1); }
+.vehicle-card.status-onsite { border-left: 4px solid var(--status-onsite); }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.customer-badge { font-size: 11px; font-weight: 800; padding: 4px 9px; border-radius: 6px; background: #f1f5f9; color: #1e293b; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-details-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: var(--surface-subtle); padding: 10px 12px; border-radius: var(--radius-md); }
+.detail-item { display: flex; flex-direction: column; gap: 2px; }
+.detail-item span { font-size: 10px; font-weight: 700; color: var(--text-subtle); text-transform: uppercase; }
+.detail-item b { font-size: 12px; color: var(--text-main); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.card-status-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.card-status-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; border-radius: 8px; border: 1px solid var(--border); background: #ffffff; color: var(--text-muted); font-size: 11px; font-weight: 700; transition: all 0.15s ease; }
+.card-status-btn.active.onsite { background: var(--status-onsite); color: #ffffff; border-color: var(--status-onsite); }
+.card-status-btn.active.t1 { background: var(--status-t1); color: #ffffff; border-color: var(--status-t1); }
+.card-status-btn.active.done { background: var(--status-done); color: #ffffff; border-color: var(--status-done); }
+
+.card-actions-row { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); }
+.whatsapp-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 5px 10px; border-radius: 6px; transition: all 0.15s ease; }
+.whatsapp-btn:hover { background: #10b981; color: #ffffff; }
+
+/* Modals & Dialogs */
+dialog { border: 0; border-radius: var(--radius-xl); padding: 0; background: #ffffff; color: var(--text-main); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); max-width: 580px; width: calc(100% - 32px); max-height: 90vh; overflow: auto; }
+dialog::backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; background: var(--surface-subtle); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.form-group label { font-size: 12px; font-weight: 700; color: #334155; }
+.form-input { width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 13.5px; background: #fff; outline: none; }
+.form-input:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+.plate-form-input { font-family: var(--font-mono); font-weight: 800; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; }
+
+/* Toast */
+#toast { position: fixed; bottom: 24px; right: 24px; background: var(--brand-navy); color: #ffffff; padding: 12px 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); font-size: 13px; font-weight: 700; z-index: 100; opacity: 0; transform: translateY(10px); transition: all 0.2s ease; pointer-events: none; }
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.error { background: #dc2626; }
+
+/* Responsive Mobile Rules */
+@media (max-width: 900px) {
+  .app-sidebar { display: none; }
+  .app-main { margin-left: 0; }
+  .topbar { padding: 0 16px; }
+  .page-container { padding: 16px 14px 80px; }
+  .day-tabs-row { grid-template-columns: repeat(3, 1fr); }
+  .day-tab-btn:first-child { grid-column: 1 / -1; }
+  
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: #ffffff;
+    border-top: 1px solid var(--border);
+    z-index: 50;
+    padding: 0 8px;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+  }
+  .mob-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--text-muted); padding: 6px 12px; border-radius: 8px; }
+  .mob-nav-item.active { color: var(--brand-blue); }
+  .mob-nav-item svg { width: 20px; height: 20px; }
+}
+
+@media (min-width: 901px) {
+  .mobile-bottom-nav { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<dialog id="modal"></dialog>
+<div id="toast"></div>
+<input type="file" id="registry-file" accept=".xlsx,.csv,.tsv" hidden>
+<input type="file" id="backup-file" accept=".json" hidden>
+<script src="vendor.js"></script>
+<script>
+/* Workbook templates */
+window.PCS_TEMPLATES={"operations":{"files":{"docProps/app.xml":"<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>Microsoft Excel Compatible / Openpyxl 3.1.5</Application><AppVersion>3.1</AppVersion></Properties>"},"styles":{"title":1,"subtitle":2,"header":3,"text":4,"input":5,"linked":6,"muted":7,"date":8,"integer":9,"status":10,"total":11,"percent":12}}};
+</script>
+<script>
+(() => {
+'use strict';
+const STORE = 'pcs-transit-yys.v1';
+const DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+const SHORT_DAYS = ['Pzt','Sal','Çar','Per','Cum','Cmt'];
+const I = {
+  truck: '<path d="M3 6h11v12H3zM14 10h4l3 4v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  cards: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
+  table: '<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  registry: '<path d="M4 5h16v14H4zM8 5V3m8 2V3M4 10h16"/><path d="M8 14h3m3 0h2"/>',
+  chart: '<path d="M4 4v16h17M8 16v-5m5 5V7m5 9v-8"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16l5 5"/>',
+  check: '<path d="M5 12l4 4L19 6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  whatsapp: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  edit: '<path d="M14 5l5 5M4 20l4-1L20 7a2.1 2.1 0 00-3-3L5 16z"/>',
+  trash: '<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
+  download: '<path d="M12 3v12m-5-5l5 5 5-5M4 16v5h16v-5"/>'
+};
+
+const icon = (n, cls='') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]||I.grid}</svg>`;
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = p => String(p||'').normalize('NFKC').toUpperCase().replace(/\u0130/g,'I').replace(/[\s.-]+/g,'');
+const plateText = p => String(p||'').trim().toUpperCase().replace(/\s+/g,' ');
+const uid = () => globalThis.crypto?.randomUUID?.() || ('id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+
+function localToday(){
+  const p = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const x = t => p.find(a=>a.type===t).value;
+  return `${x('year')}-${x('month')}-${x('day')}`;
+}
+const TODAY = localToday();
+
+function dateObj(s){ return new Date(s+'T12:00:00Z'); }
+function addDays(s, n){ return new Date(dateObj(s).getTime()+n*86400000).toISOString().slice(0,10); }
+function weekInfo(s){
+  let d = dateObj(s);
+  d.setUTCHours(0,0,0,0);
+  d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));
+  const y = d.getUTCFullYear();
+  return {year:y, week:Math.ceil((((d-new Date(Date.UTC(y,0,1)))/86400000)+1)/7)};
+}
+function monday(y,w){
+  const d = new Date(Date.UTC(y,0,4,12));
+  d.setUTCDate(d.getUTCDate()-(d.getUTCDay()||7)+1+(w-1)*7);
+  return d.toISOString().slice(0,10);
+}
+const weekNow = weekInfo(TODAY);
+
+let ui = {
+  page: 'pano',
+  viewMode: window.innerWidth < 850 ? 'cards' : 'table',
+  filterStatus: 'all',
+  year: weekNow.year,
+  week: weekNow.week,
+  day: 'all',
+  search: ''
+};
+
+let state = {
+  registry: [],
+  visits: [
+    {id:'demo-1', plate:'34 FF 8177', customer:'ETL LOJİSTİK - ERVİN', declaration:'BYN-2026-901', carrier:'BULTRANS LTD', registration:'34-FF-8177-RUH', date:TODAY, time:'09:15', onsite:true, t1:true, done:false, note:'Evrak kontrolü yapıldı.'},
+    {id:'demo-2', plate:'X 4627 EM', customer:'TORNADO EXPRESS', declaration:'BYN-2026-902', carrier:'TORNADO NAKLİYAT', registration:'X4627EM', date:TODAY, time:'10:30', onsite:true, t1:false, done:false, note:'Tesis girişinde.'},
+    {id:'demo-3', plate:'B 509 MIL', customer:'LİN TRANSPORT', declaration:'BYN-2026-903', carrier:'LİN LOJİSTİK', registration:'B509MIL', date:TODAY, time:'11:45', onsite:true, t1:true, done:true, note:'İşlemler tamamlandı, çıkış yapabilir.'}
+  ]
+};
+
+const weekStart = () => monday(ui.year, ui.week);
+const dates = () => Array.from({length:6}, (_,i) => addDays(weekStart(), i));
+const weekVisits = () => { const ds = dates(); return state.visits.filter(v => ds.includes(v.date)); };
+const stats = arr => ({
+  total: arr.length,
+  onsite: arr.filter(v => v.onsite).length,
+  t1: arr.filter(v => v.t1).length,
+  done: arr.filter(v => v.done).length,
+  pending: arr.filter(v => !v.done).length
+});
+
+function toast(msg, isErr=false){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' error' : '');
+  setTimeout(() => el.className = '', 3500);
+}
+
+function renderPlate(p){
+  const clean = plateText(p);
+  return `<span class="tr-plate"><span class="tr-flag">TR</span><span class="tr-num">${esc(clean)}</span></span>`;
+}
+
+function openWhatsApp(v){
+  const st = v.done ? 'gümrük ve T1 işlemleri tamamlanmıştır. Araç tesisten çıkış yapabilir.' : 
+             (v.t1 ? 'T1 beyannamesi yazılmıştır, gümrük kontrolleri devam etmektedir.' : 
+             (v.onsite ? 'aracı tesisimize giriş yapmıştır, evrak sırasına alınmıştır.' : 'araç geliş kaydı sisteme işlenmiştir.'));
+  const txt = `*PCS TRANSİT YYS BİLGİLENDİRME*\n\nSayın Yetkili,\n*${v.plate}* plakalı ${v.customer ? v.customer + ' ' : ''}aracınızın ${st}\n\nBeyanname: ${v.declaration || '—'}\nTarih: ${v.date}\nİyi çalışmalar dileriz.`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank');
+}
+
+function advanceVisitStatus(id){
+  const v = state.visits.find(x => x.id === id);
+  if(!v) return;
+  if(!v.onsite && !v.t1 && !v.done){ v.onsite = true; toast(`${v.plate} Tesiste yapıldı.`); }
+  else if(v.onsite && !v.t1 && !v.done){ v.t1 = true; toast(`${v.plate} T1 Yazıldı yapıldı.`); }
+  else if(v.t1 && !v.done){ v.done = true; toast(`${v.plate} İşlemler Bitti olarak tamamlandı.`); }
+  else { v.onsite = false; v.t1 = false; v.done = false; toast(`${v.plate} durumu sıfırlandı.`); }
+  render();
+}
+
+function render(){
+  const wv = weekVisits();
+  const ds = ui.day === 'all' ? dates() : [ui.day];
+  const st = stats(wv);
+  
+  let shown = wv.filter(v => ui.day === 'all' || v.date === ui.day);
+  if(ui.search.trim()){
+    const q = norm(ui.search);
+    shown = shown.filter(v => norm(v.plate).includes(q) || norm(v.customer).includes(q) || norm(v.declaration).includes(q));
+  }
+  if(ui.filterStatus === 'pending') shown = shown.filter(v => !v.done);
+  else if(ui.filterStatus === 'onsite') shown = shown.filter(v => v.onsite && !v.t1);
+  else if(ui.filterStatus === 't1') shown = shown.filter(v => v.t1 && !v.done);
+  else if(ui.filterStatus === 'done') shown = shown.filter(v => v.done);
+
+  document.getElementById('app').innerHTML = `
+    <div class="app-layout">
+      <aside class="app-sidebar">
+        <div class="app-brand">
+          <div class="brand-icon-box">${icon('truck')}</div>
+          <div class="brand-titles">
+            <span class="brand-title-main">PCS TRANSİT</span>
+            <span class="brand-title-sub">YYS OPERASYON</span>
+          </div>
+        </div>
+        <div class="sidebar-nav-title">Operasyon Menüsü</div>
+        <nav class="sidebar-nav">
+          <button class="sidebar-link ${ui.page==='pano'?'active':''}" data-page="pano">${icon('grid')}<span>Operasyon Panosu</span><span class="sidebar-badge">${wv.length}</span></button>
+          <button class="sidebar-link ${ui.page==='pending'?'active':''}" data-page="pending">${icon('clock')}<span>Bekleyen Araçlar</span><span class="sidebar-badge">${st.pending}</span></button>
+          <button class="sidebar-link ${ui.page==='registry'?'active':''}" data-page="registry">${icon('registry')}<span>Plaka Kayıtları</span></button>
+          <button class="sidebar-link ${ui.page==='reports'?'active':''}" data-page="reports">${icon('chart')}<span>Raporlar & Analiz</span></button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="user-pill">
+            <div class="user-avatar">AK</div>
+            <div class="user-details">
+              <span class="user-name">Atakan Kolbaşı</span>
+              <span class="user-role">Sistem Yöneticisi</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="app-main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <span class="page-title-badge">YYS YETKİLİ TESİS</span>
+          </div>
+          <div class="topbar-right">
+            <div class="live-sync-indicator"><span class="live-pulse"></span>Canlı Sistem</div>
+            <button class="btn btn-sm" id="btn-export">${icon('download')}Excel</button>
+            <button class="btn btn-primary btn-sm" id="btn-add-vehicle">${icon('plus')}Araç Ekle</button>
+          </div>
+        </header>
+
+        <div class="page-container">
+          <div class="hero-header">
+            <div class="hero-title-area">
+              <h1>Araç Operasyon & Gümrük Panosu</h1>
+              <p>Tesis araç gelişleri, T1 durumları ve beyanname süreçlerini tek merkezden yönetin.</p>
+            </div>
+            <div class="hero-actions">
+              <div class="view-toggles">
+                <button class="view-toggle-btn ${ui.viewMode==='table'?'active':''}" data-view="table">${icon('table')}Tablo</button>
+                <button class="view-toggle-btn ${ui.viewMode==='cards'?'active':''}" data-view="cards">${icon('cards')}Kartlar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI Cards -->
+          <div class="stats-grid">
+            <div class="stat-card total"><div class="stat-card-top"><span class="stat-label">Toplam Araç</span><div class="stat-icon-wrapper">${icon('truck')}</div></div><div class="stat-value">${st.total}</div><div class="stat-desc">Bu haftanın kayıtları</div></div>
+            <div class="stat-card onsite"><div class="stat-card-top"><span class="stat-label">Tesiste</span><div class="stat-icon-wrapper">${icon('calendar')}</div></div><div class="stat-value">${st.onsite}</div><div class="stat-desc">Sahadaki araç sayısı</div></div>
+            <div class="stat-card t1"><div class="stat-card-top"><span class="stat-label">T1 Yazıldı</span><div class="stat-icon-wrapper">${icon('zap')}</div></div><div class="stat-value">${st.t1}</div><div class="stat-desc">Evrağı hazır araçlar</div></div>
+            <div class="stat-card done"><div class="stat-card-top"><span class="stat-label">Tamamlanan</span><div class="stat-icon-wrapper">${icon('check')}</div></div><div class="stat-value">${st.done}</div><div class="stat-desc">İşlemleri biten araçlar</div></div>
+          </div>
+
+          <!-- Controls Card -->
+          <div class="controls-card">
+            <div class="controls-top">
+              <div class="week-navigator">
+                <button class="btn btn-sm btn-icon" id="btn-prev-wk">&lt;</button>
+                <span class="week-label">${ui.week}. Hafta · ${ui.year}</span>
+                <button class="btn btn-sm btn-icon" id="btn-next-wk">&gt;</button>
+                <span class="week-dates">${dates()[0]} – ${dates()[5]}</span>
+              </div>
+            </div>
+            <div class="day-tabs-row">
+              <button class="day-tab-btn ${ui.day==='all'?'active':''}" data-day="all">
+                <div class="day-tab-info"><span class="day-tab-name">Tüm Hafta</span><span class="day-tab-date">6 İş Günü</span></div>
+                <span class="day-tab-count">${wv.length}</span>
+              </button>
+              ${dates().map((d, i) => `
+                <button class="day-tab-btn ${ui.day===d?'active':''}" data-day="${d}">
+                  <div class="day-tab-info"><span class="day-tab-name">${DAYS[i]}</span><span class="day-tab-date">${d.slice(5)}</span></div>
+                  <span class="day-tab-count">${wv.filter(x=>x.date===d).length}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="filter-bar">
+            <div class="search-wrapper">
+              ${icon('search')}
+              <input type="text" class="search-input" id="search-box" placeholder="Plaka, müşteri, beyanname ara..." value="${esc(ui.search)}">
+            </div>
+            <div class="filter-chips">
+              <button class="filter-chip ${ui.filterStatus==='all'?'active':''}" data-filter="all">Tümü (${wv.length})</button>
+              <button class="filter-chip ${ui.filterStatus==='pending'?'active':''}" data-filter="pending">Bekleyenler (${st.pending})</button>
+              <button class="filter-chip ${ui.filterStatus==='onsite'?'active':''}" data-filter="onsite">Tesiste (${st.onsite})</button>
+              <button class="filter-chip ${ui.filterStatus==='t1'?'active':''}" data-filter="t1">T1 Hazır (${st.t1})</button>
+              <button class="filter-chip ${ui.filterStatus==='done'?'active':''}" data-filter="done">Tamamlananlar (${st.done})</button>
+            </div>
+          </div>
+
+          <!-- Content: Table or Cards -->
+          ${ds.map(d => {
+            const dayList = shown.filter(v => v.date === d);
+            const dayIndex = dates().indexOf(d);
+            return `
+              <section class="day-section">
+                <div class="day-section-header">
+                  <div class="day-header-left">
+                    <div class="day-date-badge"><b>${d.slice(8)}</b><small>${SHORT_DAYS[dayIndex]}</small></div>
+                    <div class="day-title-text">
+                      <h3>${DAYS[dayIndex]}${d===TODAY?' <span class="today-pill">BUGÜN</span>':''}</h3>
+                      <p>${d} ·${dayList.length} Araç Kaydı</p>
+                    </div>
+                  </div>
+                  <div class="day-header-right">
+                    <button class="btn btn-sm btn-soft" data-action="add-to-day" data-date="${d}">${icon('plus')} Bu Güne Ekle</button>
+                  </div>
+                </div>
+
+                ${!dayList.length ? `<div style="padding: 32px; text-align: center; color: #94a3b8; font-size: 13px;">Bu tarih için uygun araç kaydı bulunmuyor.</div>` : 
+                  ui.viewMode === 'cards' ? `
+                    <div class="cards-grid">
+                      ${dayList.map(v => `
+                        <div class="vehicle-card ${v.done?'status-done':v.t1?'status-t1':v.onsite?'status-onsite':''}">
+                          <div class="card-header-row">
+                            ${renderPlate(v.plate)}
+                            <span class="customer-badge" title="${esc(v.customer)}">${esc(v.customer||'Müşterisiz')}</span>
+                          </div>
+                          <div class="card-details-grid">
+                            <div class="detail-item"><span>Beyanname</span><b>${esc(v.declaration||'—')}</b></div>
+                            <div class="detail-item"><span>Nakliyeci</span><b>${esc(v.carrier||'—')}</b></div>
+                            <div class="detail-item"><span>Geliş Saati</span><b>${esc(v.time||'—')}</b></div>
+                            <div class="detail-item"><span>Ruhsat</span><b>${esc(v.registration||'—')}</b></div>
+                          </div>
+                          ${v.note ? `<div style="font-size:12px; color:#64748b; background:#f8fafc; padding:8px 10px; border-radius:6px;">📝 ${esc(v.note)}</div>` : ''}
+                          <div class="card-status-bar">
+                            <button class="card-status-btn ${v.onsite?'active onsite':''}" data-toggle="onsite" data-id="${v.id}">${icon('check')}Tesiste</button>
+                            <button class="card-status-btn ${v.t1?'active t1':''}" data-toggle="t1" data-id="${v.id}">${icon('zap')}T1 Yazıldı</button>
+                            <button class="card-status-btn ${v.done?'active done':''}" data-toggle="done" data-id="${v.id}">${icon('check')}Bitti</button>
+                          </div>
+                          <div class="card-actions-row">
+                            <button class="step-advance-btn ${v.done?'stage-3':v.t1?'stage-2':v.onsite?'stage-1':'stage-0'}" data-action="advance" data-id="${v.id}">
+                              ${icon('zap')}${v.done?'Tamamlandı (Başa Al)':v.t1?'İşlemler Bitti Yap':v.onsite?'T1 Yazıldı Yap':'Tesiste Yap'}
+                            </button>
+                            <div style="display:flex; gap:6px;">
+                              <button class="whatsapp-btn" data-action="wa" data-id="${v.id}">${icon('whatsapp')}WhatsApp</button>
+                              <button class="btn btn-sm btn-icon" data-action="delete" data-id="${v.id}" style="color:#ef4444;">${icon('trash')}</button>
+                            </div>
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : `
+                    <div class="table-responsive">
+                      <table class="ops-table">
+                        <thead>
+                          <tr>
+                            <th>PLAKA</th>
+                            <th>MÜŞTERİ</th>
+                            <th>BEYANNAME</th>
+                            <th>DURUM İLERLEME</th>
+                            <th>TESİSTE</th>
+                            <th>T1 YAZILDI</th>
+                            <th>İŞLEMLER BİTTİ</th>
+                            <th>NAKLİYECİ</th>
+                            <th>SAAT</th>
+                            <th>AKSİYON</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${dayList.map(v => `
+                            <tr>
+                              <td>${renderPlate(v.plate)}</td>
+                              <td><b style="font-weight:700;">${esc(v.customer)}</b></td>
+                              <td><span style="font-family:var(--font-mono); font-size:12.5px; color:#475569;">${esc(v.declaration||'—')}</span></td>
+                              <td>
+                                <button class="step-advance-btn ${v.done?'stage-3':v.t1?'stage-2':v.onsite?'stage-1':'stage-0'}" data-action="advance" data-id="${v.id}">
+                                  ${icon('zap')}${v.done?'Tamamlandı':v.t1?'Bitti Yap':v.onsite?'T1 Yap':'Tesiste Yap'}
+                                </button>
+                              </td>
+                              <td><span class="status-pill ${v.onsite?'active onsite':''}" data-toggle="onsite" data-id="${v.id}">${v.onsite?'✓ EVET':'HAYIR'}</span></td>
+                              <td><span class="status-pill ${v.t1?'active t1':''}" data-toggle="t1" data-id="${v.id}">${v.t1?'✓ EVET':'HAYIR'}</span></td>
+                              <td><span class="status-pill ${v.done?'active done':''}" data-toggle="done" data-id="${v.id}">${v.done?'✓ EVET':'HAYIR'}</span></td>
+                              <td>${esc(v.carrier||'—')}</td>
+                              <td style="font-family:var(--font-mono);">${esc(v.time||'—')}</td>
+                              <td>
+                                <div style="display:flex; gap:6px;">
+                                  <button class="whatsapp-btn" data-action="wa" data-id="${v.id}">${icon('whatsapp')}</button>
+                                  <button class="btn btn-sm btn-icon" data-action="delete" data-id="${v.id}" style="color:#ef4444;">${icon('trash')}</button>
+                                </div>
+                              </td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                  `
+                }
+              </section>
+            `;
+          }).join('')}
+        </div>
+      </main>
+
+      <!-- Mobile Bottom Navigation -->
+      <nav class="mobile-bottom-nav">
+        <button class="mob-nav-item ${ui.page==='pano'?'active':''}" data-page="pano">${icon('grid')}<span>Pano</span></button>
+        <button class="mob-nav-item ${ui.page==='pending'?'active':''}" data-page="pending">${icon('clock')}<span>Bekleyen</span></button>
+        <button class="mob-nav-item ${ui.page==='registry'?'active':''}" data-page="registry">${icon('registry')}<span>Plakalar</span></button>
+        <button class="mob-nav-item" id="mob-add-btn" style="color:var(--brand-blue);">${icon('plus')}<span>Ekle</span></button>
+      </nav>
+    </div>
+  `;
+
+  // Attach search focus restore
+  const sBox = document.getElementById('search-box');
+  if(sBox && document.activeElement?.id === 'search-box'){
+    sBox.focus();
+    sBox.setSelectionRange(sBox.value.length, sBox.value.length);
+  }
+}
+
+// Event Listeners
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  
+  if(btn.dataset.page){ ui.page = btn.dataset.page; render(); return; }
+  if(btn.dataset.view){ ui.viewMode = btn.dataset.view; render(); return; }
+  if(btn.dataset.filter){ ui.filterStatus = btn.dataset.filter; render(); return; }
+  if(btn.dataset.day){ ui.day = btn.dataset.day; render(); return; }
+  
+  if(btn.id === 'btn-prev-wk'){ ui.week = Math.max(1, ui.week - 1); render(); return; }
+  if(btn.id === 'btn-next-wk'){ ui.week = ui.week + 1; render(); return; }
+  
+  if(btn.dataset.toggle){
+    const field = btn.dataset.toggle;
+    const id = btn.dataset.id;
+    const item = state.visits.find(x => x.id === id);
+    if(item){
+      item[field] = !item[field];
+      toast(`${item.plate} durumu güncellendi.`);
+      render();
+    }
+    return;
+  }
+  
+  if(btn.dataset.action === 'advance'){
+    advanceVisitStatus(btn.dataset.id);
+    return;
+  }
+  
+  if(btn.dataset.action === 'wa'){
+    const item = state.visits.find(x => x.id === btn.dataset.id);
+    if(item) openWhatsApp(item);
+    return;
+  }
+  
+  if(btn.dataset.action === 'delete'){
+    if(confirm('Bu araç geliş kaydını silmek istiyor musunuz?')){
+      state.visits = state.visits.filter(x => x.id !== btn.dataset.id);
+      toast('Araç kaydı silindi.');
+      render();
+    }
+    return;
+  }
+
+  if(btn.id === 'btn-add-vehicle' || btn.id === 'mob-add-btn' || btn.dataset.action === 'add-to-day'){
+    const targetDate = btn.dataset.date || (ui.day !== 'all' ? ui.day : TODAY);
+    const p = prompt('Yeni Araç Plakası:');
+    if(!p || !p.trim()) return;
+    const c = prompt('Müşteri Adı:') || 'Genel Müşteri';
+    state.visits.push({
+      id: uid(),
+      plate: p.trim(),
+      customer: c.trim(),
+      declaration: '',
+      carrier: '',
+      registration: '',
+      date: targetDate,
+      time: '09:00',
+      onsite: true,
+      t1: false,
+      done: false,
+      note: ''
+    });
+    toast(`${p.toUpperCase()} aracı eklendi.`);
+    render();
+    return;
+  }
+});
+
+document.addEventListener('input', e => {
+  if(e.target.id === 'search-box'){
+    ui.search = e.target.value;
+    render();
+  }
+});
+
+render();
+})();
+</script>
+</body>
+</html>
