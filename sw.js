@@ -1,6 +1,8 @@
 /* PCS TRANSIT YYS - service worker.
  * Uygulama dosyalarını önbellekte tutar; internet yokken site yine açılır.
  * Önce ağ denenir (güncel sürüm her zaman ağdan gelir), ağ yoksa önbellekteki kopya kullanılır.
+ * GitHub Pages dosyaları tarayıcıda 10 dakika önbellekte tutar; bu yüzden her istek sunucuya
+ * "değişti mi?" diye sorularak (cache: 'no-cache') yapılır, güncelleme hemen görünür.
  * Supabase istekleri (başka alan adı) önbelleğe alınmaz. */
 const CACHE = 'pcs-shell-v1';
 const SHELL = [
@@ -11,7 +13,7 @@ const SHELL = [
 const NETWORK_TIMEOUT = 5000;
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => Promise.all(SHELL.map(url => cache.add(url).catch(() => null)))).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache => Promise.all(SHELL.map(url => cache.add(new Request(url, { cache: 'no-cache' })).catch(() => null)))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
@@ -25,7 +27,12 @@ self.addEventListener('fetch', event => {
   /* Sayfa istekleri (?izle=... dahil) tek kopya olarak './' anahtarıyla saklanır */
   const nav = req.mode === 'navigate', key = nav ? './' : req;
   let saved;
-  const network = fetch(req).then(res => {
+  /* Sayfa isteğinin ayarları değiştirilemediği için aynı adrese yeni bir istek yapılır;
+     yönlendirme olursa tarayıcı kendisi takip eder (redirect: 'manual'). */
+  const fresh = nav
+    ? new Request(req.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' })
+    : new Request(req, { cache: 'no-cache' });
+  const network = fetch(fresh).then(res => {
     if (res.ok && res.type === 'basic') {
       const copy = res.clone();
       saved = caches.open(CACHE).then(cache => cache.put(key, copy)).catch(() => {});

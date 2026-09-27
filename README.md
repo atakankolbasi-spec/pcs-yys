@@ -3,6 +3,9 @@
 Araç geliş ve gümrük işlemleri takip panosu. Kurulum gerektirmeyen statik bir sitedir;
 veriler Supabase'de tutulur.
 
+Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
+`main` dalına yapılan her değişiklik 1–2 dakika içinde otomatik yayına girer.
+
 ## Dosyalar
 
 | Dosya | İçerik |
@@ -15,9 +18,9 @@ veriler Supabase'de tutulur.
 | `vendor.js` | Supabase istemcisi |
 | `sw.js` | Service worker: internet yokken sitenin açılmasını sağlar |
 | `fonts/` | Roboto yazı tipi (WOFF2) |
-| `_headers` | Sunucu güvenlik başlıkları |
+| `_headers` | Sunucu güvenlik başlıkları. **GitHub Pages'te etkisizdir**; site Cloudflare Pages veya Netlify'a taşınırsa kullanılır. Gömülmeye (iframe) karşı koruma bu yüzden `app.js` başında yapılır. |
 | `supabase/` | Veritabanı tarafı notları ve kontrol sorguları |
-| `tests/` | Otomatik tarayıcı testleri (siteye dahil değildir) |
+| `tests/` | Otomatik tarayıcı testleri (uygulamanın parçası değildir) |
 
 ## Düzenleme yaparken
 

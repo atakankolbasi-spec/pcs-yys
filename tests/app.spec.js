@@ -157,6 +157,18 @@ test('tarih yardımcıları', async ({ page }) => {
   expect(r.today).toBe('2026-09-23');
 });
 
+test('başka bir sitenin içine (iframe) gömülünce uygulama açılmaz', async ({ page }) => {
+  await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
+  await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData() });
+  // 127.0.0.1 ile localhost farklı sitelerdir: saldırgan sayfa uygulamayı iframe içinde açar.
+  await page.goto('http://127.0.0.1:4173/__frame');
+  const framed = () => page.frames().find(f => f.url().startsWith('http://localhost:4173'));
+  await expect.poll(() => framed() && framed().evaluate(() => document.readyState)).toBe('complete');
+  const state = await framed().evaluate(() => [getComputedStyle(document.documentElement).display, document.getElementById('app').innerHTML]);
+  expect(state).toEqual(['none', '']);
+  expect(page.url()).toBe('http://127.0.0.1:4173/__frame');
+});
+
 test.describe('service worker', () => {
   test.use({ serviceWorkers: 'allow' });
   test('internet yokken site yine açılır', async ({ page, context }) => {
@@ -170,5 +182,20 @@ test.describe('service worker', () => {
     await page.reload();
     await expect(page.getByRole('button', { name: 'Giriş yap' })).toBeVisible();
     await context.setOffline(false);
+  });
+
+  test('dosyalar tarayıcı önbelleğine takılmadan sunucudan güncel alınır', async ({ page, request }) => {
+    // Test sunucusu, GitHub Pages gibi dosyaları 10 dakika önbelleğe aldırır (max-age=600).
+    // page.route tarayıcı önbelleğini kapattığı için bu testte sahte istemci kullanılmaz (oturum yok -> giriş ekranı).
+    await page.goto('/');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    const hits = async () => ((await (await request.get('/__hits')).json())['/app.css'] || 0);
+    // app.css ilk açılışta indirildi ve tarayıcı önbelleğinde 10 dakika geçerli. Normal bir istek bile
+    // service worker üzerinden sunucuya "değişti mi?" diye sormalı.
+    const before = await hits();
+    await page.evaluate(() => fetch('app.css').then(r => r.text()));
+    expect(await hits()).toBeGreaterThan(before);
   });
 });

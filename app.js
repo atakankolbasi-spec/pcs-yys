@@ -1,6 +1,9 @@
 /* PCS TRANSIT YYS - Supabase ortak veritabanlı araç operasyon panosu. */
 (() => {
 'use strict';
+/* Başka bir sitenin içine (iframe) gömülürse uygulamayı hiç açma: tıklama tuzağına (clickjacking) karşı.
+   GitHub Pages sunucu başlığı (X-Frame-Options) eklemeye izin vermediği için koruma burada yapılır. */
+if(window.top!==window.self){document.documentElement.style.display='none';try{window.top.location.replace(window.location.href);}catch(_){}return;}
 const STORE = 'pcs-transit-yys.v1';
 const DAY = 86400000;
 const DAYS = ['Pazartesi','Sal\u0131','\u00c7ar\u015famba','Per\u015fembe','Cuma','Cumartesi'];
@@ -877,7 +880,7 @@ async function importRegistry(){const plan=importPlan;if(!plan||!plan.add.length
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action="import-confirm"]');if(b&&!b.disabled&&canEdit())importRegistry();});
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));
 window.addEventListener('offline',()=>{if(!account)return;storageError='İnternet bağlantısı yok. Son alınan kayıtlar gösteriliyor; bağlantı gelince otomatik güncellenir.';render();});
 
 if(VIEW_TOKEN){account={id:'public-view',email:''};role='viewer';syncData();}else authScreen();
