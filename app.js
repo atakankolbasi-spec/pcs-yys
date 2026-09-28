@@ -925,7 +925,7 @@ function astAsk(text){return new Promise(resolve=>{const item={who:'confirm',tex
 function astResolve(ok){const c=ast.confirm;if(!c)return;ast.confirm=null;c.item.done=ok?'Onaylandı':'Vazgeçildi';astDraw();c.resolve(ok);}
 async function astCall(){
  const {data}=await client.auth.getSession();const token=data?.session?.access_token;if(!token)throw new Error('Oturum süresi dolmuş. Yeniden giriş yapın.');
- const r=await fetch(AST_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,apikey:SB_KEY},body:JSON.stringify({messages:ast.msgs})});
+ let r;try{r=await fetch(AST_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,apikey:SB_KEY},body:JSON.stringify({messages:ast.msgs})});}catch(_){throw new Error(navigator.onLine===false?'İnternet bağlantısı yok. Bağlantı gelince tekrar deneyin.':'Asistana ulaşılamadı: sunucu fonksiyonu yanıt vermedi veya erişime kapalı. Yöneticiye bildirin.');}
  let body=null;try{body=await r.json();}catch(_){}
  if(!r.ok||!body||!Array.isArray(body.content))throw new Error(body?.error||(r.status===404?'Asistan henüz kurulmamış (Supabase fonksiyonu yok). Yöneticiye bildirin.':'Asistana ulaşılamadı. Biraz sonra tekrar deneyin.'));
  return body;
