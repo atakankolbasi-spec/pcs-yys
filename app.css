@@ -1945,6 +1945,16 @@ html[data-theme="dark"]:not([data-weight="extra"]):not([data-weight="black"]) bo
 .rs-note.warn{color:#b45309}
 .rs-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 html.rs-dragging body::after{content:"Ruhsat fotoğrafını bırakın";position:fixed;inset:12px;display:grid;place-items:center;border:3px dashed var(--c-accent,#3453d1);border-radius:18px;background:color-mix(in srgb,var(--c-accent,#3453d1) 12%,transparent);color:var(--c-accent,#3453d1);font-size:22px;font-weight:800;z-index:200;pointer-events:none}
+.rs-badge{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;margin-left:6px;border-radius:999px;background:#16a34a;color:#fff;font-size:11px;font-weight:800;line-height:1}
+.rs-src{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--muted);margin-bottom:6px;text-transform:none}
+.rs-src svg{width:14px;height:14px;flex:none;color:#16a34a}
+.rs-src i{font-style:normal;color:var(--ink)}
+.rs-day svg{width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:#16a34a}
+.rs-thumb-empty{display:grid;place-items:center;color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent)}
+#ruhsat-wa:not(:empty){margin-bottom:16px}
+.rs-wa-head{margin-top:0}
+.rs-thumb-empty svg{width:30px;height:30px;opacity:.5}
+.rs-status.uzakta{color:var(--muted)}
 html[data-theme="dark"] .rs-status.hata{color:#fb923c}
 html[data-theme="dark"] .rs-note.warn{color:#fbbf24}
 @media(max-width:700px){.rs-item{grid-template-columns:88px 1fr;gap:10px}.rs-thumb{width:88px;height:88px}.rs-fields{grid-template-columns:1fr}}

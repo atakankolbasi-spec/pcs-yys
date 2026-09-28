@@ -350,6 +350,99 @@ test('WhatsApp\'tan kopyalanan resim kutuya, düğmeyle ya da dosya olarak yapı
   expect(problems).toEqual([]);
 });
 
+// WhatsApp numarasına gelmiş gibi kutuya düşen satır (sunucu fonksiyonunun eklediği biçimde).
+const waRow = (id, extra = {}) => ({
+  id, wa_message_id: 'wamid.' + id, from_number: '905321112233', sender_name: 'Ali Şoför', caption: '', media_path: `2026-09-22/${id}.png`, mime: 'image/png',
+  status: 'yeni', claimed_at: null, claimed_by: null, tractor: '', trailer: '', weights: [], fuzzy: false, note: '', plate: '', visit_id: null,
+  created_at: '2026-09-22T06:30:00Z', updated_at: '2026-09-22T06:30:00Z', ...extra
+});
+
+test('WhatsApp: kayıtlı araç panoya kendiliğinden eklenir, yeni araç kontrole düşer', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: 'KARGO SRL', registration: '14850 KG', updated_at: '2026-09-01T08:00:00Z' });
+  data.app_settings.push({ key: 'customer_contacts', value: { numbers: { 'YENİ LOJ': '0532 111 22 33' } }, updated_at: '2026-09-01T08:00:00Z' });
+  data.incoming_ruhsat = [waRow('w1'), waRow('w2', { created_at: '2026-09-22T06:31:00Z' })];
+  const files = {
+    '2026-09-22/w1.png': (await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700])).toString('base64'),
+    '2026-09-22/w2.png': (await fakeRuhsat(browser, ['PB4321AB', 7900], ['PB8765CD', 6100])).toString('base64')
+  };
+  const problems = await openApp(page, { data, files });
+  const row = id => page.evaluate(i => window.__db.incoming_ruhsat.find(r => r.id === i), id);
+
+  // 1) Kayıtlı çift: fotoğrafın geldiği güne (Salı), geldiği saatle eklenir; kutudaki satır kapanır.
+  await expect.poll(async () => (await row('w1')).status, { timeout: 120000 }).toBe('eklendi');
+  await expect.poll(async () => (await row('w2')).status, { timeout: 120000 }).toBe('bekliyor');
+  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  expect(inserted.map(v => [v.plate, v.customer, v.registration, v.visit_date, v.visit_time])).toEqual([
+    ['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG', '2026-09-22', '09:30']
+  ]);
+  expect((await row('w1')).visit_id).toBe(inserted[0].id);
+
+  // 2) Yeni araç: okunan plaka ve ağırlıklar kaydedilir, düğmede rozet çıkar.
+  const w2 = await row('w2');
+  expect([w2.tractor, w2.trailer, w2.weights]).toEqual(['PB4321AB', 'PB8765CD', [7900, 6100]]);
+  const open = page.locator('.heading [data-action="ruhsat-open"]');
+  await expect(open.locator('.rs-badge')).toHaveText('1');
+
+  // 3) Pencerede kontrol: gönderen görünür, müşteri gönderenin numarasından gelir, gün Salı olur.
+  await open.click();
+  const card = page.locator('#wa-w2');
+  await expect(card).toContainText('Ali Şoför');
+  await expect(card).toContainText('YENİ LOJ');
+  await expect(card).toContainText('7900 kg + 6100 kg = 14000 kg');
+  await expect(page.locator('#wa-w1')).toContainText('Panoya eklendi');
+  await card.locator('[data-action="ruhsat-form"]').click();
+  const form = page.locator('#visit-form');
+  await expect(form.locator('[name="plate"]')).toHaveValue('PB 4321 AB - PB 8765 CD');
+  await expect(form.locator('[name="customer"]')).toHaveValue('YENİ LOJ');
+  await expect(form.locator('[name="date"]')).toHaveValue('2026-09-22');
+  await form.locator('button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('kaydedildi');
+  await expect.poll(async () => (await row('w2')).status).toBe('eklendi');
+  await expect(open.locator('.rs-badge')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp: başka ekranın okuduğu fotoğrafa dokunulmaz, bekleyen listeden çıkarılabilir', async ({ page, context }) => {
+  const data = sampleData();
+  data.incoming_ruhsat = [
+    waRow('w3', { status: 'okunuyor', claimed_at: '2026-09-23T06:59:30Z', claimed_by: 'u2' }),
+    waRow('w4', { status: 'bekliyor', tractor: 'PB9999AA', trailer: 'PB8888BB', weights: [8000, 6500] })
+  ];
+  const problems = await openApp(page, { data, files: {} });
+  const open = page.locator('.heading [data-action="ruhsat-open"]');
+  await expect(open.locator('.rs-badge')).toHaveText('1');
+  await open.click();
+  await expect(page.locator('#wa-w3')).toContainText('Başka bir ekranda okunuyor');
+  await expect(page.locator('#wa-w4')).toContainText('8000 kg + 6500 kg = 14500 kg');
+  // Başka ekran bitirdi: satır "bekliyor" olunca bu ekranda da okunan bilgiler görünür.
+  await page.evaluate(() => { Object.assign(window.__db.incoming_ruhsat.find(r => r.id === 'w3'), { status: 'bekliyor', tractor: 'PB7777CC', trailer: 'PB6666DD' }); window.__rtEmit('incoming_ruhsat'); });
+  await expect(page.locator('#wa-w3 input').first()).toHaveValue('PB 7777 CC');
+  await expect(open.locator('.rs-badge')).toHaveText('2');
+  await page.locator('#wa-w4 [data-action="ruhsat-dismiss"]').click();
+  await expect(page.locator('#wa-w4')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__db.incoming_ruhsat.find(r => r.id === 'w4').status)).toBe('yoksayildi');
+  // Kimse bu ekranda fotoğraf okumaya kalkmadı (w3 başkasındaydı).
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'incoming_ruhsat' && c.op === 'update').length)).toBe(1);
+  expect(problems).toEqual([]);
+
+  // Görüntüleyici kutuya hiç bakmaz.
+  const viewer = await context.newPage();
+  await openApp(viewer, { role: 'viewer', data });
+  await expect(viewer.locator('#app')).toContainText('34 ABC 123');
+  expect(await viewer.evaluate(() => window.__calls.filter(c => c.table === 'incoming_ruhsat').length)).toBe(0);
+});
+
+test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
+  const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.clock.fastForward(95000);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'incoming_ruhsat').length)).toBe(1);
+  expect(problems).toEqual([]);
+});
+
 test('başka bir sitenin içine (iframe) gömülünce uygulama açılmaz', async ({ page }) => {
   await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
   await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData() });

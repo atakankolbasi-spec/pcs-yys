@@ -32,7 +32,7 @@ const iso = d => d.toISOString().slice(0,10);
 const addDays = (s,n) => iso(new Date(dateObj(s).getTime()+n*DAY));
 const validDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(dateObj(s)) && iso(dateObj(s))===s;
 const weekday = s => dateObj(s).getUTCDay();
-function localToday(){const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const x=t=>p.find(a=>a.type===t).value;return `${x('year')}-${x('month')}-${x('day')}`;}
+function localToday(at=new Date()){const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(at));const x=t=>p.find(a=>a.type===t).value;return `${x('year')}-${x('month')}-${x('day')}`;}
 const TODAY = localToday();
 const WORK_TODAY = weekday(TODAY)===0?addDays(TODAY,-1):TODAY; /* Pazar günü raporlar son iş gününden açılır */
 function weekInfo(s){let d=dateObj(s);d.setUTCHours(0,0,0,0);d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));const y=d.getUTCFullYear();return {year:y,week:Math.ceil((((d-new Date(Date.UTC(y,0,1)))/DAY)+1)/7)};}
@@ -223,7 +223,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -244,6 +244,7 @@ function onlineUI(){document.documentElement.classList.toggle('is-editor',role==
  const card=document.querySelector('.local-card');if(card)card.innerHTML=`<strong>Ortak çalışma alanı</strong><p>Değişiklikler 15 saniyede bir yenilenir.</p>${button('refresh','Şimdi yenile','','small')}`;
  const user=document.querySelector('.sidebar-user');if(user)user.innerHTML=`<span style="overflow-wrap:anywhere"><span class="acct-name">${esc(displayName(account?.email))}</span><small>${role==='editor'?'Düzenleyici':'Görüntüleyici'}</small>${button('signout','Çıkış yap','','small')}</span>`;
  const top=document.querySelector('.topbar-right');if(top&&!top.querySelector('[data-action="signout"]'))top.insertAdjacentHTML('beforeend',button('signout','Çıkış','','small'));
+ waBadge();
 }
 function mapRow(r,table){return {...r,...(table==='visits'?{date:r.visit_date,time:(r.visit_time||'').slice(0,5),createdAt:r.created_at}:{}),customer:r.customer||'',declaration:r.declaration||'',carrier:r.carrier||'',registration:r.registration||'',note:r.note||''};}
 async function fetchAll(table){let rows=[];for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('*').order('id').range(start,start+999);if(error)throw error;rows.push(...data.map(r=>mapRow(r,table)));if(data.length<1000)return rows;}}
@@ -271,7 +272,7 @@ let rtChannel=null,rtTimer=null;
 function startRealtime(){if(VIEW_TOKEN||rtChannel||typeof client.channel!=='function')return;
  const ping=()=>{clearTimeout(rtTimer);rtTimer=setTimeout(()=>{if(!document.hidden)syncData({remote:true,poll:true});},400);};
  try{rtChannel=client.channel('pcs-degisiklikler');for(const table of ['visits','registry','app_settings'])rtChannel.on('postgres_changes',{event:'*',schema:'public',table},ping);rtChannel.subscribe();}catch(_){rtChannel=null;}}
-function stopRealtime(){clearTimeout(rtTimer);if(rtChannel){try{client.removeChannel(rtChannel);}catch(_){}rtChannel=null;}}
+function stopRealtime(){clearTimeout(rtTimer);if(rtChannel){try{client.removeChannel(rtChannel);}catch(_){}rtChannel=null;}waStop();}
 async function syncData(opts={}){
  if(!account||busy)return;if(loading){if(Date.now()-syncStarted<SYNC_STUCK_MS){resync=true;return;}generation++;}
  loading=true;const run=++syncRun;syncStarted=Date.now();const stamp=generation;const prevVisits=opts.remote&&(realState?.visits||[]).length?realState.visits:null;
@@ -286,7 +287,7 @@ async function syncData(opts={}){
  if(!VIEW_TOKEN)saveCache();
  render();
  }catch(e){syncPrint='';if(stamp===generation){if(!VIEW_TOKEN&&isNetErr(e)&&!realState.visits.length&&!realState.registry.length&&loadCache()){render();return;}storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
- finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor')maybeCarry();}
+ finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor'){maybeCarry();waTick();}}
 }
 function friendly(e){if(isNetErr(e))return 'İnternet bağlantısı yok. Bağlantı gelince tekrar deneyin.';if(e.code==='23505')return 'Bu plaka zaten kayıtlı.';if(e.code==='42501')return 'Bu işlem için düzenleyici yetkisi gerekli.';if(e.code==='23514')return 'Plaka, müşteri ve Pazartesi–Cumartesi tarihini kontrol edin.';return e.message||'Bağlantıyı kontrol edip yeniden deneyin.';}
 function payload(r,table){const fields=['plate','customer','declaration','carrier','registration'];const p=Object.fromEntries(fields.map(k=>[k,r[k]||'']));if(table==='visits') Object.assign(p,{visit_date:r.date,visit_time:r.time||null,onsite:r.onsite,t1:r.t1,done:r.done,note:r.note||''});return p;}
@@ -957,7 +958,8 @@ function ruhsatResolve(cands,kinds={}){const parts=new Map();for(const r of stat
  return {tractor,trailer,fuzzy,...ruhsatLookup(tractor,trailer)};}
 const ruhsatPlateText=it=>it.reg?it.reg.plate:[fmtCompactPlate(it.tractor),fmtCompactPlate(it.trailer)].filter(Boolean).join(' - ');
 const ruhsatSmall=it=>!!it.size&&Math.max(...it.size)<1100;
-function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor')return '';const done=it.status==='eklendi';let h='';
+const ruhsatDate=it=>it.wa?waDate(it.wa):defaultDate();
+function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor'||it.status==='uzakta')return '';const done=it.status==='eklendi';let h='';
  if(it.reg)h+=`<div class="rs-match ok">${icon('check')}<span>Kayıtlı araç: <b>${esc(it.reg.customer||'Müşterisiz')}</b>${it.reg.carrier?' · '+esc(it.reg.carrier):''}${it.reg.registration?' · '+esc(kgText(it.reg.registration)):''}</span></div>`;
  else if(it.tractorReg)h+=`<div class="rs-match warn">${icon('info')}<span>Çekici kayıtlı (<b>${esc(it.tractorReg.customer)}</b>) ama bu dorseyle kaydı yok. Formda kontrol edin.</span></div>`;
  else if(it.tractor)h+=`<div class="rs-match new">${icon('info')}<span>Yeni araç: plaka kayıtlarında yok. Müşteriyi formda seçin.</span></div>`;
@@ -965,15 +967,18 @@ function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor')return '
  if(it.fuzzy)h+=`<div class="rs-note warn">Plaka fotoğrafta tam okunamadı; en yakın kayıtlı plaka seçildi. Lütfen kontrol edin.</div>`;
  if(it.status!=='hata')h+=`<div class="rs-note">${it.weights.length?`Okunan boş ağırlık: ${it.weights.map(v=>v+' kg').join(' + ')}${it.sum?` = <b>${it.sum} kg</b>`:''}`:'Boş ağırlık fotoğraftan okunamadı.'}</div>`;
  if(it.status==='tamam'&&!it.sum&&ruhsatSmall(it))h+=`<div class="rs-note warn">Fotoğraf çok küçük (${it.size[0]}×${it.size[1]} piksel), rakamlar net okunamıyor. WhatsApp'ta fotoğrafı tam ekran açıp öyle kopyalayın; gönderen kişiden fotoğrafı kırpmadan, yakından çekmesini isteyin.</div>`;
- const d=defaultDate(),plate=ruhsatPlateText(it);if(!done&&plate&&state.visits.some(x=>x.date===d&&norm(x.plate)===norm(plate)))h+=`<div class="rs-note warn">Bu araç ${esc(fmt(d))} gününde zaten panoda.</div>`;
- if(!done)h+=`<div class="rs-acts">${it.reg&&it.reg.customer?`<button type="button" class="btn primary small" data-action="ruhsat-add" data-id="${it.id}">${icon('plus')}Hemen ekle</button>`:''}<button type="button" class="btn small" data-action="ruhsat-form" data-id="${it.id}">${icon('doc')}Formda aç</button></div>`;
+ if(it.wa&&!done&&!it.reg&&!it.tractorReg&&waCustomer(it.wa))h+=`<div class="rs-note">Gönderen numara <b>${esc(waCustomer(it.wa))}</b> müşterisine kayıtlı; formda müşteri olarak gelir.</div>`;
+ const d=ruhsatDate(it),plate=ruhsatPlateText(it);if(!done&&plate&&state.visits.some(x=>x.date===d&&norm(x.plate)===norm(plate)))h+=`<div class="rs-note warn">Bu araç ${esc(fmt(d))} gününde zaten panoda.</div>`;
+ if(!done)h+=`<div class="rs-acts">${it.reg&&it.reg.customer?`<button type="button" class="btn primary small" data-action="ruhsat-add" data-id="${it.id}">${icon('plus')}Hemen ekle</button>`:''}<button type="button" class="btn small" data-action="ruhsat-form" data-id="${it.id}">${icon('doc')}Formda aç</button>${it.wa?`<button type="button" class="btn text small" data-action="ruhsat-dismiss" data-id="${it.id}" title="Bu fotoğrafı eklemeden listeden kaldırır (ör. aynı ruhsat iki kez gönderildiyse)">${icon('close')}Listeden çıkar</button>`:''}</div>`;
  return h;}
-function ruhsatStatusText(it){return it.status==='sirada'?'Sırada':it.status==='okunuyor'?`${it.phase||'Okunuyor'}${it.progress?` · %${it.progress}`:''}`:it.status==='hata'?`Okunamadı: ${it.error}`:it.status==='eklendi'?'✓ Panoya eklendi':'Okundu';}
+function ruhsatStatusText(it){return it.status==='uzakta'?'Başka bir ekranda okunuyor':it.status==='sirada'?'Sırada':it.status==='okunuyor'?`${it.phase||'Okunuyor'}${it.progress?` · %${it.progress}`:''}`:it.status==='hata'?`Okunamadı: ${it.error}`:it.status==='eklendi'?(it.dup?'✓ Bu gün zaten panodaydı, tekrar eklenmedi':`✓ Panoya eklendi${it.wa?' · '+fmt(waDate(it.wa),{weekday:'long',day:'numeric',month:'long'}):''}`):'Okundu';}
 function ruhsatCard(it){const ready=it.status==='tamam'||it.status==='hata';
- return `<article class="rs-item${it.status==='eklendi'?' is-done':''}" id="${it.id}"><img class="rs-thumb" src="${it.url}" alt="Ruhsat fotoğrafı"><div class="rs-main"><div class="rs-status ${it.status}">${esc(ruhsatStatusText(it))}</div>${ready?`<div class="rs-fields"><label>Çekici<input data-rs="${it.id}" data-k="tractor" value="${esc(fmtCompactPlate(it.tractor))}" maxlength="15" autocomplete="off" spellcheck="false"></label><label>Dorse<input data-rs="${it.id}" data-k="trailer" value="${esc(fmtCompactPlate(it.trailer))}" maxlength="15" autocomplete="off" spellcheck="false"></label></div>`:''}<div class="rs-info">${ruhsatInfo(it)}</div></div></article>`;}
-function ruhsatListHTML(){return ruhsat.items.length?`<p class="rs-day">Araçlar <b>${esc(fmt(defaultDate(),{weekday:'long',day:'numeric',month:'long'}))}</b> gününe eklenir.</p>${ruhsat.items.map(ruhsatCard).join('')}`:'';}
-function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle','Fotoğraf bu bilgisayarda okunur, hiçbir yere gönderilmez. Kayıtlı plakalar otomatik tanınır.')}<div class="modal-body" id="ruhsat-box"><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
-function ruhsatRefresh(){const l=document.getElementById('ruhsat-list');if(l)l.innerHTML=ruhsatListHTML();onlineUI();}
+ return `<article class="rs-item${it.status==='eklendi'?' is-done':''}${it.wa?' is-wa':''}" id="${it.id}">${it.url?`<img class="rs-thumb" src="${it.url}" alt="Ruhsat fotoğrafı">`:`<div class="rs-thumb rs-thumb-empty">${icon('wa')}</div>`}<div class="rs-main">${it.wa?waSource(it.wa):''}<div class="rs-status ${it.status}">${esc(ruhsatStatusText(it))}</div>${ready?`<div class="rs-fields"><label>Çekici<input data-rs="${it.id}" data-k="tractor" value="${esc(fmtCompactPlate(it.tractor))}" maxlength="15" autocomplete="off" spellcheck="false"></label><label>Dorse<input data-rs="${it.id}" data-k="trailer" value="${esc(fmtCompactPlate(it.trailer))}" maxlength="15" autocomplete="off" spellcheck="false"></label></div>`:''}<div class="rs-info">${ruhsatInfo(it)}</div></div></article>`;}
+function ruhsatListHTML(){const own=ruhsat.items.filter(x=>!x.wa);return own.length?`<p class="rs-day">Araçlar <b>${esc(fmt(defaultDate(),{weekday:'long',day:'numeric',month:'long'}))}</b> gününe eklenir.</p>${own.map(ruhsatCard).join('')}`:'';}
+/* WhatsApp'tan gelenler pencerenin en üstünde durur; kontrol bekleyen varsa ilk o görülsün. */
+function waListHTML(){const wa=ruhsat.items.filter(x=>x.wa);return wa.length?`<p class="rs-day rs-wa-head">${icon('wa')}<b>WhatsApp'tan gelenler</b> · kayıtlı araçlar panoya kendiliğinden eklenir, diğerleri burada kontrol bekler.</p>${wa.map(ruhsatCard).join('')}`:'';}
+function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle','Fotoğraf bu bilgisayarda okunur, hiçbir yere gönderilmez. Kayıtlı plakalar otomatik tanınır.')}<div class="modal-body" id="ruhsat-box"><div id="ruhsat-wa">${waListHTML()}</div><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
+function ruhsatRefresh(){const l=document.getElementById('ruhsat-list');if(l)l.innerHTML=ruhsatListHTML();const w=document.getElementById('ruhsat-wa');if(w)w.innerHTML=waListHTML();onlineUI();}
 function ruhsatUpdateCard(it){const el=document.getElementById(it.id);if(!el)return;el.outerHTML=ruhsatCard(it);onlineUI();}
 function ruhsatAllowed(){return !VIEW_TOKEN&&canEdit();}
 /* Resim dosyası: türü image/* olan ya da (WhatsApp masaüstü gibi dosya olarak kopyalayan uygulamalarda türü boş gelen) uzantısı resim olan dosya */
@@ -989,7 +994,7 @@ function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=docu
  for(const f of files.slice(0,10)){if(f.size>20*1024*1024){toast('Fotoğraf çok büyük (en fazla 20 MB).',true);continue;}
   ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,fuzzy:false,error:''});}
  ruhsatRefresh();ruhsatRun();}
-async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada')))await ruhsatProcess(it);}finally{ruhsat.running=false;}}
+async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada'&&(!x.wa||ruhsatAllowed()))))await (it.wa?waProcess(it):ruhsatProcess(it));}finally{ruhsat.running=false;}}
 async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunuyor':'Okuma programı hazırlanıyor (ilk kullanımda ~6 MB iner)';ruhsatUpdateCard(it);
  const texts=[];let last=0;
  ocrOnProgress=m=>{const p=m.status==='recognizing text'?Math.round((texts.length+m.progress)/2*100):Math.round(m.progress*100);if(Date.now()-last<250&&p<100)return;last=Date.now();it.progress=p;const el=document.querySelector(`#${it.id} .rs-status`);if(el)el.textContent=ruhsatStatusText(it);};
@@ -1003,19 +1008,19 @@ async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunu
  catch(e){it.status='hata';it.error=e?.message||String(e);}
  finally{ocrOnProgress=null;}
  ruhsatUpdateCard(it);}
-async function ruhsatQuickAdd(it){const r=it.reg;if(!r||!r.customer||!canEdit())return;const d=defaultDate();
+async function ruhsatQuickAdd(it){const r=it.reg;if(!r||!r.customer||!canEdit())return;const d=ruhsatDate(it);
  if(state.visits.some(x=>x.date===d&&norm(x.plate)===norm(r.plate))&&!window.confirm(`${r.plate} için ${fmt(d)} gününde zaten bir geliş var. Yine de eklensin mi?`))return;
  const v={id:uid(),plate:r.plate,customer:r.customer||'',declaration:r.declaration||'',carrier:r.carrier||'',registration:kgText(r.registration||(it.sum?String(it.sum):'')),date:d,time:timeNow(),note:'',onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};
- if(await mutate(s=>{s.visits.push(v);})){justChangedMap.set(v.id,Date.now());ui.selected=v.id;it.status='eklendi';render();ruhsatUpdateCard(it);toast(`${v.plate} · ${v.customer}, ${fmt(d)} gününe eklendi.`);}}
+ if(await mutate(s=>{s.visits.push(v);})){justChangedMap.set(v.id,Date.now());ui.selected=v.id;it.status='eklendi';if(it.wa)await waMark(it,'eklendi',{plate:v.plate,visit_id:v.id});render();ruhsatUpdateCard(it);toast(`${v.plate} · ${v.customer}, ${fmt(d)} gününe eklendi.`);}}
 function ruhsatForm(it){ruhsat.returnId=it.id;pendingVisit=null;const tr=it.tractorReg;
- openVisitForm(null,defaultDate(),{plate:ruhsatPlateText(it),registration:it.sum?String(it.sum):'',customer:tr?.customer||'',carrier:tr?.carrier||''});}
-function ruhsatAfterSave(){const id=ruhsat.returnId;if(!id)return;ruhsat.returnId=null;const it=ruhsat.items.find(x=>x.id===id);if(it)it.status='eklendi';
+ openVisitForm(null,ruhsatDate(it),{plate:ruhsatPlateText(it),registration:it.sum?String(it.sum):'',customer:tr?.customer||(it.wa?waCustomer(it.wa):'')||'',carrier:tr?.carrier||''});}
+function ruhsatAfterSave(){const id=ruhsat.returnId;if(!id)return;ruhsat.returnId=null;const it=ruhsat.items.find(x=>x.id===id);if(it){it.status='eklendi';if(it.wa)waMark(it,'eklendi',{plate:ruhsatPlateText(it)});}
  if(ruhsat.items.some(x=>x.status!=='eklendi'))setTimeout(()=>{if(!document.getElementById('modal').open)openRuhsat();},300);}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="ruhsat-"]');if(!b||b.disabled)return;const a=b.dataset.action;
  if(a==='ruhsat-open')return openRuhsat();
  if(a==='ruhsat-clip')return ruhsatFromClipboard();
- if(a==='ruhsat-clear'){ruhsat.items=ruhsat.items.filter(x=>{const keep=x.status!=='eklendi'&&x.status!=='hata';if(!keep)URL.revokeObjectURL(x.url);return keep;});return ruhsatRefresh();}
- const it=ruhsat.items.find(x=>x.id===b.dataset.id);if(!it)return;if(a==='ruhsat-add')ruhsatQuickAdd(it);if(a==='ruhsat-form')ruhsatForm(it);});
+ if(a==='ruhsat-clear'){ruhsat.items=ruhsat.items.filter(x=>{const keep=x.status!=='eklendi'&&(x.wa||x.status!=='hata');if(!keep&&x.url)URL.revokeObjectURL(x.url);return keep;});return ruhsatRefresh();}
+ const it=ruhsat.items.find(x=>x.id===b.dataset.id);if(!it)return;if(a==='ruhsat-add')ruhsatQuickAdd(it);if(a==='ruhsat-form')ruhsatForm(it);if(a==='ruhsat-dismiss')waDismiss(it);});
 document.addEventListener('input',e=>{const t=e.target;if(!t.dataset?.rs)return;const it=ruhsat.items.find(x=>x.id===t.dataset.rs);if(!it)return;
  it[t.dataset.k]=compactPlate(t.value);it.fuzzy=false;Object.assign(it,ruhsatLookup(it.tractor,it.trailer));const box=document.querySelector(`#${it.id} .rs-info`);if(box)box.innerHTML=ruhsatInfo(it);onlineUI();});
 document.addEventListener('change',e=>{if(e.target.id!=='ruhsat-file')return;const f=ruhsatFiles(e.target.files);e.target.value='';ruhsatAdd(f);});
@@ -1027,6 +1032,86 @@ document.addEventListener('beforeinput',e=>{if(e.target.id==='ruhsat-paste')e.pr
 document.addEventListener('dragover',e=>{if(dragId||!ruhsatAllowed()||![...(e.dataTransfer?.types||[])].includes('Files'))return;e.preventDefault();e.dataTransfer.dropEffect='copy';document.documentElement.classList.add('rs-dragging');});
 document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.documentElement.classList.remove('rs-dragging');});
 document.addEventListener('drop',e=>{document.documentElement.classList.remove('rs-dragging');if(dragId||!ruhsatAllowed())return;const f=transferImages(e.dataTransfer);if(!f.length)return;e.preventDefault();ruhsatAdd(f);});
+
+/* WhatsApp'tan otomatik aktarma (kurulum: supabase/WHATSAPP.md).
+   Sunucu fonksiyonu WhatsApp numarasına gelen fotoğrafı "ruhsat-gelen" deposuna koyar ve incoming_ruhsat
+   tablosuna "yeni" satırı ekler. Panonun açık olduğu bir düzenleyici ekranı satırı üstlenir (iki ekran aynı
+   fotoğrafı okumasın diye), fotoğrafı bu bilgisayarda okur ve:
+     - plaka kayıtlarında çekici + dorse çifti müşterisiyle varsa ve plaka kesin okunduysa aracı panoya ekler
+       (gün: fotoğrafın geldiği gün; Pazar gelirse Pazartesi),
+     - aynı gün zaten panodaysa "mevcut" der, tekrar eklemez,
+     - diğerlerini "bekliyor" yapar; tüm düzenleyicilerin "Ruhsattan ekle" penceresinde kontrole düşer.
+   Tablo kurulmamışsa (whatsapp-kurulumu.sql çalıştırılmadıysa) sessizce devre dışı kalır. */
+const WA_TABLE='incoming_ruhsat',WA_BUCKET='ruhsat-gelen',WA_STALE_MS=180000,WA_POLL_MS=30000;
+const wa={ready:null,loading:false,loadedAt:0,channel:null,timer:null,thumbs:false};
+const waDate=row=>{const d=localToday(row.created_at||Date.now());return weekday(d)===0?addDays(d,1):d;};
+const tsTime=iso=>{const d=new Date(iso);return isNaN(d)?timeNow():new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);};
+function waCustomer(row){const n=String(row?.from_number||'').replace(/\D/g,'').slice(-10);if(n.length<10)return '';
+ for(const [name,v] of Object.entries(customerContacts))if(String(v||'').replace(/\D/g,'').slice(-10)===n)return name;return '';}
+function waSource(row){const who=[row.sender_name,row.from_number?'+'+row.from_number:''].filter(Boolean).join(' · ');
+ return `<div class="rs-src">${icon('wa')}<span>WhatsApp${who?' · '+esc(who):''} · ${esc(tsText(row.created_at))}${row.caption?` · <i>“${esc(row.caption)}”</i>`:''}</span></div>`;}
+const waPending=()=>ruhsat.items.filter(x=>x.wa&&(x.status==='tamam'||x.status==='hata')).length;
+function waBadge(){const n=role==='editor'&&!VIEW_TOKEN?waPending():0;
+ for(const b of document.querySelectorAll('[data-action="ruhsat-open"]')){let s=b.querySelector('.rs-badge');if(!n){s?.remove();continue;}
+  if(!s){s=document.createElement('b');s.className='rs-badge';b.appendChild(s);}s.textContent=n;s.title=`WhatsApp'tan gelen ${n} ruhsat kontrol bekliyor`;}}
+function waTick(){if(Date.now()-wa.loadedAt>=WA_POLL_MS)waLoad();}
+async function waLoad(){if(VIEW_TOKEN||!account||role!=='editor'||wa.ready===false||wa.loading)return;wa.loading=true;wa.loadedAt=Date.now();
+ try{const {data,error}=await client.from(WA_TABLE).select('*').in('status',['yeni','okunuyor','bekliyor']).order('created_at').limit(200);
+  if(error){if(/PGRST205|42P01/.test(error.code||'')||/does not exist|schema cache/i.test(error.message||''))wa.ready=false;return;}
+  if(!wa.ready){wa.ready=true;waStart();}waSync(data||[]);}
+ catch(_){}finally{wa.loading=false;}}
+/* WhatsApp tablosu için ayrı anlık bildirim kanalı: tablo yoksa ana kanal bozulmasın diye yalnızca tablo varken açılır. */
+function waStart(){if(wa.channel||typeof client.channel!=='function')return;
+ try{wa.channel=client.channel('pcs-whatsapp').on('postgres_changes',{event:'*',schema:'public',table:WA_TABLE},()=>{clearTimeout(wa.timer);wa.timer=setTimeout(waLoad,400);});wa.channel.subscribe();}catch(_){wa.channel=null;}}
+/* çıkışta: kanal kapanır, liste temizlenir (aynı sayfada başka kullanıcı girerse öncekinin listesi görünmesin) */
+function waStop(){clearTimeout(wa.timer);if(wa.channel){try{client.removeChannel(wa.channel);}catch(_){}wa.channel=null;}
+ Object.assign(wa,{ready:null,loadedAt:0});for(const x of ruhsat.items)if(x.wa&&x.url)URL.revokeObjectURL(x.url);ruhsat.items=ruhsat.items.filter(x=>!x.wa);}
+function waFill(it,row){const w=(row.weights||[]).map(Number).filter(Boolean);
+ Object.assign(it,{tractor:row.tractor||'',trailer:row.trailer||'',weights:w,sum:w.length===2?w[0]+w[1]:null,fuzzy:!!row.fuzzy,error:row.note||'',status:row.note&&!row.tractor?'hata':'tamam'},ruhsatLookup(compactPlate(row.tractor),compactPlate(row.trailer)));}
+/* Veritabanındaki açık satırları pencere listesiyle eşitler. Başka ekranda eklenen / çıkarılan satır listeden düşer. */
+function waSync(rows){const ids=new Set(),before=waPending();let changed=false;
+ for(const row of rows){const id='wa-'+row.id;ids.add(id);let it=ruhsat.items.find(x=>x.id===id);
+  const free=row.status==='yeni'||(row.status==='okunuyor'&&Date.parse(row.claimed_at||0)<Date.now()-WA_STALE_MS);
+  if(!it){it={id,wa:row,file:null,url:'',status:free?'sirada':'uzakta',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,fuzzy:false,error:''};
+   if(row.status==='bekliyor')waFill(it,row);ruhsat.items.push(it);changed=true;continue;}
+  it.wa=row;if(it.status==='okunuyor'||it.status==='eklendi')continue;
+  if(row.status==='bekliyor'&&(it.status==='sirada'||it.status==='uzakta')){waFill(it,row);changed=true;}
+  else if(row.status!=='bekliyor'){const want=free?'sirada':'uzakta';if(it.status!==want){it.status=want;changed=true;}}}
+ const kept=ruhsat.items.filter(x=>!x.wa||ids.has(x.id)||x.status==='eklendi'||x.status==='okunuyor');
+ if(kept.length!==ruhsat.items.length){for(const x of ruhsat.items)if(!kept.includes(x)&&x.url)URL.revokeObjectURL(x.url);ruhsat.items=kept;changed=true;}
+ if(changed)ruhsatRefresh();waBadge();
+ const after=waPending();if(after>before&&!document.getElementById('ruhsat-box'))toast(`WhatsApp'tan gelen ${after} ruhsat kontrol bekliyor. "Ruhsattan ekle"ye bakın.`);
+ waThumbs();ruhsatRun();}
+/* Başka ekranda okunmuş fotoğrafların küçük resmini indir (sırayla). */
+async function waThumbs(){if(wa.thumbs)return;wa.thumbs=true;
+ try{let it;while((it=ruhsat.items.find(x=>x.wa&&!x.url&&!x.noThumb&&x.wa.media_path&&x.status!=='sirada'))){
+  try{const {data,error}=await client.storage.from(WA_BUCKET).download(it.wa.media_path);if(error||!data)throw error;it.file=it.file||new File([data],'ruhsat',{type:data.type||it.wa.mime||'image/jpeg'});it.url=URL.createObjectURL(data);ruhsatUpdateCard(it);}
+  catch(_){it.noThumb=true;}}}
+ finally{wa.thumbs=false;}}
+async function waMark(it,status,extra={}){const patch={status,...extra};
+ if(status==='eklendi'||status==='mevcut'||status==='yoksayildi')Object.assign(patch,{handled_by:account?.id||null,handled_at:new Date().toISOString()});
+ try{const {error}=await client.from(WA_TABLE).update(patch).eq('id',it.wa.id).select('id');if(error)throw error;Object.assign(it.wa,patch);waBadge();return true;}
+ catch(e){toast('WhatsApp kaydı güncellenemedi: '+friendly(e),true);return false;}}
+async function waDismiss(it){if(!canEdit())return;if(await waMark(it,'yoksayildi')){ruhsat.items=ruhsat.items.filter(x=>x!==it);if(it.url)URL.revokeObjectURL(it.url);ruhsatRefresh();waBadge();}}
+async function waProcess(it){const row=it.wa;it.status='okunuyor';it.phase='WhatsApp fotoğrafı alınıyor';ruhsatUpdateCard(it);
+ const stale=new Date(Date.now()-WA_STALE_MS).toISOString();
+ const {data,error}=await client.from(WA_TABLE).update({status:'okunuyor',claimed_at:new Date().toISOString(),claimed_by:account?.id||null}).eq('id',row.id).or(`status.eq.yeni,and(status.eq.okunuyor,claimed_at.lt."${stale}")`).select('*').then(r=>r,e=>({error:e}));
+ if(error||!data?.length){it.status='uzakta';ruhsatUpdateCard(it);return;} /* başka ekran üstlendi */
+ Object.assign(row,data[0]);
+ try{if(!row.media_path)throw new Error('fotoğraf artık depoda yok');const {data:blob,error:dErr}=await client.storage.from(WA_BUCKET).download(row.media_path);if(dErr||!blob)throw dErr||new Error('boş dosya');
+  it.file=new File([blob],row.media_path.split('/').pop(),{type:blob.type||row.mime||'image/jpeg'});if(!it.url)it.url=URL.createObjectURL(blob);}
+ catch(e){it.status='hata';it.error='Fotoğraf indirilemedi ('+(e?.message||e)+')';ruhsatUpdateCard(it);await waMark(it,'bekliyor',{note:it.error});return;}
+ await ruhsatProcess(it);await waDecide(it);ruhsatUpdateCard(it);waBadge();}
+/* Okuma bitince: kesin eşleşen kayıtlı aracı ekle, değilse kontrole bırak. */
+async function waDecide(it){const r=it.reg,d=waDate(it.wa);
+ if(it.status==='tamam'&&r&&r.customer&&!it.fuzzy){
+  if(state.visits.some(x=>x.date===d&&norm(x.plate)===norm(r.plate))){it.status='eklendi';it.dup=true;await waMark(it,'mevcut',{plate:r.plate,tractor:it.tractor,trailer:it.trailer,weights:it.weights});toast(`WhatsApp: ${r.plate} ${fmt(d)} gününde zaten panoda, tekrar eklenmedi.`);return;}
+  for(let i=0;i<30&&!canEdit();i++)await new Promise(ok=>setTimeout(ok,1000)); /* başka bir kayıt sürüyorsa bitmesini bekle */
+  const v={id:uid(),plate:r.plate,customer:r.customer||'',declaration:r.declaration||'',carrier:r.carrier||'',registration:kgText(r.registration||(it.sum?String(it.sum):'')),date:d,time:tsTime(it.wa.created_at),note:'',onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};
+  if(canEdit()&&await mutate(s=>{s.visits.push(v);})){justChangedMap.set(v.id,Date.now());it.status='eklendi';await waMark(it,'eklendi',{plate:v.plate,visit_id:v.id,tractor:it.tractor,trailer:it.trailer,weights:it.weights});render();toast(`WhatsApp: ${v.plate} · ${v.customer}, ${fmt(d)} gününe eklendi.`);return;}}
+ if(await waMark(it,'bekliyor',{tractor:it.tractor,trailer:it.trailer,weights:it.weights,fuzzy:!!it.fuzzy,note:it.status==='hata'?String(it.error||'').slice(0,300):''})&&!document.getElementById('ruhsat-box'))
+  toast(`WhatsApp'tan gelen ${waPending()} ruhsat kontrol bekliyor. "Ruhsattan ekle"ye bakın.`);}
+setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));
