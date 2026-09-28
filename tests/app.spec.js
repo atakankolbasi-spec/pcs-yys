@@ -211,6 +211,80 @@ test('koyu temada yazılar okunaklı (yeterli kontrast)', async ({ page }) => {
   expect(r.stroke).toBeGreaterThan(0);
 });
 
+// Sahte ruhsat görüntüsü üretir. Gerçek ruhsat fotoğrafları kişisel veri içerdiği için depoda tutulmaz.
+async function fakeRuhsat(browser, [tractor, gT], [trailer, gR]) {
+  const p = await browser.newPage({ viewport: { width: 1100, height: 640 } });
+  const card = (plate, kind, g, f1) => `<div class="c"><p>(A) ${plate}</p><p>(D) ${kind}</p><p>(J) N3 &nbsp; (G) ${g} &nbsp; (F.1) ${f1}</p></div>`;
+  await p.setContent(`<style>body{margin:0;background:#e9e6dc;font:bold 30px Arial}.c{background:#f7f5ee;margin:30px;padding:20px 40px;border:1px solid #bbb}p{margin:10px 0}</style>${card(tractor, 'TRACTOR', gT, 18000)}${card(trailer, 'SEMI-TRAILER', gR, 39000)}`);
+  const buf = await p.screenshot();
+  await p.close();
+  return buf;
+}
+
+test('ruhsattan ekle: kayıtlı araç tek tıkla, yeni araç formla eklenir', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: 'KARGO SRL', registration: '14850 KG', updated_at: '2026-09-01T08:00:00Z' });
+  const kayitli = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
+  const yeni = await fakeRuhsat(browser, ['PB4321AB', 7900], ['PB8765CD', 6100]);
+  const problems = await openApp(page, { data });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await page.locator('#ruhsat-file').setInputFiles([
+    { name: 'kayitli.png', mimeType: 'image/png', buffer: kayitli },
+    { name: 'yeni.png', mimeType: 'image/png', buffer: yeni }
+  ]);
+  const cards = page.locator('.rs-item');
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('.rs-status.tamam')).toHaveCount(2, { timeout: 120000 });
+
+  // 1) Kayıtlı çift: kayıttaki bilgilerle tek tıkla eklenir.
+  await expect(cards.nth(0)).toContainText('RUHSAT LOJ');
+  await expect(cards.nth(0)).toContainText('8150 kg + 6700 kg = 14850 kg');
+  await cards.nth(0).locator('[data-action="ruhsat-add"]').click();
+  await expect(page.locator('#toast')).toContainText('gününe eklendi');
+  await expect(cards.nth(0).locator('.rs-status')).toContainText('Panoya eklendi');
+
+  // 2) Yeni araç: plaka ve boş ağırlık toplamı forma doldurulur, müşteri elle seçilir.
+  await expect(cards.nth(1)).toContainText('Yeni araç');
+  expect(await cards.nth(1).locator('input').evaluateAll(xs => xs.map(x => x.value))).toEqual(['PB 4321 AB', 'PB 8765 CD']);
+  await expect(cards.nth(1)).toContainText('7900 kg + 6100 kg = 14000 kg');
+  await cards.nth(1).locator('[data-action="ruhsat-form"]').click();
+  const form = page.locator('#visit-form');
+  await expect(form.locator('[name="plate"]')).toHaveValue('PB 4321 AB - PB 8765 CD');
+  await expect(form.locator('[name="registration"]')).toHaveValue('14000');
+  await form.locator('[name="customer"]').fill('YENİ LOJ');
+  await form.locator('button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('kaydedildi');
+
+  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  expect(inserted.map(v => [v.plate, v.customer, v.registration])).toEqual([
+    ['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG'],
+    ['PB 4321 AB - PB 8765 CD', 'YENİ LOJ', '14000 KG']
+  ]);
+  expect(problems).toEqual([]);
+});
+
+test('ruhsat fotoğrafı Ctrl+V ile yapıştırılabilir; görüntüleyici ekleyemez', async ({ page, browser, context }) => {
+  const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
+  const paste = p => p.evaluate(b64 => {
+    const f = new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'ruhsat.png', { type: 'image/png' });
+    const dt = new DataTransfer(); dt.items.add(f);
+    document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
+  }, img.toString('base64'));
+  await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await paste(page);
+  await expect(page.locator('#ruhsat-box')).toBeVisible();
+  await expect(page.locator('.rs-item')).toHaveCount(1);
+
+  const viewer = await context.newPage();
+  await openApp(viewer, { role: 'viewer' });
+  await expect(viewer.locator('#app')).toContainText('34 ABC 123');
+  await expect(viewer.locator('.heading [data-action="ruhsat-open"]')).toBeHidden();
+  await paste(viewer);
+  await expect(viewer.locator('#ruhsat-box')).toHaveCount(0);
+});
+
 test('başka bir sitenin içine (iframe) gömülünce uygulama açılmaz', async ({ page }) => {
   await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
   await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData() });

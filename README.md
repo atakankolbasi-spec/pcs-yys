@@ -18,6 +18,7 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 | `vendor.js` | Supabase istemcisi |
 | `sw.js` | Service worker: internet yokken sitenin açılmasını sağlar |
 | `fonts/` | Roboto yazı tipi (WOFF2) |
+| `ocr/` | "Ruhsattan ekle" için tarayıcıda çalışan metin okuma programı (Tesseract). Ayrıntı: `ocr/README.md` |
 | `_headers` | Sunucu güvenlik başlıkları. **GitHub Pages'te etkisizdir**; site Cloudflare Pages veya Netlify'a taşınırsa kullanılır. Gömülmeye (iframe) karşı koruma bu yüzden `app.js` başında yapılır. |
 | `supabase/` | Veritabanı tarafı notları ve kontrol sorguları |
 | `tests/` | Otomatik tarayıcı testleri (uygulamanın parçası değildir) |
