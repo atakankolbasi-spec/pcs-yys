@@ -31,6 +31,7 @@
     };
     function run() {
       calls.push({ table, op: st.op, cols: st.cols, count: st.count, rows: st.rows && clone(st.rows) });
+      if (window.__hang) return new Promise(() => {}); // takılan istek: hiç cevap gelmez
       if (cfg.offline) return netError();
       const t = db[table] || (db[table] = []);
       if (st.op === 'insert') {
@@ -77,6 +78,19 @@
       async updateUser() { return { error: null }; }
     },
     from: query,
+    // Realtime: testler window.__rtEmit(tablo) ile "başka kullanıcı değiştirdi" bildirimi gönderebilir.
+    channel(name) {
+      const handlers = [];
+      const ch = {
+        name,
+        on(type, filter, cb) { handlers.push({ type, filter, cb }); return ch; },
+        subscribe(cb) { (window.__channels = window.__channels || []).push(ch); if (cb) setTimeout(() => cb('SUBSCRIBED'), 0); return ch; },
+        emit(table) { handlers.filter(h => h.type === 'postgres_changes' && h.filter.table === table).forEach(h => h.cb({ table, eventType: 'UPDATE' })); }
+      };
+      window.__rtEmit = table => (window.__channels || []).forEach(c => c.emit(table));
+      return ch;
+    },
+    removeChannel(ch) { window.__channels = (window.__channels || []).filter(c => c !== ch); return Promise.resolve('ok'); },
     async rpc(name) {
       calls.push({ rpc: name });
       if (cfg.offline) return netError();
