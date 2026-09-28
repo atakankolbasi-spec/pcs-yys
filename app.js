@@ -220,7 +220,7 @@ document.addEventListener('submit',async e=>{
  if(e.target.id==='registry-form'){e.preventDefault();const f=e.target,fd=new FormData(f),id=f.dataset.id;const r={id:id||uid(),plate:plateText(fd.get('plate')),customer:String(fd.get('customer')||'').trim(),declaration:String(fd.get('declaration')||'').trim(),carrier:String(fd.get('carrier')||'').trim(),registration:kgText(fd.get('registration'))};if(!norm(r.plate)||!r.customer)return formError('Plaka ve m\u00fc\u015fteri zorunludur.');if(state.registry.some(x=>x.id!==id&&norm(x.plate)===norm(r.plate)))return formError('Bu plaka zaten kay\u0131tl\u0131. Mevcut kayd\u0131 d\u00fczenleyin.');if(!id&&state.registry.length>=10000)return formError('10.000 plaka s\u0131n\u0131r\u0131na ula\u015f\u0131ld\u0131.');if(await mutate(s=>{if(id)s.registry=s.registry.map(x=>x.id===id?r:x);else s.registry.push(r);})){const pending=pendingVisit;pendingVisit=null;closeModal();toast('Plaka kayd\u0131 kaydedildi.');if(pending)openVisitForm(pending.editingId||null,pending.date,{...pending,plate:r.plate});}return;}
  if(e.target.id==='visit-form'){e.preventDefault();const f=e.target,id=f.dataset.id,v=visitFields(f);const source=matchPlate(v.plate);if(source)v.plate=source.plate;if(!validDate(v.date))return formError('Ge\u00e7erli bir geli\u015f tarihi se\u00e7in.');if(weekday(v.date)===0)return formError('Pazar g\u00fcn\u00fc kay\u0131t al\u0131nmaz. Pazartesi\u2013Cumartesi aras\u0131nda bir g\u00fcn se\u00e7in.');const reg=matchPlate(v.plate);const skipReg=!reg&&id&&f.dataset.original===norm(v.plate);if(!v.customer)return formError('M\u00fc\u015fteri ad\u0131 zorunludur.');if(state.visits.some(x=>x.id!==id&&x.date===v.date&&norm(x.plate)===norm(v.plate))&&!window.confirm('Bu plaka i\u00e7in ayn\u0131 g\u00fcnde ba\u015fka bir geli\u015f kayd\u0131 var. Ayr\u0131 bir geli\u015f olarak kaydetmek istiyor musunuz?'))return;let regNote='';if(!skipReg){if(!reg)v.plate=plateText(v.plate);const ch=registryChange(reg,v);if(ch){if(!await writeRegistry(ch))return;await syncData();regNote=ch.insert?'Ara\u00e7 geli\u015fi kaydedildi ve plaka kay\u0131tlar\u0131na eklendi.':'Ara\u00e7 geli\u015fi kaydedildi; plaka kayd\u0131ndaki bo\u015f bilgiler tamamland\u0131.';}}const prev=id?state.visits.find(x=>x.id===id):null;v.id=id||uid();v.createdAt=prev?.createdAt||new Date().toISOString();if(await mutate(s=>{if(id)s.visits=s.visits.map(x=>x.id===id?v:x);else s.visits.push(v);})){const w=weekInfo(v.date);if(w.year!==ui.year||w.week!==ui.week){ui.year=w.year;ui.week=w.week;ui.day=v.date;}else if(ui.day!=='all')ui.day=v.date;ui.collapsed.delete(v.date);closeModal();render();toast(regNote||'Ara\u00e7 geli\u015fi kaydedildi.');ruhsatAfterSave();}return;}
 });
-window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
+window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
 const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip']);
@@ -914,14 +914,27 @@ async function ruhsatEnhance(file){const bmp=await createImageBitmap(file);const
  let lo=0,hi=255,acc=0;while(lo<254&&(acc+=hist[lo])<n*0.01)lo++;acc=0;while(hi>lo+1&&(acc+=hist[hi])<n*0.01)hi--;const k=255/(hi-lo);
  for(let i=0;i<n;i++)g[i]=(g[i]-lo)*k;
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let v=g[i];if(x>0&&y>0&&x<w-1&&y<h-1)v=v+0.5*(4*g[i]-g[i-1]-g[i+1]-g[i-w]-g[i+w]);const q=i*4;d[q]=d[q+1]=d[q+2]=v<0?0:v>255?255:v;}
- cx.putImageData(img,0,0);return cv;}
+ cx.putImageData(img,0,0);cv.srcW=w/sc;cv.srcH=h/sc;return cv;}
 const compactPlate=v=>String(v||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[^A-Z0-9]/g,'');
 function fmtCompactPlate(c){c=compactPlate(c);let m;if((m=c.match(/^(\d{2})([A-Z]{1,3})(\d{2,5})$/))||(m=c.match(/^([A-Z]{1,3})(\d{2,4})([A-Z]{1,3})$/)))return m.slice(1).join(' ');if((m=c.match(/^([A-Z]{3})(\d{3,4})$/)))return m.slice(1).join(' ');return c;}
+/* Küçük / bulanık fotoğrafta rakam harf sanılabilir (CM2817EK → "CM2B17EK"). Rakam grubunun ortasına düşen
+   ve rakama benzeyen harfler rakama çevrilir; sonuç geçerli bir plaka değilse düzeltme yapılmaz. */
+const DIGIT_LIKE={O:'0',Q:'0',D:'0',I:'1',L:'1',Z:'2',S:'5',G:'6',B:'8'};
+function plateFix(c){const a=c.search(/\d/),b=c.length-1-[...c].reverse().join('').search(/\d/);if(a<0||b-a<2)return '';
+ let f=c.slice(0,a);for(let i=a;i<=b;i++){const ch=c[i];if(/\d/.test(ch))f+=ch;else if(DIGIT_LIKE[ch])f+=DIGIT_LIKE[ch];else return '';}f+=c.slice(b+1);
+ return f!==c&&plateCountry(f)?f:'';}
 /* Metindeki plaka adayları: satır içinde en fazla 3 parçayı birleştir ("47 DU 965", "CT-46-AXL"), ülke biçimine uyanları al. */
 function ruhsatPlates(text){const out=[];const up=String(text||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I');
  for(const line of up.split('\n')){const t=line.split(/[\s|()[\]{}"'“”‘’,;:]+/).map(x=>x.replace(/[^A-Z0-9]/g,'')).filter(Boolean);
-  for(let i=0;i<t.length;i++){let c='';for(let j=i;j<Math.min(i+3,t.length);j++){if(t[j].length>8)break;c+=t[j];if(c.length>=5&&c.length<=9&&plateCountry(c)&&!out.includes(c))out.push(c);}}}
+  for(let i=0;i<t.length;i++){let c='';for(let j=i;j<Math.min(i+3,t.length);j++){if(t[j].length>8)break;c+=t[j];if(c.length<5||c.length>9)continue;const v=plateCountry(c)?c:plateFix(c);if(v&&!out.includes(v))out.push(v);}}}
  return out;}
+/* Aracın cinsi: plakadan sonra gelen ilk "TRACTOR / ВЛЕКАЧ / ÇEKİCİ" ya da "SEMI-TRAILER / ПОЛУРЕМАРКЕ / RÖMORK"
+   yazısı o plakanın çekici mi dorse mi olduğunu söyler (Kiril harfler İngilizce okuyucuda "BAEKAY", "NONYPEMAPKE" gibi çıkar). */
+const KIND_TRAILER=/TRAIL|SEMI|REMAR|PEMAP|REMOR|R[ÖO]MORK|AUFLIEG|ANH[ÄA]NG|ПОЛУРЕМ/,KIND_TRACTOR=/TRA[CK]T|B[AN]EKA|BJIEKA|ВЛЕКА|[CÇ]EK[İI]C[İI]|ZUGMASCH/;
+function ruhsatKinds(text,kinds){let last='',gap=0;
+ for(const line of String(text||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').split('\n')){if(!line.trim())continue;const ps=ruhsatPlates(line);if(ps.length){last=ps[ps.length-1];gap=0;}else gap++;
+  if(!last||gap>15||kinds[last])continue;const k=KIND_TRAILER.test(line)?'trailer':KIND_TRACTOR.test(line)?'tractor':'';if(k){kinds[last]=k;last='';}}
+ return kinds;}
 /* Boş ağırlık: AB ruhsatında "(G) 8162" / "G 8332", Türk ruhsatında "G.1 NET AĞIRLIĞI 7180". Emin olunmayan sayı alınmaz. */
 function ruhsatWeights(text){const out=[],t=String(text||'').replace(/[“”"'‘’|]/g,' ');
  for(const m of t.matchAll(/(?:\(G\)|\bG(?:\.1)?\b|NET\s*A[GĞ]IRLI[GĞ]I)[^\d]{0,30}?(\d{4,5})(?!\d)/gi)){const v=+m[1];if(v>=2000&&v<=16000)out.push(v);}
@@ -931,14 +944,19 @@ function ruhsatLookup(tractor,trailer){const full=tractor+trailer;const reg=full
  const tractorReg=!reg&&tractor?state.registry.find(r=>norm(splitPlate(r.plate)[0]||'')===tractor&&r.customer)||null:null;return {reg,tractorReg};}
 /* Okunan adaylardan çekici ve dorseyi seç. Kayıtlı plakalar önce gelir; fotoğrafta tek harfi yanlış okunmuş
    plaka, kayıtlarda buna benzeyen TEK bir plaka varsa ona düzeltilir (birden fazlaysa düzeltilmez). */
-function ruhsatResolve(cands){const parts=new Map();for(const r of state.registry)splitPlate(r.plate).forEach((p,i)=>{const k=norm(p);if(!k)return;if(!parts.has(k))parts.set(k,[]);parts.get(k).push({r,i});});
+function ruhsatResolve(cands,kinds={}){const parts=new Map();for(const r of state.registry)splitPlate(r.plate).forEach((p,i)=>{const k=norm(p);if(!k)return;if(!parts.has(k))parts.set(k,[]);parts.get(k).push({r,i});});
  let fuzzy=false;const fixed=cands.slice(0,8).map(c=>{if(parts.has(c))return {c,k:c};let hit=null,n=0;for(const k of parts.keys())if(lev1(k,c)){hit=k;if(++n>1)break;}return n===1?{c,k:hit,fz:true}:{c,k:null};});
  const known=fixed.filter(f=>f.k),plates=[...new Set(fixed.map(f=>f.k||f.c))];let tractor='',trailer='';
  for(const a of known){for(const {r,i} of parts.get(a.k)){if(i!==0)continue;const p=splitPlate(r.plate).map(norm);const b=known.find(x=>x!==a&&x.k===p[1]);if(b){tractor=a.k;trailer=b.k;fuzzy=!!(a.fz||b.fz);break;}}if(tractor)break;}
- /* kayıtta çift yoksa: dorse çekiciyle aynı ülke biçiminde olmalı; uyan yoksa yanlış tahmin yerine boş bırakılır */
- if(!tractor){const a=known.find(f=>parts.get(f.k).some(x=>x.i===0))||known[0];if(a){tractor=a.k;fuzzy=!!a.fz;}else tractor=plates[0]||'';const cc=plateCountry(tractor);trailer=plates.find(p=>p!==tractor&&plateCountry(p)===cc)||'';}
+ /* kayıtta çift yoksa: çekici/dorse ayrımı önce plaka kayıtlarından, sonra ruhsattaki cins yazısından yapılır.
+    Dorse çekiciyle aynı ülke biçiminde olmalı; uyan yoksa yanlış tahmin yerine boş bırakılır. */
+ if(!tractor){const regTr=p=>!!parts.get(p)?.some(x=>x.i===0),role=p=>parts.has(p)?(regTr(p)?'tractor':'trailer'):kinds[p]||'';
+  tractor=plates.find(regTr)||plates.find(p=>role(p)==='tractor')||plates.find(p=>role(p)!=='trailer')||'';const cc=plateCountry(tractor);
+  const rest=plates.filter(p=>p!==tractor&&(!tractor||plateCountry(p)===cc));trailer=rest.find(p=>role(p)==='trailer')||rest.find(p=>role(p)!=='tractor')||'';
+  fuzzy=fixed.some(f=>f.fz&&(f.k===tractor||f.k===trailer));}
  return {tractor,trailer,fuzzy,...ruhsatLookup(tractor,trailer)};}
 const ruhsatPlateText=it=>it.reg?it.reg.plate:[fmtCompactPlate(it.tractor),fmtCompactPlate(it.trailer)].filter(Boolean).join(' - ');
+const ruhsatSmall=it=>!!it.size&&Math.max(...it.size)<1100;
 function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor')return '';const done=it.status==='eklendi';let h='';
  if(it.reg)h+=`<div class="rs-match ok">${icon('check')}<span>Kayıtlı araç: <b>${esc(it.reg.customer||'Müşterisiz')}</b>${it.reg.carrier?' · '+esc(it.reg.carrier):''}${it.reg.registration?' · '+esc(kgText(it.reg.registration)):''}</span></div>`;
  else if(it.tractorReg)h+=`<div class="rs-match warn">${icon('info')}<span>Çekici kayıtlı (<b>${esc(it.tractorReg.customer)}</b>) ama bu dorseyle kaydı yok. Formda kontrol edin.</span></div>`;
@@ -946,6 +964,7 @@ function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor')return '
  else h+=`<div class="rs-match bad">${icon('info')}<span>Plaka okunamadı. Plakayı elle yazın ya da daha net, düz çekilmiş bir fotoğraf deneyin.</span></div>`;
  if(it.fuzzy)h+=`<div class="rs-note warn">Plaka fotoğrafta tam okunamadı; en yakın kayıtlı plaka seçildi. Lütfen kontrol edin.</div>`;
  if(it.status!=='hata')h+=`<div class="rs-note">${it.weights.length?`Okunan boş ağırlık: ${it.weights.map(v=>v+' kg').join(' + ')}${it.sum?` = <b>${it.sum} kg</b>`:''}`:'Boş ağırlık fotoğraftan okunamadı.'}</div>`;
+ if(it.status==='tamam'&&!it.sum&&ruhsatSmall(it))h+=`<div class="rs-note warn">Fotoğraf çok küçük (${it.size[0]}×${it.size[1]} piksel), rakamlar net okunamıyor. WhatsApp'ta fotoğrafı tam ekran açıp öyle kopyalayın; gönderen kişiden fotoğrafı kırpmadan, yakından çekmesini isteyin.</div>`;
  const d=defaultDate(),plate=ruhsatPlateText(it);if(!done&&plate&&state.visits.some(x=>x.date===d&&norm(x.plate)===norm(plate)))h+=`<div class="rs-note warn">Bu araç ${esc(fmt(d))} gününde zaten panoda.</div>`;
  if(!done)h+=`<div class="rs-acts">${it.reg&&it.reg.customer?`<button type="button" class="btn primary small" data-action="ruhsat-add" data-id="${it.id}">${icon('plus')}Hemen ekle</button>`:''}<button type="button" class="btn small" data-action="ruhsat-form" data-id="${it.id}">${icon('doc')}Formda aç</button></div>`;
  return h;}
@@ -975,11 +994,12 @@ async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunu
  const texts=[];let last=0;
  ocrOnProgress=m=>{const p=m.status==='recognizing text'?Math.round((texts.length+m.progress)/2*100):Math.round(m.progress*100);if(Date.now()-last<250&&p<100)return;last=Date.now();it.progress=p;const el=document.querySelector(`#${it.id} .rs-status`);if(el)el.textContent=ruhsatStatusText(it);};
  try{const w=await ocrWorker();it.phase='Okunuyor';
-  texts.push((await w.recognize(await ruhsatEnhance(it.file))).data.text);
+  const cv=await ruhsatEnhance(it.file);it.size=[Math.round(cv.srcW),Math.round(cv.srcH)];
+  texts.push((await w.recognize(cv)).data.text);
   texts.push((await w.recognize(it.file)).data.text);
   const [a,b]=texts,ca=ruhsatPlates(a),cands=[...ca,...ruhsatPlates(b).filter(x=>!ca.includes(x))];
   const wa=ruhsatWeights(a),wb=ruhsatWeights(b);let ws=wa.length===2?wa:wb.length===2?wb:[...new Set([...wa,...wb])];if(ws.length>2)ws=[];
-  Object.assign(it,{weights:ws,sum:ws.length===2?ws[0]+ws[1]:null},ruhsatResolve(cands));it.status='tamam';}
+  Object.assign(it,{weights:ws,sum:ws.length===2?ws[0]+ws[1]:null},ruhsatResolve(cands,ruhsatKinds(b,ruhsatKinds(a,{}))));it.status='tamam';}
  catch(e){it.status='hata';it.error=e?.message||String(e);}
  finally{ocrOnProgress=null;}
  ruhsatUpdateCard(it);}
