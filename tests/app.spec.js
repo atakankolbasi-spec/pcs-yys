@@ -126,6 +126,36 @@ test('hafif senkron: değişiklik yokken tablolar yeniden indirilmez', async ({ 
   expect(problems).toEqual([]);
 });
 
+test('anlık güncelleme: başka kullanıcının değişikliği 15 sn beklemeden görünür', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  // Başka bir kullanıcı yeni bir araç eklesin ve Realtime bildirimi gelsin.
+  await page.evaluate(() => {
+    const r = window.__db.registry.find(x => x.id === 'r4');
+    window.__db.visits.push({ id: 'v99', plate: '41 ZZ 900', customer: r.customer, declaration: '', carrier: '', registration: '',
+      visit_date: '2026-09-23', visit_time: '10:05', note: '', onsite: false, t1: false, done: false,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), onsite_at: null, done_at: null, sort_order: null });
+    window.__rtEmit('visits');
+  });
+  await page.clock.runFor(1000); // 15 sn'lik yoklamadan çok önce
+  await expect(page.locator('#app')).toContainText('41 ZZ 900');
+  expect(problems).toEqual([]);
+});
+
+test('takılan bir istek güncellemeleri kalıcı olarak durdurmaz', async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.clock.runFor(2000);
+  await page.evaluate(() => { window.__hang = true; });
+  await page.clock.runFor(15000); // yoklama başlar ve cevapsız kalır
+  await page.evaluate(() => {
+    window.__hang = false;
+    const v = window.__db.visits.find(x => x.id === 'v6'); v.plate = '99 YENI 99'; v.updated_at = new Date().toISOString();
+  });
+  await page.clock.runFor(35000); // 30 sn sonra takılan senkron bırakılır, yenisi çalışır
+  await expect(page.locator('#app')).toContainText('99 YENI 99');
+});
+
 test('çevrimdışı açılış: son kayıtlar cihazdaki kopyadan gösterilir', async ({ page, context }) => {
   await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');

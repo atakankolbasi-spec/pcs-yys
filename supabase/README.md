@@ -102,3 +102,17 @@ order by 1, 2;
 
 `registry` ve `visits` için `BEFORE UPDATE` ile `updated_at = now()` yapan bir tetikleyici
 görmelisiniz. Yoksa değişiklikler diğer ekranlara en geç 2 dakika içinde yansır.
+(Kontrol edildi: `registry_set_updated_at` ve `visits_set_updated_at` mevcut.)
+
+## 6. Anlık güncelleme (Realtime)
+
+`anlik-guncelleme-kurulumu.sql` dosyasını SQL Editor'de bir kez çalıştırın. Bundan sonra
+biri araç eklediğinde ya da değiştirdiğinde diğer ekranlar 15 saniye beklemeden, yaklaşık
+1 saniye içinde yenilenir. Çalıştırılmazsa site yine 15 saniyede bir kendini yeniler.
+
+## Bu klasördeki SQL dosyaları
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `islem-gecmisi-duzeltmesi.sql` | "Kaydı düzenle"deki `malformed array literal` hatasını düzelten işlem geçmişi tetikleyicisi |
+| `anlik-guncelleme-kurulumu.sql` | Tabloları Realtime yayınına ekler (anlık güncelleme) |

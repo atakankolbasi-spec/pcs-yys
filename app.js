@@ -261,8 +261,20 @@ function loadCache(){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'nu
  role=c.role==='editor'?'editor':'viewer';state=realState={...emptyState(),registry:c.registry,visits:c.visits,updatedAt:c.at};if(c.settings)applySettings(c.settings);
  storageError=`İnternet bağlantısı yok. ${tsText(c.at)} itibarıyla bu cihazda saklanan kayıtlar gösteriliyor; bağlantı gelince otomatik güncellenir.`;return true;}catch(_){return false;}}
 function clearCache(){try{localStorage.removeItem(CACHE_KEY);}catch(_){}}
+/* Bir istek takılırsa (bilgisayar uykudan çıkınca, ağ değişince) senkron sonsuza kadar "sürüyor" kalmasın:
+   25 sn'den uzun süren senkron bırakılır, yenisi başlar; eskisinin sonucu (generation farkı) yok sayılır.
+   (15 sn'lik yoklamanın katı olmasın diye 25 sn: ikinci yoklamada kesin devreye girer.) */
+let syncRun=0,syncStarted=0;const SYNC_STUCK_MS=25000;
+/* Anlık güncelleme: başka biri kayıt değiştirince Supabase Realtime haber verir, 15 sn'lik yoklama beklenmez.
+   Tablolar Supabase'de "supabase_realtime" yayınına eklenmemişse bildirim gelmez; 15 sn'lik yoklama yine çalışır. */
+let rtChannel=null,rtTimer=null;
+function startRealtime(){if(VIEW_TOKEN||rtChannel||typeof client.channel!=='function')return;
+ const ping=()=>{clearTimeout(rtTimer);rtTimer=setTimeout(()=>{if(!document.hidden)syncData({remote:true,poll:true});},400);};
+ try{rtChannel=client.channel('pcs-degisiklikler');for(const table of ['visits','registry','app_settings'])rtChannel.on('postgres_changes',{event:'*',schema:'public',table},ping);rtChannel.subscribe();}catch(_){rtChannel=null;}}
+function stopRealtime(){clearTimeout(rtTimer);if(rtChannel){try{client.removeChannel(rtChannel);}catch(_){}rtChannel=null;}}
 async function syncData(opts={}){
- if(!account||busy)return;if(loading){resync=true;return;}loading=true;const stamp=generation;const prevVisits=opts.remote&&(realState?.visits||[]).length?realState.visits:null;
+ if(!account||busy)return;if(loading){if(Date.now()-syncStarted<SYNC_STUCK_MS){resync=true;return;}generation++;}
+ loading=true;const run=++syncRun;syncStarted=Date.now();const stamp=generation;const prevVisits=opts.remote&&(realState?.visits||[]).length?realState.visits:null;
  try{if(VIEW_TOKEN){const {data,error}=await client.rpc('public_board',{p_token:VIEW_TOKEN});if(error)throw error;if(stamp!==generation)return;
  role='viewer';state=realState={...emptyState(),registry:[],visits:(data?.visits||[]).map(r=>mapRow(r,'visits')),updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();applySettings(data?.settings||{});
  }else{let fp='';try{fp=await remotePrint();}catch(_){fp='';}
@@ -274,7 +286,7 @@ async function syncData(opts={}){
  if(!VIEW_TOKEN)saveCache();
  render();
  }catch(e){syncPrint='';if(stamp===generation){if(!VIEW_TOKEN&&isNetErr(e)&&!realState.visits.length&&!realState.registry.length&&loadCache()){render();return;}storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
- finally{loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor')maybeCarry();}
+ finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor')maybeCarry();}
 }
 function friendly(e){if(isNetErr(e))return 'İnternet bağlantısı yok. Bağlantı gelince tekrar deneyin.';if(e.code==='23505')return 'Bu plaka zaten kayıtlı.';if(e.code==='42501')return 'Bu işlem için düzenleyici yetkisi gerekli.';if(e.code==='23514')return 'Plaka, müşteri ve Pazartesi–Cumartesi tarihini kontrol edin.';return e.message||'Bağlantıyı kontrol edip yeniden deneyin.';}
 function payload(r,table){const fields=['plate','customer','declaration','carrier','registration'];const p=Object.fromEntries(fields.map(k=>[k,r[k]||'']));if(table==='visits') Object.assign(p,{visit_date:r.date,visit_time:r.time||null,onsite:r.onsite,t1:r.t1,done:r.done,note:r.note||''});return p;}
@@ -434,7 +446,7 @@ document.addEventListener('submit',async e=>{
 },true);
 client.auth.onAuthStateChange((event,session)=>{
  if(VIEW_TOKEN)return;
- setTimeout(async()=>{const userChanged=(session?.user?.id||null)!==(account?.id||null);if(userChanged){generation++;role='viewer';}account=session?.user||null;if(!account){state=realState=emptyState();clearCache();selectedIds.clear();closeModal();authScreen();return;}await syncData();if(event==='PASSWORD_RECOVERY')openModal(`${modalHeader('Yeni parola')}<form id="recovery-form"><div class="modal-body"><label>Yeni parola <input name="password" type="password" minlength="8" required autocomplete="new-password"></label></div><div class="modal-footer"><button class="btn primary">Parolayı kaydet</button></div></form>`);},0);
+ setTimeout(async()=>{const userChanged=(session?.user?.id||null)!==(account?.id||null);if(userChanged){generation++;role='viewer';}account=session?.user||null;if(!account){stopRealtime();state=realState=emptyState();clearCache();selectedIds.clear();closeModal();authScreen();return;}if(userChanged)stopRealtime();startRealtime();await syncData();if(event==='PASSWORD_RECOVERY')openModal(`${modalHeader('Yeni parola')}<form id="recovery-form"><div class="modal-body"><label>Yeni parola <input name="password" type="password" minlength="8" required autocomplete="new-password"></label></div><div class="modal-footer"><button class="btn primary">Parolayı kaydet</button></div></form>`);},0);
 });
 function registryChange(reg,v){
  const keys=['customer','declaration','carrier','registration'];
