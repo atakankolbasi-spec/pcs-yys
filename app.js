@@ -221,8 +221,7 @@ document.addEventListener('submit',async e=>{
  if(e.target.id==='visit-form'){e.preventDefault();const f=e.target,id=f.dataset.id,v=visitFields(f);const source=matchPlate(v.plate);if(source)v.plate=source.plate;if(!validDate(v.date))return formError('Ge\u00e7erli bir geli\u015f tarihi se\u00e7in.');if(weekday(v.date)===0)return formError('Pazar g\u00fcn\u00fc kay\u0131t al\u0131nmaz. Pazartesi\u2013Cumartesi aras\u0131nda bir g\u00fcn se\u00e7in.');const reg=matchPlate(v.plate);const skipReg=!reg&&id&&f.dataset.original===norm(v.plate);if(!v.customer)return formError('M\u00fc\u015fteri ad\u0131 zorunludur.');if(state.visits.some(x=>x.id!==id&&x.date===v.date&&norm(x.plate)===norm(v.plate))&&!window.confirm('Bu plaka i\u00e7in ayn\u0131 g\u00fcnde ba\u015fka bir geli\u015f kayd\u0131 var. Ayr\u0131 bir geli\u015f olarak kaydetmek istiyor musunuz?'))return;let regNote='';if(!skipReg){if(!reg)v.plate=plateText(v.plate);const ch=registryChange(reg,v);if(ch){if(!await writeRegistry(ch))return;await syncData();regNote=ch.insert?'Ara\u00e7 geli\u015fi kaydedildi ve plaka kay\u0131tlar\u0131na eklendi.':'Ara\u00e7 geli\u015fi kaydedildi; plaka kayd\u0131ndaki bo\u015f bilgiler tamamland\u0131.';}}const prev=id?state.visits.find(x=>x.id===id):null;v.id=id||uid();v.createdAt=prev?.createdAt||new Date().toISOString();if(await mutate(s=>{if(id)s.visits=s.visits.map(x=>x.id===id?v:x);else s.visits.push(v);})){const w=weekInfo(v.date);if(w.year!==ui.year||w.week!==ui.week){ui.year=w.year;ui.week=w.week;ui.day=v.date;}else if(ui.day!=='all')ui.day=v.date;ui.collapsed.delete(v.date);closeModal();render();toast(regNote||'Ara\u00e7 geli\u015fi kaydedildi.');}return;}
 });
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
-const SB_URL='https://ollrccfqiqilbflanuik.supabase.co',SB_KEY='sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk';
-const client = window.createPCSClient(SB_URL,SB_KEY);
+const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
 const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm']);
 const disabledActions=new Set(['toggle-demo']);
@@ -883,111 +882,6 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action="im
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));
 window.addEventListener('offline',()=>{if(!account)return;storageError='İnternet bağlantısı yok. Son alınan kayıtlar gösteriliyor; bağlantı gelince otomatik güncellenir.';render();});
-
-/* asistan: panodaki verilerle Türkçe soru-cevap, özet ve (onayla) kayıt değiştirme.
-   Claude'a Supabase Edge Function (supabase/functions/asistan) üzerinden gidilir; API anahtarı tarayıcıya inmez.
-   Araçlar burada, tarayıcıda çalışır: okuma araçları ekrandaki kayıtları kullanır, değişiklikler her zaman
-   kullanıcı onayından sonra mutate() ile, kullanıcının kendi yetkisiyle yapılır. */
-const AST_URL=SB_URL+'/functions/v1/asistan';
-const AST_MAX_STEPS=8;
-const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
-I.spark='<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>';
-I.mic='<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
-I.send='<path d="M4 12l16-8-6 16-2.5-6.5z"/>';
-I.speaker='<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/>';
-const ast={open:false,msgs:[],view:[],busy:false,voice:false,listening:false,confirm:null,rec:null};
-const AST_HELLO='Merhaba! Panodaki kayıtlarla ilgili soru sorabilir, özet isteyebilir veya durum değiştirmemi isteyebilirsiniz. Örnek: "Bugün kaç araç bekliyor?", "34 ABC 123 T1 yazıldı yap".';
-const astText=s=>esc(s).replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
-function astMount(){
- let root=document.getElementById('ast-root');
- if(!account||VIEW_TOKEN){if(root){astStopVoice();root.remove();ast.open=false;ast.msgs=[];ast.view=[];}return;}
- if(!root){root=document.createElement('div');root.id='ast-root';document.body.appendChild(root);astDraw();}
-}
-function astDraw(){const root=document.getElementById('ast-root');if(!root)return;
- const items=(ast.view.length?ast.view:[{who:'bot',text:AST_HELLO}]).map(m=>m.who==='confirm'?`<div class="ast-msg confirm"><div>${astText(m.text)}</div>${m.done?`<small>${m.done}</small>`:`<div class="ast-confirm-btns"><button type="button" class="btn small" data-ast="no">Vazgeç</button><button type="button" class="btn small primary" data-ast="ok">${icon('check')}Onayla</button></div>`}</div>`:`<div class="ast-msg ${m.who}">${astText(m.text)}</div>`).join('');
- root.innerHTML=`<button type="button" class="ast-fab${ast.open?' open':''}" data-ast="toggle" aria-expanded="${ast.open}" aria-controls="ast-panel" title="Asistan">${icon(ast.open?'close':'spark')}<span>Asistan</span></button>${ast.open?`<section id="ast-panel" class="ast-panel" role="dialog" aria-label="Asistan"><header class="ast-head"><div><b>${icon('spark')}Asistan</b><small>Panodaki kayıtlarla çalışır</small></div><div class="ast-head-btns"><button type="button" class="icon-btn${ast.voice?' on':''}" data-ast="voice" aria-pressed="${ast.voice}" title="${ast.voice?'Cevapları sesli okumayı kapat':'Cevapları sesli oku'}" aria-label="Cevapları sesli oku">${icon('speaker')}</button><button type="button" class="btn text small" data-ast="new" ${ast.busy?'disabled':''}>Yeni konuşma</button><button type="button" class="icon-btn" data-ast="toggle" aria-label="Asistanı kapat">${icon('close')}</button></div></header><div class="ast-log" id="ast-log" aria-live="polite">${items}${ast.busy?'<div class="ast-msg bot typing"><i></i><i></i><i></i></div>':''}</div><form class="ast-form" id="ast-form">${SpeechRec?`<button type="button" class="icon-btn ast-mic${ast.listening?' on':''}" data-ast="mic" aria-pressed="${ast.listening}" title="${ast.listening?'Dinlemeyi durdur':'Sesli sor'}" aria-label="Sesli sor">${icon('mic')}</button>`:''}<input id="ast-input" name="q" type="text" maxlength="1000" autocomplete="off" placeholder="${ast.listening?'Dinliyorum…':'Bir şey sorun veya isteyin…'}" aria-label="Asistana mesaj" ${ast.busy?'disabled':''}><button type="submit" class="icon-btn ast-send" aria-label="Gönder" ${ast.busy?'disabled':''}>${icon('send')}</button></form><p class="ast-note">Sorular ve ilgili kayıtlar yanıt üretmek için Anthropic'e (Claude) gönderilir.</p></section>`:''}`;
- const log=document.getElementById('ast-log');if(log)log.scrollTop=log.scrollHeight;
-}
-function astSay(who,text){ast.view.push({who,text});astDraw();if(who==='bot'&&ast.voice)astSpeak(text);}
-function astSpeak(text){try{if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(text).replace(/\*\*/g,'').replace(/^[-•]\s*/gm,''));u.lang='tr-TR';const v=speechSynthesis.getVoices().find(x=>/^tr/i.test(x.lang));if(v)u.voice=v;speechSynthesis.speak(u);}catch(_){}}
-function astStopVoice(){try{ast.rec?.abort();}catch(_){}ast.rec=null;ast.listening=false;try{window.speechSynthesis?.cancel();}catch(_){}}
-function astListen(){
- if(ast.listening){try{ast.rec?.stop();}catch(_){}return;}
- const rec=new SpeechRec();rec.lang='tr-TR';rec.interimResults=true;rec.maxAlternatives=1;let final='';
- rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)final+=t;else interim+=t;}const inp=document.getElementById('ast-input');if(inp)inp.value=(final+interim).trim();};
- rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')toast('Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni verin.',true);};
- rec.onend=()=>{ast.listening=false;ast.rec=null;const q=final.trim();astDraw();if(!q)return;
-  if(ast.confirm){if(/^(evet|onayla|onaylıyorum|tamam)/i.test(q))return astResolve(true);if(/^(hayır|vazgeç|iptal)/i.test(q))return astResolve(false);}
-  astSend(q);};
- try{window.speechSynthesis?.cancel();rec.start();ast.rec=rec;ast.listening=true;ast.voice=true;astDraw();}catch(_){toast('Sesli giriş başlatılamadı.',true);}
-}
-function astAsk(text){return new Promise(resolve=>{const item={who:'confirm',text};ast.view.push(item);ast.confirm={item,resolve};astDraw();if(ast.voice)astSpeak(text+' Onaylıyor musunuz?');});}
-function astResolve(ok){const c=ast.confirm;if(!c)return;ast.confirm=null;c.item.done=ok?'Onaylandı':'Vazgeçildi';astDraw();c.resolve(ok);}
-async function astCall(){
- const {data}=await client.auth.getSession();const token=data?.session?.access_token;if(!token)throw new Error('Oturum süresi dolmuş. Yeniden giriş yapın.');
- const r=await fetch(AST_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,apikey:SB_KEY},body:JSON.stringify({messages:ast.msgs})});
- let body=null;try{body=await r.json();}catch(_){}
- if(!r.ok||!body||!Array.isArray(body.content))throw new Error(body?.error||(r.status===404?'Asistan henüz kurulmamış (Supabase fonksiyonu yok). Yöneticiye bildirin.':'Asistana ulaşılamadı. Biraz sonra tekrar deneyin.'));
- return body;
-}
-async function astSend(q){
- q=String(q||'').trim();if(!q||ast.busy)return;
- const mark=ast.msgs.length;ast.msgs.push({role:'user',content:q});ast.view.push({who:'me',text:q});ast.busy=true;astDraw();
- try{
-  for(let step=0;step<AST_MAX_STEPS;step++){
-   const res=await astCall();ast.msgs.push({role:'assistant',content:res.content});
-   const text=res.content.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
-   if(res.stop_reason==='refusal'){ast.msgs.length=mark;astSay('err','Asistan bu isteğe cevap veremedi. Soruyu farklı biçimde sorun.');return;}
-   const uses=res.content.filter(b=>b.type==='tool_use');
-   if(res.stop_reason!=='tool_use'||!uses.length){astSay('bot',text||'Bir cevap üretilemedi; soruyu farklı biçimde sorun.');return;}
-   if(text)astSay('bot',text);
-   const results=[];for(const b of uses){let out;try{out=await astTool(b.name,b.input||{});}catch(e){out={hata:String(e?.message||e)};}results.push({type:'tool_result',tool_use_id:b.id,content:JSON.stringify(out),...(out&&out.hata?{is_error:true}:{})});}
-   ast.msgs.push({role:'user',content:results});
-  }
-  ast.msgs.length=mark;astSay('err','İstek çok fazla adım gerektirdi. Daha basit parçalara bölerek sorun.');
- }catch(e){ast.msgs.length=mark;astSay('err',String(e?.message||e));}
- finally{ast.busy=false;astDraw();document.getElementById('ast-input')?.focus();}
-}
-const astVisit=v=>({id:v.id,plaka:v.plate,musteri:v.customer,tarih:v.date,gun:DAYS[weekday(v.date)-1]||'',saat:v.time||'',beyanname:v.declaration||'',nakliyeci:v.carrier||'',ruhsat:v.registration||'',not:v.note||'',tesiste:v.onsite,t1:v.t1,bitti:v.done});
-const astStatus=v=>[v.onsite&&'TESİSTE',v.t1&&'T1 YAZILDI',v.done&&'İŞLEMLER BİTTİ'].filter(Boolean).join(', ')||'hiçbir kutu işaretli değil';
-const astRange=(a,b)=>v=>(!validDate(a)||v.date>=a)&&(!validDate(b)||v.date<=b);
-async function astTool(name,x){
- if(name==='gelisleri_ara'){const inR=astRange(x.baslangic,x.bitis);const rows=state.visits.filter(v=>inR(v)&&searchMatch(v,x.metin||'')&&(x.durum==='bekleyen'?!v.done:x.durum==='biten'?v.done:true)).sort((a,b)=>b.date.localeCompare(a.date)||String(a.time||'').localeCompare(String(b.time||'')));return {toplam:rows.length,gosterilen:Math.min(rows.length,40),gelisler:rows.slice(0,40).map(astVisit)};}
- if(name==='ozet'){if(!validDate(x.baslangic)||!validDate(x.bitis))return {hata:'Tarihler YYYY-AA-GG biçiminde olmalı.'};const rows=state.visits.filter(astRange(x.baslangic,x.bitis));const s=stats(rows);const by=k=>{const m={};for(const v of rows){const key=k(v);(m[key]||(m[key]=[])).push(v);}return Object.entries(m).map(([key,a])=>({ad:key,...stats(a)}));};
-  return {aralik:`${x.baslangic} – ${x.bitis}`,toplam:s.total,tesiste:s.onsite,t1_yazildi:s.t1,bitti:s.done,bekleyen:s.pending,tamamlanma_yuzdesi:s.percent,musteriler:by(v=>v.customer||'MÜŞTERİSİZ').sort((a,b)=>b.total-a.total).slice(0,30),gunler:by(v=>v.date).sort((a,b)=>a.ad.localeCompare(b.ad)).slice(0,62)};}
- if(name==='plaka_kayitlari'){const rows=state.registry.filter(r=>searchMatch(r,x.metin||''));return {toplam:rows.length,kayitlar:rows.slice(0,30).map(r=>({plaka:r.plate,musteri:r.customer,beyanname:r.declaration||'',nakliyeci:r.carrier||'',ruhsat:r.registration||''}))};}
- if(!canEdit())return {hata:role!=='editor'?'Bu kullanıcının düzenleme yetkisi yok; değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (bağlantı yok veya başka bir kayıt sürüyor).'};
- if(name==='durum_guncelle'){const v=state.visits.find(r=>r.id===x.id);if(!v)return {hata:'Bu id ile geliş bulunamadı. Önce gelisleri_ara ile arayın.'};
-  const patch={};for(const [k,key] of [['tesiste','onsite'],['t1','t1'],['bitti','done']])if(typeof x[k]==='boolean'&&x[k]!==v[key])patch[key]=x[k];
-  if(!Object.keys(patch).length)return {sonuc:'Değişiklik gerekmedi; durum zaten istenen gibi.',durum:astStatus(v)};
-  const next={...v,...patch};
-  if(!await astAsk(`**${v.plate}** (${v.customer}, ${fmt(v.date)}) durumu değişecek:\nŞu an: ${astStatus(v)}\nYeni: ${astStatus(next)}`))return {sonuc:'Kullanıcı değişikliği onaylamadı; hiçbir şey değiştirilmedi.'};
-  justChangedMap.set(v.id,Date.now());
-  if(!await mutate(s=>{const r=s.visits.find(y=>y.id===v.id);if(r)Object.assign(r,patch);}))return {hata:'Kayıt yapılamadı (bağlantı, yetki veya kayıt başka biri tarafından değiştirilmiş olabilir).'};
-  render();return {sonuc:'Kaydedildi.',durum:astStatus(next)};}
- if(name==='gelis_ekle'){const date=String(x.tarih||'').trim(),time=String(x.saat||'').trim();
-  if(!validDate(date))return {hata:'Tarih YYYY-AA-GG biçiminde olmalı.'};if(weekday(date)===0)return {hata:'Pazar günü kayıt alınmaz; Pazartesi–Cumartesi arasında bir gün seçin.'};
-  if(time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return {hata:'Saat SS:DD biçiminde olmalı.'};
-  const reg=matchPlate(x.plaka);const plate=reg?reg.plate:plateText(x.plaka);if(!norm(plate))return {hata:'Plaka boş olamaz.'};
-  const customer=reg?reg.customer:String(x.musteri||'').trim();if(!customer)return {hata:'Bu plaka kayıtlı değil; müşteri adı gerekli. Kullanıcıya müşteriyi sorun.'};
-  const same=state.visits.some(v=>v.date===date&&norm(v.plate)===norm(plate));
-  const v={id:uid(),plate,customer,declaration:reg?.declaration||'',carrier:reg?.carrier||'',registration:reg?.registration||'',date,time,note:String(x.not||'').trim().slice(0,1000),onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};
-  if(!await astAsk(`Yeni geliş eklenecek:\n**${plate}** · ${customer}\n${fmt(date,{weekday:'long',day:'numeric',month:'long'})}${time?' · '+time:''}${v.note?'\nNot: '+v.note:''}${reg?'':'\nBu plaka kayıtlı değil; plaka kayıtlarına da eklenecek.'}${same?'\nDikkat: bu plakanın aynı gün başka bir gelişi var.':''}`))return {sonuc:'Kullanıcı onaylamadı; kayıt eklenmedi.'};
-  if(!reg){if(!await writeRegistry(registryChange(null,v)))return {hata:'Plaka kaydı eklenemedi.'};await syncData();}
-  if(!await mutate(s=>{s.visits.push(v);}))return {hata:'Geliş kaydedilemedi.'};
-  render();return {sonuc:'Geliş kaydedildi.',gelis:astVisit(v)};}
- return {hata:'Bilinmeyen araç: '+name};
-}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-ast]');if(!b)return;const a=b.dataset.ast;
- if(a==='toggle'){ast.open=!ast.open;if(!ast.open)astStopVoice();astDraw();if(ast.open)document.getElementById('ast-input')?.focus();else document.querySelector('.ast-fab')?.focus();}
- else if(a==='new'){if(ast.busy)return;astStopVoice();if(ast.confirm)astResolve(false);ast.msgs=[];ast.view=[];astDraw();}
- else if(a==='voice'){ast.voice=!ast.voice;if(!ast.voice)try{speechSynthesis.cancel();}catch(_){}astDraw();}
- else if(a==='mic')astListen();
- else if(a==='ok'||a==='no')astResolve(a==='ok');});
-window.addEventListener('submit',e=>{if(e.target.id!=='ast-form')return;e.preventDefault();e.stopImmediatePropagation();const inp=document.getElementById('ast-input');const q=inp?.value||'';if(inp)inp.value='';astSend(q);},true); /* window: pano'nun salt-görüntüleyici engelinden önce çalışır */
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ast.open&&e.target.closest?.('#ast-root')&&!document.getElementById('modal').open){ast.open=false;astStopVoice();astDraw();document.querySelector('.ast-fab')?.focus();}});
-const renderNoAst=render;render=function(){renderNoAst();astMount();};
-const authScreenNoAst=authScreen;authScreen=function(m){authScreenNoAst(m);astMount();};
 
 if(VIEW_TOKEN){account={id:'public-view',email:''};role='viewer';syncData();}else authScreen();
 })();

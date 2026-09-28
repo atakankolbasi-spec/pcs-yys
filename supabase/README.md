@@ -102,36 +102,3 @@ order by 1, 2;
 
 `registry` ve `visits` için `BEFORE UPDATE` ile `updated_at = now()` yapan bir tetikleyici
 görmelisiniz. Yoksa değişiklikler diğer ekranlara en geç 2 dakika içinde yansır.
-
-## Asistan (Claude) kurulumu
-
-Sağ alttaki **Asistan** düğmesi panodaki kayıtlarla ilgili soruları Türkçe cevaplar, günlük/haftalık
-özet çıkarır ve istenirse bir aracın durumunu değiştirir ya da yeni geliş ekler. Sesli soru da sorulabilir
-(mikrofon düğmesi; Chrome ve Edge'de çalışır).
-
-Nasıl çalışır:
-
-- Tarayıcı, soruyu `asistan` adlı Supabase Edge Function'a gönderir. Fonksiyon, giriş yapmış kullanıcıyı
-  doğrular ve soruyu Claude'a (Anthropic) iletir. **API anahtarı yalnızca Supabase'de durur**, siteye konmaz.
-- Asistan veriyi tarayıcıdaki kayıtlardan okur. Soruyla ilgili kayıtlar (plaka, müşteri, tarih, durum)
-  cevap üretmek için Anthropic'e gönderilir.
-- Kayıt değişikliği her zaman bir **Onayla / Vazgeç** kartıyla sorulur ve kullanıcının kendi yetkisiyle
-  yapılır. Görüntüleyici hesaplar soru sorabilir ama değişiklik yapamaz.
-
-Kurulum (bir kez):
-
-1. https://console.anthropic.com adresinden bir API anahtarı alın (kullanım başına ücretlendirilir).
-2. Supabase paneli → **Edge Functions → Secrets** → `ANTHROPIC_API_KEY` adıyla anahtarı ekleyin.
-3. Fonksiyonu yükleyin. Bilgisayarda [Supabase CLI](https://supabase.com/docs/guides/cli) ile, repo kökünde:
-
-   ```bash
-   supabase login
-   supabase functions deploy asistan --project-ref ollrccfqiqilbflanuik
-   ```
-
-   Alternatif: Supabase paneli → **Edge Functions → Deploy a new function → Via Editor**, adını `asistan`
-   koyun ve `supabase/functions/asistan/index.ts` dosyasının içeriğini yapıştırın.
-
-Fonksiyon kurulmadan önce Asistan düğmesi görünür, ancak soru sorulduğunda "Asistan henüz kurulmamış"
-uyarısı verir. Site başka bir adrese taşınırsa `index.ts` içindeki `ALLOWED_ORIGINS` listesine yeni adres
-eklenmelidir.
