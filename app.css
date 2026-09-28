@@ -1913,3 +1913,32 @@ html[data-theme="dark"] .gd-table tr:last-child td{border-bottom:0}
 /*gece-modu-okunaklilik: koyu zeminde ince yazılar kaybolmasın diye tüm yazılar hafifçe kalınlaştırılır
   (kalınlık sıralaması korunur). "Çok kalın" / "En kalın" ayarı seçiliyse eklenmez. */
 html[data-theme="dark"]:not([data-weight="extra"]):not([data-weight="black"]) body{-webkit-text-stroke-width:.3px}
+/* ruhsattan araç ekleme */
+.rs-drop{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:22px 16px;border:2px dashed var(--line);border-radius:12px;cursor:pointer;color:var(--muted);text-transform:none}
+.rs-drop svg{width:28px;height:28px;color:var(--c-accent,#3453d1)}
+.rs-drop>b{color:var(--ink);font-size:14px}
+.rs-drop span{font-size:12px;line-height:1.7;max-width:470px}
+.rs-drop:hover,html.rs-dragging .rs-drop{border-color:var(--c-accent,#3453d1)}
+.rs-day{font-size:12px;color:var(--muted);margin:16px 0 4px}
+.rs-item{display:grid;grid-template-columns:130px 1fr;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+.rs-item.is-done{opacity:.6}
+.rs-thumb{width:130px;height:130px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#111}
+.rs-main{min-width:0}
+.rs-status{font-size:12px;font-weight:700;margin-bottom:8px;color:var(--ink)}
+.rs-status.hata{color:#c2410c}
+.rs-status.eklendi{color:var(--c-done,#15803d)}
+.rs-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.rs-fields label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--muted)}
+.rs-fields input{font-size:15px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;min-height:38px}
+.rs-match{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.6;padding:8px 10px;border-radius:8px;margin-bottom:6px;color:var(--ink)}
+.rs-match svg{width:16px;height:16px;margin-top:2px}
+.rs-match.ok{background:color-mix(in srgb,var(--c-done,#15803d) 13%,transparent)}
+.rs-match.warn,.rs-match.new{background:color-mix(in srgb,var(--c-onsite,#f59e0b) 15%,transparent)}
+.rs-match.bad{background:color-mix(in srgb,#dc2626 13%,transparent)}
+.rs-note{font-size:11.5px;line-height:1.6;color:var(--muted);margin:2px 0}
+.rs-note.warn{color:#b45309}
+.rs-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+html.rs-dragging body::after{content:"Ruhsat fotoğrafını bırakın";position:fixed;inset:12px;display:grid;place-items:center;border:3px dashed var(--c-accent,#3453d1);border-radius:18px;background:color-mix(in srgb,var(--c-accent,#3453d1) 12%,transparent);color:var(--c-accent,#3453d1);font-size:22px;font-weight:800;z-index:200;pointer-events:none}
+html[data-theme="dark"] .rs-status.hata{color:#fb923c}
+html[data-theme="dark"] .rs-note.warn{color:#fbbf24}
+@media(max-width:700px){.rs-item{grid-template-columns:88px 1fr;gap:10px}.rs-thumb{width:88px;height:88px}.rs-fields{grid-template-columns:1fr}}
