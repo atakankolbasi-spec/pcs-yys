@@ -224,78 +224,69 @@ test.describe('service worker', () => {
   });
 });
 
-/* Asistan: Supabase fonksiyonu (Claude) yerine sahte cevaplar verilir; araçlar tarayıcıda gerçekten çalışır. */
-async function mockAssistant(page, replies) {
-  const requests = [];
-  await page.route('**/functions/v1/asistan', async route => {
-    const body = route.request().postDataJSON();
-    requests.push(body);
-    const next = replies[requests.length - 1] || { content: [{ type: 'text', text: 'Tamam.' }], stop_reason: 'end_turn' };
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(next) });
-  });
-  return requests;
+/* Asistan: ücretsiz, tarayıcıda çalışan kurallı cevaplayıcı. Dışarıya istek gitmemeli. */
+async function askAssistant(page, q) {
+  const before = await page.locator('.ast-msg.me').count();
+  await page.getByLabel('Asistana mesaj').fill(q);
+  await page.locator('.ast-send').click();
+  await expect(page.locator('.ast-msg.me')).toHaveCount(before + 1);
+  await expect(page.locator('.ast-msg.typing')).toHaveCount(0);
+  const last = page.locator('.ast-log > .ast-msg').last();
+  await expect(last).not.toHaveClass(/\bme\b/);
+  return last;
 }
-
-test('asistan: soruyu panodaki verilerle cevaplar', async ({ page }) => {
-  const requests = await mockAssistant(page, [
-    { content: [{ type: 'tool_use', id: 't1', name: 'gelisleri_ara', input: { metin: '34 ABC 123', baslangic: '', bitis: '', durum: 'hepsi' } }], stop_reason: 'tool_use' },
-    { content: [{ type: 'text', text: '34 ABC 123 bu hafta **2 kez** geldi.' }], stop_reason: 'end_turn' }
-  ]);
-  const problems = await openApp(page);
+async function openAssistant(page, cfg) {
+  const problems = await openApp(page, cfg);
+  const external = [];
+  page.on('request', r => { if (!/localhost:4173/.test(r.url())) external.push(r.url()); });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.locator('.ast-fab').click();
-  await page.getByLabel('Asistana mesaj').fill('34 ABC 123 kaç kez geldi?');
-  await page.locator('.ast-send').click();
-  await expect(page.locator('.ast-msg.bot').last()).toContainText('2 kez');
-  expect(requests).toHaveLength(2);
-  expect(requests[0].messages).toEqual([{ role: 'user', content: '34 ABC 123 kaç kez geldi?' }]);
-  const result = requests[1].messages[2].content[0];
-  expect(result.tool_use_id).toBe('t1');
-  expect(JSON.parse(result.content).toplam).toBe(2);
+  return { problems, external };
+}
+
+test('asistan: sayı, bekleyen, özet ve plaka sorularını cevaplar', async ({ page }) => {
+  const { problems, external } = await openAssistant(page);
+  await expect(await askAssistant(page, 'Bugün kaç araç var?')).toContainText('3 araç var');
+  const pending = await askAssistant(page, 'Bugün kaç araç bekliyor?');
+  await expect(pending).toContainText('3 araç bekliyor');
+  await expect(pending).toContainText('CB 1234 AB');
+  await expect(await askAssistant(page, 'bu haftanın özeti')).toContainText('Toplam: 7');
+  await expect(await askAssistant(page, 'Bu hafta kaç T1 yazıldı?')).toContainText('T1 yazılan araç sayısı: 5');
+  const plate = await askAssistant(page, '34abc123 nerede?');
+  await expect(plate).toContainText('BULTRANS');
+  await expect(plate).toContainText('Tesiste');
+  await expect(await askAssistant(page, "TORNADO'nun bekleyenleri")).toContainText('1 araç bekliyor');
+  await expect(await askAssistant(page, 'asdf qwerty')).toContainText('anlayamadım');
+  expect(external).toEqual([]);
   expect(problems).toEqual([]);
 });
 
 test('asistan: durum değişikliği yalnızca onaydan sonra kaydedilir', async ({ page }) => {
-  const change = { type: 'tool_use', id: 't9', name: 'durum_guncelle', input: { id: 'v6', tesiste: null, t1: null, bitti: true } };
-  await mockAssistant(page, [
-    { content: [change], stop_reason: 'tool_use' },
-    { content: [{ type: 'text', text: 'İşaretlemedim.' }], stop_reason: 'end_turn' },
-    { content: [change], stop_reason: 'tool_use' },
-    { content: [{ type: 'text', text: 'CB 1234 AB bitti olarak işaretlendi.' }], stop_reason: 'end_turn' }
-  ]);
-  const problems = await openApp(page);
-  await expect(page.locator('#app')).toContainText('34 ABC 123');
-  await page.locator('.ast-fab').click();
-  const ask = async q => { await page.getByLabel('Asistana mesaj').fill(q); await page.locator('.ast-send').click(); };
+  const { problems } = await openAssistant(page);
   const done = () => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').done);
-
-  await ask('CB 1234 AB bitti yap');
+  const card = await askAssistant(page, 'CB 1234 AB bitti yap');
+  await expect(card).toContainText('İŞLEMLER BİTTİ');
   await page.locator('#ast-panel').getByRole('button', { name: 'Vazgeç' }).click();
-  await expect(page.locator('.ast-msg.bot').last()).toContainText('İşaretlemedim');
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('hiçbir şey değiştirmedim');
   expect(await done()).toBe(false);
 
-  await ask('CB 1234 AB bitti yap');
-  await expect(page.locator('.ast-msg.confirm').last()).toContainText('İŞLEMLER BİTTİ');
+  await askAssistant(page, 'CB 1234 AB bitti yap');
   await page.locator('#ast-panel').getByRole('button', { name: 'Onayla' }).click();
-  await expect(page.locator('.ast-msg.bot').last()).toContainText('işaretlendi');
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('Kaydedildi');
   expect(await done()).toBe(true);
+
+  await askAssistant(page, '06 KL 4567 ekle');
+  await page.locator('#ast-panel').getByRole('button', { name: 'Onayla' }).click();
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('eklendi');
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.plate === '06 KL 4567' && v.visit_date === '2026-09-23').length)).toBe(1);
   expect(problems).toEqual([]);
 });
 
 test('asistan: görüntüleyici değişiklik yapamaz ama soru sorabilir', async ({ page }) => {
-  const requests = await mockAssistant(page, [
-    { content: [{ type: 'tool_use', id: 't2', name: 'durum_guncelle', input: { id: 'v6', tesiste: true, t1: null, bitti: null } }], stop_reason: 'tool_use' },
-    { content: [{ type: 'text', text: 'Düzenleme yetkiniz yok.' }], stop_reason: 'end_turn' }
-  ]);
-  const problems = await openApp(page, { role: 'viewer' });
-  await expect(page.locator('#app')).toContainText('34 ABC 123');
-  await page.locator('.ast-fab').click();
-  await page.getByLabel('Asistana mesaj').fill('CB 1234 AB tesiste yap');
-  await page.locator('.ast-send').click();
-  await expect(page.locator('.ast-msg.bot').last()).toContainText('yetkiniz yok');
+  const { problems } = await openAssistant(page, { role: 'viewer' });
+  await expect(await askAssistant(page, 'CB 1234 AB tesiste yap')).toContainText('yetkisi yok');
   await expect(page.locator('.ast-msg.confirm')).toHaveCount(0);
-  const result = requests[1].messages[2].content[0];
-  expect(result.is_error).toBe(true);
   expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').onsite)).toBe(false);
+  await expect(await askAssistant(page, 'Bugün kaç araç var?')).toContainText('3 araç var');
   expect(problems).toEqual([]);
 });

@@ -885,27 +885,24 @@ if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostnam
 window.addEventListener('offline',()=>{if(!account)return;storageError='İnternet bağlantısı yok. Son alınan kayıtlar gösteriliyor; bağlantı gelince otomatik güncellenir.';render();});
 
 /* asistan: panodaki verilerle Türkçe soru-cevap, özet ve (onayla) kayıt değiştirme.
-   Claude'a Supabase Edge Function (supabase/functions/asistan) üzerinden gidilir; API anahtarı tarayıcıya inmez.
-   Araçlar burada, tarayıcıda çalışır: okuma araçları ekrandaki kayıtları kullanır, değişiklikler her zaman
-   kullanıcı onayından sonra mutate() ile, kullanıcının kendi yetkisiyle yapılır. */
-const AST_URL=SB_URL+'/functions/v1/asistan';
-const AST_MAX_STEPS=8;
+   Tamamen tarayıcıda, ücretsiz çalışır; dışarıya istek gitmez. Değişiklikler her zaman kullanıcı
+   onayından sonra mutate() ile, kullanıcının kendi yetkisiyle yapılır. */
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 I.spark='<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>';
 I.mic='<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
 I.send='<path d="M4 12l16-8-6 16-2.5-6.5z"/>';
 I.speaker='<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/>';
-const ast={open:false,msgs:[],view:[],busy:false,voice:false,listening:false,confirm:null,rec:null};
-const AST_HELLO='Merhaba! Panodaki kayıtlarla ilgili soru sorabilir, özet isteyebilir veya durum değiştirmemi isteyebilirsiniz. Örnek: "Bugün kaç araç bekliyor?", "34 ABC 123 T1 yazıldı yap".';
+const ast={open:false,view:[],busy:false,voice:false,listening:false,confirm:null,rec:null};
+const AST_HELLO='Merhaba! Panodaki kayıtlarla ilgili soru sorabilir, özet isteyebilir veya durum değiştirmemi isteyebilirsiniz. Örnek: "Bugün kaç araç var?", "Bekleyen araçlar", "34 ABC 123 T1 yazıldı yap". Tüm örnekler için "yardım" yazın.';
 const astText=s=>esc(s).replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
 function astMount(){
  let root=document.getElementById('ast-root');
- if(!account||VIEW_TOKEN){if(root){astStopVoice();root.remove();ast.open=false;ast.msgs=[];ast.view=[];}return;}
+ if(!account||VIEW_TOKEN){if(root){astStopVoice();root.remove();ast.open=false;ast.view=[];}return;}
  if(!root){root=document.createElement('div');root.id='ast-root';document.body.appendChild(root);astDraw();}
 }
 function astDraw(){const root=document.getElementById('ast-root');if(!root)return;
  const items=(ast.view.length?ast.view:[{who:'bot',text:AST_HELLO}]).map(m=>m.who==='confirm'?`<div class="ast-msg confirm"><div>${astText(m.text)}</div>${m.done?`<small>${m.done}</small>`:`<div class="ast-confirm-btns"><button type="button" class="btn small" data-ast="no">Vazgeç</button><button type="button" class="btn small primary" data-ast="ok">${icon('check')}Onayla</button></div>`}</div>`:`<div class="ast-msg ${m.who}">${astText(m.text)}</div>`).join('');
- root.innerHTML=`<button type="button" class="ast-fab${ast.open?' open':''}" data-ast="toggle" aria-expanded="${ast.open}" aria-controls="ast-panel" title="Asistan">${icon(ast.open?'close':'spark')}<span>Asistan</span></button>${ast.open?`<section id="ast-panel" class="ast-panel" role="dialog" aria-label="Asistan"><header class="ast-head"><div><b>${icon('spark')}Asistan</b><small>Panodaki kayıtlarla çalışır</small></div><div class="ast-head-btns"><button type="button" class="icon-btn${ast.voice?' on':''}" data-ast="voice" aria-pressed="${ast.voice}" title="${ast.voice?'Cevapları sesli okumayı kapat':'Cevapları sesli oku'}" aria-label="Cevapları sesli oku">${icon('speaker')}</button><button type="button" class="btn text small" data-ast="new" ${ast.busy?'disabled':''}>Yeni konuşma</button><button type="button" class="icon-btn" data-ast="toggle" aria-label="Asistanı kapat">${icon('close')}</button></div></header><div class="ast-log" id="ast-log" aria-live="polite">${items}${ast.busy?'<div class="ast-msg bot typing"><i></i><i></i><i></i></div>':''}</div><form class="ast-form" id="ast-form">${SpeechRec?`<button type="button" class="icon-btn ast-mic${ast.listening?' on':''}" data-ast="mic" aria-pressed="${ast.listening}" title="${ast.listening?'Dinlemeyi durdur':'Sesli sor'}" aria-label="Sesli sor">${icon('mic')}</button>`:''}<input id="ast-input" name="q" type="text" maxlength="1000" autocomplete="off" placeholder="${ast.listening?'Dinliyorum…':'Bir şey sorun veya isteyin…'}" aria-label="Asistana mesaj" ${ast.busy?'disabled':''}><button type="submit" class="icon-btn ast-send" aria-label="Gönder" ${ast.busy?'disabled':''}>${icon('send')}</button></form><p class="ast-note">Sorular ve ilgili kayıtlar yanıt üretmek için Anthropic'e (Claude) gönderilir.</p></section>`:''}`;
+ root.innerHTML=`<button type="button" class="ast-fab${ast.open?' open':''}" data-ast="toggle" aria-expanded="${ast.open}" aria-controls="ast-panel" title="Asistan">${icon(ast.open?'close':'spark')}<span>Asistan</span></button>${ast.open?`<section id="ast-panel" class="ast-panel" role="dialog" aria-label="Asistan"><header class="ast-head"><div><b>${icon('spark')}Asistan</b><small>Panodaki kayıtlarla çalışır</small></div><div class="ast-head-btns"><button type="button" class="icon-btn${ast.voice?' on':''}" data-ast="voice" aria-pressed="${ast.voice}" title="${ast.voice?'Cevapları sesli okumayı kapat':'Cevapları sesli oku'}" aria-label="Cevapları sesli oku">${icon('speaker')}</button><button type="button" class="btn text small" data-ast="new" ${ast.busy?'disabled':''}>Yeni konuşma</button><button type="button" class="icon-btn" data-ast="toggle" aria-label="Asistanı kapat">${icon('close')}</button></div></header><div class="ast-log" id="ast-log" aria-live="polite">${items}${ast.busy&&!ast.confirm?'<div class="ast-msg bot typing"><i></i><i></i><i></i></div>':''}</div><form class="ast-form" id="ast-form">${SpeechRec?`<button type="button" class="icon-btn ast-mic${ast.listening?' on':''}" data-ast="mic" aria-pressed="${ast.listening}" title="${ast.listening?'Dinlemeyi durdur':'Sesli sor'}" aria-label="Sesli sor">${icon('mic')}</button>`:''}<input id="ast-input" name="q" type="text" maxlength="1000" autocomplete="off" placeholder="${ast.listening?'Dinliyorum…':'Bir şey sorun veya isteyin…'}" aria-label="Asistana mesaj" ${ast.busy?'disabled':''}><button type="submit" class="icon-btn ast-send" aria-label="Gönder" ${ast.busy?'disabled':''}>${icon('send')}</button></form><p class="ast-note">Ücretsiz · kayıtlar bu cihazda işlenir, dışarı gönderilmez.</p></section>`:''}`;
  const log=document.getElementById('ast-log');if(log)log.scrollTop=log.scrollHeight;
 }
 function astSay(who,text){ast.view.push({who,text});astDraw();if(who==='bot'&&ast.voice)astSpeak(text);}
@@ -923,29 +920,81 @@ function astListen(){
 }
 function astAsk(text){return new Promise(resolve=>{const item={who:'confirm',text};ast.view.push(item);ast.confirm={item,resolve};astDraw();if(ast.voice)astSpeak(text+' Onaylıyor musunuz?');});}
 function astResolve(ok){const c=ast.confirm;if(!c)return;ast.confirm=null;c.item.done=ok?'Onaylandı':'Vazgeçildi';astDraw();c.resolve(ok);}
-async function astCall(){
- const {data}=await client.auth.getSession();const token=data?.session?.access_token;if(!token)throw new Error('Oturum süresi dolmuş. Yeniden giriş yapın.');
- let r;try{r=await fetch(AST_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,apikey:SB_KEY},body:JSON.stringify({messages:ast.msgs})});}catch(_){throw new Error(navigator.onLine===false?'İnternet bağlantısı yok. Bağlantı gelince tekrar deneyin.':'Asistana ulaşılamadı: sunucu fonksiyonu yanıt vermedi veya erişime kapalı. Yöneticiye bildirin.');}
- let body=null;try{body=await r.json();}catch(_){}
- if(!r.ok||!body||!Array.isArray(body.content))throw new Error((body?.error&&body.detay?body.error+' (Ayrıntı: '+String(body.detay).slice(0,300)+')':body?.error)||(r.status===404?'Asistan henüz kurulmamış (Supabase fonksiyonu yok). Yöneticiye bildirin.':'Asistana ulaşılamadı. Biraz sonra tekrar deneyin.'));
- return body;
+/* Ücretsiz, kurallı cevaplayıcı: Türkçe kalıp cümleleri tanır (plaka, müşteri, tarih, durum sözcükleri). */
+const astLow=s=>String(s||'').toLocaleLowerCase('tr-TR');
+const AST_DAYS=['cumartesi','pazartesi','salı','çarşamba','perşembe','cuma'];/* cumartesi, cuma'dan önce denenir */
+const AST_MONTHS=['ocak','şubat','mart','nisan','mayıs','haziran','temmuz','ağustos','eylül','ekim','kasım','aralık'];
+const AST_GENERIC=new Set(['LOJ','LOJİSTİK','LOJISTIK','TRANS','TRANSPORT','SRL','LTD','ŞTİ','STI','NAKLİYAT','GROUP','INTERNATIONAL','TİCARET','ETL','ÇOKAL']);
+const astDay=d=>d===TODAY?'bugün':fmt(d,{weekday:'long',day:'numeric',month:'long'});
+const astLabel=r=>r.a===r.b?astDay(r.a):r.label||`${fmt(r.a)} – ${fmt(r.b)}`;
+const astShort=v=>[v.onsite&&'Tesiste',v.t1&&'T1',v.done&&'Bitti'].filter(Boolean).join(', ')||'hiçbir kutu işaretli değil';
+const astLine=v=>`- **${v.plate}** · ${v.customer||'müşterisiz'} · ${fmt(v.date,{day:'numeric',month:'short'})}${v.time?' '+v.time:''} · ${astShort(v)}`;
+const astList=(rows,max=10)=>rows.slice(0,max).map(astLine).join('\n')+(rows.length>max?`\n… ve ${rows.length-max} araç daha`:'');
+function astDates(q){
+ const mon=monday(weekNow.year,weekNow.week),one=d=>({a:d,b:d});let m;
+ if(/geçen hafta/.test(q)){const a=addDays(mon,-7);return {a,b:addDays(a,5),label:'geçen hafta'};}
+ if(/gelecek hafta|haftaya/.test(q)){const a=addDays(mon,7);return {a,b:addDays(a,5),label:'gelecek hafta'};}
+ if(/bu hafta|haftalık|hafta/.test(q))return {a:mon,b:addDays(mon,5),label:'bu hafta'};
+ if(/bu ay|aylık/.test(q)){const y=+TODAY.slice(0,4),mo=+TODAY.slice(5,7);return {a:TODAY.slice(0,8)+'01',b:iso(new Date(Date.UTC(y,mo,0,12))),label:'bu ay'};}
+ if(/(?<![a-zçğıöşü])dün/.test(q))return one(addDays(TODAY,-1));
+ if(/yarın/.test(q))return one(addDays(TODAY,1));
+ if((m=q.match(/\b(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\b/))){const y=m[3]?(m[3].length===2?'20'+m[3]:m[3]):TODAY.slice(0,4);const d=`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(validDate(d))return one(d);}
+ if((m=q.match(new RegExp('\\b(\\d{1,2})\\s+('+AST_MONTHS.join('|')+')')))){const d=`${TODAY.slice(0,4)}-${String(AST_MONTHS.indexOf(m[2])+1).padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(validDate(d))return one(d);}
+ const words=q.split(/[^a-zçğıöşü]+/);for(const day of AST_DAYS)if(words.some(w=>w.startsWith(day)))return one(addDays(mon,['pazartesi','salı','çarşamba','perşembe','cuma','cumartesi'].indexOf(day)));
+ if(/bugün/.test(q))return one(TODAY);
+ return null;
+}
+function astPlates(q){const nq=norm(q),found=new Map();
+ for(const p of [...state.registry.map(r=>r.plate),...state.visits.map(v=>v.plate)]){const k=norm(p);if(!k||found.has(k))continue;
+  const s=[k,...String(p).split(/[|/]/).map(norm)].filter(x=>x.length>=4&&nq.includes(x)).reduce((t,x)=>Math.max(t,x.length),0);if(s)found.set(k,{plate:p,s});}
+ const best=Math.max(0,...[...found.values()].map(x=>x.s));return [...found.values()].filter(x=>x.s===best).map(x=>x.plate);}
+function astCustomer(q){const Q=' '+q.toLocaleUpperCase('tr-TR').replace(/[^\p{L}\p{N}]+/gu,' ')+' ';let best=null,score=0;
+ for(const c of new Set([...state.visits,...state.registry].map(x=>x.customer).filter(Boolean))){const C=c.toLocaleUpperCase('tr-TR');
+  let s=Q.includes(' '+C.replace(/[^\p{L}\p{N}]+/gu,' ').trim()+' ')?100:0;
+  for(const w of C.split(/[^\p{L}\p{N}]+/u))if(w.length>=4&&!AST_GENERIC.has(w)&&Q.includes(' '+w))s+=w.length;
+  if(s>score){score=s;best=c;}}
+ return best;}
+const AST_HELP='Şunları anlayabilirim:\n- "Bugün kaç araç var?", "Bu hafta kaç araç geldi?"\n- "Bekleyen araçlar", "BOSCH\'un bekleyenleri"\n- "Bugünün özeti", "Haftalık rapor", "Eksik bilgiler"\n- "34 ABC 123 nerede?" (plaka durumu)\n- "34 ABC 123 T1 yazıldı yap", "… bitti yap", "… tesiste işaretini kaldır"\n- "34 ABC 123 ekle" (bugüne yeni geliş)';
+async function astAnswer(raw){
+ const q=astLow(raw).replace(/[’`]/g,"'"),plates=astPlates(raw),range=astDates(q);
+ const question=/\?|(?<![a-zçğıöşü])(mı|mi|mu|mü|mısın|misin|kaç|hangi|nerede|ne zaman|neler)(?![a-zçğıöşü])/.test(q);
+ const st={onsite:/tesis/.test(q),t1:/\bt\s?-?1\b/.test(q),done:/bitti|bitir|tamamla|kapat/.test(q)};
+ const neg=/kaldır|geri al|iptal|sil\b|boşalt|değil/.test(q);
+ if(/^(merhaba|selam|günaydın|iyi günler)\b/.test(q)&&!plates.length)return 'Merhaba! '+AST_HELP;
+ if(/yardım|ne yapabilir|neler yapabilir|nasıl kullan/.test(q))return AST_HELP;
+ if(plates.length>1&&!question)return `Birden fazla plaka eşleşti: ${plates.map(p=>'**'+p+'**').join(', ')}. Plakanın tamamını yazın.`;
+ if(plates.length===1){const plate=plates[0],all=state.visits.filter(v=>norm(v.plate)===norm(plate)).sort((a,b)=>b.date.localeCompare(a.date)||String(b.time||'').localeCompare(String(a.time||'')));
+  const act=!question&&(st.onsite||st.t1||st.done)&&/yap|işaretle|olarak|yaz|geldi|girdi|bitti|bitir|tamamla|kapat|kaldır|geri al|iptal|sil\b/.test(q);
+  if(act){const pick=(range&&all.find(v=>v.date>=range.a&&v.date<=range.b))||all.find(v=>v.date===TODAY)||all.find(v=>!v.done)||all[0];
+   if(!pick)return `**${plate}** için geliş kaydı yok. Önce gelişi ekleyin: "${plate} ekle".`;
+   const r=await astTool('durum_guncelle',{id:pick.id,tesiste:st.onsite?!neg:null,t1:st.t1?!neg:null,bitti:st.done?!neg:null});
+   if(r.hata)return r.hata;const v=state.visits.find(x=>x.id===pick.id)||pick;
+   return r.sonuc==='Kaydedildi.'?`Kaydedildi. **${v.plate}** (${astDay(v.date)}): ${astShort(v)}.`:r.sonuc.startsWith('Değişiklik gerekmedi')?`**${v.plate}** zaten istenen durumda: ${r.durum}.`:'Tamam, hiçbir şey değiştirmedim.';}
+  if(!question&&/(?<![a-zçğıöşü])(ekle|kaydet|yeni geliş|geldi|girdi)/.test(q)){const date=range?range.a:TODAY,tm=q.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+   const r=await astTool('gelis_ekle',{plaka:plate,tarih:date,saat:tm?tm[1].padStart(2,'0')+':'+tm[2]:(date===TODAY?timeNow():''),musteri:'',not:''});
+   if(r.hata)return r.hata;return r.gelis?`**${r.gelis.plaka}** ${astDay(date)} için eklendi.`:'Tamam, kayıt eklemedim.';}
+  const reg=matchPlate(plate);
+  if(!all.length)return reg?`**${reg.plate}** kayıtlı (${reg.customer}) ama hiç gelişi yok.`:`**${plate}** için kayıt bulunamadı.`;
+  const v=all[0];return `**${v.plate}** · ${v.customer}\nSon geliş: ${astDay(v.date)}${v.time?' '+v.time:''} · ${astShort(v)}${v.declaration?'\nBeyanname: '+v.declaration:''}${v.carrier?'\nNakliyeci: '+v.carrier:''}${all.length>1?`\n\nÖnceki gelişler:\n${astList(all.slice(1),4)}`:''}`;}
+ if(!plates.length&&/(?<![a-zçğıöşü])(ekle|kaydet)/.test(q)&&!question)return 'Hangi plakayı ekleyeyim? Kayıtlı bir plakayı yazın, örneğin "34 ABC 123 ekle". Kayıtlı olmayan plakalar için "Araç ekle" formunu kullanın.';
+ const cust=astCustomer(raw),cf=v=>!cust||v.customer===cust,who=cust?`**${cust}** için `:'';
+ if(/eksik/.test(q)){const r=range||{a:TODAY,b:TODAY};const rows=state.visits.filter(v=>v.date>=r.a&&v.date<=r.b&&cf(v)&&isMissing(v));
+  return rows.length?`${who}${astLabel(r)} bilgisi eksik ${rows.length} araç var (beyanname, nakliyeci veya ruhsat):\n${astList(rows)}`:`${who}${astLabel(r)} bilgisi eksik araç yok.`;}
+ if(/bekl|bitme|kalan|açık|tamamlanma/.test(q)&&!/oran|yüzde/.test(q)){const rows=state.visits.filter(v=>!v.done&&cf(v)&&(!range||(v.date>=range.a&&v.date<=range.b))).sort((a,b)=>a.date.localeCompare(b.date));
+  return rows.length?`${who}${range?astLabel(range)+' ':''}${rows.length} araç bekliyor (en eskisi üstte):\n${astList(rows)}`:`${who}${range?astLabel(range)+' ':''}bekleyen araç yok.`;}
+ const r=range||{a:TODAY,b:TODAY};const rows=state.visits.filter(v=>v.date>=r.a&&v.date<=r.b&&cf(v));const s=stats(rows);
+ if(/özet|rapor|durum|oran|yüzde/.test(q)||(!question&&cust)){const by={};for(const v of rows)by[v.customer||'müşterisiz']=(by[v.customer||'müşterisiz']||0)+1;const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  return `${who}${astLabel(r)} özeti:\n- Toplam: **${s.total}** araç\n- Tesiste: ${s.onsite} · T1 yazıldı: ${s.t1}\n- İşlemleri biten: ${s.done} (%${s.percent}) · Bekleyen: ${s.pending}${!cust&&top.length?`\n\nEn çok araç: ${top.map(([n,c])=>`${n} (${c})`).join(', ')}`:''}`;}
+ if(question||/kaç|toplam|sayı|liste|göster|gelen|geldi|araç/.test(q)){const key=st.done?'done':st.t1?'t1':st.onsite?'onsite':null,name={done:'işlemleri biten',t1:'T1 yazılan',onsite:'tesiste işaretli'}[key];
+  const list=key?rows.filter(v=>v[key]):rows;const want=/hangi|liste|göster|neler/.test(q);
+  const head=key?`${who}${astLabel(r)} ${name} araç sayısı: **${list.length}** (toplam ${s.total}).`:`${who}${astLabel(r)} **${s.total}** araç var: ${s.onsite} tesiste, ${s.t1} T1 yazıldı, ${s.done} bitti, ${s.pending} bekliyor.`;
+  return head+(list.length&&(want||list.length<=5)?'\n'+astList(list):'');}
+ return 'Bunu anlayamadım. '+AST_HELP;
 }
 async function astSend(q){
  q=String(q||'').trim();if(!q||ast.busy)return;
- const mark=ast.msgs.length;ast.msgs.push({role:'user',content:q});ast.view.push({who:'me',text:q});ast.busy=true;astDraw();
- try{
-  for(let step=0;step<AST_MAX_STEPS;step++){
-   const res=await astCall();ast.msgs.push({role:'assistant',content:res.content});
-   const text=res.content.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
-   if(res.stop_reason==='refusal'){ast.msgs.length=mark;astSay('err','Asistan bu isteğe cevap veremedi. Soruyu farklı biçimde sorun.');return;}
-   const uses=res.content.filter(b=>b.type==='tool_use');
-   if(res.stop_reason!=='tool_use'||!uses.length){astSay('bot',text||'Bir cevap üretilemedi; soruyu farklı biçimde sorun.');return;}
-   if(text)astSay('bot',text);
-   const results=[];for(const b of uses){let out;try{out=await astTool(b.name,b.input||{});}catch(e){out={hata:String(e?.message||e)};}results.push({type:'tool_result',tool_use_id:b.id,content:JSON.stringify(out),...(out&&out.hata?{is_error:true}:{})});}
-   ast.msgs.push({role:'user',content:results});
-  }
-  ast.msgs.length=mark;astSay('err','İstek çok fazla adım gerektirdi. Daha basit parçalara bölerek sorun.');
- }catch(e){ast.msgs.length=mark;astSay('err',String(e?.message||e));}
+ ast.view.push({who:'me',text:q});ast.busy=true;astDraw();
+ try{const a=await astAnswer(q);astSay('bot',a.charAt(0).toLocaleUpperCase('tr-TR')+a.slice(1));}catch(e){astSay('err',String(e?.message||e));}
  finally{ast.busy=false;astDraw();document.getElementById('ast-input')?.focus();}
 }
 const astVisit=v=>({id:v.id,plaka:v.plate,musteri:v.customer,tarih:v.date,gun:DAYS[weekday(v.date)-1]||'',saat:v.time||'',beyanname:v.declaration||'',nakliyeci:v.carrier||'',ruhsat:v.registration||'',not:v.note||'',tesiste:v.onsite,t1:v.t1,bitti:v.done});
@@ -980,7 +1029,7 @@ async function astTool(name,x){
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ast]');if(!b)return;const a=b.dataset.ast;
  if(a==='toggle'){ast.open=!ast.open;if(!ast.open)astStopVoice();astDraw();if(ast.open)document.getElementById('ast-input')?.focus();else document.querySelector('.ast-fab')?.focus();}
- else if(a==='new'){if(ast.busy)return;astStopVoice();if(ast.confirm)astResolve(false);ast.msgs=[];ast.view=[];astDraw();}
+ else if(a==='new'){if(ast.busy)return;astStopVoice();if(ast.confirm)astResolve(false);ast.view=[];astDraw();}
  else if(a==='voice'){ast.voice=!ast.voice;if(!ast.voice)try{speechSynthesis.cancel();}catch(_){}astDraw();}
  else if(a==='mic')astListen();
  else if(a==='ok'||a==='no')astResolve(a==='ok');});
