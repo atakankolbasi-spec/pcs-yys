@@ -157,6 +157,30 @@ test('tarih yardımcıları', async ({ page }) => {
   expect(r.today).toBe('2026-09-23');
 });
 
+test('koyu temada yazılar okunaklı (yeterli kontrast)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pcs-transit-yys.v1.theme', 'dark'));
+  await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const r = await page.evaluate(() => {
+    const lum = c => { const m = c.match(/\d+(\.\d+)?/g); if (!m) return null; const k = c.startsWith('color(') ? 1 : 255;
+      const [x, y, z] = m.slice(0, 3).map(Number).map(v => { v /= k; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+      return 0.2126 * x + 0.7152 * y + 0.0722 * z; };
+    const transparent = c => /rgba\(0, 0, 0, 0\)|transparent/.test(c) || /, 0\)$| \/ 0\)$/.test(c);
+    const bgOf = el => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (!transparent(c)) return c; } return 'rgb(14, 18, 24)'; };
+    let total = 0, low = 0;
+    for (const el of document.querySelectorAll('#app *')) {
+      if (el.offsetParent === null || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+      const a = lum(getComputedStyle(el).color), b = lum(bgOf(el)); if (a == null || b == null) continue;
+      total++; if ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) < 4.5) low++;
+    }
+    return { total, low, stroke: parseFloat(getComputedStyle(document.body).webkitTextStrokeWidth) };
+  });
+  // Düzeltmeden önce yazıların ~%13'ü 4.5:1'in altındaydı; şimdi yalnızca renkli düğme üstü birkaç yazı kalıyor.
+  expect(r.total).toBeGreaterThan(50);
+  expect(r.low / r.total).toBeLessThan(0.05);
+  expect(r.stroke).toBeGreaterThan(0);
+});
+
 test('başka bir sitenin içine (iframe) gömülünce uygulama açılmaz', async ({ page }) => {
   await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
   await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData() });
