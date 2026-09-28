@@ -264,6 +264,32 @@ test('ruhsattan ekle: kayıtlı araç tek tıkla, yeni araç formla eklenir', as
   expect(problems).toEqual([]);
 });
 
+test('ruhsat okuma: harf sanılan rakam düzelir, çekici/dorse cins yazısından ayrılır', async ({ page }) => {
+  const data = sampleData();
+  data.registry.push({ id: 'r6', plate: 'PB 9876 TT - PB 1111 AA', customer: 'ÖRNEK LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  // Küçük fotoğraftan okunmuş gibi metin: dorse kartı üstte, "8" harf "B" sanılmış, Kiril yazılar bozuk.
+  const text = ['(A)', 'CA1B34KX', 'w= 012345678', 'iB) 16.04.2014', 'fe) NONYPEMAPKE', '(D.2)SCB"S3T 06 VL', '', 'PB9876TT', 'io) 188', '2', 'WMAO0BXZZ8CME01', 'BAEKAY', 'TRAC'].join('\n');
+  const r = await page.evaluate(t => {
+    const T = window.PCS_TEST, cands = T.ruhsatPlates(t), kinds = T.ruhsatKinds(t, {});
+    const pick = ({ tractor, trailer, reg, tractorReg }) => ({ tractor, trailer, reg: !!reg, tractorCustomer: tractorReg?.customer || '' });
+    return {
+      cands, kinds,
+      known: pick(T.ruhsatResolve(cands, kinds)),
+      // kayıtta olmayan çekici: sıra yalnızca cins yazısından belirlenir
+      unknown: pick(T.ruhsatResolve(T.ruhsatPlates(t.replace('PB9876TT', 'PB5555TT')), T.ruhsatKinds(t.replace('PB9876TT', 'PB5555TT'), {}))),
+      tr: T.ruhsatPlates('(A) 34 ABC 123\n34 SB 1234')
+    };
+  }, text);
+  expect(r.cands).toEqual(['CA1834KX', 'PB9876TT']);
+  expect(r.kinds).toEqual({ CA1834KX: 'trailer', PB9876TT: 'tractor' });
+  expect(r.known).toEqual({ tractor: 'PB9876TT', trailer: 'CA1834KX', reg: false, tractorCustomer: 'ÖRNEK LOJ' });
+  expect(r.unknown).toEqual({ tractor: 'PB5555TT', trailer: 'CA1834KX', reg: false, tractorCustomer: '' });
+  // Türk plakasında harfler rakamların arasındadır; düzeltme bunlara dokunmaz.
+  expect(r.tr).toEqual(expect.arrayContaining(['34ABC123', '34SB1234']));
+});
+
 test('ruhsat fotoğrafı Ctrl+V ile yapıştırılabilir; görüntüleyici ekleyemez', async ({ page, browser, context }) => {
   const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
   const paste = p => p.evaluate(b64 => {
