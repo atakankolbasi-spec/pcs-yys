@@ -189,7 +189,11 @@ Deno.serve(async (req) => {
     }
     if (e instanceof Anthropic.BadRequestError) {
       console.error("Anthropic 400:", e.message);
-      return json({ error: "Konuşma işlenemedi. Yeni bir konuşma başlatın." }, 400, headers);
+      if (/credit balance/i.test(e.message)) {
+        return json({ error: "Anthropic API bakiyesi yetersiz. Yönetici console.anthropic.com → Billing sayfasından bakiye yüklemeli." }, 402, headers);
+      }
+      // Anthropic'in hata açıklaması gizli bilgi içermez; sorunu bulmayı kolaylaştırmak için iletilir.
+      return json({ error: "Konuşma işlenemedi. Yeni bir konuşma başlatın.", detay: e.message }, 400, headers);
     }
     if (e instanceof Anthropic.APIError) {
       console.error("Anthropic hata:", e.status, e.message);
