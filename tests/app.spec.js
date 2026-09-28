@@ -223,3 +223,79 @@ test.describe('service worker', () => {
     expect(await hits()).toBeGreaterThan(before);
   });
 });
+
+/* Asistan: Supabase fonksiyonu (Claude) yerine sahte cevaplar verilir; araçlar tarayıcıda gerçekten çalışır. */
+async function mockAssistant(page, replies) {
+  const requests = [];
+  await page.route('**/functions/v1/asistan', async route => {
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    const next = replies[requests.length - 1] || { content: [{ type: 'text', text: 'Tamam.' }], stop_reason: 'end_turn' };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(next) });
+  });
+  return requests;
+}
+
+test('asistan: soruyu panodaki verilerle cevaplar', async ({ page }) => {
+  const requests = await mockAssistant(page, [
+    { content: [{ type: 'tool_use', id: 't1', name: 'gelisleri_ara', input: { metin: '34 ABC 123', baslangic: '', bitis: '', durum: 'hepsi' } }], stop_reason: 'tool_use' },
+    { content: [{ type: 'text', text: '34 ABC 123 bu hafta **2 kez** geldi.' }], stop_reason: 'end_turn' }
+  ]);
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.ast-fab').click();
+  await page.getByLabel('Asistana mesaj').fill('34 ABC 123 kaç kez geldi?');
+  await page.locator('.ast-send').click();
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('2 kez');
+  expect(requests).toHaveLength(2);
+  expect(requests[0].messages).toEqual([{ role: 'user', content: '34 ABC 123 kaç kez geldi?' }]);
+  const result = requests[1].messages[2].content[0];
+  expect(result.tool_use_id).toBe('t1');
+  expect(JSON.parse(result.content).toplam).toBe(2);
+  expect(problems).toEqual([]);
+});
+
+test('asistan: durum değişikliği yalnızca onaydan sonra kaydedilir', async ({ page }) => {
+  const change = { type: 'tool_use', id: 't9', name: 'durum_guncelle', input: { id: 'v6', tesiste: null, t1: null, bitti: true } };
+  await mockAssistant(page, [
+    { content: [change], stop_reason: 'tool_use' },
+    { content: [{ type: 'text', text: 'İşaretlemedim.' }], stop_reason: 'end_turn' },
+    { content: [change], stop_reason: 'tool_use' },
+    { content: [{ type: 'text', text: 'CB 1234 AB bitti olarak işaretlendi.' }], stop_reason: 'end_turn' }
+  ]);
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.ast-fab').click();
+  const ask = async q => { await page.getByLabel('Asistana mesaj').fill(q); await page.locator('.ast-send').click(); };
+  const done = () => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').done);
+
+  await ask('CB 1234 AB bitti yap');
+  await page.locator('#ast-panel').getByRole('button', { name: 'Vazgeç' }).click();
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('İşaretlemedim');
+  expect(await done()).toBe(false);
+
+  await ask('CB 1234 AB bitti yap');
+  await expect(page.locator('.ast-msg.confirm').last()).toContainText('İŞLEMLER BİTTİ');
+  await page.locator('#ast-panel').getByRole('button', { name: 'Onayla' }).click();
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('işaretlendi');
+  expect(await done()).toBe(true);
+  expect(problems).toEqual([]);
+});
+
+test('asistan: görüntüleyici değişiklik yapamaz ama soru sorabilir', async ({ page }) => {
+  const requests = await mockAssistant(page, [
+    { content: [{ type: 'tool_use', id: 't2', name: 'durum_guncelle', input: { id: 'v6', tesiste: true, t1: null, bitti: null } }], stop_reason: 'tool_use' },
+    { content: [{ type: 'text', text: 'Düzenleme yetkiniz yok.' }], stop_reason: 'end_turn' }
+  ]);
+  const problems = await openApp(page, { role: 'viewer' });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.ast-fab').click();
+  await page.getByLabel('Asistana mesaj').fill('CB 1234 AB tesiste yap');
+  await page.locator('.ast-send').click();
+  await expect(page.locator('.ast-msg.bot').last()).toContainText('yetkiniz yok');
+  await expect(page.locator('.ast-msg.confirm')).toHaveCount(0);
+  const result = requests[1].messages[2].content[0];
+  expect(result.is_error).toBe(true);
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').onsite)).toBe(false);
+  expect(problems).toEqual([]);
+});
