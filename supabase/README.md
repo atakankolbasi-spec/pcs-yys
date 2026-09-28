@@ -110,9 +110,16 @@ görmelisiniz. Yoksa değişiklikler diğer ekranlara en geç 2 dakika içinde y
 biri araç eklediğinde ya da değiştirdiğinde diğer ekranlar 15 saniye beklemeden, yaklaşık
 1 saniye içinde yenilenir. Çalıştırılmazsa site yine 15 saniyede bir kendini yeniler.
 
-## Bu klasördeki SQL dosyaları
+## 7. WhatsApp'tan otomatik ruhsat aktarma
+
+Kurulum adımları `WHATSAPP.md` dosyasında. Kurulmadıkça site bu özelliği sessizce kapalı tutar.
+
+## Bu klasördeki dosyalar
 
 | Dosya | Ne işe yarar |
 |---|---|
 | `islem-gecmisi-duzeltmesi.sql` | "Kaydı düzenle"deki `malformed array literal` hatasını düzelten işlem geçmişi tetikleyicisi |
 | `anlik-guncelleme-kurulumu.sql` | Tabloları Realtime yayınına ekler (anlık güncelleme) |
+| `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |
+| `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |
+| `WHATSAPP.md` | WhatsApp kurulum rehberi (Meta + Supabase) |

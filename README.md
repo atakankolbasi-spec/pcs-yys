@@ -20,7 +20,7 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 | `fonts/` | Roboto yazı tipi (WOFF2) |
 | `ocr/` | "Ruhsattan ekle" için tarayıcıda çalışan metin okuma programı (Tesseract). Ayrıntı: `ocr/README.md` |
 | `_headers` | Sunucu güvenlik başlıkları. **GitHub Pages'te etkisizdir**; site Cloudflare Pages veya Netlify'a taşınırsa kullanılır. Gömülmeye (iframe) karşı koruma bu yüzden `app.js` başında yapılır. |
-| `supabase/` | Veritabanı tarafı notları ve kontrol sorguları |
+| `supabase/` | Veritabanı tarafı notları, kurulum SQL'leri ve WhatsApp sunucu fonksiyonu. WhatsApp kurulumu: `supabase/WHATSAPP.md` |
 | `tests/` | Otomatik tarayıcı testleri (uygulamanın parçası değildir) |
 
 ## Düzenleme yaparken
