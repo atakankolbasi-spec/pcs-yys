@@ -20,6 +20,7 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 | `fonts/` | Roboto yazı tipi (WOFF2) |
 | `_headers` | Sunucu güvenlik başlıkları. **GitHub Pages'te etkisizdir**; site Cloudflare Pages veya Netlify'a taşınırsa kullanılır. Gömülmeye (iframe) karşı koruma bu yüzden `app.js` başında yapılır. |
 | `supabase/` | Veritabanı tarafı notları ve kontrol sorguları |
+| `supabase/functions/asistan/` | Asistan (Claude) için sunucu fonksiyonu. Kurulumu: `supabase/README.md` → Asistan |
 | `tests/` | Otomatik tarayıcı testleri (uygulamanın parçası değildir) |
 
 ## Düzenleme yaparken
