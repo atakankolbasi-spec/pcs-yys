@@ -285,6 +285,45 @@ test('ruhsat fotoğrafı Ctrl+V ile yapıştırılabilir; görüntüleyici ekley
   await expect(viewer.locator('#ruhsat-box')).toHaveCount(0);
 });
 
+test('WhatsApp\'tan kopyalanan resim kutuya, düğmeyle ya da dosya olarak yapıştırılır', async ({ page, browser, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
+  const problems = await openApp(page);
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const box = page.locator('#ruhsat-paste');
+  await expect(box).toBeFocused();
+  const items = page.locator('.rs-item');
+
+  // Tarayıcıda "Resmi kopyala": panoda image/png olur.
+  await page.evaluate(async b64 => {
+    const blob = new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: 'image/png' });
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+  }, img.toString('base64'));
+  await box.click();
+  await page.keyboard.press('Control+V');
+  await expect(items).toHaveCount(1);
+  await page.locator('[data-action="ruhsat-clip"]').click();
+  await expect(items).toHaveCount(2);
+
+  // Kutuya yazı yazılamaz; resim olmayan bir şey yapıştırılırsa ne yapılacağı söylenir.
+  await box.click();
+  await page.keyboard.type('abc');
+  await page.evaluate(() => navigator.clipboard.writeText('merhaba'));
+  await page.keyboard.press('Control+V');
+  await expect(page.locator('#toast')).toContainText('resim değil');
+  await expect(box).toHaveText('');
+  await expect(items).toHaveCount(2);
+
+  // WhatsApp masaüstü uygulaması resmi dosya olarak kopyalar; türü boş gelebilir.
+  await page.evaluate(b64 => {
+    const f = new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'WhatsApp Image 2026-09-28.jpeg', { type: '' });
+    const dt = new DataTransfer(); dt.items.add(f);
+    document.getElementById('ruhsat-paste').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
+  }, img.toString('base64'));
+  await expect(items).toHaveCount(3);
+  expect(problems).toEqual([]);
+});
+
 test('başka bir sitenin içine (iframe) gömülünce uygulama açılmaz', async ({ page }) => {
   await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
   await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData() });

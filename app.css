@@ -1914,11 +1914,17 @@ html[data-theme="dark"] .gd-table tr:last-child td{border-bottom:0}
   (kalınlık sıralaması korunur). "Çok kalın" / "En kalın" ayarı seçiliyse eklenmez. */
 html[data-theme="dark"]:not([data-weight="extra"]):not([data-weight="black"]) body{-webkit-text-stroke-width:.3px}
 /* ruhsattan araç ekleme */
-.rs-drop{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:22px 16px;border:2px dashed var(--line);border-radius:12px;cursor:pointer;color:var(--muted);text-transform:none}
+.rs-drop{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:20px 16px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-transform:none}
 .rs-drop svg{width:28px;height:28px;color:var(--c-accent,#3453d1)}
 .rs-drop>b{color:var(--ink);font-size:14px}
 .rs-drop span{font-size:12px;line-height:1.7;max-width:470px}
 .rs-drop:hover,html.rs-dragging .rs-drop{border-color:var(--c-accent,#3453d1)}
+.rs-paste{width:100%;max-width:470px;min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface,transparent);color:var(--ink);font-size:13px;font-weight:600;cursor:text;caret-color:transparent;overflow:hidden;white-space:nowrap}
+.rs-paste:empty::before{content:attr(data-ph);color:var(--muted);font-weight:600;white-space:normal}
+.rs-paste:focus{outline:none;border-color:var(--c-accent,#3453d1);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent,#3453d1) 22%,transparent)}
+.rs-paste:focus:empty::before{content:"Şimdi Ctrl+V yapın (ya da sağ tık → Yapıştır)";color:var(--c-accent,#3453d1)}
+.rs-drop-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.rs-drop-acts svg{width:16px;height:16px;color:inherit}
 .rs-day{font-size:12px;color:var(--muted);margin:16px 0 4px}
 .rs-item{display:grid;grid-template-columns:130px 1fr;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
 .rs-item.is-done{opacity:.6}

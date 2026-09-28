@@ -223,7 +223,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -953,11 +953,18 @@ function ruhsatStatusText(it){return it.status==='sirada'?'Sırada':it.status===
 function ruhsatCard(it){const ready=it.status==='tamam'||it.status==='hata';
  return `<article class="rs-item${it.status==='eklendi'?' is-done':''}" id="${it.id}"><img class="rs-thumb" src="${it.url}" alt="Ruhsat fotoğrafı"><div class="rs-main"><div class="rs-status ${it.status}">${esc(ruhsatStatusText(it))}</div>${ready?`<div class="rs-fields"><label>Çekici<input data-rs="${it.id}" data-k="tractor" value="${esc(fmtCompactPlate(it.tractor))}" maxlength="15" autocomplete="off" spellcheck="false"></label><label>Dorse<input data-rs="${it.id}" data-k="trailer" value="${esc(fmtCompactPlate(it.trailer))}" maxlength="15" autocomplete="off" spellcheck="false"></label></div>`:''}<div class="rs-info">${ruhsatInfo(it)}</div></div></article>`;}
 function ruhsatListHTML(){return ruhsat.items.length?`<p class="rs-day">Araçlar <b>${esc(fmt(defaultDate(),{weekday:'long',day:'numeric',month:'long'}))}</b> gününe eklenir.</p>${ruhsat.items.map(ruhsatCard).join('')}`:'';}
-function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle','Fotoğraf bu bilgisayarda okunur, hiçbir yere gönderilmez. Kayıtlı plakalar otomatik tanınır.')}<div class="modal-body" id="ruhsat-box"><label class="rs-drop" for="ruhsat-file">${icon('upload')}<b>Ruhsat fotoğrafını buraya bırakın</b><span>WhatsApp Web'de fotoğrafa sağ tıklayıp <b>Resmi kopyala</b> deyin, burada <b>Ctrl+V</b> ile yapıştırın. Sürükleyip bırakabilir ya da tıklayıp dosya seçebilirsiniz. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></label><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
+function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle','Fotoğraf bu bilgisayarda okunur, hiçbir yere gönderilmez. Kayıtlı plakalar otomatik tanınır.')}<div class="modal-body" id="ruhsat-box"><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
 function ruhsatRefresh(){const l=document.getElementById('ruhsat-list');if(l)l.innerHTML=ruhsatListHTML();onlineUI();}
 function ruhsatUpdateCard(it){const el=document.getElementById(it.id);if(!el)return;el.outerHTML=ruhsatCard(it);onlineUI();}
 function ruhsatAllowed(){return !VIEW_TOKEN&&canEdit();}
-const ruhsatFiles=list=>[...(list||[])].filter(f=>f&&/^image\//.test(f.type));
+/* Resim dosyası: türü image/* olan ya da (WhatsApp masaüstü gibi dosya olarak kopyalayan uygulamalarda türü boş gelen) uzantısı resim olan dosya */
+const isImageFile=f=>!!f&&(/^image\//.test(f.type)||/\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name||''));
+const ruhsatFiles=list=>[...(list||[])].filter(isImageFile);
+function transferImages(dt){if(!dt)return [];const out=[];for(const it of [...(dt.items||[])])if(it.kind==='file'){const f=it.getAsFile();if(isImageFile(f))out.push(f);}return out.length?out:ruhsatFiles(dt.files);}
+async function ruhsatFromClipboard(){if(!navigator.clipboard?.read){toast('Bu tarayıcı panoya erişime izin vermiyor. Ctrl+V ile yapıştırın ya da fotoğrafı seçin.',true);return;}
+ try{const files=[];for(const item of await navigator.clipboard.read()){const t=item.types.find(x=>x.startsWith('image/'));if(t)files.push(new File([await item.getType(t)],'pano.'+(t.split('/')[1]||'png'),{type:t}));}
+  if(files.length)ruhsatAdd(files);else toast('Panoda resim yok. WhatsApp\'ta fotoğrafı açıp sağ tıklayın → "Resmi kopyala", sonra tekrar deneyin.',true);}
+ catch(_){toast('Panoya erişilemedi (tarayıcı izin vermedi). Ctrl+V ile yapıştırın ya da fotoğrafı kaydedip "Fotoğraf seç" ile ekleyin.',true);}}
 function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=document.getElementById('modal');
  if(!document.getElementById('ruhsat-box')){if(m.open){toast('Önce açık pencereyi kapatın, sonra fotoğrafı yapıştırın.',true);return;}openRuhsat();}
  for(const f of files.slice(0,10)){if(f.size>20*1024*1024){toast('Fotoğraf çok büyük (en fazla 20 MB).',true);continue;}
@@ -986,15 +993,20 @@ function ruhsatAfterSave(){const id=ruhsat.returnId;if(!id)return;ruhsat.returnI
  if(ruhsat.items.some(x=>x.status!=='eklendi'))setTimeout(()=>{if(!document.getElementById('modal').open)openRuhsat();},300);}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="ruhsat-"]');if(!b||b.disabled)return;const a=b.dataset.action;
  if(a==='ruhsat-open')return openRuhsat();
+ if(a==='ruhsat-clip')return ruhsatFromClipboard();
  if(a==='ruhsat-clear'){ruhsat.items=ruhsat.items.filter(x=>{const keep=x.status!=='eklendi'&&x.status!=='hata';if(!keep)URL.revokeObjectURL(x.url);return keep;});return ruhsatRefresh();}
  const it=ruhsat.items.find(x=>x.id===b.dataset.id);if(!it)return;if(a==='ruhsat-add')ruhsatQuickAdd(it);if(a==='ruhsat-form')ruhsatForm(it);});
 document.addEventListener('input',e=>{const t=e.target;if(!t.dataset?.rs)return;const it=ruhsat.items.find(x=>x.id===t.dataset.rs);if(!it)return;
  it[t.dataset.k]=compactPlate(t.value);it.fuzzy=false;Object.assign(it,ruhsatLookup(it.tractor,it.trailer));const box=document.querySelector(`#${it.id} .rs-info`);if(box)box.innerHTML=ruhsatInfo(it);onlineUI();});
 document.addEventListener('change',e=>{if(e.target.id!=='ruhsat-file')return;const f=ruhsatFiles(e.target.files);e.target.value='';ruhsatAdd(f);});
-document.addEventListener('paste',e=>{if(!ruhsatAllowed())return;const f=ruhsatFiles(e.clipboardData?.files);if(!f.length)return;e.preventDefault();ruhsatAdd(f);});
+document.addEventListener('paste',e=>{if(!ruhsatAllowed())return;const f=transferImages(e.clipboardData);
+ if(!f.length){if(e.target.closest?.('#ruhsat-paste')){e.preventDefault();toast('Yapıştırılan şey resim değil. WhatsApp\'ta fotoğrafı açıp sağ tıklayın → "Resmi kopyala" (masaüstü uygulamasında "Kopyala"). Olmazsa fotoğrafı kaydedip "Fotoğraf seç" ile ekleyin.',true);}return;}
+ e.preventDefault();ruhsatAdd(f);});
+/* yapıştırma kutusu yalnızca yapıştırmayı karşılar; yazı yazılmaz */
+document.addEventListener('beforeinput',e=>{if(e.target.id==='ruhsat-paste')e.preventDefault();});
 document.addEventListener('dragover',e=>{if(dragId||!ruhsatAllowed()||![...(e.dataTransfer?.types||[])].includes('Files'))return;e.preventDefault();e.dataTransfer.dropEffect='copy';document.documentElement.classList.add('rs-dragging');});
 document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.documentElement.classList.remove('rs-dragging');});
-document.addEventListener('drop',e=>{document.documentElement.classList.remove('rs-dragging');if(dragId||!ruhsatAllowed())return;const f=ruhsatFiles(e.dataTransfer?.files);if(!f.length)return;e.preventDefault();ruhsatAdd(f);});
+document.addEventListener('drop',e=>{document.documentElement.classList.remove('rs-dragging');if(dragId||!ruhsatAllowed())return;const f=transferImages(e.dataTransfer);if(!f.length)return;e.preventDefault();ruhsatAdd(f);});
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));
