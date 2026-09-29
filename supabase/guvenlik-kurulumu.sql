@@ -219,6 +219,9 @@ begin
 end;
 $function$;
 
+-- Sitenin yeni fonksiyonları hemen görmesi için Supabase'in fonksiyon listesini yenile
+notify pgrst, 'reload schema';
+
 -- Kontrol: dört satır da "tamam" olmalı.
 select 'çıkış saati sütunu' as kontrol,
        case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'visits' and column_name = 'exit_at') then 'tamam' else 'EKSİK' end as durum
