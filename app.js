@@ -1190,19 +1190,23 @@ async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){par
   else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
   else guard.error=isNetErr(e)?'İnternet bağlantısı yok. Bağlantı gelince liste kendiliğinden yenilenir.':'Liste yenilenemedi: '+(e?.message||e);}
  renderGuard();}
-function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis=busy?'disabled':'',can=gCanMark(v);const {from}=guardRange();
- const undo=!can?'':out?(gNow()-Date.parse(v.exit_at)<GUARD_UNDO_MS?'cikis_geri':''):inn&&v.onsite_at&&gNow()-Date.parse(v.onsite_at)<GUARD_UNDO_MS?'giris_geri':'';
- const act=out?`<div class="guard-left">${icon('check')}Çıktı · ${esc(tsTime(v.exit_at))}</div>`
-  :!can?`<div class="guard-left muted">${inn?'İçeride':'Giriş kaydı yok'}</div>`
-  :!inn?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}" ${dis}>${stIcon('onsite',true)}GİRİŞ</button>`
-  :`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}" ${dis}>${icon('left')}ÇIKIŞ</button>`;
+/* Kart: GİRİŞ ve ÇIKIŞ yan yana, aynı blokta. Basılan düğme saatini gösterir ("✓ GİRİŞ 10:29").
+   ÇIKIŞ, giriş yapılmadan basılamaz. Eski günlerin araçlarında düğmeler yalnızca bilgi gösterir. */
+function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis=busy?' disabled':'',can=gCanMark(v);const {from}=guardRange();
+ const recent=t=>t&&gNow()-Date.parse(t)<GUARD_UNDO_MS;
+ const inBtn=inn?`<div class="guard-btn in done">${icon('check')}<span>GİRİŞ<small>${v.onsite_at?esc(tsTime(v.onsite_at)):'yapıldı'}</small></span></div>`
+  :can?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}"${dis}>${stIcon('onsite',true)}<span>GİRİŞ</span></button>`
+  :`<div class="guard-btn in off"><span>GİRİŞ<small>kayıt yok</small></span></div>`;
+ const outBtn=out?`<div class="guard-btn out done">${icon('check')}<span>ÇIKIŞ<small>${esc(tsTime(v.exit_at))}</small></span></div>`
+  :can&&inn?`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}"${dis}>${icon('left')}<span>ÇIKIŞ</span></button>`
+  :`<div class="guard-btn out off" title="${can?'Önce GİRİŞ yapılmalı':''}"><span>ÇIKIŞ<small>${can?'önce giriş':inn?'içeride':'—'}</small></span></div>`;
+ const undo=!can?'':out?(recent(v.exit_at)?'cikis_geri':''):inn&&recent(v.onsite_at)?'giris_geri':'';
  const showDate=v.visit_date&&(v.visit_date<from||guard.from);
  return `<article class="saha-card guard-card${out?' is-done':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate,'lg')}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
  <div class="saha-cust"><i></i>${esc(v.customer||'Müşterisiz')}</div>
- <div class="guard-times"><span><small>Giriş</small><b>${v.onsite_at?esc(tsTime(v.onsite_at)):'—'}</b></span><span><small>Çıkış</small><b>${v.exit_at?esc(tsTime(v.exit_at)):'—'}</b></span></div>
  ${inn&&!out?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti, çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
- <div class="guard-acts">${act}${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}" ${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</div></article>`;}
-function guardSection(cls,ic,title,list,empty){return `<section class="guard-sec"><h2 class="guard-sec-h ${cls}">${ic}${title}<b>${list.length}</b></h2>${list.length?`<div class="saha-grid">${list.map(guardCard).join('')}</div>`:`<p class="guard-sec-empty">${empty}</p>`}</section>`;}
+ <div class="guard-pair">${inBtn}${outBtn}</div>
+ ${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}"${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</article>`;}
 /* Rapor: seçilen aralığın araçları müşteri bazında; panodaki "Günlük giriş – çıkış" penceresiyle aynı biçim */
 function guardRepRows(st,cust){const {from,to}=guardRange(),q=norm(guard.q);
  return guard.rows.filter(v=>v.visit_date>=from&&v.visit_date<=to&&(cust==null||(v.customer||'')===cust)&&(!q||norm(v.plate).includes(q)||norm(v.customer).includes(q))&&(!st||(st==='out'?!!outAt(v):st==='in'?!!v.onsite_at&&!outAt(v):true)))
@@ -1225,8 +1229,10 @@ function renderGuard(){const app=document.getElementById('app');document.title='
  if(!guard.loaded)body=`<div class="saha-empty">${icon('clock')}<b>Yükleniyor…</b></div>`;
  else if(tab==='rep')body=guardReport();
  else if(tab==='wait'){const inList=list.filter(v=>!gIn(v)&&!gOut(v)).sort(byTime),outList=list.filter(v=>gIn(v)&&!gOut(v)).sort((a,b)=>(b.done?1:0)-(a.done?1:0)||String(a.onsite_at||'').localeCompare(String(b.onsite_at||'')));
-  body=guardSection('in',stIcon('onsite',true),'Giriş bekleyen',inList,q?'Eşleşen araç yok.':'Giriş bekleyen araç yok.')+guardSection('out',icon('left'),'Çıkış bekleyen · içeride',outList,q?'Eşleşen araç yok.':'İçeride araç yok.')
-   +(q&&!inList.length&&!outList.length?'<p class="guard-sec-empty">Araç listede yoksa ofise haber verin.</p>':'');}
+  const justOut=list.filter(v=>gOut(v)&&gNow()-Date.parse(v.exit_at)<GUARD_UNDO_MS).sort((a,b)=>String(a.exit_at).localeCompare(String(b.exit_at)));
+  const waiting=[...inList,...outList].sort(byTime),all=[...waiting,...justOut];
+  body=`<p class="guard-summary"><span>${stIcon('onsite',true)}Giriş bekleyen <b>${inList.length}</b></span><span>${icon('left')}İçeride · çıkış bekleyen <b>${outList.length}</b></span></p>`
+   +(all.length?`<div class="saha-grid">${all.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bekleyen araç yok'}</b>${q?'<small>Araç listede yoksa ofise haber verin.</small>':''}</div>`);}
  else{const l=(tab==='out'?list.filter(gOut).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at))):list.slice().sort(byTime));
   body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
  const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;

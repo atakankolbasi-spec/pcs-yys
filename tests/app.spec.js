@@ -538,33 +538,37 @@ test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async 
   expect(problems).toEqual([]);
 });
 
-test('güvenlik linki: tek ekranda GİRİŞ (tesiste) ve ÇIKIŞ (ayrı saat); başka bilgi görünmez', async ({ page }) => {
+test('güvenlik linki: her kartta GİRİŞ ve ÇIKIŞ yan yana; giriş tesiste yapar, çıkış ayrı saat yazar', async ({ page }) => {
   const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
   await expect(page.locator('.guard')).toBeVisible();
   await expect(page.locator('#auth-form')).toHaveCount(0);
-  const sec = t => page.locator('.guard-sec', { has: page.locator('.guard-sec-h', { hasText: t }) });
   const card = () => page.locator('.guard-card', { hasText: 'CB 1234 AB' });
   const v6 = () => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'));
-  // Bekleyenler tek ekranda: giriş bekleyen 1, çıkış bekleyen 3 (bugün içeride 2 + iki gün önce girip çıkmamış 1)
-  await expect(sec('Giriş bekleyen').locator('.guard-sec-h b')).toHaveText('1');
-  await expect(sec('Çıkış bekleyen').locator('.guard-sec-h b')).toHaveText('3');
-  await expect(sec('Giriş bekleyen').locator('.guard-card')).toContainText('CB 1234 AB');
+  // Bekleyenler tek listede: giriş bekleyen 1, içeride 3 (bugün 2 + iki gün önce girip çıkmamış 1)
+  await expect(page.locator('.guard-summary')).toContainText(/Giriş bekleyen\s*1/i);
+  await expect(page.locator('.guard-summary')).toContainText(/çıkış bekleyen\s*3/i);
+  // Girişten önce: GİRİŞ basılabilir, ÇIKIŞ basılamaz
+  await expect(card().locator('button[data-k="giris"]')).toBeVisible();
+  await expect(card().locator('button[data-k="cikis"]')).toHaveCount(0);
+  await expect(card().locator('.guard-btn.out.off')).toContainText('önce giriş');
 
-  // GİRİŞ -> TESİSTE + giriş saati; araç aynı ekranda "çıkış bekleyen"e geçer
+  // GİRİŞ -> TESİSTE + giriş saati; aynı kartta ÇIKIŞ açılır, kartın yeri değişmez
   await card().locator('[data-k="giris"]').click();
   await expect(page.locator('#toast')).toContainText('giriş yaptı, tesiste');
   let v = await v6();
   expect([v.onsite, !!v.onsite_at, v.done, v.exit_at || null]).toEqual([true, true, false, null]);
-  await expect(sec('Çıkış bekleyen').locator('.guard-card', { hasText: 'CB 1234 AB' })).toContainText('İşlemleri sürüyor');
-  await expect(sec('Giriş bekleyen').locator('.guard-card')).toHaveCount(0);
+  await expect(card().locator('.guard-btn.in.done')).toContainText('GİRİŞ');
+  await expect(card()).toContainText('İşlemleri sürüyor');
+  await expect(card().locator('[data-k="giris_geri"]')).toBeVisible();
 
-  // ÇIKIŞ -> ayrı çıkış saati; araç "bitti" olmaz ve "Çıkanlar"a geçer
-  await card().locator('[data-k="cikis"]').click();
+  // ÇIKIŞ -> ayrı çıkış saati; "bitti" değişmez; kart 15 dk boyunca listede kalır, geri alınabilir
+  await card().locator('button[data-k="cikis"]').click();
   await expect(page.locator('#toast')).toContainText('çıkış yaptı');
   v = await v6();
   expect([!!v.exit_at, v.done, v.done_at || null]).toEqual([true, false, null]);
+  await expect(card().locator('.guard-btn.out.done')).toContainText('ÇIKIŞ');
   await page.locator('[data-action="guard-tab"][data-k="out"]').click();
-  await expect(card()).toContainText('Çıktı');
+  await expect(card()).toBeVisible();
   await card().locator('[data-k="cikis_geri"]').click();
   await expect(page.locator('#toast')).toContainText('çıkışı geri alındı');
   expect((await v6()).exit_at).toBeNull();
