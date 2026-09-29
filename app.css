@@ -1977,10 +1977,6 @@ html[data-theme="dark"] .rs-note.warn{color:#fbbf24}
 .guard-btn.done{cursor:default;background:#dcfce7;color:#166534}.guard-btn.out.done{background:#dbeafe;color:#1e40af}
 .guard-btn.done svg{width:26px;height:26px}
 .guard-btn.off{cursor:default;background:#eef1f6;color:#8a97ab}
-.guard-summary{display:flex;flex-wrap:wrap;gap:18px;margin:4px 0 14px;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#16233a}
-.guard-summary span{display:inline-flex;align-items:center;gap:8px}
-.guard-summary svg{width:20px;height:20px;color:#16a34a}.guard-summary span+span svg{color:#1d4ed8}
-.guard-summary b{min-width:28px;height:28px;padding:0 8px;border-radius:14px;background:#e7ebf2;display:grid;place-items:center;font-size:13px}
 .guard-undo{align-self:center;border:0;background:none;color:#5b6b82;font-weight:700;font-size:14px;display:inline-flex;gap:6px;align-items:center;padding:8px 12px;cursor:pointer;text-decoration:underline;font-family:inherit}
 .guard-undo svg{width:16px;height:16px}
 .guard-old{font-size:13px;font-weight:800;color:#92400e;background:#fef3c7;border-radius:8px;padding:4px 8px;text-transform:uppercase}
@@ -1997,7 +1993,6 @@ html[data-theme="dark"] .guard-state.ok{background:#0f2e1b;color:#86efac}
 html[data-theme="dark"] .guard-undo{color:#c4cdd9}
 html[data-theme="dark"] .guard-btn.done{background:#0f2e1b;color:#86efac}html[data-theme="dark"] .guard-btn.out.done{background:#172554;color:#93c5fd}
 html[data-theme="dark"] .guard-btn.off{background:#252933;color:#8f9bb0}
-html[data-theme="dark"] .guard-summary{color:#eef1f6}html[data-theme="dark"] .guard-summary b{background:#252933}
 html[data-theme="dark"] .guard-old{background:#3b2a0a;color:#fcd34d}
 html[data-theme="dark"] .guard-alert{background:#3b1111;color:#fecaca}
 html[data-theme="dark"] .exit-badge{background:#172554;color:#93c5fd}
@@ -2039,9 +2034,6 @@ html[data-theme="dark"] .guard-rep .gd-group{background:#1c1f26}
 .guard .saha-tabs{gap:8px;margin-bottom:12px}
 .guard .saha-tab{height:44px;border-radius:10px;font-size:13px;letter-spacing:.03em}
 .guard .saha-tab b{min-width:24px;height:24px;font-size:12px}
-.guard-summary{font-size:12px;gap:14px;margin:2px 0 12px;color:#3e4c63}
-.guard-summary svg{width:16px;height:16px}
-.guard-summary b{min-width:22px;height:22px;font-size:11.5px;padding:0 6px}
 .guard .saha-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
 .guard .saha-card{padding:12px 14px;gap:8px;border-radius:12px;border-left-width:4px;box-shadow:0 1px 2px #16233a0d}
 .guard .saha-card .lp{font-size:15px}
@@ -2069,20 +2061,54 @@ html[data-theme="dark"] .guard-btn.done{background:#0f2e1b;color:#86efac;box-sha
 html[data-theme="dark"] .guard-btn.out.done{background:#172554;color:#93c5fd;box-shadow:inset 0 0 0 1px #1e3a8a}
 html[data-theme="dark"] .guard-btn.off{background:#20242c;color:#8f9bb0;box-shadow:inset 0 0 0 1px #2a303a}
 html[data-theme="dark"] .guard .saha-time{color:#c4cdd9}
-html[data-theme="dark"] .guard-summary{color:#dce1e9}
 /* çıkışa hazır araç (ofis "işlemleri bitti" dedi): yeşil çerçeve, listenin en üstünde */
 .guard-card.is-ready{border-color:#86efac;border-left-color:var(--bc);box-shadow:0 0 0 1px #86efac,0 4px 14px #16a34a14}
 .guard-card.just-changed{animation:cardFlash 1.4s ease-out}
 .guard-card.is-ready.just-changed{animation:guardReady 1.6s ease-out}
 @keyframes guardReady{0%{box-shadow:0 0 0 6px #22c55e70}100%{box-shadow:0 0 0 1px #86efac,0 4px 14px #16a34a14}}
-.guard-summary .in svg,.guard-summary .ready svg{color:#16a34a}.guard-summary .out svg{color:#1d4ed8}
-.guard-summary .ready{color:#15803d}.guard-summary .ready b{background:#dcfce7;color:#166534}
 /* kart altı: WhatsApp'ta paylaş + geri al */
 .guard-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
 .guard-foot .guard-undo{margin:0;flex:none}
 .guard-wa{flex:1;min-height:36px;border:0;border-radius:9px;background:#16a34a;color:#fff;font-family:inherit;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 12px;cursor:pointer;white-space:nowrap}
 .guard-wa:hover{background:#15803d}.guard-wa svg{width:16px;height:16px;flex:none}
 html[data-theme="dark"] .guard-card.is-ready{border-color:#166534;border-left-color:var(--bc);box-shadow:0 0 0 1px #166534}
-html[data-theme="dark"] .guard-summary .ready{color:#86efac}html[data-theme="dark"] .guard-summary .ready b{background:#0f2e1b;color:#86efac}
 html[data-theme="dark"] .guard-wa{background:#16a34a;color:#fff}html[data-theme="dark"] .guard-wa:hover{background:#257041}
+/* Bekleyenler: üç blok (gelecek araçlar → tesiste · işlemde → çıkışa hazır) */
+.guard-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.guard-col{--col:#64748b;--col-bg:#e2e8f0;--col-fg:#334155;background:#eef2f7;border:1px solid #e1e7ef;border-top:4px solid var(--col);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:10px;min-width:0;scroll-margin-top:10px}
+.guard-col.inside{--col:#d97706;--col-bg:#fef3c7;--col-fg:#92400e}
+.guard-col.ready{--col:#16a34a;--col-bg:#dcfce7;--col-fg:#166534}
+.guard-col-head{display:flex;align-items:center;gap:10px;padding:2px 2px 0}
+.guard-col-ic{width:34px;height:34px;border-radius:10px;background:var(--col-bg);color:var(--col-fg);display:grid;place-items:center;flex:none}
+.guard-col-ic svg{width:18px;height:18px}
+.guard-col-head div{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.guard-col-head b{font-size:14px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:#16233a}
+.guard-col-head small{font-size:11.5px;font-weight:600;color:#5b6b82}
+.guard-col-n{min-width:32px;height:28px;padding:0 9px;border-radius:14px;background:var(--col);color:#fff;font-weight:900;font-size:14px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.guard-col-list{display:flex;flex-direction:column;gap:10px}
+.guard-col-empty{margin:0;padding:22px 10px;border:1px dashed #cfd7e3;border-radius:12px;text-align:center;color:#8a97ab;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.guard-col-sep{margin:6px 2px 0;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5b6b82}
+.guard-jump{display:none}
+.guard .saha-card.is-done{opacity:1;background:#f8fafc}.guard .saha-card.is-done>:not(.guard-foot){opacity:.62}
+html[data-theme="dark"] .guard .saha-card.is-done{background:#181b21}
+.guard-presets{display:inline-flex;align-items:center;gap:3px;background:#fff;border:1px solid #d9e0ea;border-radius:12px;padding:3px}
+.guard-presets button{height:40px;border:0;background:transparent;border-radius:9px;padding:0 16px;font-family:inherit;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#3e4c63;cursor:pointer;white-space:nowrap}
+.guard-presets button:not(.active):hover{background:#eef1f6}
+.guard-presets button.active{background:#16233a;color:#fff}
+html[data-theme="dark"] .guard-col{background:#161a21;border-color:#232f42;border-top-color:var(--col)}
+html[data-theme="dark"] .guard-col.coming{--col-bg:#252933;--col-fg:#cbd5e1}
+html[data-theme="dark"] .guard-col.inside{--col-bg:#3b2a0a;--col-fg:#fcd34d}
+html[data-theme="dark"] .guard-col.ready{--col-bg:#0f2e1b;--col-fg:#86efac}
+html[data-theme="dark"] .guard-col-head b{color:#eef1f6}html[data-theme="dark"] .guard-col-head small,html[data-theme="dark"] .guard-col-sep{color:#9aa6b8}
+html[data-theme="dark"] .guard-col-empty{border-color:#2a303a;color:#6b7a90}
+html[data-theme="dark"] .guard-presets{background:#1c1f26;border-color:#283649}
+html[data-theme="dark"] .guard-presets button{color:#dce1e9}html[data-theme="dark"] .guard-presets button:not(.active):hover{background:#252933}
+html[data-theme="dark"] .guard-presets button.active{background:#2b4a7e;color:#fff}
+@media (max-width:960px){.guard-board{grid-template-columns:1fr}
+ .guard-jump{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 10px}
+ .guard-jump button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:52px;border:1px solid #d9e0ea;border-top:3px solid var(--col);border-radius:10px;background:#fff;color:#3e4c63;font-family:inherit;font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;line-height:1.15;padding:4px;cursor:pointer}
+ .guard-jump button b{font-size:16px;color:var(--col)}
+ .guard-jump .coming{--col:#64748b}.guard-jump .inside{--col:#d97706}.guard-jump .ready{--col:#16a34a}
+ html[data-theme="dark"] .guard-jump button{background:#1c1f26;border-color:#283649;border-top-color:var(--col);color:#dce1e9}}
+@media (max-width:760px){.guard-presets{width:100%;display:grid;grid-template-columns:1fr 1fr}}
 @media (max-width:760px){.guard .saha-grid{grid-template-columns:1fr}.guard-btn{min-height:48px;font-size:14px}.guard-btn svg{width:17px;height:17px}.guard .saha-tab{height:42px}}

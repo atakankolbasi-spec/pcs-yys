@@ -119,11 +119,11 @@ Kurulum adımları `WHATSAPP.md` dosyasında. Kurulmadıkça site bu özelliği 
 `guvenlik-kurulumu.sql` dosyasını SQL Editor'de bir kez çalıştırın. Ardından **Ayarlar → Güvenlik linki**
 bölümünden linki alıp kapıdaki güvenliğe gönderin. Güvenlik linki giriş yapmadan açar; yalnızca **GİRİŞ**
 (araç TESİSTE olur) ve **ÇIKIŞ** (ayrı çıkış saati yazılır) düğmelerine basabilir. "İşlemler bitti" saati
-ayrı kalır. Giriş ve çıkış bekleyenler tek ekrandadır; tarih aralığı seçilebilir ve "Rapor" sekmesinden
-giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Ofisin "işlemleri bitti" dediği araçlar
-listenin en üstünde yeşil çerçeveyle görünür. "Çıkanlar"daki her kartta o aracın bilgisini WhatsApp'ta
-paylaşma düğmesi vardır; önceki günden kalıp bugün çıkan araçlar da orada görünür. Kurulmadıkça site bu
-özelliği kapalı tutar. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
+ayrı kalır. "Bekleyenler" üç bloktur: **Gelecek araçlar**, **Tesiste · işlemde** ve ofisin "işlemleri bitti"
+dediği **Çıkışa hazır** araçlar. Tarih aralığı seçilebilir (Bugün / Bu hafta ya da takvimden); "Çıkanlar"
+yalnızca seçilen aralığın araçlarını gösterir ve her kartta o aracın bilgisini WhatsApp'ta paylaşma düğmesi
+vardır. "Rapor" sekmesinden giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Kurulmadıkça
+site bu özelliği kapalı tutar. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
 
 ## Bu klasördeki dosyalar
 

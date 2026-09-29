@@ -1170,16 +1170,17 @@ setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
    Giriş yapmadan açılır; güvenlik yalnızca plaka, müşteri ve saatleri görür, yalnızca iki şey yapabilir:
      GİRİŞ -> araç TESİSTE olur, giriş saati yazılır
      ÇIKIŞ -> ayrı bir çıkış saati yazılır ("işlemler bitti" saatine dokunulmaz)
-   "Bekleyenler" tek ekranda giriş bekleyenleri ve içeride olup çıkış bekleyenleri gösterir; ofisin
-   "işlemleri bitti" dediği araçlar en üstte (en son biten en başta) yeşil çerçeveyle durur. Tarih aralığı
-   seçilebilir (en fazla 31 gün); "Rapor" sekmesinden giriş-çıkışlar müşteri bazında kopyalanır / WhatsApp'ta
-   paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
+   "Bekleyenler" üç bloktur: Gelecek araçlar (giriş bekliyor) → Tesiste · işlemde → Çıkışa hazır (ofis
+   "işlemleri bitti" dedi; en son biten en başta). "Çıkanlar" yalnızca seçilen aralığın araçlarını gösterir.
+   Tarih aralığı seçilebilir (Bugün / Bu hafta ya da en fazla 31 gün); "Rapor" sekmesinden giriş-çıkışlar
+   müşteri bazında kopyalanır / WhatsApp'ta paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
    (sunucu da aynı kuralları uygular). Liste 10 sn'de bir yenilenir. */
 const GUARD_UNDO_MS=15*60000,GUARD_POLL_MS=10000;
 const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0};
 const gIn=v=>!!(v.onsite||v.onsite_at),gOut=v=>!!v.exit_at,gNow=()=>Date.now()+guard.skew;
 const gToday=()=>guard.today||localToday();
 function guardRange(){const f=guard.from||gToday();return {from:f,to:guard.to||f};}
+function guardWeek(){const t=gToday(),m=addDays(t,-((weekday(t)+6)%7));return {from:m,to:weekday(t)===0?t:addDays(m,5)};}
 const gCanMark=v=>!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&v.visit_date<=addDays(gToday(),1);
 async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
  try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
@@ -1196,7 +1197,7 @@ async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){par
 /* Kart: GİRİŞ ve ÇIKIŞ yan yana, aynı blokta. Basılan düğme saatini gösterir ("✓ GİRİŞ 10:29").
    ÇIKIŞ, giriş yapılmadan basılamaz. Eski günlerin araçlarında düğmeler yalnızca bilgi gösterir.
    Çıkış yapan aracın kartında giriş-çıkış bilgisini WhatsApp'ta paylaşma düğmesi vardır. */
-function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis=busy?' disabled':'',can=gCanMark(v);const {from}=guardRange();
+function guardCard(v,ctx){const board=ctx==='board',busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis=busy?' disabled':'',can=gCanMark(v);const {from}=guardRange();
  const recent=t=>t&&gNow()-Date.parse(t)<GUARD_UNDO_MS;
  const inBtn=inn?`<div class="guard-btn in done">${icon('check')}<span>Giriş</span><b>${v.onsite_at?esc(tsTime(v.onsite_at)):'✓'}</b></div>`
   :can?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}"${dis}>${stIcon('onsite',true)}<span>Giriş</span></button>`
@@ -1204,11 +1205,11 @@ function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis
  const outBtn=out?`<div class="guard-btn out done">${icon('check')}<span>Çıkış</span><b>${esc(tsTime(v.exit_at))}</b></div>`
   :can&&inn?`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}"${dis}><span>Çıkış</span>${icon('chevron')}</button>`
   :`<div class="guard-btn out off" title="${can?'Önce GİRİŞ yapılmalı':''}"><span>Çıkış</span>${can?'<b>önce giriş</b>':''}</div>`;
- const undo=!can?'':out?(recent(v.exit_at)?'cikis_geri':''):inn&&recent(v.onsite_at)?'giris_geri':'',ready=!!v.done&&!out;
+ const undo=!can?'':out?(recent(v.exit_at)?'cikis_geri':''):inn&&recent(v.onsite_at)?'giris_geri':'',ready=!!v.done&&!out&&!board;
  const showDate=v.visit_date&&(v.visit_date<from||guard.from);
  return `<article class="saha-card guard-card${out&&guard.tab!=='out'?' is-done':''}${ready?' is-ready':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate)}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
  <div class="saha-cust"><i></i>${esc(v.customer||'Müşterisiz')}</div>
- ${ready||inn&&!out?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti · çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
+ ${!board&&(ready||inn&&!out)?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti · çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
  <div class="guard-pair">${inBtn}${outBtn}</div>
  ${undo||out?`<div class="guard-foot">${out?`<button type="button" class="guard-wa" data-action="guard-card-wa" data-id="${esc(v.id)}" title="Giriş-çıkış bilgisini WhatsApp’ta paylaş">${icon('wa')}<span>WhatsApp</span></button>`:''}${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}"${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</div>`:''}</article>`;}
 /* Rapor: seçilen aralığın araçları müşteri bazında; panodaki "Günlük giriş – çıkış" penceresiyle aynı biçim */
@@ -1224,26 +1225,33 @@ function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardR
   :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
 function renderGuard(){const app=document.getElementById('app');document.title='Güvenlik · PCS TRANSİT';
  if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b></div></div>`;return;}
- const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange();
+ const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange(),week=guardWeek();
  const match=v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q);
- const tabs=[['wait','Bekleyenler',rows.filter(v=>!gOut(v)).length],['out','Çıkanlar',rows.filter(gOut).length],['all','Tümü',rows.length],['rep','Rapor · paylaş',guardRepRows('').length]];
+ const inRange=v=>v.visit_date>=from&&v.visit_date<=to,isOut=v=>gOut(v)&&inRange(v),isAll=v=>inRange(v)||!gOut(v);
+ const tabs=[['wait','Bekleyenler',rows.filter(v=>!gOut(v)).length],['out','Çıkanlar',rows.filter(isOut).length],['all','Tümü',rows.filter(isAll).length],['rep','Rapor · paylaş',guardRepRows('').length]];
  const tab=tabs.find(t=>t[0]===guard.tab)?.[0]||'wait';const list=rows.filter(match);
  const byTime=(a,b)=>a.visit_date.localeCompare(b.visit_date)||String(a.visit_time||'~').localeCompare(String(b.visit_time||'~'))||a.plate.localeCompare(b.plate);
  let body;
  if(!guard.loaded)body=`<div class="saha-empty">${icon('clock')}<b>Yükleniyor…</b></div>`;
  else if(tab==='rep')body=guardReport();
- else if(tab==='wait'){const inList=list.filter(v=>!gIn(v)&&!gOut(v)),outList=list.filter(v=>gIn(v)&&!gOut(v));
+ else if(tab==='wait'){
   const ready=list.filter(v=>v.done&&!gOut(v)).sort((a,b)=>String(b.done_at||'').localeCompare(String(a.done_at||''))||byTime(a,b));
-  const justOut=list.filter(v=>gOut(v)&&gNow()-Date.parse(v.exit_at)<GUARD_UNDO_MS).sort((a,b)=>String(a.exit_at).localeCompare(String(b.exit_at)));
-  const waiting=[...inList,...outList].filter(v=>!v.done).sort(byTime),all=[...ready,...waiting,...justOut];
-  body=`<p class="guard-summary">${ready.length?`<span class="ready">${icon('check')}Çıkışa hazır <b>${ready.length}</b></span>`:''}<span class="in">${stIcon('onsite',true)}Giriş bekleyen <b>${inList.length}</b></span><span class="out">${icon('left')}İçeride · çıkış bekleyen <b>${outList.length}</b></span></p>`
-   +(all.length?`<div class="saha-grid">${all.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bekleyen araç yok'}</b>${q?'<small>Araç listede yoksa ofise haber verin.</small>':''}</div>`);}
- else{const l=(tab==='out'?list.filter(gOut).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at))):list.slice().sort(byTime));
+  const coming=list.filter(v=>!gIn(v)&&!gOut(v)&&!v.done).sort(byTime);
+  const inside=list.filter(v=>gIn(v)&&!gOut(v)&&!v.done).sort((a,b)=>String(a.onsite_at||'~').localeCompare(String(b.onsite_at||'~'))||byTime(a,b));
+  const justOut=list.filter(v=>gOut(v)&&gNow()-Date.parse(v.exit_at)<GUARD_UNDO_MS).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at)));
+  const cols=[['coming','Gelecek araçlar','Giriş bekleniyor',stIcon('onsite',true),coming],['inside','Tesiste · işlemde','Giriş yapıldı, işlemleri sürüyor',icon('clock'),inside],['ready','Çıkışa hazır','İşlemleri bitti, çıkabilir',icon('check'),ready]];
+  const cards=l=>l.map(v=>guardCard(v,'board')).join('');
+  body=q&&!coming.length&&!inside.length&&!ready.length&&!justOut.length?`<div class="saha-empty">${icon('search')}<b>Eşleşen araç yok</b><small>Araç listede yoksa ofise haber verin.</small></div>`
+   :`<nav class="guard-jump" aria-label="Bloklara git">${cols.map(([k,t,,,l])=>`<button type="button" class="${k}" data-action="guard-jump" data-k="${k}">${esc(t)}<b>${l.length}</b></button>`).join('')}</nav>
+   <div class="guard-board">${cols.map(([k,t,sub,ic,l])=>`<section class="guard-col ${k}" id="guard-col-${k}" aria-label="${esc(t)}"><header class="guard-col-head"><span class="guard-col-ic">${ic}</span><div><b>${esc(t)}</b><small>${esc(sub)}</small></div><span class="guard-col-n">${l.length}</span></header>
+    <div class="guard-col-list">${l.length?cards(l):`<p class="guard-col-empty">${k==='coming'?'Gelecek araç yok':k==='inside'?'Tesiste araç yok':'Çıkışa hazır araç yok'}</p>`}${k==='ready'&&justOut.length?`<p class="guard-col-sep">Az önce çıkanlar · 15 dk geri alınabilir</p>${cards(justOut)}`:''}</div></section>`).join('')}</div>`;}
+ else{const l=(tab==='out'?list.filter(isOut).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at))):list.filter(isAll).sort(byTime));
   body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
  const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;
  const focus=document.activeElement?.id,sel=document.activeElement?.selectionStart;
  app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>Güvenlik · giriş-çıkış</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small></div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button></div></header>
- <div class="guard-bar"><div class="guard-dates" role="group" aria-label="Tarih aralığı"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="-1" aria-label="Önceki">${icon('left')}</button><input type="date" id="guard-from" value="${esc(from)}" max="${esc(addDays(today,7))}" aria-label="Başlangıç tarihi"><span>–</span><input type="date" id="guard-to" value="${esc(to)}" max="${esc(addDays(today,7))}" aria-label="Bitiş tarihi"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="1" aria-label="Sonraki">${icon('chevron')}</button>${from!==today||to!==today?`<button type="button" class="btn small" data-action="guard-today">Bugün</button>`:''}</div>
+ <div class="guard-bar"><div class="guard-dates" role="group" aria-label="Tarih aralığı"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="-1" aria-label="Önceki">${icon('left')}</button><input type="date" id="guard-from" value="${esc(from)}" max="${esc(addDays(today,7))}" aria-label="Başlangıç tarihi"><span>–</span><input type="date" id="guard-to" value="${esc(to)}" max="${esc(addDays(today,7))}" aria-label="Bitiş tarihi"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="1" aria-label="Sonraki">${icon('chevron')}</button></div>
+ <div class="guard-presets" role="group" aria-label="Hızlı tarih seçimi">${[['guard-today','Bugün',from===today&&to===today],['guard-week','Bu hafta',from===week.from&&to===week.to]].map(([a,l,on])=>`<button type="button" class="${on?'active':''}" data-action="${a}" aria-pressed="${on}">${l}</button>`).join('')}</div>
  <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
  <div class="saha-tabs" role="group" aria-label="Liste">${tabs.map(([k,l,n])=>`<button type="button" class="saha-tab${tab===k?' active':''}" data-action="guard-tab" data-k="${k}" aria-pressed="${tab===k}">${l}<b>${n}</b></button>`).join('')}</div></div>
  ${guard.error?`<div class="guard-alert" role="alert">${icon('info')}<span>${esc(guard.error)}</span></div>`:''}${body}</div>`;
@@ -1273,6 +1281,8 @@ document.addEventListener('click',e=>{if(!GUARD_TOKEN)return;const b=e.target.cl
  if(a==='guard-rep-st'){guard.repSt=b.dataset.st;return renderGuard();}
  if(a==='guard-rep-copy'||a==='guard-rep-wa')return guardShare(a==='guard-rep-wa'?'wa':'copy','cust' in b.dataset?b.dataset.cust:null);
  if(a==='guard-today')return setGuardRange(gToday(),gToday());
+ if(a==='guard-week'){const w=guardWeek();return setGuardRange(w.from,w.to);}
+ if(a==='guard-jump'){document.getElementById('guard-col-'+b.dataset.k)?.scrollIntoView({behavior:'smooth',block:'start'});return;}
  if(a==='guard-day-step'){const {from,to}=guardRange(),n=Math.round((dateObj(to)-dateObj(from))/DAY)+1,st=Number(b.dataset.step)*n;return setGuardRange(addDays(from,st),addDays(to,st));}});
 document.addEventListener('input',e=>{if(!GUARD_TOKEN||e.target.id!=='guard-q')return;guard.q=e.target.value;renderGuard();});
 document.addEventListener('change',e=>{if(!GUARD_TOKEN)return;const id=e.target.id;if(id!=='guard-from'&&id!=='guard-to')return;const r=guardRange();
