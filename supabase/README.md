@@ -120,8 +120,10 @@ Kurulum adımları `WHATSAPP.md` dosyasında. Kurulmadıkça site bu özelliği 
 bölümünden linki alıp kapıdaki güvenliğe gönderin. Güvenlik linki giriş yapmadan açar; yalnızca **GİRİŞ**
 (araç TESİSTE olur) ve **ÇIKIŞ** (ayrı çıkış saati yazılır) düğmelerine basabilir. "İşlemler bitti" saati
 ayrı kalır. Giriş ve çıkış bekleyenler tek ekrandadır; tarih aralığı seçilebilir ve "Rapor" sekmesinden
-giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Kurulmadıkça site bu özelliği kapalı
-tutar. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
+giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Ofisin "işlemleri bitti" dediği araçlar
+listenin en üstünde yeşil çerçeveyle görünür. "Çıkanlar"daki her kartta o aracın bilgisini WhatsApp'ta
+paylaşma düğmesi vardır; önceki günden kalıp bugün çıkan araçlar da orada görünür. Kurulmadıkça site bu
+özelliği kapalı tutar. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
 
 ## Bu klasördeki dosyalar
 
