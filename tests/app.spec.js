@@ -174,6 +174,20 @@ test('çıkış yapınca cihazdaki kopya silinir', async ({ page }) => {
   expect(await page.evaluate(() => localStorage.getItem('pcs-transit-yys.v1.cache'))).toBeNull();
 });
 
+test('Kiril harfle yazılmış plaka BG tanınır, Latin harfle aranınca bulunur', async ({ page }) => {
+  const data = sampleData();
+  // "Х 8123 КТ - Х 3382 ЕМ": X, K, T, E, M harfleri Kiril (Bulgar belgesinden kopyalanmış gibi)
+  const cyr = '\u0425 8123 \u041a\u0422 - \u0425 3382 \u0415\u041c';
+  data.visits.push({ ...data.visits[5], id: 'v8', plate: cyr, customer: 'KİRİL LOJ', visit_time: '11:00' });
+  const problems = await openApp(page, { data });
+  const lp = page.locator('.lp', { hasText: '8123' }).first();
+  await expect(lp.locator('.lp-band b')).toHaveText('BG');
+  await expect(lp.locator('.lp-cc2')).toHaveCount(0); // dorse de BG: ayrı ülke etiketi yok
+  await page.locator('#board-search').fill('x 8123 kt');
+  await expect(page.locator('#app')).toContainText('KİRİL LOJ');
+  expect(problems).toEqual([]);
+});
+
 test('tarih yardımcıları', async ({ page }) => {
   await openApp(page, { session: false });
   const r = await page.evaluate(() => {

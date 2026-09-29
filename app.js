@@ -24,8 +24,13 @@ settings:'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6
 };
 const icon = (n,cls='') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]||I.doc}</svg>`;
 const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const norm = p => String(p||'').normalize('NFKC').toUpperCase().replace(/\u0130/g,'I').replace(/[\s.-]+/g,'');
-const plateText = p => String(p||'').trim().toUpperCase().replace(/\s+/g,' ');
+/* Bulgar / Yunan belgesinden kopyalanan plakada harfler Kiril ya da Yunan olabilir ("Х 8123 КТ"): gözle Latin
+   harflerle aynıdır ama bilgisayar için farklıdır; ülke bulunamaz, kayıtla eşleşmez. Bunlar Latin karşılığına
+   çevrilir; görünmez karakterler (sıfır genişlikli boşluk vb.) silinir. */
+const LOOKALIKE = {'А':'A','В':'B','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','С':'C','Т':'T','У':'Y','Х':'X','І':'I','Ј':'J','Ѕ':'S','Α':'A','Β':'B','Ε':'E','Ζ':'Z','Η':'H','Ι':'I','Κ':'K','Μ':'M','Ν':'N','Ο':'O','Ρ':'P','Τ':'T','Υ':'Y','Χ':'X'};
+const latinPlate = p => String(p??'').normalize('NFKC').replace(/[\u00AD\u200B-\u200D\u2060\uFEFF]/g,'').replace(/[\u0370-\u03FF\u0400-\u04FF]/g,c=>LOOKALIKE[c.toUpperCase()]||c);
+const norm = p => latinPlate(p||'').toUpperCase().replace(/\u0130/g,'I').replace(/[\s.-]+/g,'');
+const plateText = p => latinPlate(p||'').trim().toUpperCase().replace(/\s+/g,' ');
 const uid = () => globalThis.crypto?.randomUUID?.() || ('id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
 const dateObj = s => new Date(s+'T12:00:00Z');
 const iso = d => d.toISOString().slice(0,10);
@@ -403,7 +408,7 @@ document.addEventListener('input',e=>{if(e.target.id==='f-plate'){const p=docume
 var PLATE_COUNTRY={TR:['Türkiye',0],BG:['Bulgaristan',1],RO:['Romanya',1],GR:['Yunanistan',1],AL:['Arnavutluk',0],UA:['Ukrayna',0],MD:['Moldova',0]};
 var BG_RE=/^(A|B|BH|BP|BT|E|EB|EH|K|KH|M|H|OB|P|PA|PB|PK|PP|C|CA|CB|CC|CH|CM|CO|CT|T|TX|X|Y)\d{4}[A-Z]{1,2}$/;
 var RO_RE=/^(B\d{2,3}|(AB|AR|AG|BC|BH|BN|BT|BV|BR|BZ|CS|CL|CJ|CT|CV|DB|DJ|GL|GR|GJ|HR|HD|IL|IS|IF|MM|MH|MS|NT|OT|PH|SM|SJ|SB|SV|TR|TM|TL|VS|VL|VN)\d{2,3})[A-Z]{3}$/;
-function plateCountry(p){const c=String(p||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[\s.\-]/g,'');
+function plateCountry(p){const c=latinPlate(p||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[\s.\-]/g,'');
  if(/^\d{2}[A-Z]{1,3}\d{2,5}$/.test(c))return 'TR';if(BG_RE.test(c))return 'BG';if(RO_RE.test(c))return 'RO';if(/^[A-Z]{3}\d{4}$/.test(c))return 'GR';if(/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(c))return 'AL';if(/^[A-Z]{2}\d{4}[A-Z]{2}$/.test(c))return 'UA';if(/^[A-Z]{3}\d{3}$/.test(c))return 'MD';return '';}
 function splitPlate(p){const s=String(p||'').trim();let parts=s.split(/\s*[–—\/]\s*|\s+-\s*|\s*-\s+/).filter(Boolean);if(parts.length===1)parts=s.split(/(?<=[A-ZÇĞİÖŞÜ])-(?=[A-ZÇĞİÖŞÜ])/i).filter(Boolean);return parts.slice(0,2).map(x=>x.trim().replace(/\s+/g,' '));}
 var EU_STARS=(()=>{let d='';for(let i=0;i<12;i++){const a=i*Math.PI/6;d+=`<circle cx="${(12+8*Math.cos(a)).toFixed(2)}" cy="${(12+8*Math.sin(a)).toFixed(2)}" r="1.3" fill="#ffd33d"/>`;}return `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;})();
@@ -921,7 +926,7 @@ async function ruhsatEnhance(file,rot=0){const bmp=await createImageBitmap(file)
  for(let i=0;i<n;i++)g[i]=(g[i]-lo)*k;
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let v=g[i];if(x>0&&y>0&&x<w-1&&y<h-1)v=v+0.5*(4*g[i]-g[i-1]-g[i+1]-g[i-w]-g[i+w]);const q=i*4;d[q]=d[q+1]=d[q+2]=v<0?0:v>255?255:v;}
  cx.putImageData(img,0,0);cv.srcW=w/sc;cv.srcH=h/sc;return cv;}
-const compactPlate=v=>String(v||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[^A-Z0-9]/g,'');
+const compactPlate=v=>latinPlate(v||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[^A-Z0-9]/g,'');
 function fmtCompactPlate(c){c=compactPlate(c);let m;if((m=c.match(/^(\d{2})([A-Z]{1,3})(\d{2,5})$/))||(m=c.match(/^([A-Z]{1,3})(\d{2,4})([A-Z]{1,3})$/)))return m.slice(1).join(' ');if((m=c.match(/^([A-Z]{3})(\d{3,4})$/)))return m.slice(1).join(' ');return c;}
 /* Küçük / bulanık fotoğrafta rakam harf sanılabilir (CM2817EK → "CM2B17EK"). Rakam grubunun ortasına düşen
    ve rakama benzeyen harfler rakama çevrilir; sonuç geçerli bir plaka değilse düzeltme yapılmaz. */
