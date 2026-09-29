@@ -66,7 +66,8 @@ begin
 end $$;
 
 -- Güvenlik ekranının listesi: seçilen tarih aralığının araçları (varsayılan bugün) + aralık bugünü
--- kapsıyorsa son 7 günden girip henüz çıkmamış olanlar. En fazla 31 günlük aralık, en fazla 2 ay öncesi.
+-- kapsıyorsa son 7 günden girip henüz çıkmamış olanlar + önceki günlerden gelip bu aralıkta çıkanlar
+-- ("Çıkanlar"da görünsün, paylaşılabilsin). En fazla 31 günlük aralık, en fazla 2 ay öncesi.
 drop function if exists public.guard_board(text);
 create or replace function public.guard_board(p_token text, p_from date default null, p_to date default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -93,6 +94,8 @@ begin
       from public.visits v
       where v.visit_date between f and t
          or (t >= today and v.visit_date >= today - 7 and v.visit_date < f and v.onsite_at is not null and v.exit_at is null)
+         or (v.visit_date >= f - 7 and v.visit_date < f and v.exit_at is not null
+             and (v.exit_at at time zone 'Europe/Istanbul')::date between f and t)
     ), '[]'::jsonb));
 end $$;
 
