@@ -123,7 +123,11 @@ ayrı kalır. "Bekleyenler" üç bloktur: **Gelecek araçlar**, **Tesiste · iş
 dediği **Çıkışa hazır** araçlar. Tarih aralığı seçilebilir (Bugün / Bu hafta ya da takvimden); "Çıkanlar"
 yalnızca seçilen aralığın araçlarını gösterir ve her kartta o aracın bilgisini WhatsApp'ta paylaşma düğmesi
 vardır. "Rapor" sekmesinden giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Kurulmadıkça
-site bu özelliği kapalı tutar. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
+site bu özelliği kapalı tutar.
+
+**Ayarlar → Güvenlik ekranı izleme linki** aynı ekranı yalnızca görüntüleme için açar (`?guvenlik-izle=…`):
+açan kişi listeleri ve raporu görür, GİRİŞ / ÇIKIŞ yapamaz (sunucu da reddeder). Anahtarı güvenlik linkinden
+ayrıdır; biri yenilenince diğeri etkilenmez. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
 
 ## Bu klasördeki dosyalar
 

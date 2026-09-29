@@ -686,6 +686,28 @@ test('güvenlik: veritabanı eski sürümdeyse tarih seçimi bugüne döner, ekr
   expect(problems).toEqual([]);
 });
 
+test('güvenlik izleme linki: ekran görünür, GİRİŞ / ÇIKIŞ yapılamaz', async ({ page }) => {
+  const data = sampleData();
+  Object.assign(data.visits[4], { done: true, done_at: '2026-09-23T06:10:00Z', exit_at: '2026-09-23T06:30:00Z' });
+  const problems = await openApp(page, { session: false, guardToken: 'g1', guardViewToken: 'gv1', data }, '/?guvenlik-izle=gv1');
+  await expect(page.locator('.guard-view-pill')).toHaveText(/Yalnızca görüntüleme/i);
+  await expect(page).toHaveTitle(/Güvenlik izleme/);
+  // Üç blok ve kartlar görünür; hiçbir kartta GİRİŞ / ÇIKIŞ düğmesi ya da geri alma yok
+  await expect(page.locator('#guard-col-coming')).toContainText('CB 1234 AB');
+  await expect(page.locator('#guard-col-ready')).toContainText('21 Eylül');
+  await expect(page.locator('[data-action="guard-mark"]')).toHaveCount(0);
+  await expect(page.locator('#guard-col-inside .guard-btn.in.done').first()).toContainText('Giriş');
+  // Çıkanlar ve rapor açılır; çıkan aracın bilgisi paylaşılabilir
+  await page.locator('[data-action="guard-tab"][data-k="out"]').click();
+  await expect(page.locator('.guard-card')).toHaveCount(1);
+  await expect(page.locator('.guard-card [data-action="guard-card-wa"]')).toBeVisible();
+  await expect(page.locator('[data-action="guard-mark"]')).toHaveCount(0);
+  await page.locator('[data-action="guard-tab"][data-k="rep"]').click();
+  await expect(page.locator('.gd-group').first()).toBeVisible();
+  expect(await page.evaluate(() => window.__calls.filter(c => c.rpc === 'guard_mark').length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
 test('güvenlik linki geçersizse ekran açılmaz', async ({ page }) => {
   const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=eski-anahtar');
   await expect(page.locator('.guard-fatal')).toContainText('geçersiz');
@@ -703,6 +725,17 @@ test('ayarlar: güvenlik linki gösterilir ve yenilenir', async ({ page }) => {
   await page.locator('[data-action="glink-rotate"]').click();
   await expect(page.locator('#toast')).toContainText('Yeni güvenlik linki');
   await expect(page.locator('#guard-link')).toHaveValue(/\?guvenlik=yeni\d+$/);
+  // İzleme linki ayrı: gösterilir, yenilenir; güvenlik linki değişmez
+  const guardValue = await page.locator('#guard-link').inputValue();
+  await page.locator('details[data-panel="guardview"] summary').click();
+  await page.locator('[data-action="gvlink-show"]').click();
+  await expect(page.locator('#guard-view-link')).toHaveValue(/\?guvenlik-izle=izle\d+$/);
+  const firstView = await page.locator('#guard-view-link').inputValue();
+  page.once('dialog', d => d.accept());
+  await page.locator('[data-action="gvlink-rotate"]').click();
+  await expect(page.locator('#toast')).toContainText('Yeni izleme linki');
+  await expect(page.locator('#guard-view-link')).not.toHaveValue(firstView);
+  await expect(page.locator('#guard-link')).toHaveValue(guardValue);
   expect(problems).toEqual([]);
 });
 
