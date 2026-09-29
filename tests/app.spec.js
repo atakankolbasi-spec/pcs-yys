@@ -791,6 +791,88 @@ test('ayarlar: güvenlik linki gösterilir ve yenilenir', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('güvenlik hesabı: giriş yapınca yalnızca güvenlik ekranı açılır, GİRİŞ yapar, ofis verisi hiç çekilmez', async ({ page }) => {
+  const problems = await openApp(page, { guardAccount: { name: 'Tepecik', active: true } });
+  await expect(page.locator('.guard')).toBeVisible();
+  await expect(page.locator('.saha-brand small')).toHaveText(/Güvenlik · Tepecik/i);
+  await expect(page.locator('.sidebar')).toHaveCount(0);
+  await expect(page.locator('.guard-view-pill')).toHaveCount(0);
+  const card = () => page.locator('.guard-card', { hasText: 'CB 1234 AB' });
+  await card().locator('[data-k="giris"]').click();
+  await expect(page.locator('#toast')).toContainText('giriş yaptı, tesiste');
+  await expect(page.locator('#guard-col-inside .guard-card', { hasText: 'CB 1234 AB' })).toBeVisible();
+  const calls = await page.evaluate(() => window.__calls);
+  expect(calls.find(c => c.rpc === 'guard_mark').params.p_token).toBeNull();
+  expect(calls.filter(c => c.table).length).toBe(0); // registry / visits / app_settings tablolarına hiç gidilmez
+  // 15 sn'lik yoklama da ofis verisini çekmez
+  await page.clock.runFor(31000);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table).length)).toBe(0);
+  // Çıkış düğmesi oturumu kapatıp sayfayı yeniler
+  await Promise.all([page.waitForEvent('framenavigated'), page.locator('[data-action="guard-signout"]').first().click()]);
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik hesabı kapatılmışsa ekran açılmaz, çıkış yapılabilir', async ({ page }) => {
+  const problems = await openApp(page, { guardAccount: { name: 'Tepecik', active: false } });
+  await expect(page.locator('.guard-fatal')).toContainText('kapatılmış');
+  await expect(page.locator('.guard-fatal [data-action="guard-signout"]')).toBeVisible();
+  await expect(page.locator('.guard-card')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table).length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('ayarlar: güvenlik hesabı eklenir, kapatılır, açılır ve silinir', async ({ page }) => {
+  const problems = await openApp(page);
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('details[data-panel="guardacct"] summary').click();
+  const panel = page.locator('details[data-panel="guardacct"]');
+  await expect(panel).toContainText('Henüz güvenlik hesabı yok');
+  // kendi hesabı eklenemez
+  await page.locator('#gacc-email').fill('test@ornek.com');
+  await page.locator('[data-action="gacc-add"]').click();
+  await expect(page.locator('#toast')).toContainText('Kendi hesabınızı');
+  // yeni hesap: onay sorulur
+  await page.locator('#gacc-email').fill('Guv.Kapi@Ornek.com');
+  await page.locator('#gacc-name').fill('Tepecik');
+  page.once('dialog', d => { expect(d.message()).toContain('yalnızca güvenlik ekranını'); d.accept(); });
+  await page.locator('[data-action="gacc-add"]').click();
+  const row = panel.locator('.gacc-row', { hasText: 'guv.kapi@ornek.com' });
+  await expect(row).toContainText('Tepecik');
+  await expect(row.locator('.gacc-st')).toHaveText(/kullanıcı yok/i);
+  const saved = await page.evaluate(() => window.__calls.filter(c => c.rpc === 'save_guard_account').at(-1).params);
+  expect(saved).toEqual({ p_email: 'guv.kapi@ornek.com', p_name: 'Tepecik', p_active: true });
+  // kapat -> aç
+  page.once('dialog', d => d.accept());
+  await row.locator('[data-action="gacc-off"]').click();
+  await expect(row.locator('.gacc-st')).toHaveText(/kapalı/i);
+  await row.locator('[data-action="gacc-on"]').click();
+  await expect(row.locator('.gacc-st')).toHaveText(/kullanıcı yok/i);
+  // Supabase'de kullanıcısı olmayan hesap silinebilir
+  page.once('dialog', d => d.accept());
+  await row.locator('[data-action="gacc-del"]').click();
+  await expect(panel).toContainText('Henüz güvenlik hesabı yok');
+  expect(problems).toEqual([]);
+});
+
+test('ayarlar: Supabase kullanıcısı olan güvenlik hesabı silinemez, yalnızca kapatılır', async ({ page }) => {
+  const problems = await openApp(page, { guardAccounts: [{ email: 'guv@ornek.com', name: 'Kapı', active: true, has_user: true, last_sign_in_at: '2026-09-23T06:30:00Z' }] });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('details[data-panel="guardacct"] summary').click();
+  const row = page.locator('.gacc-row', { hasText: 'guv@ornek.com' });
+  await expect(row.locator('.gacc-st')).toHaveText(/açık · son giriş/i);
+  await expect(row.locator('[data-action="gacc-del"]')).toHaveCount(0);
+  await expect(row.locator('[data-action="gacc-off"]')).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('ayarlar: güvenlik hesapları görüntüleyiciye görünmez', async ({ page }) => {
+  const problems = await openApp(page, { role: 'viewer' });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await expect(page.locator('details[data-panel="guardacct"]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.rpc === 'list_guard_accounts').length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
 test('çıkış saati panoda, raporda ve formda işlemler bitti saatinden ayrı görünür', async ({ page }) => {
   const data = sampleData();
   // v5: 08:05 giriş, 09:10 işlemler bitti, 09:30 güvenlik çıkışı (İstanbul saati)

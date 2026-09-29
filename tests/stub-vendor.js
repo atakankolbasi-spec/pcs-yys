@@ -4,7 +4,9 @@
  *     files: { 'depo/yolu.png': base64 },   // storage.download için dosyalar
  *     missing: ['incoming_ruhsat'],         // "tablo yok" hatası veren tablolar (kurulum yapılmamış gibi)
  *     guardToken: 'g1', today: '2026-09-23',  // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
- *     guardViewToken: 'gv1' }                  // güvenlik ekranı izleme linki (yalnızca görüntüleme)
+ *     guardViewToken: 'gv1',                   // güvenlik ekranı izleme linki (yalnızca görüntüleme)
+ *     guardAccount: { name: 'Tepecik', active: true },  // giriş yapan kullanıcı güvenlik hesabı
+ *     guardAccounts: [{ email, name, active, has_user, last_sign_in_at }] }  // Ayarlar > Güvenlik hesapları
  * Yapılan her çağrı window.__calls dizisine yazılır. */
 (() => {
   const cfg = window.__PCS_STUB || {};
@@ -135,8 +137,29 @@
         if (name === 'rotate_guard_view_link' || !cfg.guardViewToken) cfg.guardViewToken = 'izle' + Date.now();
         return { data: cfg.guardViewToken, error: null };
       }
+      // Güvenlik hesapları: cfg.guardAccount = { name, active } ise giriş yapan kullanıcı güvenlik hesabıdır
+      if (name === 'guard_account') {
+        if ((cfg.missing || []).includes('guard-accounts')) return guardErr('PGRST202', 'Could not find the function');
+        return { data: session && cfg.guardAccount ? clone(cfg.guardAccount) : null, error: null };
+      }
+      if (name === 'list_guard_accounts' || name === 'save_guard_account' || name === 'delete_guard_account') {
+        if ((cfg.missing || []).includes('guard-accounts')) return guardErr('PGRST202', 'Could not find the function');
+        const list = (cfg.guardAccounts = cfg.guardAccounts || []), e = String(params.p_email || '').toLowerCase();
+        if (name === 'save_guard_account') {
+          const a = list.find(x => x.email === e);
+          if (a) Object.assign(a, { name: params.p_name || '', active: params.p_active !== false });
+          else list.push({ email: e, name: params.p_name || '', active: params.p_active !== false, has_user: false, last_sign_in_at: null });
+        }
+        if (name === 'delete_guard_account') {
+          const i = list.findIndex(x => x.email === e);
+          if (i >= 0 && list[i].has_user) return guardErr('22023', "Bu kullanıcı Supabase'de duruyor. Önce Authentication > Users'tan silin.");
+          if (i >= 0) list.splice(i, 1);
+        }
+        return { data: name === 'list_guard_accounts' ? clone(list) : null, error: null };
+      }
       if (name === 'guard_board' || name === 'guard_mark') {
-        const canMark = !!cfg.guardToken && params.p_token === cfg.guardToken;
+        const acct = params.p_token == null && !!session && !!cfg.guardAccount && cfg.guardAccount.active !== false;
+        const canMark = acct || (!!cfg.guardToken && params.p_token === cfg.guardToken);
         const viewOk = name === 'guard_board' && !!cfg.guardViewToken && params.p_token === cfg.guardViewToken;
         if (!canMark && !viewOk) return guardErr('42501', 'Güvenlik linki geçersiz');
         const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
