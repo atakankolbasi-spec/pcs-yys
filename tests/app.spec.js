@@ -292,6 +292,58 @@ async function rotateImage(browser, buf, deg) {
   return Buffer.from(b64, 'base64');
 }
 
+test('araç o gün panodaysa ruhsattan yeni kayıt açılmaz, ruhsat kilosu mevcut kayda işlenir', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r6', plate: 'PB 4321 AB - PB 8765 CD', customer: 'İKİNCİ LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  // Bugün (Çarşamba) iki araç panoda: birinin ruhsatı boş, diğerinde farklı bir değer yazılı.
+  data.visits.push({ ...data.visits[5], id: 'v8', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', registration: '' });
+  data.visits.push({ ...data.visits[5], id: 'v9', plate: 'PB 4321 AB - PB 8765 CD', customer: 'İKİNCİ LOJ', registration: '15000 KG' });
+  const bos = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
+  const dolu = await fakeRuhsat(browser, ['PB4321AB', 7900], ['PB8765CD', 6100]);
+  const problems = await openApp(page, { data });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await page.locator('#ruhsat-file').setInputFiles([{ name: 'bos.png', mimeType: 'image/png', buffer: bos }, { name: 'dolu.png', mimeType: 'image/png', buffer: dolu }]);
+  await expect(page.locator('.rs-status.tamam')).toHaveCount(2, { timeout: 120000 });
+  const [c1, c2] = [page.locator('.rs-item').nth(0), page.locator('.rs-item').nth(1)];
+
+  // 1) Ruhsatı boş olan kayıt: "Hemen ekle" yok, ruhsat tek tıkla işlenir; plaka kaydındaki boş ruhsat da dolar.
+  await expect(c1).toContainText('zaten panoda');
+  await expect(c1.locator('[data-action="ruhsat-add"]')).toHaveCount(0);
+  await c1.locator('[data-action="ruhsat-kg"]').click();
+  await expect(page.locator('#toast')).toContainText('14850 KG olarak panodaki kayda işlendi');
+  await expect(c1.locator('.rs-status')).toContainText('Ruhsat panodaki kayda işlendi');
+
+  // 2) Farklı değer yazılı kayıt: önce sorulur, onaylanınca değişir.
+  await expect(c2).toContainText('Panodaki ruhsat: 15000 KG');
+  page.once('dialog', d => d.accept());
+  await c2.locator('[data-action="ruhsat-kg"]').click();
+  await expect(c2.locator('.rs-status')).toContainText('14000 KG');
+
+  const calls = await page.evaluate(() => window.__calls.filter(c => c.op === 'insert' || c.op === 'update').map(c => c.table + ':' + c.op));
+  expect(calls.filter(c => c.endsWith('insert'))).toEqual([]);
+  const db = await page.evaluate(() => ({ v8: window.__db.visits.find(v => v.id === 'v8').registration, v9: window.__db.visits.find(v => v.id === 'v9').registration, r5: window.__db.registry.find(r => r.id === 'r5').registration }));
+  expect(db).toEqual({ v8: '14850 KG', v9: '14000 KG', r5: '14850 KG' });
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp: araç o gün panodaysa ruhsat kilosu mevcut kayda kendiliğinden işlenir', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const data = sampleData();
+  // Araç bugün (Çarşamba) panoda, ruhsatı boş; fotoğraf da bugün geldi. Panodaki araç plaka kayıtlarında da var.
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.visits.push({ ...data.visits[5], id: 'v8', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', registration: '' });
+  data.incoming_ruhsat = [waRow('w1', { created_at: '2026-09-23T06:30:00Z' })];
+  const files = { '2026-09-22/w1.png': (await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700])).toString('base64') };
+  const problems = await openApp(page, { data, files });
+  await expect.poll(() => page.evaluate(() => window.__db.incoming_ruhsat[0].status), { timeout: 120000 }).toBe('mevcut');
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v8').registration)).toBe('14850 KG');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
+  await expect(page.locator('#toast')).toContainText('ruhsat 14850 KG olarak işlendi');
+  expect(problems).toEqual([]);
+});
+
 test('yan çekilmiş ruhsat fotoğrafı döndürülüp okunur', async ({ page, browser }) => {
   test.setTimeout(150000);
   const data = sampleData();
