@@ -15,6 +15,15 @@
 
 alter table public.visits add column if not exists exit_at timestamptz;
 
+-- Güvenlik oturum açmadığı için "son değiştiren" (updated_by) boş yazılır; sütun boş bırakılamaz
+-- tanımlıysa bu kısıt kaldırılır. Kimin yaptığı işlem geçmişinde "Güvenlik" olarak görünür.
+do $$ begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'visits' and column_name = 'updated_by' and is_nullable = 'NO') then
+    alter table public.visits alter column updated_by drop not null;
+  end if;
+end $$;
+
 create table if not exists private.guard_link (
   id int primary key default 1 check (id = 1),
   token text not null,
