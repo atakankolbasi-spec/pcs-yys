@@ -131,6 +131,20 @@ site bu özelliği kapalı tutar.
 açan kişi listeleri ve raporu görür, GİRİŞ / ÇIKIŞ yapamaz (sunucu da reddeder). Anahtarı güvenlik linkinden
 ayrıdır; biri yenilenince diğeri etkilenmez. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
 
+**Güvenlik hesapları** (linke gerek kalmadan, kişiye özel kullanıcı adı ve şifre):
+
+1. Supabase → **Authentication → Users → Add user → Create new user**: görevlinin e-postası ve şifresi,
+   "Auto Confirm User" işaretli.
+2. Sitede **Ayarlar → Güvenlik hesapları**: aynı e-postayı ve görevlinin adını yazıp **Ekle**.
+3. Görevli sitede bu e-posta ve şifreyle giriş yapar; yalnızca güvenlik ekranı açılır (GİRİŞ / ÇIKIŞ,
+   Çıkanlar, Rapor). Ofis panosu, beyanname ve nakliyeci bilgisi kapalıdır; veritabanı da bu hesapların
+   tablolara doğrudan erişimini engeller. İşlem geçmişinde "Güvenlik · ad" yazılır.
+
+Görevli ayrılırsa ya da telefon kaybolursa listede **Kapat** deyin; o an güvenlik ekranını açamaz. Kapatılan
+hesabın tablolara erişim engeli sürer. Listeden tamamen silmek için önce kullanıcıyı Supabase'den silin (aksi
+halde o kullanıcı normal hesap gibi tablolara erişebilirdi). Şifreyi değiştirmek için kullanıcıyı Supabase'den
+silip aynı e-postayla yeniden açmak yeterlidir; listedeki kayıt durur.
+
 ## Bu klasördeki dosyalar
 
 | Dosya | Ne işe yarar |

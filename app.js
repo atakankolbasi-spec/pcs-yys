@@ -20,7 +20,7 @@ plus:'<path d="M12 5v14M5 12h14"/>',download:'<path d="M12 3v12m-5-5l5 5 5-5M4 1
 check:'<path d="M5 12l4 4L19 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',doc:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h6"/>',
 search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16l5 5"/>',st_onsite:'<path d="M3 21V9.5L12 4l9 5.5V21"/><path d="M3 21h18"/><path d="M8 21v-6.5h8V21"/><path d="M8 17.5h8"/><path d="M10 10h4"/>',st_t1:'<path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21H11"/><path d="M13 3v5h5v3"/><path d="M8 12h6M8 16h3"/><path d="M19.2 13.8a1.6 1.6 0 0 1 2.3 2.3L16 21.6 13 22l.4-3z"/>',st_done:'<path d="M12 2.8 19.5 5.6v6c0 4.9-3.3 8.3-7.5 9.6-4.2-1.3-7.5-4.7-7.5-9.6v-6z"/><path d="m8.6 12.1 2.4 2.4 4.6-4.9"/>',wa:'<path d="M20.5 11.6a8.6 8.6 0 0 1-12.7 7.6L3.5 20.5l1.4-4.1a8.6 8.6 0 1 1 15.6-4.8z"/><path d="M9.2 8.4c.1 3.3 3 6.2 6.4 6.4l1-1.3-1.9-1.1-.9.8a4.1 4.1 0 0 1-2.4-2.4l.8-.9-1.1-1.9z"/>',edit:'<path d="M14 5l5 5M4 20l4-1L20 7a2.1 2.1 0 00-3-3L5 16z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
 info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',close:'<path d="M6 6l12 12M6 18L18 6"/>',database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
-settings:'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',print:'<path d="M7 8V3h10v5M7 17H4V9h16v8h-3M7 14h10v7H7zM17 11h.1"/>',refresh:'<path d="M4 12a8 8 0 0114-5.3M20 12a8 8 0 01-14 5.3"/><path d="M18 4v4h-4M6 20v-4h4"/>',arrow:'<path d="M4 12h16m-6-6l6 6-6 6"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>',undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',bell:'<path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 004 0"/>',moon:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',tablet:'<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18h2"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 2-3 4m0 3h.1"/>',building:'<path d="M4 21V3h11v18m0-12h5v12M2 21h20M8 7h3m-3 4h3m-3 4h3"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>'
+settings:'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',print:'<path d="M7 8V3h10v5M7 17H4V9h16v8h-3M7 14h10v7H7zM17 11h.1"/>',refresh:'<path d="M4 12a8 8 0 0114-5.3M20 12a8 8 0 01-14 5.3"/><path d="M18 4v4h-4M6 20v-4h4"/>',arrow:'<path d="M4 12h16m-6-6l6 6-6 6"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>',undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',bell:'<path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 004 0"/>',moon:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',tablet:'<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18h2"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 2-3 4m0 3h.1"/>',building:'<path d="M4 21V3h11v18m0-12h5v12M2 21h20M8 7h3m-3 4h3m-3 4h3"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>',logout:'<path d="M10 4H5v16h5"/><path d="M15 8l4 4-4 4M19 12H9"/>'
 };
 const icon = (n,cls='') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]||I.doc}</svg>`;
 const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -228,13 +228,13 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
  document.getElementById('app').innerHTML=`<div class="auth-wrap"><section class="auth-hero"><div class="auth-brand"><i class="auth-logo"><img src="logo.svg" alt=""></i>PCS TRANSİT YYS</div><div><h2>Araç geliş ve gümrük işlemlerini tek panelden takip edin.</h2><p>Plaka, müşteri, beyanname ve T1 durumları ekip üyeleri arasında anlık ve düzenli biçimde paylaşılır.</p><ul class="auth-points"><li><span class="dot">${icon('grid')}</span><div><b>Haftalık operasyon panosu</b>Pazartesi–Cumartesi günlerine göre gelen araçlar.</div></li><li><span class="dot">${icon('st_done')}</span><div><b>Tesiste, T1 yazıldı, işlemler bitti</b>Her aracın durumu ayrı ayrı işaretlenir.</div></li><li><span class="dot">${icon('chart')}</span><div><b>Raporlar ve Excel çıktısı</b>Günlük ve haftalık özetler, müşteri bazlı toplamlar.</div></li></ul><div class="auth-demo" aria-hidden="true"><div class="auth-demo-row">${plateHTML('PB 5126 PE - PB 2244 EC')}<span class="auth-chip on onsite">${icon('st_onsite')}Tesiste</span><span class="auth-chip on t1">${icon('st_t1')}T1</span><span class="auth-chip">${icon('st_done')}Bitti</span></div><div class="auth-demo-row">${plateHTML('34 ETK 42')}<span class="auth-chip on onsite">${icon('st_onsite')}Tesiste</span><span class="auth-chip on t1">${icon('st_t1')}T1</span><span class="auth-chip on done">${icon('st_done')}Bitti</span></div></div></div><small>PCS TRANSİT YYS · Ortak Çalışma</small></section><section class="auth-panel"><div class="card auth-card"><img class="auth-card-logo" src="logo.svg" alt=""><div class="eyebrow">ORTAK ÇALIŞMA</div><h1>Hoş geldiniz</h1><p class="lead">Araç operasyon panosuna kendi hesabınızla giriş yapın.</p><form id="auth-form"><div class="field"><label for="email">E-posta</label><input id="email" name="email" type="email" required autocomplete="username" placeholder="ad@sirket.com"></div><div class="field"><label for="password">Parola</label><input id="password" name="password" type="password" minlength="8" required autocomplete="current-password" placeholder="En az 8 karakter"></div><div class="auth-forgot"><button class="btn text small" type="button" data-action="reset-password">Parolamı unuttum</button></div><button class="btn primary" type="submit">Giriş yap</button><p id="auth-message" class="auth-msg" role="status">${esc(message)}</p></form><div class="auth-note">Hesaplar yönetici tarafından açılır. Erişim için yöneticinize başvurun.</div></div></section></div>`;
 }
-function onlineUI(){document.documentElement.classList.toggle('is-editor',role==='editor');
+function onlineUI(){if(GUARD_ACCT)return;document.documentElement.classList.toggle('is-editor',role==='editor');
  for(const b of document.querySelectorAll('[data-action]')){
   if(disabledActions.has(b.dataset.action)){b.hidden=true;b.style.display='none';}
   if(writeActions.has(b.dataset.action)){b.disabled=!canEdit();if(role!=='editor'&&!b.classList.contains('plate-button'))b.style.display='none';}
@@ -279,11 +279,12 @@ function startRealtime(){if(VIEW_TOKEN||rtChannel||typeof client.channel!=='func
  try{rtChannel=client.channel('pcs-degisiklikler');for(const table of ['visits','registry','app_settings'])rtChannel.on('postgres_changes',{event:'*',schema:'public',table},ping);rtChannel.subscribe();}catch(_){rtChannel=null;}}
 function stopRealtime(){clearTimeout(rtTimer);if(rtChannel){try{client.removeChannel(rtChannel);}catch(_){}rtChannel=null;}waStop();}
 async function syncData(opts={}){
- if(!account||busy)return;if(loading){if(Date.now()-syncStarted<SYNC_STUCK_MS){resync=true;return;}generation++;}
+ if(!account||busy||GUARD_ACCT)return;if(loading){if(Date.now()-syncStarted<SYNC_STUCK_MS){resync=true;return;}generation++;}
  loading=true;const run=++syncRun;syncStarted=Date.now();const stamp=generation;const prevVisits=opts.remote&&(realState?.visits||[]).length?realState.visits:null;
  try{if(VIEW_TOKEN){const {data,error}=await client.rpc('public_board',{p_token:VIEW_TOKEN});if(error)throw error;if(stamp!==generation)return;
  role='viewer';state=realState={...emptyState(),registry:[],visits:(data?.visits||[]).map(r=>mapRow(r,'visits')),updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();applySettings(data?.settings||{});
- }else{let fp='';try{fp=await remotePrint();}catch(_){fp='';}
+ }else{if(!guardChecked){const g=await guardAccountCheck();if(stamp!==generation)return;if(g){enterGuardAccount(g);return;}}
+ let fp='';try{fp=await remotePrint();}catch(_){fp='';}
  if(opts.poll&&fp&&fp===syncPrint&&!storageError&&Date.now()-fullSyncAt<FULL_SYNC_MS){lastSync=timeNow();const sd=document.querySelector('.saha-date small');if(sd)sd.textContent='Güncel · '+lastSync;return;}
  const [{data:nextRole,error},registry,visits]=await Promise.all([client.rpc('current_app_role'),fetchAll('registry'),fetchAll('visits')]);if(error)throw error;if(stamp!==generation)return;
  role=nextRole==='editor'?'editor':'viewer';state=realState={...emptyState(),registry,visits,updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();syncPrint=fp;fullSyncAt=Date.now();
@@ -313,6 +314,9 @@ var VIEW_TOKEN=(new URLSearchParams(location.search).get('izle')||'').trim();
    İzleme linki (?guvenlik-izle=ANAHTAR): aynı ekran, yalnızca görüntüleme (GİRİŞ / ÇIKIŞ yapamaz). */
 var GUARD_Q=new URLSearchParams(location.search),GUARD_MARK_TOKEN=(GUARD_Q.get('guvenlik')||'').trim();
 var GUARD_TOKEN=GUARD_MARK_TOKEN||(GUARD_Q.get('guvenlik-izle')||'').trim(),GUARD_VIEW=!!GUARD_TOKEN&&!GUARD_MARK_TOKEN;
+/* güvenlik hesabı: kendi e-posta ve şifresiyle giren görevli yalnızca güvenlik ekranını görür ({name, active}) */
+var GUARD_ACCT=null,guardChecked=false;
+function inGuard(){return !!GUARD_TOKEN||!!GUARD_ACCT;}
 var prioDirty=false,appearanceDirty=false,publicLink='',guardLink='',guardViewLink='';
 const APP_FONTS={varsayilan:['Varsayılan · Roboto (siteye gömülü, her cihazda aynı)','"PCS Roboto",Roboto,"Segoe UI",Arial,sans-serif'],eski:['Eski varsayılan (Inter / Segoe UI)','Inter,"Segoe UI",Arial,sans-serif'],segoe:['Segoe UI','"Segoe UI",Arial,sans-serif'],segoevar:['Segoe UI Variable','"Segoe UI Variable Text","Segoe UI",sans-serif'],arial:['Arial','Arial,Helvetica,sans-serif'],arialnarrow:['Arial Narrow (dar)','"Arial Narrow",Arial,sans-serif'],verdana:['Verdana','Verdana,Geneva,sans-serif'],tahoma:['Tahoma','Tahoma,Verdana,sans-serif'],trebuchet:['Trebuchet MS','"Trebuchet MS",Arial,sans-serif'],calibri:['Calibri','Calibri,Carlito,Arial,sans-serif'],candara:['Candara','Candara,Calibri,sans-serif'],corbel:['Corbel','Corbel,Calibri,sans-serif'],bahnschrift:['Bahnschrift','Bahnschrift,"Segoe UI",sans-serif'],franklin:['Franklin Gothic','"Franklin Gothic Medium","Franklin Gothic",Arial,sans-serif'],century:['Century Gothic','"Century Gothic",Futura,Arial,sans-serif'],lucida:['Lucida Sans','"Lucida Sans Unicode","Lucida Grande",sans-serif'],gill:['Gill Sans','"Gill Sans MT","Gill Sans",Calibri,sans-serif'],georgia:['Georgia','Georgia,"Times New Roman",serif'],cambria:['Cambria','Cambria,Georgia,serif'],constantia:['Constantia','Constantia,Georgia,serif'],palatino:['Palatino','"Palatino Linotype",Palatino,Georgia,serif'],consolas:['Consolas (eş aralıklı)','Consolas,"Courier New",monospace'],courier:['Courier New (daktilo)','"Courier New",Courier,monospace']};
 const APP_PLATE_FONTS={ayni:['Genel yazı tipiyle aynı',''],...APP_FONTS,arialblack:['Arial Black (çok kalın)','"Arial Black",Arial,sans-serif']};
@@ -369,6 +373,7 @@ function settingsView(){const a=appearance;const lbl=(o,k,d)=>{const v=o[k]||o[d
  ${setPanel('customers','registry','Müşteri renkleri ve sıralama',`${custPriorityList.length} öncelikli müşteri · panodaki blok sırası ve renkleri`,priorityEditor())}
  ${setPanel('whatsapp','wa','WhatsApp',`${filled}/${names.length} müşterinin numarası kayıtlı · mesaj şablonu`,contactsEditor())}
  ${setPanel('link','search','Görüntüleme linki','Giriş gerektirmeyen, sadece izleme linki',linkEditor())}
+ ${setPanel('guardacct','user','Güvenlik hesapları','Görevli kendi e-posta ve şifresiyle girer · yalnızca güvenlik ekranı',guardAccountsEditor())}
  ${setPanel('guard','tablet','Güvenlik linki','Kapıdaki güvenlik için yalnızca GİRİŞ / ÇIKIŞ ekranı',guardLinkEditor())}
  ${setPanel('guardview','search','Güvenlik ekranı izleme linki','Güvenlik ekranını yalnızca görüntüleme · GİRİŞ / ÇIKIŞ yapılamaz',guardViewLinkEditor())}
  </div>
@@ -480,7 +485,7 @@ document.addEventListener('submit',async e=>{
 },true);
 client.auth.onAuthStateChange((event,session)=>{
  if(VIEW_TOKEN||GUARD_TOKEN)return;
- setTimeout(async()=>{const userChanged=(session?.user?.id||null)!==(account?.id||null);if(userChanged){generation++;role='viewer';}account=session?.user||null;if(!account){stopRealtime();state=realState=emptyState();clearCache();selectedIds.clear();closeModal();authScreen();return;}if(userChanged)stopRealtime();startRealtime();await syncData();if(event==='PASSWORD_RECOVERY')openModal(`${modalHeader('Yeni parola')}<form id="recovery-form"><div class="modal-body"><label>Yeni parola <input name="password" type="password" minlength="8" required autocomplete="new-password"></label></div><div class="modal-footer"><button class="btn primary">Parolayı kaydet</button></div></form>`);},0);
+ setTimeout(async()=>{const userChanged=(session?.user?.id||null)!==(account?.id||null);if(GUARD_ACCT){if(userChanged)location.reload();return;}if(userChanged){generation++;role='viewer';guardChecked=false;}account=session?.user||null;if(!account){stopRealtime();state=realState=emptyState();clearCache();selectedIds.clear();closeModal();authScreen();return;}if(userChanged)stopRealtime();startRealtime();await syncData();if(event==='PASSWORD_RECOVERY')openModal(`${modalHeader('Yeni parola')}<form id="recovery-form"><div class="modal-body"><label>Yeni parola <input name="password" type="password" minlength="8" required autocomplete="new-password"></label></div><div class="modal-footer"><button class="btn primary">Parolayı kaydet</button></div></form>`);},0);
 });
 function registryChange(reg,v){
  const keys=['customer','declaration','carrier','registration'];
@@ -744,7 +749,7 @@ async function sahaSubmit(){if(!canEdit())return;const raw=(document.getElementB
 
 /* ekrana bağlama */
 const renderBase=render;
-render=function(){if(GUARD_TOKEN){renderGuard();return;}if(account&&ui.page==='saha'){renderSaha();return;}renderBase();const tr=document.querySelector('.topbar-right');if(tr&&account)tr.insertAdjacentHTML('afterbegin',headerTools());};
+render=function(){if(inGuard()){renderGuard();return;}if(account&&ui.page==='saha'){renderSaha();return;}renderBase();const tr=document.querySelector('.topbar-right');if(tr&&account)tr.insertAdjacentHTML('afterbegin',headerTools());};
 document.addEventListener('input',e=>{if(e.target.id!=='saha-plate')return;ui.sahaQ=e.target.value;renderSaha();});
 document.addEventListener('submit',e=>{if(e.target.id!=='saha-add')return;e.preventDefault();sahaSubmit();});
 document.addEventListener('click',async e=>{
@@ -1208,13 +1213,13 @@ const gToday=()=>guard.today||localToday();
 function guardRange(){const f=guard.from||gToday();return {from:f,to:guard.to||f};}
 function guardWeek(){const t=gToday(),m=addDays(t,-((weekday(t)+6)%7));return {from:m,to:weekday(t)===0?t:addDays(m,5)};}
 const gCanMark=v=>!gView()&&!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&v.visit_date<=addDays(gToday(),1);
-async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
+async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
  try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
   const was=guard.loaded?new Map(guard.rows.map(v=>[v.id,!!v.done])):null;
   Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',at:timeNow(),canMark:data?.can_mark!==false});
   if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());}
  catch(e){if(seq!==guard.seq)return;
-  if(e?.code==='42501')guard.fatal='Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.';
+  if(e?.code==='42501')guard.fatal=GUARD_ACCT?'Bu hesabın güvenlik ekranı kapatılmış. Ofise haber verin.':'Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.';
   else if(e?.code==='PGRST202'&&guard.from){guard.from=guard.to='';toast('Tarih seçimi için ofisin Supabase’de guvenlik-kurulumu.sql dosyasının yeni halini çalıştırması gerekiyor.',true);return guardLoad();}
   else if(e?.code==='PGRST202')guard.fatal='Güvenlik ekranı henüz kurulmadı. Ofis, Supabase’de guvenlik-kurulumu.sql dosyasını çalıştırmalı.';
   else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
@@ -1250,7 +1255,8 @@ function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardR
   +(rows.some(v=>!v.exit_at&&v.done_at)?'<p class="help-note">* Güvenlik çıkışı işlenmemiş; işlemlerin bittiği saat gösteriliyor.</p>':'')
   :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
 function renderGuard(){const app=document.getElementById('app');document.title=gView()?'Güvenlik izleme · PCS TRANSİT':'Güvenlik · PCS TRANSİT';
- if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b></div></div>`;return;}
+ const out=GUARD_ACCT?`<button type="button" class="saha-icon guard-signout" data-action="guard-signout" aria-label="Çıkış yap" title="Çıkış yap">${icon('logout')}</button>`:'';
+ if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b>${GUARD_ACCT?`<button type="button" class="btn" data-action="guard-signout">${icon('logout')}Çıkış yap</button>`:''}</div></div>`;return;}
  const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange(),week=guardWeek();
  const match=v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q);
  const inRange=v=>v.visit_date>=from&&v.visit_date<=to,isOut=v=>gOut(v)&&inRange(v),isAll=v=>inRange(v)||!gOut(v);
@@ -1275,7 +1281,7 @@ function renderGuard(){const app=document.getElementById('app');document.title=g
   body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
  const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;
  const focus=document.activeElement?.id,sel=document.activeElement?.selectionStart;
- app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>${gView()?'Güvenlik · izleme':'Güvenlik · giriş-çıkış'}</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small>${gView()?'<span class="guard-view-pill">Yalnızca görüntüleme</span>':''}</div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button></div></header>
+ app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>${gView()?'Güvenlik · izleme':GUARD_ACCT?'Güvenlik · '+esc(GUARD_ACCT.name):'Güvenlik · giriş-çıkış'}</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small>${gView()?'<span class="guard-view-pill">Yalnızca görüntüleme</span>':''}</div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button>${out}</div></header>
  <div class="guard-bar"><div class="guard-dates" role="group" aria-label="Tarih aralığı"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="-1" aria-label="Önceki">${icon('left')}</button><input type="date" id="guard-from" value="${esc(from)}" max="${esc(addDays(today,7))}" aria-label="Başlangıç tarihi"><span>–</span><input type="date" id="guard-to" value="${esc(to)}" max="${esc(addDays(today,7))}" aria-label="Bitiş tarihi"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="1" aria-label="Sonraki">${icon('chevron')}</button></div>
  <div class="guard-presets" role="group" aria-label="Hızlı tarih seçimi">${[['guard-today','Bugün',from===today&&to===today],['guard-week','Bu hafta',from===week.from&&to===week.to]].map(([a,l,on])=>`<button type="button" class="${on?'active':''}" data-action="${a}" aria-pressed="${on}">${l}</button>`).join('')}</div>
  <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
@@ -1288,19 +1294,25 @@ function setGuardRange(f,t){const today=gToday();if(!validDate(f)||!validDate(t)
  if(f<addDays(today,-62)){toast('Güvenlik ekranında en fazla 2 ay öncesi gösterilir.',true);return renderGuard();}
  if(f===today&&t===today)guard.from=guard.to='';else{guard.from=f;guard.to=t;}guard.loaded=false;renderGuard();guardLoad();}
 async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guard.busy.has(id)||gView())return;guard.busy.add(id);renderGuard();
- try{const {data,error}=await client.rpc('guard_mark',{p_token:GUARD_TOKEN,p_visit_id:id,p_action:k});if(error)throw error;
+ try{const {data,error}=await client.rpc('guard_mark',{p_token:GUARD_TOKEN||null,p_visit_id:id,p_action:k});if(error)throw error;
   if(data&&typeof data==='object')Object.assign(v,data);justChangedMap.set(id,Date.now());guard.q='';
   toast(`${v.plate} ${{giris:'giriş yaptı, tesiste.',cikis:'çıkış yaptı.',giris_geri:'girişi geri alındı.',cikis_geri:'çıkışı geri alındı.'}[k]}`);}
- catch(e){toast(e?.code==='42501'?'Bu güvenlik linki artık geçersiz.':isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
+ catch(e){toast(e?.code==='42501'?(GUARD_ACCT?'Bu hesabın güvenlik yetkisi kapatılmış.':'Bu güvenlik linki artık geçersiz.'):isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
  finally{guard.busy.delete(id);}
  await guardLoad();}
 function guardShare(how,cust){const rows=guardRepRows(guard.repSt||'',cust==null?null:cust);if(!rows.length)return;const text=rows.map(gateText).join('\n\n');
  if(how==='wa')waLaunch('',text);else copyOut(text,'',`${rows.length} aracın giriş-çıkış bilgisi kopyalandı.`);}
-function guardStart(){document.documentElement.classList.add('guard-mode');renderGuard();guardLoad();keepAwake(true);
+function guardStart(){if(guard.started)return;guard.started=true;document.documentElement.classList.add('guard-mode');renderGuard();guardLoad();keepAwake(true);
  setInterval(()=>{if(!document.hidden&&!guard.busy.size)guardLoad();},GUARD_POLL_MS);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){guardLoad();wakeLock=null;keepAwake(true);}});
  window.addEventListener('online',guardLoad);}
-document.addEventListener('click',e=>{if(!GUARD_TOKEN)return;const b=e.target.closest('[data-action^="guard-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+/* Giriş yapan kişi güvenlik hesabı mı? Ağ hatasında bir sonraki senkronda yeniden sorulur;
+   fonksiyon yoksa (SQL eski) herkes eskisi gibi ofis panosuna girer. */
+async function guardAccountCheck(){try{const {data,error}=await client.rpc('guard_account');if(error){if(!isNetErr(error))guardChecked=true;return null;}guardChecked=true;return data&&typeof data==='object'?data:null;}catch(e){if(!isNetErr(e))guardChecked=true;return null;}}
+function enterGuardAccount(g){GUARD_ACCT={name:String(g.name||'').trim()||'Güvenlik',active:g.active!==false};stopRealtime();state=realState=emptyState();clearCache();closeModal();
+ if(!GUARD_ACCT.active)guard.fatal='Bu güvenlik hesabı kapatılmış. Ofise haber verin.';guardStart();}
+document.addEventListener('click',e=>{if(!inGuard())return;const b=e.target.closest('[data-action^="guard-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+ if(a==='guard-signout'){b.disabled=true;(async()=>{try{await client.auth.signOut();}catch(_){}location.reload();})();return;}
  if(a==='guard-tab'){guard.tab=b.dataset.k;return renderGuard();}
  if(a==='guard-mark')return guardMark(b.dataset.id,b.dataset.k);
  if(a==='guard-card-wa'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(v)waLaunch('',gateText(v));return;}
@@ -1310,8 +1322,8 @@ document.addEventListener('click',e=>{if(!GUARD_TOKEN)return;const b=e.target.cl
  if(a==='guard-week'){const w=guardWeek();return setGuardRange(w.from,w.to);}
  if(a==='guard-jump'){document.getElementById('guard-col-'+b.dataset.k)?.scrollIntoView({behavior:'smooth',block:'start'});return;}
  if(a==='guard-day-step'){const {from,to}=guardRange(),n=Math.round((dateObj(to)-dateObj(from))/DAY)+1,st=Number(b.dataset.step)*n;return setGuardRange(addDays(from,st),addDays(to,st));}});
-document.addEventListener('input',e=>{if(!GUARD_TOKEN||e.target.id!=='guard-q')return;guard.q=e.target.value;renderGuard();});
-document.addEventListener('change',e=>{if(!GUARD_TOKEN)return;const id=e.target.id;if(id!=='guard-from'&&id!=='guard-to')return;const r=guardRange();
+document.addEventListener('input',e=>{if(!inGuard()||e.target.id!=='guard-q')return;guard.q=e.target.value;renderGuard();});
+document.addEventListener('change',e=>{if(!inGuard())return;const id=e.target.id;if(id!=='guard-from'&&id!=='guard-to')return;const r=guardRange();
  let f=id==='guard-from'?e.target.value:r.from,t=id==='guard-to'?e.target.value:r.to;if(t<f){if(id==='guard-from')t=f;else f=t;}setGuardRange(f,t);});
 
 /* Ayarlar: güvenlik linki (yalnızca düzenleyici) */
@@ -1337,6 +1349,39 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
   L.set(location.origin+location.pathname+'?'+L.param+'='+encodeURIComponent(data));busy=false;render();if(a==='rotate')toast(L.done);}
  catch(err){toast(err?.code==='PGRST202'?'Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.':friendly(err),true);}
  finally{busy=false;onlineUI();}});
+
+/* Ayarlar: güvenlik hesapları (yalnızca düzenleyici). Kullanıcı Supabase'de açılır, burada güvenlik hesabı yapılır. */
+const gAccts={state:'idle',list:[]};
+async function loadGuardAccounts(){gAccts.state='loading';
+ try{const {data,error}=await client.rpc('list_guard_accounts');if(error)throw error;gAccts.list=Array.isArray(data)?data:[];gAccts.state='ready';}
+ catch(e){gAccts.list=[];gAccts.state=e?.code==='PGRST202'?'missing':'error';}
+ if(ui.page==='settings')render();}
+function guardAccountsEditor(){if(role!=='editor'||VIEW_TOKEN)return '';if(gAccts.state==='idle')setTimeout(loadGuardAccounts,0);
+ const st=a=>!a.active?['off','Kapalı']:!a.has_user?['warn','Supabase’de kullanıcı yok']:['ok',a.last_sign_in_at?'Açık · son giriş '+tsText(a.last_sign_in_at):'Açık · henüz giriş yapmadı'];
+ const rows=gAccts.state==='missing'?`<div class="notice">${icon('info')}<div>Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.</div></div>`
+  :gAccts.state==='error'?`<p class="help-note">Liste alınamadı. ${button('gacc-reload','Tekrar dene','refresh','small')}</p>`
+  :gAccts.state!=='ready'?'<p class="help-note">Yükleniyor…</p>'
+  :gAccts.list.length?`<div class="gacc-list">${gAccts.list.map(a=>{const [k,t]=st(a),e=esc(a.email);return `<div class="gacc-row${a.active?'':' off'}"><span class="gacc-ic">${icon('user')}</span><div class="gacc-who"><b>${esc(a.name||a.email.split('@')[0])}</b><small>${e}</small></div><span class="gacc-st ${k}">${esc(t)}</span><div class="gacc-acts"><button type="button" class="btn small" data-action="${a.active?'gacc-off':'gacc-on'}" data-email="${e}" data-name="${esc(a.name)}">${a.active?'Kapat':'Aç'}</button>${a.has_user?'':`<button type="button" class="btn small danger" data-action="gacc-del" data-email="${e}">Sil</button>`}</div></div>`;}).join('')}</div>`
+  :'<p class="help-note">Henüz güvenlik hesabı yok.</p>';
+ return `<p class="help-note" style="margin:0 0 10px">Görevli kendi e-postası ve şifresiyle giriş yapınca <b>yalnızca güvenlik ekranını</b> görür: gelecek, tesisteki ve çıkışa hazır araçlar, GİRİŞ / ÇIKIŞ, çıkanlar ve rapor. Ofis panosu, beyanname ve nakliyeci bilgisi kapalıdır. İşlem geçmişinde “Güvenlik · ad” yazılır.</p>
+ <ol class="gacc-steps"><li>Supabase → Authentication → Users → <b>Add user → Create new user</b>: görevlinin e-postası ve şifresi, “Auto Confirm User” işaretli.</li><li>Aynı e-postayı aşağıya yazıp <b>Ekle</b>’ye basın.</li><li>Görevli sitede bu e-posta ve şifreyle giriş yapar.</li></ol>
+ <div class="gacc-form"><input id="gacc-email" type="email" placeholder="guvenlik@ornek.com" autocomplete="off" spellcheck="false" aria-label="Güvenlik hesabının e-postası"><input id="gacc-name" type="text" placeholder="Görevlinin adı (ör. Tepecik kapı)" maxlength="60" autocomplete="off" aria-label="Görevlinin adı">${button('gacc-add','Ekle','plus','primary')}</div>
+ ${rows}<p class="help-note" style="margin-top:10px">Görevli ayrılırsa ya da telefon kaybolursa “Kapat” deyin; o an güvenlik ekranını açamaz. Listeden tamamen silmek için önce kullanıcıyı Supabase’den silin.</p>`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="gacc-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+ if(a==='gacc-reload'){gAccts.state='idle';return render();}
+ if(!canEdit())return;let email=b.dataset.email||'',name=b.dataset.name||'',active=a!=='gacc-off';
+ if(a==='gacc-add'){email=(document.getElementById('gacc-email')?.value||'').trim().toLowerCase();name=(document.getElementById('gacc-name')?.value||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Geçerli bir e-posta yazın.',true);document.getElementById('gacc-email')?.focus();return;}
+  if(email===String(account?.email||'').toLowerCase()){toast('Kendi hesabınızı güvenlik hesabı yapamazsınız.',true);return;}
+  if(!window.confirm(`${email} güvenlik hesabı yapılsın mı?\n\nBu hesap bundan sonra yalnızca güvenlik ekranını görür; ofis panosunu, beyanname ve nakliyeci bilgisini göremez.`))return;}
+ if(a==='gacc-off'&&!window.confirm(`${email} kapatılsın mı? Görevli güvenlik ekranını o an açamaz.`))return;
+ if(a==='gacc-del'&&!window.confirm(`${email} listeden silinsin mi?`))return;
+ busy=true;onlineUI();
+ try{const {error}=a==='gacc-del'?await client.rpc('delete_guard_account',{p_email:email}):await client.rpc('save_guard_account',{p_email:email,p_name:name,p_active:active});if(error)throw error;
+  toast(a==='gacc-add'?'Güvenlik hesabı eklendi.':a==='gacc-off'?'Hesap kapatıldı.':a==='gacc-on'?'Hesap açıldı.':'Hesap listeden silindi.');}
+ catch(err){toast(err?.code==='PGRST202'?'Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.':err?.message&&err.code==='22023'?err.message:friendly(err),true);}
+ finally{busy=false;}
+ await loadGuardAccounts();});
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));
