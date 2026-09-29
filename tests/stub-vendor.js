@@ -2,7 +2,8 @@
  * Ayarlar sayfa açılmadan önce window.__PCS_STUB ile verilir:
  *   { session: true|false, role: 'editor'|'viewer', data: {registry, visits, app_settings, incoming_ruhsat}, offline: false,
  *     files: { 'depo/yolu.png': base64 },   // storage.download için dosyalar
- *     missing: ['incoming_ruhsat'] }        // "tablo yok" hatası veren tablolar (kurulum yapılmamış gibi)
+ *     missing: ['incoming_ruhsat'],         // "tablo yok" hatası veren tablolar (kurulum yapılmamış gibi)
+ *     guardToken: 'g1', today: '2026-09-23' } // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
  * Yapılan her çağrı window.__calls dizisine yazılır. */
 (() => {
   const cfg = window.__PCS_STUB || {};
@@ -118,9 +119,33 @@
       return ch;
     },
     removeChannel(ch) { window.__channels = (window.__channels || []).filter(c => c !== ch); return Promise.resolve('ok'); },
-    async rpc(name) {
-      calls.push({ rpc: name });
+    async rpc(name, params = {}) {
+      calls.push({ rpc: name, params: clone(params) });
       if (cfg.offline) return netError();
+      // Güvenlik linki (supabase/guvenlik-kurulumu.sql'deki fonksiyonların sade karşılığı)
+      const guardErr = (code, message) => ({ data: null, error: { code, message } });
+      if (name === 'get_guard_link' || name === 'rotate_guard_link') {
+        if ((cfg.missing || []).includes('guard')) return guardErr('PGRST202', 'Could not find the function');
+        if (name === 'rotate_guard_link') cfg.guardToken = 'yeni' + Date.now();
+        return { data: cfg.guardToken || 'g1', error: null };
+      }
+      if (name === 'guard_board' || name === 'guard_mark') {
+        if (params.p_token !== cfg.guardToken) return guardErr('42501', 'Güvenlik linki geçersiz');
+        const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
+        const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, exit_at: v.exit_at || null });
+        if (name === 'guard_board') return { data: { today, now: now(), visits: db.visits.filter(v => v.visit_date === today || (v.visit_date >= back(3) && v.visit_date < today && v.onsite_at && !v.exit_at)).map(pick) }, error: null };
+        const v = db.visits.find(x => x.id === params.p_visit_id && x.visit_date >= back(3) && x.visit_date <= today);
+        if (!v) return guardErr('P0002', 'Araç bulunamadı');
+        const recent = t => t && Date.now() - Date.parse(t) < 15 * 60000;
+        const a = params.p_action;
+        if (a === 'giris') Object.assign(v, { onsite: true, onsite_at: v.onsite_at || now() });
+        else if (a === 'cikis') { if (!v.onsite && !v.onsite_at) return guardErr('22023', 'Önce giriş yapılmalı'); v.exit_at = v.exit_at || now(); }
+        else if (a === 'giris_geri') { if (v.exit_at || !recent(v.onsite_at)) return guardErr('22023', 'Giriş artık geri alınamaz; ofise haber verin'); Object.assign(v, { onsite: false, onsite_at: null }); }
+        else if (a === 'cikis_geri') { if (!recent(v.exit_at)) return guardErr('22023', 'Çıkış artık geri alınamaz; ofise haber verin'); v.exit_at = null; }
+        else return guardErr('22023', 'Geçersiz işlem');
+        v.updated_at = now();
+        return { data: { id: v.id, onsite: v.onsite, onsite_at: v.onsite_at, exit_at: v.exit_at }, error: null };
+      }
       if (name === 'current_app_role') return { data: cfg.role || 'editor', error: null };
       if (name === 'list_backups') return { data: [{ id: 1, taken_at: now() }], error: null };
       if (name === 'visit_history') return { data: [], error: null };

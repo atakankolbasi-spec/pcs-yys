@@ -114,12 +114,20 @@ biri araç eklediğinde ya da değiştirdiğinde diğer ekranlar 15 saniye bekle
 
 Kurulum adımları `WHATSAPP.md` dosyasında. Kurulmadıkça site bu özelliği sessizce kapalı tutar.
 
+## 8. Güvenlik linki ve ayrı çıkış saati
+
+`guvenlik-kurulumu.sql` dosyasını SQL Editor'de bir kez çalıştırın. Ardından **Ayarlar → Güvenlik linki**
+bölümünden linki alıp kapıdaki güvenliğe gönderin. Güvenlik linki giriş yapmadan açar; yalnızca **GİRİŞ**
+(araç TESİSTE olur) ve **ÇIKIŞ** (ayrı çıkış saati yazılır) düğmelerine basabilir. "İşlemler bitti" saati
+ayrı kalır. Kurulmadıkça site bu özelliği kapalı tutar.
+
 ## Bu klasördeki dosyalar
 
 | Dosya | Ne işe yarar |
 |---|---|
 | `islem-gecmisi-duzeltmesi.sql` | "Kaydı düzenle"deki `malformed array literal` hatasını düzelten işlem geçmişi tetikleyicisi |
 | `anlik-guncelleme-kurulumu.sql` | Tabloları Realtime yayınına ekler (anlık güncelleme) |
+| `guvenlik-kurulumu.sql` | Güvenlik linki (GİRİŞ / ÇIKIŞ ekranı) ve ayrı çıkış saati |
 | `plaka-harf-duzeltmesi.sql` | Eski kayıtlardaki Kiril / Yunan harfli plakaları Latin harfe çevirir (isteğe bağlı) |
 | `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |
 | `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |

@@ -538,6 +538,84 @@ test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async 
   expect(problems).toEqual([]);
 });
 
+test('güvenlik linki: GİRİŞ aracı tesiste yapar, ÇIKIŞ ayrı saat yazar; başka bilgi görünmez', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  await expect(page.locator('.guard')).toBeVisible();
+  await expect(page.locator('#auth-form')).toHaveCount(0);
+  const tab = k => page.locator(`[data-action="guard-tab"][data-k="${k}"]`);
+  const card = () => page.locator('.guard-card', { hasText: 'CB 1234 AB' });
+  const v6 = () => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'));
+  // Bugün 3 araç: biri giriş bekliyor; iki gün önce girip çıkışı işlenmemiş araç da "İçeride" görünür.
+  await expect(tab('wait').locator('b')).toHaveText('1');
+  await expect(tab('in').locator('b')).toHaveText('3');
+
+  // GİRİŞ -> TESİSTE + giriş saati; "işlemler bitti"ye dokunulmaz
+  await card().locator('[data-k="giris"]').click();
+  await expect(page.locator('#toast')).toContainText('giriş yaptı, tesiste');
+  let v = await v6();
+  expect([v.onsite, !!v.onsite_at, v.done, v.exit_at || null]).toEqual([true, true, false, null]);
+  await tab('in').click();
+  await expect(card()).toContainText('İşlemleri sürüyor');
+  await expect(card().locator('[data-k="giris_geri"]')).toBeVisible();
+
+  // ÇIKIŞ -> ayrı çıkış saati; araç "bitti" olmaz
+  await card().locator('[data-k="cikis"]').click();
+  await expect(page.locator('#toast')).toContainText('çıkış yaptı');
+  v = await v6();
+  expect([!!v.exit_at, v.done, v.done_at || null]).toEqual([true, false, null]);
+  await tab('out').click();
+  await expect(card()).toContainText('Çıktı');
+  // yanlış basıldıysa geri alınır
+  await card().locator('[data-k="cikis_geri"]').click();
+  await expect(page.locator('#toast')).toContainText('çıkışı geri alındı');
+  expect((await v6()).exit_at).toBeNull();
+
+  // Güvenlik ekranı yalnızca kendi fonksiyonlarını çağırır; tablolar ve beyanname gibi bilgiler görünmez.
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table).length)).toBe(0);
+  await expect(page.locator('body')).not.toContainText('26341200EX0001');
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik linki geçersizse ekran açılmaz', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=eski-anahtar');
+  await expect(page.locator('.guard-fatal')).toContainText('geçersiz');
+  await expect(page.locator('.guard-btn')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('ayarlar: güvenlik linki gösterilir ve yenilenir', async ({ page }) => {
+  const problems = await openApp(page, { guardToken: 'g1' });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('details[data-panel="guard"] summary').click();
+  await page.locator('[data-action="glink-show"]').click();
+  await expect(page.locator('#guard-link')).toHaveValue(/\?guvenlik=g1$/);
+  page.once('dialog', d => d.accept());
+  await page.locator('[data-action="glink-rotate"]').click();
+  await expect(page.locator('#toast')).toContainText('Yeni güvenlik linki');
+  await expect(page.locator('#guard-link')).toHaveValue(/\?guvenlik=yeni\d+$/);
+  expect(problems).toEqual([]);
+});
+
+test('çıkış saati panoda, raporda ve formda işlemler bitti saatinden ayrı görünür', async ({ page }) => {
+  const data = sampleData();
+  // v5: 08:05 giriş, 09:10 işlemler bitti, 09:30 güvenlik çıkışı (İstanbul saati)
+  Object.assign(data.visits[4], { done: true, done_at: '2026-09-23T06:10:00Z', exit_at: '2026-09-23T06:30:00Z' });
+  await page.setViewportSize({ width: 1600, height: 1000 }); // yan panel geniş ekranda görünür
+  const problems = await openApp(page, { data });
+  await expect(page.locator('tr[data-row-id="v5"] .exit-badge')).toHaveText(/Çıktı 09:30/i);
+  await page.locator('tr[data-row-id="v5"] .plate-button').click();
+  await page.locator('.side-card [data-action="gate-report"][data-id="v5"]').click();
+  await expect(page.locator('.gate-stat.in b')).toHaveText('23.09.2026  08:05');
+  await expect(page.locator('.gate-stat.done b')).toHaveText('23.09.2026  09:10');
+  await expect(page.locator('.gate-stat.out b')).toHaveText('23.09.2026  09:30');
+  await expect(page.locator('.gate-pre')).toContainText('TESİS ÇIKIŞ TARİH SAAT : 23.09.2026  09:30');
+  await page.locator('[data-action="close-modal"]').last().click();
+  await page.locator('.side-card [data-action="edit-visit"]').click();
+  await expect(page.locator('#visit-form [name="exit_at"]')).toHaveValue('2026-09-23T09:30');
+  await expect(page.locator('#visit-form [name="done_at"]')).toHaveValue('2026-09-23T09:10');
+  expect(problems).toEqual([]);
+});
+
 test('başka bir sitenin içine (iframe) gömülünce uygulama açılmaz', async ({ page }) => {
   await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
   await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData() });
