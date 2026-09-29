@@ -188,6 +188,55 @@ test('Kiril harfle yazılmış plaka BG tanınır, Latin harfle aranınca bulunu
   expect(problems).toEqual([]);
 });
 
+test('Macar plakası tanınır: yeni biçim her zaman, eski biçim Macar nakliyecide ya da Macar plakasıyla çiftte', async ({ page }) => {
+  const data = sampleData();
+  const add = (id, plate, carrier) => data.visits.push({ ...data.visits[5], id, plate, carrier, customer: 'BBL LOJİSTİK', visit_time: '11:00' });
+  add('v8', 'AAKX 760', 'BBL LOGISTICS HUNGARY KFT');
+  add('v9', 'KLM-123 - XAA-456', 'SZABÓ TRANS Kft.');
+  add('v10', 'AE BC-321 - XZZ 654', '');
+  add('v11', 'CHA 123', 'MOLDTRANS SRL');
+  const problems = await openApp(page, { data });
+  const band = t => page.locator('.lp', { hasText: t }).first();
+  await expect(band('AAKX 760').locator('.lp-band b')).toHaveText('HU');
+  await expect(band('AAKX 760')).toHaveAttribute('title', /Macaristan/);
+  await expect(band('KLM-123').locator('.lp-band b')).toHaveText('HU');
+  await expect(band('KLM-123').locator('.lp-cc2')).toHaveCount(0); // dorse de Macar
+  await expect(band('AE BC-321').locator('.lp-band b')).toHaveText('HU');
+  await expect(band('AE BC-321').locator('.lp-cc2')).toHaveCount(0);
+  await expect(band('CHA 123').locator('.lp-band b')).toHaveText('MD');
+  expect(problems).toEqual([]);
+});
+
+test('son hareketler: işlemi kimin yaptığı görünür', async ({ page }) => {
+  const data = sampleData();
+  data.visits.find(v => v.id === 'v7').updated_at = '2026-09-23T06:55:00Z';
+  data.app_settings.push({ key: 'display_names', value: { 'atakan@pcs.com': 'Atakan Kolbaşı' }, updated_at: '2026-09-01T08:00:00Z' });
+  const history = {
+    v7: [
+      { action: 'onsite_on', at: '2026-09-23T06:10:00Z', actor_email: 'mehmet@pcs.com' },
+      { action: 't1_on', at: '2026-09-23T06:55:00Z', actor_email: 'atakan@pcs.com' }
+    ],
+    v5: [{ action: 'onsite_on', at: '2026-09-23T05:05:00Z', actor_email: 'Güvenlik' }]
+  };
+  const problems = await openApp(page, { data, history });
+  const acts = page.locator('#side-activity .activity');
+  await expect(acts.first()).toContainText('T1 yazıldı');
+  await expect(acts.first().locator('.activity-who')).toHaveText('Atakan Kolbaşı');
+  await expect(acts.first()).toContainText('5 dk önce');
+  const v5 = page.locator('#side-activity .activity[data-id="v5"]');
+  await expect(v5).toContainText('Tesiste');
+  await expect(v5.locator('.activity-who')).toHaveText('Güvenlik');
+  // geçmişi olmayan araçta kişi satırı yok; aracın durumu gösterilir
+  await expect(page.locator('#side-activity .activity[data-id="v6"] .activity-who')).toHaveCount(0);
+  // geçmiş araç değişmedikçe yeniden sorulmaz
+  const asked = await page.evaluate(() => window.__calls.filter(c => c.rpc === 'visit_history').length);
+  expect(asked).toBeGreaterThan(0);
+  await page.locator('#board-search').fill('34');
+  await page.locator('#board-search').fill('');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.rpc === 'visit_history').length)).toBe(asked);
+  expect(problems).toEqual([]);
+});
+
 test('tarih yardımcıları', async ({ page }) => {
   await openApp(page, { session: false });
   const r = await page.evaluate(() => {
