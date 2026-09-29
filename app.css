@@ -2111,4 +2111,7 @@ html[data-theme="dark"] .guard-presets button.active{background:#2b4a7e;color:#f
  .guard-jump .coming{--col:#64748b}.guard-jump .inside{--col:#d97706}.guard-jump .ready{--col:#16a34a}
  html[data-theme="dark"] .guard-jump button{background:#1c1f26;border-color:#283649;border-top-color:var(--col);color:#dce1e9}}
 @media (max-width:760px){.guard-presets{width:100%;display:grid;grid-template-columns:1fr 1fr}}
+/* izleme linki (?guvenlik-izle=): yalnızca görüntüleme etiketi */
+.guard-view-pill{display:inline-block;margin-left:8px;vertical-align:middle;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#1e40af;background:#dbeafe;border-radius:999px;padding:3px 10px}
+html[data-theme="dark"] .guard-view-pill{color:#93c5fd;background:#172554}
 @media (max-width:760px){.guard .saha-grid{grid-template-columns:1fr}.guard-btn{min-height:48px;font-size:14px}.guard-btn svg{width:17px;height:17px}.guard .saha-tab{height:42px}}

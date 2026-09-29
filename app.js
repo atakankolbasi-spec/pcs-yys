@@ -228,7 +228,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -309,9 +309,11 @@ async function mutate(fn){
 }
 function dataView(){return `<section class="card"><h2>Ortak veriler</h2><p style="margin:15px 0">${state.registry.length} plaka · ${state.visits.length} geliş. Veriler Supabase üzerinde ortak saklanır. Günlük ve haftalık Excel dosyalarını Raporlar bölümünden indirebilirsiniz.</p>${button('backup','JSON kopyası indir','download','primary')}<p class="help-note">Bu dosya tüm geçmişin kopyasıdır. Toplu geri yükleme yönetici tarafından yapılır.</p></section>`;}
 var VIEW_TOKEN=(new URLSearchParams(location.search).get('izle')||'').trim();
-/* güvenlik linki (?guvenlik=ANAHTAR): giriş yapmadan yalnızca GİRİŞ / ÇIKIŞ ekranı */
-var GUARD_TOKEN=(new URLSearchParams(location.search).get('guvenlik')||'').trim();
-var prioDirty=false,appearanceDirty=false,publicLink='',guardLink='';
+/* güvenlik linki (?guvenlik=ANAHTAR): giriş yapmadan yalnızca GİRİŞ / ÇIKIŞ ekranı.
+   İzleme linki (?guvenlik-izle=ANAHTAR): aynı ekran, yalnızca görüntüleme (GİRİŞ / ÇIKIŞ yapamaz). */
+var GUARD_Q=new URLSearchParams(location.search),GUARD_MARK_TOKEN=(GUARD_Q.get('guvenlik')||'').trim();
+var GUARD_TOKEN=GUARD_MARK_TOKEN||(GUARD_Q.get('guvenlik-izle')||'').trim(),GUARD_VIEW=!!GUARD_TOKEN&&!GUARD_MARK_TOKEN;
+var prioDirty=false,appearanceDirty=false,publicLink='',guardLink='',guardViewLink='';
 const APP_FONTS={varsayilan:['Varsayılan · Roboto (siteye gömülü, her cihazda aynı)','"PCS Roboto",Roboto,"Segoe UI",Arial,sans-serif'],eski:['Eski varsayılan (Inter / Segoe UI)','Inter,"Segoe UI",Arial,sans-serif'],segoe:['Segoe UI','"Segoe UI",Arial,sans-serif'],segoevar:['Segoe UI Variable','"Segoe UI Variable Text","Segoe UI",sans-serif'],arial:['Arial','Arial,Helvetica,sans-serif'],arialnarrow:['Arial Narrow (dar)','"Arial Narrow",Arial,sans-serif'],verdana:['Verdana','Verdana,Geneva,sans-serif'],tahoma:['Tahoma','Tahoma,Verdana,sans-serif'],trebuchet:['Trebuchet MS','"Trebuchet MS",Arial,sans-serif'],calibri:['Calibri','Calibri,Carlito,Arial,sans-serif'],candara:['Candara','Candara,Calibri,sans-serif'],corbel:['Corbel','Corbel,Calibri,sans-serif'],bahnschrift:['Bahnschrift','Bahnschrift,"Segoe UI",sans-serif'],franklin:['Franklin Gothic','"Franklin Gothic Medium","Franklin Gothic",Arial,sans-serif'],century:['Century Gothic','"Century Gothic",Futura,Arial,sans-serif'],lucida:['Lucida Sans','"Lucida Sans Unicode","Lucida Grande",sans-serif'],gill:['Gill Sans','"Gill Sans MT","Gill Sans",Calibri,sans-serif'],georgia:['Georgia','Georgia,"Times New Roman",serif'],cambria:['Cambria','Cambria,Georgia,serif'],constantia:['Constantia','Constantia,Georgia,serif'],palatino:['Palatino','"Palatino Linotype",Palatino,Georgia,serif'],consolas:['Consolas (eş aralıklı)','Consolas,"Courier New",monospace'],courier:['Courier New (daktilo)','"Courier New",Courier,monospace']};
 const APP_PLATE_FONTS={ayni:['Genel yazı tipiyle aynı',''],...APP_FONTS,arialblack:['Arial Black (çok kalın)','"Arial Black",Arial,sans-serif']};
 const APP_WEIGHTS={ince:'İnce',normal:'Normal',bold:'Kalın',extra:'Çok kalın',black:'En kalın'};
@@ -368,6 +370,7 @@ function settingsView(){const a=appearance;const lbl=(o,k,d)=>{const v=o[k]||o[d
  ${setPanel('whatsapp','wa','WhatsApp',`${filled}/${names.length} müşterinin numarası kayıtlı · mesaj şablonu`,contactsEditor())}
  ${setPanel('link','search','Görüntüleme linki','Giriş gerektirmeyen, sadece izleme linki',linkEditor())}
  ${setPanel('guard','tablet','Güvenlik linki','Kapıdaki güvenlik için yalnızca GİRİŞ / ÇIKIŞ ekranı',guardLinkEditor())}
+ ${setPanel('guardview','search','Güvenlik ekranı izleme linki','Güvenlik ekranını yalnızca görüntüleme · GİRİŞ / ÇIKIŞ yapılamaz',guardViewLinkEditor())}
  </div>
  <div class="save-bar${appearanceDirty?' show':''}" id="save-bar" role="status"><span>${icon('info')}Görünüm ayarlarında kaydedilmemiş değişiklik var.</span>${button('app-cancel','Vazgeç')}${button('app-save','Kaydet','check','primary')}</div>`;}
 function updateSaveBar(){const b=document.getElementById('save-bar');if(b)b.classList.toggle('show',!!appearanceDirty);}
@@ -1176,16 +1179,17 @@ setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
    müşteri bazında kopyalanır / WhatsApp'ta paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
    (sunucu da aynı kuralları uygular). Liste 10 sn'de bir yenilenir. */
 const GUARD_UNDO_MS=15*60000,GUARD_POLL_MS=10000;
-const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0};
+const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true};
+const gView=()=>GUARD_VIEW||!guard.canMark; // izleme linki: GİRİŞ / ÇIKIŞ yok
 const gIn=v=>!!(v.onsite||v.onsite_at),gOut=v=>!!v.exit_at,gNow=()=>Date.now()+guard.skew;
 const gToday=()=>guard.today||localToday();
 function guardRange(){const f=guard.from||gToday();return {from:f,to:guard.to||f};}
 function guardWeek(){const t=gToday(),m=addDays(t,-((weekday(t)+6)%7));return {from:m,to:weekday(t)===0?t:addDays(m,5)};}
-const gCanMark=v=>!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&v.visit_date<=addDays(gToday(),1);
+const gCanMark=v=>!gView()&&!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&v.visit_date<=addDays(gToday(),1);
 async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
  try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
   const was=guard.loaded?new Map(guard.rows.map(v=>[v.id,!!v.done])):null;
-  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',at:timeNow()});
+  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',at:timeNow(),canMark:data?.can_mark!==false});
   if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());}
  catch(e){if(seq!==guard.seq)return;
   if(e?.code==='42501')guard.fatal='Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.';
@@ -1223,7 +1227,7 @@ function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardR
  <table class="gd-table"><thead><tr><th>PLAKA</th><th>TESİS GİRİŞ</th><th>İŞLEM BİTTİ</th><th>TESİS ÇIKIŞ</th><th>KALMA</th></tr></thead><tbody>${list.map(v=>`<tr><td>${plateHTML(v.plate,'sm')}</td><td class="gate-ts">${tsText(v.onsite_at)}</td><td class="gate-ts">${tsText(v.done_at)}</td><td class="gate-ts">${exitCell(v)}</td><td class="gate-dur">${esc(stayText(v))}</td></tr>`).join('')}</tbody></table></section>`).join('')
   +(rows.some(v=>!v.exit_at&&v.done_at)?'<p class="help-note">* Güvenlik çıkışı işlenmemiş; işlemlerin bittiği saat gösteriliyor.</p>':'')
   :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
-function renderGuard(){const app=document.getElementById('app');document.title='Güvenlik · PCS TRANSİT';
+function renderGuard(){const app=document.getElementById('app');document.title=gView()?'Güvenlik izleme · PCS TRANSİT':'Güvenlik · PCS TRANSİT';
  if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b></div></div>`;return;}
  const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange(),week=guardWeek();
  const match=v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q);
@@ -1244,12 +1248,12 @@ function renderGuard(){const app=document.getElementById('app');document.title='
   body=q&&!coming.length&&!inside.length&&!ready.length&&!justOut.length?`<div class="saha-empty">${icon('search')}<b>Eşleşen araç yok</b><small>Araç listede yoksa ofise haber verin.</small></div>`
    :`<nav class="guard-jump" aria-label="Bloklara git">${cols.map(([k,t,,,l])=>`<button type="button" class="${k}" data-action="guard-jump" data-k="${k}">${esc(t)}<b>${l.length}</b></button>`).join('')}</nav>
    <div class="guard-board">${cols.map(([k,t,sub,ic,l])=>`<section class="guard-col ${k}" id="guard-col-${k}" aria-label="${esc(t)}"><header class="guard-col-head"><span class="guard-col-ic">${ic}</span><div><b>${esc(t)}</b><small>${esc(sub)}</small></div><span class="guard-col-n">${l.length}</span></header>
-    <div class="guard-col-list">${l.length?cards(l):`<p class="guard-col-empty">${k==='coming'?'Gelecek araç yok':k==='inside'?'Tesiste araç yok':'Çıkışa hazır araç yok'}</p>`}${k==='ready'&&justOut.length?`<p class="guard-col-sep">Az önce çıkanlar · 15 dk geri alınabilir</p>${cards(justOut)}`:''}</div></section>`).join('')}</div>`;}
+    <div class="guard-col-list">${l.length?cards(l):`<p class="guard-col-empty">${k==='coming'?'Gelecek araç yok':k==='inside'?'Tesiste araç yok':'Çıkışa hazır araç yok'}</p>`}${k==='ready'&&justOut.length?`<p class="guard-col-sep">${gView()?'Az önce çıkanlar':'Az önce çıkanlar · 15 dk geri alınabilir'}</p>${cards(justOut)}`:''}</div></section>`).join('')}</div>`;}
  else{const l=(tab==='out'?list.filter(isOut).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at))):list.filter(isAll).sort(byTime));
   body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
  const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;
  const focus=document.activeElement?.id,sel=document.activeElement?.selectionStart;
- app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>Güvenlik · giriş-çıkış</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small></div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button></div></header>
+ app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>${gView()?'Güvenlik · izleme':'Güvenlik · giriş-çıkış'}</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small>${gView()?'<span class="guard-view-pill">Yalnızca görüntüleme</span>':''}</div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button></div></header>
  <div class="guard-bar"><div class="guard-dates" role="group" aria-label="Tarih aralığı"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="-1" aria-label="Önceki">${icon('left')}</button><input type="date" id="guard-from" value="${esc(from)}" max="${esc(addDays(today,7))}" aria-label="Başlangıç tarihi"><span>–</span><input type="date" id="guard-to" value="${esc(to)}" max="${esc(addDays(today,7))}" aria-label="Bitiş tarihi"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="1" aria-label="Sonraki">${icon('chevron')}</button></div>
  <div class="guard-presets" role="group" aria-label="Hızlı tarih seçimi">${[['guard-today','Bugün',from===today&&to===today],['guard-week','Bu hafta',from===week.from&&to===week.to]].map(([a,l,on])=>`<button type="button" class="${on?'active':''}" data-action="${a}" aria-pressed="${on}">${l}</button>`).join('')}</div>
  <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
@@ -1261,7 +1265,7 @@ function setGuardRange(f,t){const today=gToday();if(!validDate(f)||!validDate(t)
  if(t>addDays(today,7)){toast('İleri tarih en fazla 1 hafta seçilebilir.',true);return renderGuard();}
  if(f<addDays(today,-62)){toast('Güvenlik ekranında en fazla 2 ay öncesi gösterilir.',true);return renderGuard();}
  if(f===today&&t===today)guard.from=guard.to='';else{guard.from=f;guard.to=t;}guard.loaded=false;renderGuard();guardLoad();}
-async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guard.busy.has(id))return;guard.busy.add(id);renderGuard();
+async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guard.busy.has(id)||gView())return;guard.busy.add(id);renderGuard();
  try{const {data,error}=await client.rpc('guard_mark',{p_token:GUARD_TOKEN,p_visit_id:id,p_action:k});if(error)throw error;
   if(data&&typeof data==='object')Object.assign(v,data);justChangedMap.set(id,Date.now());guard.q='';
   toast(`${v.plate} ${{giris:'giriş yaptı, tesiste.',cikis:'çıkış yaptı.',giris_geri:'girişi geri alındı.',cikis_geri:'çıkışı geri alındı.'}[k]}`);}
@@ -1291,15 +1295,25 @@ document.addEventListener('change',e=>{if(!GUARD_TOKEN)return;const id=e.target.
 /* Ayarlar: güvenlik linki (yalnızca düzenleyici) */
 function guardLinkEditor(){if(role!=='editor'||VIEW_TOKEN)return '';
  return `<section class="card" style="margin-top:16px"><div class="card-header"><div><h2>Güvenlik linki</h2><p>Kapıdaki güvenlik görevlisi bu linki telefonunda ya da tabletinde açar; giriş yapmadan bugünün araçlarını görür ve yalnızca <b>GİRİŞ</b> ve <b>ÇIKIŞ</b> düğmelerine basabilir. GİRİŞ aracı TESİSTE yapar; ÇIKIŞ ayrı bir çıkış saati yazar, “işlemler bitti” saatine dokunmaz.</p></div></div><div class="link-row"><input id="guard-link" type="text" readonly value="${esc(guardLink)}" placeholder="Linki görmek için “Linki göster”e basın" aria-label="Güvenlik linki">${guardLink?button('glink-copy','Kopyala','doc'):button('glink-show','Linki göster','search','primary')}</div>${guardLink?`<div class="actions" style="margin-top:12px"><a class="btn" href="${esc(guardLink)}" target="_blank" rel="noopener">${icon('tablet')}Güvenlik ekranını aç</a>${button('glink-wa','WhatsApp ile gönder','wa')}</div>`:''}<p class="help-note" style="margin-top:10px">Güvenlik ekranı yalnızca plaka, müşteri ve saatleri görür; beyanname, nakliyeci ve ruhsat bilgilerini göremez. Link yanlış ellere geçerse “Yeni link oluştur” deyin; eski link o an çalışmaz olur.</p><div class="actions" style="margin-top:12px">${button('glink-rotate','Yeni link oluştur','refresh','danger')}</div></section>`;}
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="glink-"]');if(!b||b.disabled)return;const a=b.dataset.action;
- if(a==='glink-copy'){try{await navigator.clipboard.writeText(guardLink);toast('Güvenlik linki kopyalandı.');}catch(_){document.getElementById('guard-link')?.select();toast('Kopyalanamadı; linki seçip Ctrl+C ile kopyalayın.',true);}return;}
- if(a==='glink-wa')return waLaunch('',`PCS TRANSİT güvenlik giriş-çıkış ekranı:\n${guardLink}\n\nAraç kapıdan girince GİRİŞ, çıkınca ÇIKIŞ düğmesine basın.`);
+/* Ayarlar: güvenlik ekranı izleme linki (yalnızca görüntüleme; güvenlik linkinden ayrı anahtar) */
+function guardViewLinkEditor(){if(role!=='editor'||VIEW_TOKEN)return '';
+ return `<section class="card" style="margin-top:16px"><div class="card-header"><div><h2>Güvenlik ekranı izleme linki</h2></div></div><p class="help-note" style="margin:0 0 12px">Bu linki açan kişi güvenlik ekranını giriş yapmadan görür: gelecek, tesisteki ve çıkışa hazır araçlar, çıkanlar ve rapor. <b>GİRİŞ</b> ve <b>ÇIKIŞ</b> yapamaz. Güvenlik linkinden ayrıdır; biri yenilenince diğeri etkilenmez.</p><div class="link-row"><input id="guard-view-link" type="text" readonly value="${esc(guardViewLink)}" placeholder="Linki görmek için “Linki göster”e basın" aria-label="Güvenlik ekranı izleme linki">${guardViewLink?button('gvlink-copy','Kopyala','doc'):button('gvlink-show','Linki göster','search','primary')}</div>${guardViewLink?`<div class="actions" style="margin-top:12px"><a class="btn" href="${esc(guardViewLink)}" target="_blank" rel="noopener">${icon('tablet')}İzleme ekranını aç</a>${button('gvlink-wa','WhatsApp ile gönder','wa')}</div>`:''}<p class="help-note" style="margin-top:10px">Linki yalnızca görmesi gereken kişiye verin. Yanlış ellere geçerse “Yeni izleme linki” deyin; eski link o an çalışmaz olur.</p><div class="actions" style="margin-top:12px">${button('gvlink-rotate','Yeni izleme linki','refresh','danger')}</div></section>`;}
+const GLINK={
+ glink:{get:()=>guardLink,set:v=>{guardLink=v;},param:'guvenlik',rpc:['get_guard_link','rotate_guard_link'],copied:'Güvenlik linki kopyalandı.',
+  wa:l=>`PCS TRANSİT güvenlik giriş-çıkış ekranı:\n${l}\n\nAraç kapıdan girince GİRİŞ, çıkınca ÇIKIŞ düğmesine basın.`,
+  ask:'Yeni güvenlik linki oluşturulsun mu? Eski link hemen çalışmaz olur; güvenliğe yeni linki göndermeniz gerekir.',done:'Yeni güvenlik linki oluşturuldu; eski link artık çalışmıyor.'},
+ gvlink:{get:()=>guardViewLink,set:v=>{guardViewLink=v;},param:'guvenlik-izle',rpc:['get_guard_view_link','rotate_guard_view_link'],copied:'İzleme linki kopyalandı.',
+  wa:l=>`PCS TRANSİT kapı giriş-çıkış ekranı (yalnızca görüntüleme):\n${l}`,
+  ask:'Yeni izleme linki oluşturulsun mu? Eski izleme linki hemen çalışmaz olur; güvenlik linki etkilenmez.',done:'Yeni izleme linki oluşturuldu; eski izleme linki artık çalışmıyor.'}};
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="glink-"],[data-action^="gvlink-"]');if(!b||b.disabled)return;const [kind,a]=b.dataset.action.split('-'),L=GLINK[kind];if(!L)return;
+ if(a==='copy'){try{await navigator.clipboard.writeText(L.get());toast(L.copied);}catch(_){document.getElementById(kind==='glink'?'guard-link':'guard-view-link')?.select();toast('Kopyalanamadı; linki seçip Ctrl+C ile kopyalayın.',true);}return;}
+ if(a==='wa')return waLaunch('',L.wa(L.get()));
  if(!canEdit())return;
- if(a==='glink-rotate'&&!window.confirm('Yeni güvenlik linki oluşturulsun mu? Eski link hemen çalışmaz olur; güvenliğe yeni linki göndermeniz gerekir.'))return;
+ if(a==='rotate'&&!window.confirm(L.ask))return;
  busy=true;onlineUI();
- try{const {data,error}=await client.rpc(a==='glink-show'?'get_guard_link':'rotate_guard_link');if(error)throw error;if(!data)throw new Error('Link alınamadı.');
-  guardLink=location.origin+location.pathname+'?guvenlik='+encodeURIComponent(data);busy=false;render();if(a==='glink-rotate')toast('Yeni güvenlik linki oluşturuldu; eski link artık çalışmıyor.');}
- catch(err){toast(err?.code==='PGRST202'?'Önce guvenlik-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}
+ try{const {data,error}=await client.rpc(a==='show'?L.rpc[0]:L.rpc[1]);if(error)throw error;if(!data)throw new Error('Link alınamadı.');
+  L.set(location.origin+location.pathname+'?'+L.param+'='+encodeURIComponent(data));busy=false;render();if(a==='rotate')toast(L.done);}
+ catch(err){toast(err?.code==='PGRST202'?'Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.':friendly(err),true);}
  finally{busy=false;onlineUI();}});
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */

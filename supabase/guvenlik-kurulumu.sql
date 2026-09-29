@@ -11,6 +11,8 @@
 --    ve saatleri görür; beyanname, nakliyeci, ruhsat gibi bilgileri göremez. Tarih aralığı seçilebilir
 --    (en fazla 31 gün, en fazla 2 ay öncesi); işaretleme yalnızca son 7 gün ile yarın arasındaki araçlarda.
 -- 4) İşlem geçmişine çıkış kayıtları eklenir; güvenlikten yapılan işlemler "Güvenlik" adıyla görünür.
+-- 5) Güvenlik ekranı için ayrı bir "izleme linki": açan kişi ekranı görür ama GİRİŞ / ÇIKIŞ yapamaz.
+--    Anahtarı güvenlik linkinden ayrıdır; biri yenilenince diğeri etkilenmez.
 --
 -- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
 
@@ -30,6 +32,7 @@ create table if not exists private.guard_link (
   token text not null,
   created_at timestamptz not null default now()
 );
+alter table private.guard_link add column if not exists view_token text;
 revoke all on private.guard_link from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then execute 'revoke all on private.guard_link from anon'; end if;
@@ -65,9 +68,38 @@ begin
   return t;
 end $$;
 
+-- İzleme linkinin anahtarını göster (yoksa oluştur) / yenile: yalnızca düzenleyici
+create or replace function public.get_guard_view_link() returns text
+language plpgsql security definer set search_path = '' as $$
+declare t text;
+begin
+  if not coalesce((select private.is_editor()), false) then
+    raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501';
+  end if;
+  insert into private.guard_link (id, token) values (1, replace(gen_random_uuid()::text, '-', ''))
+  on conflict (id) do nothing;
+  update private.guard_link set view_token = replace(gen_random_uuid()::text, '-', '')
+  where id = 1 and view_token is null;
+  select g.view_token into t from private.guard_link g where g.id = 1;
+  return t;
+end $$;
+
+create or replace function public.rotate_guard_view_link() returns text
+language plpgsql security definer set search_path = '' as $$
+declare t text := replace(gen_random_uuid()::text, '-', '');
+begin
+  if not coalesce((select private.is_editor()), false) then
+    raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501';
+  end if;
+  insert into private.guard_link (id, token, view_token) values (1, replace(gen_random_uuid()::text, '-', ''), t)
+  on conflict (id) do update set view_token = excluded.view_token;
+  return t;
+end $$;
+
 -- Güvenlik ekranının listesi: seçilen tarih aralığının araçları (varsayılan bugün) + aralık bugünü
 -- kapsıyorsa son 7 günden girip henüz çıkmamış olanlar + önceki günlerden gelip bu aralıkta çıkanlar
 -- ("Çıkanlar"da görünsün, paylaşılabilsin). En fazla 31 günlük aralık, en fazla 2 ay öncesi.
+-- Güvenlik linki de izleme linki de listeyi görür; "can_mark" yalnızca güvenlik linkinde true'dur.
 drop function if exists public.guard_board(text);
 create or replace function public.guard_board(p_token text, p_from date default null, p_to date default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -75,8 +107,11 @@ declare
   today date := (now() at time zone 'Europe/Istanbul')::date;
   f date := coalesce(p_from, today);
   t date := coalesce(p_to, p_from, today);
+  can_mark boolean;
 begin
-  if p_token is null or not exists (select 1 from private.guard_link g where g.id = 1 and g.token = p_token) then
+  select g.token = p_token into can_mark from private.guard_link g
+  where g.id = 1 and p_token is not null and (g.token = p_token or g.view_token = p_token);
+  if can_mark is null then
     raise exception 'Güvenlik linki geçersiz' using errcode = '42501';
   end if;
   if t < f then raise exception 'Bitiş tarihi başlangıçtan önce olamaz' using errcode = '22023'; end if;
@@ -84,7 +119,7 @@ begin
   if f < today - 62 or t > today + 7 then raise exception 'Güvenlik ekranında en fazla 2 ay öncesi gösterilir' using errcode = '22023'; end if;
   return jsonb_build_object(
     'today', today, 'from', f, 'to', t,
-    'now', now(),
+    'now', now(), 'can_mark', can_mark,
     'visits', coalesce((
       select jsonb_agg(jsonb_build_object(
                'id', v.id, 'plate', v.plate, 'customer', v.customer, 'visit_date', v.visit_date,
@@ -139,15 +174,15 @@ begin
           from public.visits x where x.id = v.id);
 end $$;
 
-revoke all on function public.get_guard_link(), public.rotate_guard_link() from public;
+revoke all on function public.get_guard_link(), public.rotate_guard_link(), public.get_guard_view_link(), public.rotate_guard_view_link() from public;
 revoke all on function public.guard_board(text, date, date), public.guard_mark(text, text, text) from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    execute 'revoke all on function public.get_guard_link(), public.rotate_guard_link() from anon';
+    execute 'revoke all on function public.get_guard_link(), public.rotate_guard_link(), public.get_guard_view_link(), public.rotate_guard_view_link() from anon';
     execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text) to anon';
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
-    execute 'grant execute on function public.get_guard_link(), public.rotate_guard_link() to authenticated';
+    execute 'grant execute on function public.get_guard_link(), public.rotate_guard_link(), public.get_guard_view_link(), public.rotate_guard_view_link() to authenticated';
     execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text) to authenticated';
   end if;
 end $$;
@@ -229,10 +264,10 @@ notify pgrst, 'reload schema';
 select 'çıkış saati sütunu' as kontrol,
        case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'visits' and column_name = 'exit_at') then 'tamam' else 'EKSİK' end as durum
 union all
-select 'güvenlik fonksiyonları', case when count(*) = 4 then 'tamam' else 'EKSİK' end
+select 'güvenlik fonksiyonları', case when count(*) = 6 then 'tamam' else 'EKSİK' end
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname in ('get_guard_link', 'rotate_guard_link', 'guard_board', 'guard_mark')
+  where n.nspname = 'public' and p.proname in ('get_guard_link', 'rotate_guard_link', 'get_guard_view_link', 'rotate_guard_view_link', 'guard_board', 'guard_mark')
 union all
-select 'link anahtarı tablosu', case when to_regclass('private.guard_link') is not null then 'tamam' else 'EKSİK' end
+select 'link anahtarları (güvenlik + izleme)', case when exists (select 1 from information_schema.columns where table_schema = 'private' and table_name = 'guard_link' and column_name = 'view_token') then 'tamam' else 'EKSİK' end
 union all
 select 'işlem geçmişi (çıkış)', case when pg_get_functiondef('public.pcs_log_visit'::regproc) like '%exit_on%' then 'tamam' else 'EKSİK' end;

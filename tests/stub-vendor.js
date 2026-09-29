@@ -3,7 +3,8 @@
  *   { session: true|false, role: 'editor'|'viewer', data: {registry, visits, app_settings, incoming_ruhsat}, offline: false,
  *     files: { 'depo/yolu.png': base64 },   // storage.download için dosyalar
  *     missing: ['incoming_ruhsat'],         // "tablo yok" hatası veren tablolar (kurulum yapılmamış gibi)
- *     guardToken: 'g1', today: '2026-09-23' } // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
+ *     guardToken: 'g1', today: '2026-09-23',  // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
+ *     guardViewToken: 'gv1' }                  // güvenlik ekranı izleme linki (yalnızca görüntüleme)
  * Yapılan her çağrı window.__calls dizisine yazılır. */
 (() => {
   const cfg = window.__PCS_STUB || {};
@@ -129,8 +130,15 @@
         if (name === 'rotate_guard_link') cfg.guardToken = 'yeni' + Date.now();
         return { data: cfg.guardToken || 'g1', error: null };
       }
+      if (name === 'get_guard_view_link' || name === 'rotate_guard_view_link') {
+        if ((cfg.missing || []).includes('guard-view')) return guardErr('PGRST202', 'Could not find the function');
+        if (name === 'rotate_guard_view_link' || !cfg.guardViewToken) cfg.guardViewToken = 'izle' + Date.now();
+        return { data: cfg.guardViewToken, error: null };
+      }
       if (name === 'guard_board' || name === 'guard_mark') {
-        if (params.p_token !== cfg.guardToken) return guardErr('42501', 'Güvenlik linki geçersiz');
+        const canMark = !!cfg.guardToken && params.p_token === cfg.guardToken;
+        const viewOk = name === 'guard_board' && !!cfg.guardViewToken && params.p_token === cfg.guardViewToken;
+        if (!canMark && !viewOk) return guardErr('42501', 'Güvenlik linki geçersiz');
         const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
         const ymdIst = iso => new Date(Date.parse(iso) + 3 * 36e5).toISOString().slice(0, 10); // İstanbul (UTC+3) günü
         const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, exit_at: v.exit_at || null });
@@ -138,7 +146,7 @@
           if (cfg.guardOldSql && params.p_from) return guardErr('PGRST202', 'Could not find the function public.guard_board(p_from, p_to, p_token)');
           const f = params.p_from || today, t = params.p_to || f;
           if (t < f) return guardErr('22023', 'Bitiş tarihi başlangıçtan önce olamaz');
-          return { data: { today, from: f, to: t, now: now(), visits: db.visits.filter(v => (v.visit_date >= f && v.visit_date <= t) || (t >= today && v.visit_date >= back(7) && v.visit_date < f && v.onsite_at && !v.exit_at)
+          return { data: { today, from: f, to: t, now: now(), can_mark: canMark, visits: db.visits.filter(v => (v.visit_date >= f && v.visit_date <= t) || (t >= today && v.visit_date >= back(7) && v.visit_date < f && v.onsite_at && !v.exit_at)
             || (v.exit_at && v.visit_date < f && v.visit_date >= new Date(Date.parse(f) - 7 * 864e5).toISOString().slice(0, 10) && ymdIst(v.exit_at) >= f && ymdIst(v.exit_at) <= t)).map(pick) }, error: null };
         }
         const v = db.visits.find(x => x.id === params.p_visit_id && x.visit_date >= back(7) && x.visit_date <= back(-1));
