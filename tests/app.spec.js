@@ -557,7 +557,7 @@ test('güvenlik linki: her kartta GİRİŞ ve ÇIKIŞ yan yana; giriş tesiste y
   await expect(page.locator('#toast')).toContainText('giriş yaptı, tesiste');
   let v = await v6();
   expect([v.onsite, !!v.onsite_at, v.done, v.exit_at || null]).toEqual([true, true, false, null]);
-  await expect(card().locator('.guard-btn.in.done')).toContainText('GİRİŞ');
+  await expect(card().locator('.guard-btn.in.done')).toContainText('Giriş');
   await expect(card()).toContainText('İşlemleri sürüyor');
   await expect(card().locator('[data-k="giris_geri"]')).toBeVisible();
 
@@ -566,7 +566,7 @@ test('güvenlik linki: her kartta GİRİŞ ve ÇIKIŞ yan yana; giriş tesiste y
   await expect(page.locator('#toast')).toContainText('çıkış yaptı');
   v = await v6();
   expect([!!v.exit_at, v.done, v.done_at || null]).toEqual([true, false, null]);
-  await expect(card().locator('.guard-btn.out.done')).toContainText('ÇIKIŞ');
+  await expect(card().locator('.guard-btn.out.done')).toContainText('Çıkış');
   await page.locator('[data-action="guard-tab"][data-k="out"]').click();
   await expect(card()).toBeVisible();
   await card().locator('[data-k="cikis_geri"]').click();

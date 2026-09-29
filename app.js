@@ -1194,17 +1194,17 @@ async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){par
    ÇIKIŞ, giriş yapılmadan basılamaz. Eski günlerin araçlarında düğmeler yalnızca bilgi gösterir. */
 function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis=busy?' disabled':'',can=gCanMark(v);const {from}=guardRange();
  const recent=t=>t&&gNow()-Date.parse(t)<GUARD_UNDO_MS;
- const inBtn=inn?`<div class="guard-btn in done">${icon('check')}<span>GİRİŞ<small>${v.onsite_at?esc(tsTime(v.onsite_at)):'yapıldı'}</small></span></div>`
-  :can?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}"${dis}>${stIcon('onsite',true)}<span>GİRİŞ</span></button>`
-  :`<div class="guard-btn in off"><span>GİRİŞ<small>kayıt yok</small></span></div>`;
- const outBtn=out?`<div class="guard-btn out done">${icon('check')}<span>ÇIKIŞ<small>${esc(tsTime(v.exit_at))}</small></span></div>`
-  :can&&inn?`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}"${dis}>${icon('left')}<span>ÇIKIŞ</span></button>`
-  :`<div class="guard-btn out off" title="${can?'Önce GİRİŞ yapılmalı':''}"><span>ÇIKIŞ<small>${can?'önce giriş':inn?'içeride':'—'}</small></span></div>`;
+ const inBtn=inn?`<div class="guard-btn in done">${icon('check')}<span>Giriş</span><b>${v.onsite_at?esc(tsTime(v.onsite_at)):'✓'}</b></div>`
+  :can?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}"${dis}>${stIcon('onsite',true)}<span>Giriş</span></button>`
+  :`<div class="guard-btn in off"><span>Giriş</span><b>—</b></div>`;
+ const outBtn=out?`<div class="guard-btn out done">${icon('check')}<span>Çıkış</span><b>${esc(tsTime(v.exit_at))}</b></div>`
+  :can&&inn?`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}"${dis}><span>Çıkış</span>${icon('chevron')}</button>`
+  :`<div class="guard-btn out off" title="${can?'Önce GİRİŞ yapılmalı':''}"><span>Çıkış</span>${can?'<b>önce giriş</b>':''}</div>`;
  const undo=!can?'':out?(recent(v.exit_at)?'cikis_geri':''):inn&&recent(v.onsite_at)?'giris_geri':'';
  const showDate=v.visit_date&&(v.visit_date<from||guard.from);
- return `<article class="saha-card guard-card${out?' is-done':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate,'lg')}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
+ return `<article class="saha-card guard-card${out?' is-done':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate)}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
  <div class="saha-cust"><i></i>${esc(v.customer||'Müşterisiz')}</div>
- ${inn&&!out?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti, çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
+ ${inn&&!out?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti · çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
  <div class="guard-pair">${inBtn}${outBtn}</div>
  ${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}"${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</article>`;}
 /* Rapor: seçilen aralığın araçları müşteri bazında; panodaki "Günlük giriş – çıkış" penceresiyle aynı biçim */
