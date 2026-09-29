@@ -550,6 +550,9 @@ test('güvenlik linki: Bekleyenler üç blok; GİRİŞ aracı "Tesiste"ye geçir
   await expect(col('inside').locator('.guard-col-n')).toHaveText('2');
   await expect(col('ready').locator('.guard-col-n')).toHaveText('1');
   await expect(col('coming')).toContainText('CB 1234 AB');
+  // Ruhsat (kilo) kartta görünür; ruhsatı olmayan araçta etiket yok
+  await expect(page.locator('#guard-col-inside .guard-card', { hasText: '34 ABC 123' }).locator('.guard-reg')).toHaveText(/Ruhsat\s*15400 KG/i);
+  await expect(page.locator('.guard-card', { hasText: 'B 123 XYZ' }).locator('.guard-reg')).toHaveCount(0);
   // Girişten önce: GİRİŞ basılabilir, ÇIKIŞ basılamaz
   await expect(card().locator('button[data-k="giris"]')).toBeVisible();
   await expect(card().locator('button[data-k="cikis"]')).toHaveCount(0);

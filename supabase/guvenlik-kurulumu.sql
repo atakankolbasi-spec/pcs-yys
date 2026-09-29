@@ -7,8 +7,8 @@
 -- 3) Güvenlik ekranı yalnızca iki şey yapabilir:
 --      GİRİŞ  -> araç TESİSTE olur, giriş saati yazılır
 --      ÇIKIŞ  -> çıkış saati yazılır
---    Yanlış basılan düğme 15 dakika içinde geri alınabilir. Güvenlik ekranı yalnızca plaka, müşteri
---    ve saatleri görür; beyanname, nakliyeci, ruhsat gibi bilgileri göremez. Tarih aralığı seçilebilir
+--    Yanlış basılan düğme 15 dakika içinde geri alınabilir. Güvenlik ekranı yalnızca plaka, müşteri,
+--    ruhsat (kilo) ve saatleri görür; beyanname ve nakliyeci bilgilerini göremez. Tarih aralığı seçilebilir
 --    (en fazla 31 gün, en fazla 2 ay öncesi); işaretleme yalnızca son 7 gün ile yarın arasındaki araçlarda.
 -- 4) İşlem geçmişine çıkış kayıtları eklenir; güvenlikten yapılan işlemler "Güvenlik" adıyla görünür.
 -- 5) Güvenlik ekranı için ayrı bir "izleme linki": açan kişi ekranı görür ama GİRİŞ / ÇIKIŞ yapamaz.
@@ -122,7 +122,7 @@ begin
     'now', now(), 'can_mark', can_mark,
     'visits', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'id', v.id, 'plate', v.plate, 'customer', v.customer, 'visit_date', v.visit_date,
+               'id', v.id, 'plate', v.plate, 'customer', v.customer, 'registration', v.registration, 'visit_date', v.visit_date,
                'visit_time', v.visit_time, 'onsite', v.onsite, 'onsite_at', v.onsite_at,
                'done', v.done, 'done_at', v.done_at, 'exit_at', v.exit_at)
              order by v.visit_date, v.visit_time nulls last, v.plate)
