@@ -908,8 +908,13 @@ function ocrWorker(){
   ocrWorkerP.catch(()=>{ocrWorkerP=null;});}
  return ocrWorkerP;}
 /* Okumadan önce: büyüt, griye çevir, kontrastı ger, hafif keskinleştir (küçük yazılar daha iyi okunur). */
-async function ruhsatEnhance(file){const bmp=await createImageBitmap(file);const sc=Math.min(3,Math.max(1,3000/bmp.width)),w=Math.round(bmp.width*sc),h=Math.round(bmp.height*sc);
- const cv=document.createElement('canvas');cv.width=w;cv.height=h;const cx=cv.getContext('2d',{willReadFrequently:true});cx.imageSmoothingQuality='high';cx.drawImage(bmp,0,0,w,h);if(bmp.close)bmp.close();
+/* rot: fotoğrafı saat yönünde kaç derece döndürerek okuyacağımız (0, 90, 180, 270) */
+function ruhsatDraw(bmp,rot,sc){const bw=rot%180?bmp.height:bmp.width,bh=rot%180?bmp.width:bmp.height,w=Math.round(bw*sc),h=Math.round(bh*sc);
+ const cv=document.createElement('canvas');cv.width=w;cv.height=h;const cx=cv.getContext('2d',{willReadFrequently:true});cx.imageSmoothingQuality='high';
+ cx.translate(w/2,h/2);cx.rotate(rot*Math.PI/180);cx.drawImage(bmp,-bmp.width*sc/2,-bmp.height*sc/2,bmp.width*sc,bmp.height*sc);cx.setTransform(1,0,0,1,0,0);return {cv,cx,w,h};}
+async function ruhsatRotated(file,rot){if(!rot)return file;const bmp=await createImageBitmap(file);const {cv}=ruhsatDraw(bmp,rot,1);if(bmp.close)bmp.close();return cv;}
+async function ruhsatEnhance(file,rot=0){const bmp=await createImageBitmap(file);const sc=Math.min(3,Math.max(1,3000/(rot%180?bmp.height:bmp.width)));
+ const {cv,cx,w,h}=ruhsatDraw(bmp,rot,sc);if(bmp.close)bmp.close();
  const img=cx.getImageData(0,0,w,h),d=img.data,n=w*h,g=new Float32Array(n),hist=new Uint32Array(256);
  for(let i=0,j=0;i<n;i++,j+=4){const v=(d[j]*299+d[j+1]*587+d[j+2]*114)/1000;g[i]=v;hist[v|0]++;}
  let lo=0,hi=255,acc=0;while(lo<254&&(acc+=hist[lo])<n*0.01)lo++;acc=0;while(hi>lo+1&&(acc+=hist[hi])<n*0.01)hi--;const k=255/(hi-lo);
@@ -973,7 +978,7 @@ function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor'||it.stat
  return h;}
 function ruhsatStatusText(it){return it.status==='uzakta'?'Başka bir ekranda okunuyor':it.status==='sirada'?'Sırada':it.status==='okunuyor'?`${it.phase||'Okunuyor'}${it.progress?` · %${it.progress}`:''}`:it.status==='hata'?`Okunamadı: ${it.error}`:it.status==='eklendi'?(it.dup?'✓ Bu gün zaten panodaydı, tekrar eklenmedi':`✓ Panoya eklendi${it.wa?' · '+fmt(waDate(it.wa),{weekday:'long',day:'numeric',month:'long'}):''}`):'Okundu';}
 function ruhsatCard(it){const ready=it.status==='tamam'||it.status==='hata';
- return `<article class="rs-item${it.status==='eklendi'?' is-done':''}${it.wa?' is-wa':''}" id="${it.id}">${it.url?`<img class="rs-thumb" src="${it.url}" alt="Ruhsat fotoğrafı">`:`<div class="rs-thumb rs-thumb-empty">${icon('wa')}</div>`}<div class="rs-main">${it.wa?waSource(it.wa):''}<div class="rs-status ${it.status}">${esc(ruhsatStatusText(it))}</div>${ready?`<div class="rs-fields"><label>Çekici<input data-rs="${it.id}" data-k="tractor" value="${esc(fmtCompactPlate(it.tractor))}" maxlength="15" autocomplete="off" spellcheck="false"></label><label>Dorse<input data-rs="${it.id}" data-k="trailer" value="${esc(fmtCompactPlate(it.trailer))}" maxlength="15" autocomplete="off" spellcheck="false"></label></div>`:''}<div class="rs-info">${ruhsatInfo(it)}</div></div></article>`;}
+ return `<article class="rs-item${it.status==='eklendi'?' is-done':''}${it.wa?' is-wa':''}" id="${it.id}">${it.url?`<img class="rs-thumb" src="${it.url}" alt="Ruhsat fotoğrafı"${it.rot?` style="transform:rotate(${it.rot}deg)"`:''}>`:`<div class="rs-thumb rs-thumb-empty">${icon('wa')}</div>`}<div class="rs-main">${it.wa?waSource(it.wa):''}<div class="rs-status ${it.status}">${esc(ruhsatStatusText(it))}</div>${ready?`<div class="rs-fields"><label>Çekici<input data-rs="${it.id}" data-k="tractor" value="${esc(fmtCompactPlate(it.tractor))}" maxlength="15" autocomplete="off" spellcheck="false"></label><label>Dorse<input data-rs="${it.id}" data-k="trailer" value="${esc(fmtCompactPlate(it.trailer))}" maxlength="15" autocomplete="off" spellcheck="false"></label></div>`:''}<div class="rs-info">${ruhsatInfo(it)}</div></div></article>`;}
 function ruhsatListHTML(){const own=ruhsat.items.filter(x=>!x.wa);return own.length?`<p class="rs-day">Araçlar <b>${esc(fmt(defaultDate(),{weekday:'long',day:'numeric',month:'long'}))}</b> gününe eklenir.</p>${own.map(ruhsatCard).join('')}`:'';}
 /* WhatsApp'tan gelenler pencerenin en üstünde durur; kontrol bekleyen varsa ilk o görülsün. */
 function waListHTML(){const wa=ruhsat.items.filter(x=>x.wa);return wa.length?`<p class="rs-day rs-wa-head">${icon('wa')}<b>WhatsApp'tan gelenler</b> · kayıtlı araçlar panoya kendiliğinden eklenir, diğerleri burada kontrol bekler.</p>${wa.map(ruhsatCard).join('')}`:'';}
@@ -996,12 +1001,20 @@ function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=docu
  ruhsatRefresh();ruhsatRun();}
 async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada'&&(!x.wa||ruhsatAllowed()))))await (it.wa?waProcess(it):ruhsatProcess(it));}finally{ruhsat.running=false;}}
 async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunuyor':'Okuma programı hazırlanıyor (ilk kullanımda ~6 MB iner)';ruhsatUpdateCard(it);
- const texts=[];let last=0;
- ocrOnProgress=m=>{const p=m.status==='recognizing text'?Math.round((texts.length+m.progress)/2*100):Math.round(m.progress*100);if(Date.now()-last<250&&p<100)return;last=Date.now();it.progress=p;const el=document.querySelector(`#${it.id} .rs-status`);if(el)el.textContent=ruhsatStatusText(it);};
+ const texts=[];let last=0,done=0,total=2;
+ const status=()=>{const el=document.querySelector(`#${it.id} .rs-status`);if(el)el.textContent=ruhsatStatusText(it);};
+ ocrOnProgress=m=>{const p=m.status==='recognizing text'?Math.round((done+m.progress)/total*100):Math.round(m.progress*100);if(Date.now()-last<250&&p<100)return;last=Date.now();it.progress=p;status();};
  try{const w=await ocrWorker();it.phase='Okunuyor';
-  const cv=await ruhsatEnhance(it.file);it.size=[Math.round(cv.srcW),Math.round(cv.srcH)];
-  texts.push((await w.recognize(cv)).data.text);
-  texts.push((await w.recognize(it.file)).data.text);
+  const pass=async rot=>{const cv=await ruhsatEnhance(it.file,rot),d=(await w.recognize(cv)).data;done++;return {rot,cv,text:d.text,conf:+d.confidence||0};};
+  /* Yan ya da ters çekilmiş fotoğraf: düz okunduğunda plaka çıkmıyorsa ya da okuma güveni düşükse fotoğraf
+     döndürülerek yeniden okunur, en güvenli okunan yön kullanılır (doğru yönde güven belirgin biçimde yükselir). */
+  let best=await pass(0);
+  if(!(ruhsatPlates(best.text).length&&best.conf>=40)){total=5;it.phase='Fotoğraf yan çekilmiş olabilir, döndürülüp okunuyor';status();
+   for(const rot of [270,90,180]){const r=await pass(rot);if(r.conf>best.conf)best=r;if(r.conf>=50&&ruhsatPlates(r.text).length)break;}
+   total=done+1;it.phase='Okunuyor';}
+  it.rot=best.rot;it.size=[Math.round(best.cv.srcW),Math.round(best.cv.srcH)];
+  texts.push(best.text);
+  texts.push((await w.recognize(await ruhsatRotated(it.file,best.rot))).data.text);
   const [a,b]=texts,ca=ruhsatPlates(a),cands=[...ca,...ruhsatPlates(b).filter(x=>!ca.includes(x))];
   const wa=ruhsatWeights(a),wb=ruhsatWeights(b);let ws=wa.length===2?wa:wb.length===2?wb:[...new Set([...wa,...wb])];if(ws.length>2)ws=[];
   Object.assign(it,{weights:ws,sum:ws.length===2?ws[0]+ws[1]:null},ruhsatResolve(cands,ruhsatKinds(b,ruhsatKinds(a,{}))));it.status='tamam';}

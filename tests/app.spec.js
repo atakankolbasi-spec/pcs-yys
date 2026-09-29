@@ -264,6 +264,35 @@ test('ruhsattan ekle: kayıtlı araç tek tıkla, yeni araç formla eklenir', as
   expect(problems).toEqual([]);
 });
 
+// Görüntüyü saat yönünde döndürür (yan çekilmiş fotoğraf gibi).
+async function rotateImage(browser, buf, deg) {
+  const p = await browser.newPage();
+  const b64 = await p.evaluate(async ({ src, deg }) => {
+    const img = new Image(); img.src = src; await img.decode();
+    const c = document.createElement('canvas'); const side = deg % 180 !== 0;
+    c.width = side ? img.height : img.width; c.height = side ? img.width : img.height;
+    const x = c.getContext('2d'); x.translate(c.width / 2, c.height / 2); x.rotate(deg * Math.PI / 180); x.drawImage(img, -img.width / 2, -img.height / 2);
+    return c.toDataURL('image/png').split(',')[1];
+  }, { src: 'data:image/png;base64,' + buf.toString('base64'), deg });
+  await p.close();
+  return Buffer.from(b64, 'base64');
+}
+
+test('yan çekilmiş ruhsat fotoğrafı döndürülüp okunur', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: 'KARGO SRL', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  const yan = await rotateImage(browser, await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]), 90);
+  await openApp(page, { data });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await page.locator('#ruhsat-file').setInputFiles([{ name: 'yan.png', mimeType: 'image/png', buffer: yan }]);
+  await expect(page.locator('.rs-status.tamam')).toHaveCount(1, { timeout: 120000 });
+  const card = page.locator('.rs-item');
+  await expect(card).toContainText('RUHSAT LOJ');
+  await expect(card).toContainText('8150 kg + 6700 kg = 14850 kg');
+  await expect(card.locator('.rs-thumb')).toHaveAttribute('style', /rotate\(270deg\)/);
+});
+
 test('ruhsat okuma: harf sanılan rakam düzelir, çekici/dorse cins yazısından ayrılır', async ({ page }) => {
   const data = sampleData();
   data.registry.push({ id: 'r6', plate: 'PB 9876 TT - PB 1111 AA', customer: 'ÖRNEK LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
