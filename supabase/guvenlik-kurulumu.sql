@@ -8,7 +8,8 @@
 --      GİRİŞ  -> araç TESİSTE olur, giriş saati yazılır
 --      ÇIKIŞ  -> çıkış saati yazılır
 --    Yanlış basılan düğme 15 dakika içinde geri alınabilir. Güvenlik ekranı yalnızca plaka, müşteri
---    ve saatleri görür; beyanname, nakliyeci, ruhsat gibi bilgileri göremez.
+--    ve saatleri görür; beyanname, nakliyeci, ruhsat gibi bilgileri göremez. Tarih aralığı seçilebilir
+--    (en fazla 31 gün, en fazla 2 ay öncesi); işaretleme yalnızca son 7 gün ile yarın arasındaki araçlarda.
 -- 4) İşlem geçmişine çıkış kayıtları eklenir; güvenlikten yapılan işlemler "Güvenlik" adıyla görünür.
 --
 -- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
@@ -64,16 +65,24 @@ begin
   return t;
 end $$;
 
--- Güvenlik ekranının listesi: bugünün araçları + son 3 günden girip henüz çıkmamış olanlar
-create or replace function public.guard_board(p_token text) returns jsonb
+-- Güvenlik ekranının listesi: seçilen tarih aralığının araçları (varsayılan bugün) + aralık bugünü
+-- kapsıyorsa son 7 günden girip henüz çıkmamış olanlar. En fazla 31 günlük aralık, en fazla 2 ay öncesi.
+drop function if exists public.guard_board(text);
+create or replace function public.guard_board(p_token text, p_from date default null, p_to date default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare today date := (now() at time zone 'Europe/Istanbul')::date;
+declare
+  today date := (now() at time zone 'Europe/Istanbul')::date;
+  f date := coalesce(p_from, today);
+  t date := coalesce(p_to, p_from, today);
 begin
   if p_token is null or not exists (select 1 from private.guard_link g where g.id = 1 and g.token = p_token) then
     raise exception 'Güvenlik linki geçersiz' using errcode = '42501';
   end if;
+  if t < f then raise exception 'Bitiş tarihi başlangıçtan önce olamaz' using errcode = '22023'; end if;
+  if t - f > 31 then raise exception 'En fazla 31 günlük aralık seçilebilir' using errcode = '22023'; end if;
+  if f < today - 62 or t > today + 7 then raise exception 'Güvenlik ekranında en fazla 2 ay öncesi gösterilir' using errcode = '22023'; end if;
   return jsonb_build_object(
-    'today', today,
+    'today', today, 'from', f, 'to', t,
     'now', now(),
     'visits', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -82,8 +91,8 @@ begin
                'done', v.done, 'done_at', v.done_at, 'exit_at', v.exit_at)
              order by v.visit_date, v.visit_time nulls last, v.plate)
       from public.visits v
-      where v.visit_date = today
-         or (v.visit_date >= today - 3 and v.visit_date < today and v.onsite_at is not null and v.exit_at is null)
+      where v.visit_date between f and t
+         or (t >= today and v.visit_date >= today - 7 and v.visit_date < f and v.onsite_at is not null and v.exit_at is null)
     ), '[]'::jsonb));
 end $$;
 
@@ -97,7 +106,8 @@ begin
   if p_token is null or not exists (select 1 from private.guard_link g where g.id = 1 and g.token = p_token) then
     raise exception 'Güvenlik linki geçersiz' using errcode = '42501';
   end if;
-  select * into v from public.visits x where x.id::text = p_visit_id and x.visit_date between today - 3 and today for update;
+  -- yalnızca son 7 gün ile yarın arasındaki araçlar işaretlenebilir
+  select * into v from public.visits x where x.id::text = p_visit_id and x.visit_date between today - 7 and today + 1 for update;
   if not found then raise exception 'Araç bulunamadı' using errcode = 'P0002'; end if;
   perform set_config('pcs.actor', 'Güvenlik', true);
 
@@ -127,15 +137,15 @@ begin
 end $$;
 
 revoke all on function public.get_guard_link(), public.rotate_guard_link() from public;
-revoke all on function public.guard_board(text), public.guard_mark(text, text, text) from public;
+revoke all on function public.guard_board(text, date, date), public.guard_mark(text, text, text) from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     execute 'revoke all on function public.get_guard_link(), public.rotate_guard_link() from anon';
-    execute 'grant execute on function public.guard_board(text), public.guard_mark(text, text, text) to anon';
+    execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text) to anon';
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     execute 'grant execute on function public.get_guard_link(), public.rotate_guard_link() to authenticated';
-    execute 'grant execute on function public.guard_board(text), public.guard_mark(text, text, text) to authenticated';
+    execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text) to authenticated';
   end if;
 end $$;
 
