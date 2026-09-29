@@ -163,7 +163,7 @@
       }
       if (name === 'current_app_role') return { data: cfg.role || 'editor', error: null };
       if (name === 'list_backups') return { data: [{ id: 1, taken_at: now() }], error: null };
-      if (name === 'visit_history') return { data: [], error: null };
+      if (name === 'visit_history') return { data: (cfg.history || {})[params.p_visit_id] || [], error: null };
       return { data: null, error: null };
     }
   });

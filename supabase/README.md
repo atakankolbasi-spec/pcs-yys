@@ -74,6 +74,8 @@ order by 1;
 
 İşlem geçmişinde kullanıcı adları daha önce kodun içine sabit yazılmıştı; artık `app_settings`
 tablosundaki `display_names` ayarından okunuyor. Ayar yoksa e-postanın `@` öncesi gösterilir.
+Panodaki **Son hareketler** listesi de işlemi kimin yaptığını bu adlarla gösterir (işlem geçmişinden okunur;
+güvenlik ekranından yapılanlar "Güvenlik" yazılır).
 Kendi e-posta adreslerinizle bir kez çalıştırın:
 
 ```sql

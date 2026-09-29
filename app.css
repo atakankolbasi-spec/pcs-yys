@@ -932,6 +932,9 @@ html:not(.is-editor) .vc-next:not(.finished),html:not(.is-editor) .vcard .row-se
 .activity span{display:flex;flex-direction:column;gap:2px;min-width:0}
 .activity b{font-size:12px;font-weight:800}
 .activity small{font-size:11px;color:#6b7a90}
+.activity-list{display:flex;flex-direction:column;gap:12px}
+.activity-who{display:inline-flex;align-items:center;gap:4px;margin-top:1px;font-style:normal;font-size:11px;font-weight:700;color:#3e4c63}
+.activity-who svg{width:12px;height:12px;stroke-width:2.2}
 .activity:hover b{text-decoration:underline}
 @media(max-width:1439px){.board-layout{grid-template-columns:minmax(0,1fr)}.side-panel{display:none}}
 
@@ -1807,6 +1810,7 @@ html[data-theme="dark"] .check-native:focus-visible+.flow-step{outline:2px solid
 html[data-theme="dark"] .side-empty{color:#cacfd7}
 html[data-theme="dark"] .activity{border:0;background:none}
 html[data-theme="dark"] .activity small{color:#cacfd7}
+html[data-theme="dark"] .activity-who{color:#e6ebf2}
 }html[data-theme="dark"] .hdr-btn{border:1px solid #232f42;background:#1c1f26;color:#dce1e9}
 html[data-theme="dark"] .hdr-btn:hover{border-color:#313f55;background:#20242c;color:#eef1f6}
 html[data-theme="dark"] .notif-count{background:#d97706;color:#fff;border:2px solid #1c1f26}
