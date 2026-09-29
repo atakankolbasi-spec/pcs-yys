@@ -1170,42 +1170,78 @@ setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
    Giriş yapmadan açılır; güvenlik yalnızca plaka, müşteri ve saatleri görür, yalnızca iki şey yapabilir:
      GİRİŞ -> araç TESİSTE olur, giriş saati yazılır
      ÇIKIŞ -> ayrı bir çıkış saati yazılır ("işlemler bitti" saatine dokunulmaz)
-   Yanlış basılan düğme 15 dakika içinde geri alınabilir (sunucu da aynı kuralı uygular). Liste 10 sn'de bir yenilenir. */
+   "Bekleyenler" tek ekranda giriş bekleyenleri ve içeride olup çıkış bekleyenleri gösterir. Tarih aralığı
+   seçilebilir (en fazla 31 gün); "Rapor" sekmesinden giriş-çıkışlar müşteri bazında kopyalanır / WhatsApp'ta
+   paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
+   (sunucu da aynı kuralları uygular). Liste 10 sn'de bir yenilenir. */
 const GUARD_UNDO_MS=15*60000,GUARD_POLL_MS=10000;
-const guard={rows:[],today:'',skew:0,loaded:false,error:'',fatal:'',busy:new Set(),q:'',tab:'wait',at:''};
+const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0};
 const gIn=v=>!!(v.onsite||v.onsite_at),gOut=v=>!!v.exit_at,gNow=()=>Date.now()+guard.skew;
-async function guardLoad(){
- try{const {data,error}=await client.rpc('guard_board',{p_token:GUARD_TOKEN});if(error)throw error;
+const gToday=()=>guard.today||localToday();
+function guardRange(){const f=guard.from||gToday();return {from:f,to:guard.to||f};}
+const gCanMark=v=>!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&v.visit_date<=addDays(gToday(),1);
+async function guardLoad(){const params={p_token:GUARD_TOKEN};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
+ try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
   Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',at:timeNow()});}
- catch(e){if(e?.code==='42501')guard.fatal='Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.';
+ catch(e){if(seq!==guard.seq)return;
+  if(e?.code==='42501')guard.fatal='Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.';
+  else if(e?.code==='PGRST202'&&guard.from){guard.from=guard.to='';toast('Tarih seçimi için ofisin Supabase’de guvenlik-kurulumu.sql dosyasının yeni halini çalıştırması gerekiyor.',true);return guardLoad();}
   else if(e?.code==='PGRST202')guard.fatal='Güvenlik ekranı henüz kurulmadı. Ofis, Supabase’de guvenlik-kurulumu.sql dosyasını çalıştırmalı.';
+  else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
   else guard.error=isNetErr(e)?'İnternet bağlantısı yok. Bağlantı gelince liste kendiliğinden yenilenir.':'Liste yenilenemedi: '+(e?.message||e);}
  renderGuard();}
-function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),old=v.visit_date&&guard.today&&v.visit_date<guard.today,dis=busy?'disabled':'';
- const undo=out?(gNow()-Date.parse(v.exit_at)<GUARD_UNDO_MS?'cikis_geri':''):inn&&v.onsite_at&&gNow()-Date.parse(v.onsite_at)<GUARD_UNDO_MS?'giris_geri':'';
- const act=!inn?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}" ${dis}>${stIcon('onsite',true)}GİRİŞ</button>`
-  :!out?`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}" ${dis}>${icon('left')}ÇIKIŞ</button>`
-  :`<div class="guard-left">${icon('check')}Çıktı · ${esc(tsTime(v.exit_at))}</div>`;
- return `<article class="saha-card guard-card${out?' is-done':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate,'lg')}${old?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
+function guardCard(v){const busy=guard.busy.has(v.id),inn=gIn(v),out=gOut(v),dis=busy?'disabled':'',can=gCanMark(v);const {from}=guardRange();
+ const undo=!can?'':out?(gNow()-Date.parse(v.exit_at)<GUARD_UNDO_MS?'cikis_geri':''):inn&&v.onsite_at&&gNow()-Date.parse(v.onsite_at)<GUARD_UNDO_MS?'giris_geri':'';
+ const act=out?`<div class="guard-left">${icon('check')}Çıktı · ${esc(tsTime(v.exit_at))}</div>`
+  :!can?`<div class="guard-left muted">${inn?'İçeride':'Giriş kaydı yok'}</div>`
+  :!inn?`<button type="button" class="guard-btn in" data-action="guard-mark" data-k="giris" data-id="${esc(v.id)}" ${dis}>${stIcon('onsite',true)}GİRİŞ</button>`
+  :`<button type="button" class="guard-btn out" data-action="guard-mark" data-k="cikis" data-id="${esc(v.id)}" ${dis}>${icon('left')}ÇIKIŞ</button>`;
+ const showDate=v.visit_date&&(v.visit_date<from||guard.from);
+ return `<article class="saha-card guard-card${out?' is-done':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate,'lg')}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
  <div class="saha-cust"><i></i>${esc(v.customer||'Müşterisiz')}</div>
  <div class="guard-times"><span><small>Giriş</small><b>${v.onsite_at?esc(tsTime(v.onsite_at)):'—'}</b></span><span><small>Çıkış</small><b>${v.exit_at?esc(tsTime(v.exit_at)):'—'}</b></span></div>
  ${inn&&!out?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti, çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
  <div class="guard-acts">${act}${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}" ${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</div></article>`;}
+function guardSection(cls,ic,title,list,empty){return `<section class="guard-sec"><h2 class="guard-sec-h ${cls}">${ic}${title}<b>${list.length}</b></h2>${list.length?`<div class="saha-grid">${list.map(guardCard).join('')}</div>`:`<p class="guard-sec-empty">${empty}</p>`}</section>`;}
+/* Rapor: seçilen aralığın araçları müşteri bazında; panodaki "Günlük giriş – çıkış" penceresiyle aynı biçim */
+function guardRepRows(st,cust){const {from,to}=guardRange(),q=norm(guard.q);
+ return guard.rows.filter(v=>v.visit_date>=from&&v.visit_date<=to&&(cust==null||(v.customer||'')===cust)&&(!q||norm(v.plate).includes(q)||norm(v.customer).includes(q))&&(!st||(st==='out'?!!outAt(v):st==='in'?!!v.onsite_at&&!outAt(v):true)))
+  .sort((a,b)=>(a.customer||'').localeCompare(b.customer||'','tr')||a.visit_date.localeCompare(b.visit_date)||String(a.onsite_at||'~').localeCompare(String(b.onsite_at||'~'))||a.plate.localeCompare(b.plate));}
+function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardRepRows(st);const groups=new Map();for(const v of rows){const k=v.customer||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(v);}
+ const chip=(k,l,n)=>`<button type="button" class="reg-cc${st===k?' active':''}" data-action="guard-rep-st" data-st="${k}" aria-pressed="${st===k}">${l} <b>${n}</b></button>`;
+ return `<div class="guard-rep"><div class="guard-rep-bar"><div class="reg-countries" role="group" aria-label="Duruma göre süz">${chip('','Tümü',all.length)}${chip('out','Çıkış yapanlar',all.filter(v=>outAt(v)).length)}${chip('in','Hâlâ içeride',all.filter(v=>v.onsite_at&&!outAt(v)).length)}</div>${rows.length?`<div class="gd-acts"><button type="button" class="btn" data-action="guard-rep-copy">${icon('copy')}Tümünü kopyala (${rows.length})</button><button type="button" class="btn gate-wa" data-action="guard-rep-wa">${icon('wa')}Tümünü WhatsApp’ta paylaş</button></div>`:''}</div>
+ ${rows.length?[...groups.entries()].map(([c,list])=>`<section class="gd-group" style="--bc:${custColor(c)}"><header><span class="gd-dot"></span><b>${esc(c||'Müşterisiz')}</b><small>${list.length} araç</small><span class="gd-acts"><button type="button" class="btn small" data-action="guard-rep-copy" data-cust="${esc(c)}">${icon('copy')}Kopyala</button><button type="button" class="btn small gate-wa" data-action="guard-rep-wa" data-cust="${esc(c)}">${icon('wa')}WhatsApp</button></span></header>
+ <table class="gd-table"><thead><tr><th>PLAKA</th><th>TESİS GİRİŞ</th><th>İŞLEM BİTTİ</th><th>TESİS ÇIKIŞ</th><th>KALMA</th></tr></thead><tbody>${list.map(v=>`<tr><td>${plateHTML(v.plate,'sm')}</td><td class="gate-ts">${tsText(v.onsite_at)}</td><td class="gate-ts">${tsText(v.done_at)}</td><td class="gate-ts">${exitCell(v)}</td><td class="gate-dur">${esc(stayText(v))}</td></tr>`).join('')}</tbody></table></section>`).join('')
+  +(rows.some(v=>!v.exit_at&&v.done_at)?'<p class="help-note">* Güvenlik çıkışı işlenmemiş; işlemlerin bittiği saat gösteriliyor.</p>':'')
+  :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
 function renderGuard(){const app=document.getElementById('app');document.title='Güvenlik · PCS TRANSİT';
  if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b></div></div>`;return;}
- const q=norm(guard.q),rows=guard.rows,d=guard.today||localToday(),dark=getTheme()==='dark';
- const tabs=[['wait','Giriş bekleyen',v=>!gIn(v)],['in','İçeride',v=>gIn(v)&&!gOut(v)],['out','Çıkanlar',gOut],['all','Tümü',()=>true]];
- const tab=tabs.find(t=>t[0]===guard.tab)||tabs[0];
- let list=rows.filter(tab[2]).filter(v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q));
- if(tab[0]==='in')list=list.slice().sort((a,b)=>(b.done?1:0)-(a.done?1:0)||String(a.onsite_at||'').localeCompare(String(b.onsite_at||'')));
- if(tab[0]==='out')list=list.slice().sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at)));
+ const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange();
+ const match=v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q);
+ const tabs=[['wait','Bekleyenler',rows.filter(v=>!gOut(v)).length],['out','Çıkanlar',rows.filter(gOut).length],['all','Tümü',rows.length],['rep','Rapor · paylaş',guardRepRows('').length]];
+ const tab=tabs.find(t=>t[0]===guard.tab)?.[0]||'wait';const list=rows.filter(match);
+ const byTime=(a,b)=>a.visit_date.localeCompare(b.visit_date)||String(a.visit_time||'~').localeCompare(String(b.visit_time||'~'))||a.plate.localeCompare(b.plate);
+ let body;
+ if(!guard.loaded)body=`<div class="saha-empty">${icon('clock')}<b>Yükleniyor…</b></div>`;
+ else if(tab==='rep')body=guardReport();
+ else if(tab==='wait'){const inList=list.filter(v=>!gIn(v)&&!gOut(v)).sort(byTime),outList=list.filter(v=>gIn(v)&&!gOut(v)).sort((a,b)=>(b.done?1:0)-(a.done?1:0)||String(a.onsite_at||'').localeCompare(String(b.onsite_at||'')));
+  body=guardSection('in',stIcon('onsite',true),'Giriş bekleyen',inList,q?'Eşleşen araç yok.':'Giriş bekleyen araç yok.')+guardSection('out',icon('left'),'Çıkış bekleyen · içeride',outList,q?'Eşleşen araç yok.':'İçeride araç yok.')
+   +(q&&!inList.length&&!outList.length?'<p class="guard-sec-empty">Araç listede yoksa ofise haber verin.</p>':'');}
+ else{const l=(tab==='out'?list.filter(gOut).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at))):list.slice().sort(byTime));
+  body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
+ const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;
  const focus=document.activeElement?.id,sel=document.activeElement?.selectionStart;
- app.innerHTML=`<div class="saha guard"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>Güvenlik · giriş-çıkış</small></div></div><div class="saha-date"><b>${fmt(d,{day:'numeric',month:'long'})} ${DAYS[weekday(d)-1]||'Pazar'}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small></div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button></div></header>
- ${guard.error?`<div class="guard-alert" role="alert">${icon('info')}<span>${esc(guard.error)}</span></div>`:''}
- <div class="saha-add"><label class="saha-input">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
- <div class="saha-tabs" role="group" aria-label="Liste">${tabs.map(([k,l,f])=>`<button type="button" class="saha-tab${tab[0]===k?' active':''}" data-action="guard-tab" data-k="${k}" aria-pressed="${tab[0]===k}">${l}<b>${rows.filter(f).length}</b></button>`).join('')}</div>
- ${list.length?`<div class="saha-grid">${list.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${!guard.loaded?'Yükleniyor…':q?'Eşleşen araç yok':tab[0]==='wait'?'Giriş bekleyen araç yok':'Bu listede araç yok'}</b>${q&&guard.loaded?'<small>Araç listede yoksa ofise haber verin.</small>':''}</div>`}</div>`;
+ app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>Güvenlik · giriş-çıkış</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small></div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button></div></header>
+ <div class="guard-bar"><div class="guard-dates" role="group" aria-label="Tarih aralığı"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="-1" aria-label="Önceki">${icon('left')}</button><input type="date" id="guard-from" value="${esc(from)}" max="${esc(addDays(today,7))}" aria-label="Başlangıç tarihi"><span>–</span><input type="date" id="guard-to" value="${esc(to)}" max="${esc(addDays(today,7))}" aria-label="Bitiş tarihi"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="1" aria-label="Sonraki">${icon('chevron')}</button>${from!==today||to!==today?`<button type="button" class="btn small" data-action="guard-today">Bugün</button>`:''}</div>
+ <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
+ <div class="saha-tabs" role="group" aria-label="Liste">${tabs.map(([k,l,n])=>`<button type="button" class="saha-tab${tab===k?' active':''}" data-action="guard-tab" data-k="${k}" aria-pressed="${tab===k}">${l}<b>${n}</b></button>`).join('')}</div></div>
+ ${guard.error?`<div class="guard-alert" role="alert">${icon('info')}<span>${esc(guard.error)}</span></div>`:''}${body}</div>`;
  if(focus==='guard-q'){const i=document.getElementById('guard-q');i?.focus();if(sel!=null)i?.setSelectionRange(sel,sel);}}
+function setGuardRange(f,t){const today=gToday();if(!validDate(f)||!validDate(t))return;if(t<f)[f,t]=[t,f];
+ if((dateObj(t)-dateObj(f))/DAY>30){toast('En fazla 31 günlük aralık seçilebilir.',true);t=addDays(f,30);}
+ if(t>addDays(today,7)){toast('İleri tarih en fazla 1 hafta seçilebilir.',true);return renderGuard();}
+ if(f<addDays(today,-62)){toast('Güvenlik ekranında en fazla 2 ay öncesi gösterilir.',true);return renderGuard();}
+ if(f===today&&t===today)guard.from=guard.to='';else{guard.from=f;guard.to=t;}guard.loaded=false;renderGuard();guardLoad();}
 async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guard.busy.has(id))return;guard.busy.add(id);renderGuard();
  try{const {data,error}=await client.rpc('guard_mark',{p_token:GUARD_TOKEN,p_visit_id:id,p_action:k});if(error)throw error;
   if(data&&typeof data==='object')Object.assign(v,data);justChangedMap.set(id,Date.now());guard.q='';
@@ -1213,14 +1249,22 @@ async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guar
  catch(e){toast(e?.code==='42501'?'Bu güvenlik linki artık geçersiz.':isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
  finally{guard.busy.delete(id);}
  await guardLoad();}
+function guardShare(how,cust){const rows=guardRepRows(guard.repSt||'',cust==null?null:cust);if(!rows.length)return;const text=rows.map(gateText).join('\n\n');
+ if(how==='wa')waLaunch('',text);else copyOut(text,'',`${rows.length} aracın giriş-çıkış bilgisi kopyalandı.`);}
 function guardStart(){document.documentElement.classList.add('guard-mode');renderGuard();guardLoad();keepAwake(true);
  setInterval(()=>{if(!document.hidden&&!guard.busy.size)guardLoad();},GUARD_POLL_MS);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){guardLoad();wakeLock=null;keepAwake(true);}});
  window.addEventListener('online',guardLoad);}
-document.addEventListener('click',e=>{if(!GUARD_TOKEN)return;const b=e.target.closest('[data-action^="guard-"]');if(!b||b.disabled)return;
- if(b.dataset.action==='guard-tab'){guard.tab=b.dataset.k;return renderGuard();}
- if(b.dataset.action==='guard-mark')guardMark(b.dataset.id,b.dataset.k);});
+document.addEventListener('click',e=>{if(!GUARD_TOKEN)return;const b=e.target.closest('[data-action^="guard-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+ if(a==='guard-tab'){guard.tab=b.dataset.k;return renderGuard();}
+ if(a==='guard-mark')return guardMark(b.dataset.id,b.dataset.k);
+ if(a==='guard-rep-st'){guard.repSt=b.dataset.st;return renderGuard();}
+ if(a==='guard-rep-copy'||a==='guard-rep-wa')return guardShare(a==='guard-rep-wa'?'wa':'copy','cust' in b.dataset?b.dataset.cust:null);
+ if(a==='guard-today')return setGuardRange(gToday(),gToday());
+ if(a==='guard-day-step'){const {from,to}=guardRange(),n=Math.round((dateObj(to)-dateObj(from))/DAY)+1,st=Number(b.dataset.step)*n;return setGuardRange(addDays(from,st),addDays(to,st));}});
 document.addEventListener('input',e=>{if(!GUARD_TOKEN||e.target.id!=='guard-q')return;guard.q=e.target.value;renderGuard();});
+document.addEventListener('change',e=>{if(!GUARD_TOKEN)return;const id=e.target.id;if(id!=='guard-from'&&id!=='guard-to')return;const r=guardRange();
+ let f=id==='guard-from'?e.target.value:r.from,t=id==='guard-to'?e.target.value:r.to;if(t<f){if(id==='guard-from')t=f;else f=t;}setGuardRange(f,t);});
 
 /* Ayarlar: güvenlik linki (yalnızca düzenleyici) */
 function guardLinkEditor(){if(role!=='editor'||VIEW_TOKEN)return '';

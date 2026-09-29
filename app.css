@@ -1102,11 +1102,11 @@ html:not(.is-editor) .vc-next:not(.finished),html:not(.is-editor) .vcard .row-se
 .gd-acts{margin-left:auto;display:flex;gap:6px}
 .gd-acts .btn,.modal-footer .btn{display:inline-flex;align-items:center;gap:6px}
 .gd-acts svg{width:15px;height:15px}
-.gd-table{width:100%;border-collapse:collapse;table-layout:fixed}.gd-table th:nth-child(1){width:40%}.gd-table th:nth-child(2),.gd-table th:nth-child(3){width:22%}
+.gd-table{width:100%;border-collapse:collapse;table-layout:fixed}.gd-table th:nth-child(1){width:29%}.gd-table th:nth-child(2),.gd-table th:nth-child(3),.gd-table th:nth-child(4){width:19%}
 .gd-table th{text-align:left;font-size:10.5px;letter-spacing:.09em;color:#6b7a90;padding:8px 12px;border-bottom:1px solid #eef1f6}
 .gd-table td{padding:8px 12px;border-bottom:1px solid #eef1f6;font-size:13px;font-weight:600;color:#1f2a44;text-transform:uppercase}
 .gd-table tr:last-child td{border-bottom:0}
-@media (max-width:760px){.gd-acts{margin-left:0;width:100%}.gd-acts .btn{flex:1;justify-content:center}.gd-table th:nth-child(4),.gd-table td:nth-child(4){display:none}.gd-table td,.gd-table th{padding:8px}.gate-ts{white-space:normal}}
+@media (max-width:760px){.gd-acts{margin-left:0;width:100%}.gd-acts .btn{flex:1;justify-content:center}.gd-table th:nth-child(3),.gd-table td:nth-child(3),.gd-table th:nth-child(5),.gd-table td:nth-child(5){display:none}.gd-table th:nth-child(1){width:44%}.gd-table td,.gd-table th{padding:8px}.gate-ts{white-space:normal}}
 
 
 
@@ -2000,3 +2000,31 @@ html[data-theme="dark"] .guard-alert{background:#3b1111;color:#fecaca}
 html[data-theme="dark"] .exit-badge{background:#172554;color:#93c5fd}
 html[data-theme="dark"] .log-item.k-exit>i{background:#60a5fa}
 @media (max-width:760px){.guard-btn{min-height:76px;font-size:24px}.guard .saha-tabs{grid-template-columns:repeat(2,1fr)}.gate-grid{grid-template-columns:1fr 1fr}}
+
+/* güvenlik ekranı: tarih aralığı, tek ekranda giriş ve çıkış bekleyenler, rapor */
+.guard-head{position:sticky;top:0;z-index:6;background:var(--bg);padding-bottom:4px}
+.guard .saha-top{position:static}
+.guard-bar{display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 14px}
+.guard-dates{display:flex;align-items:center;gap:6px;background:#fff;border:2px solid #d9e0ea;border-radius:18px;padding:6px 10px;flex-wrap:wrap}
+.guard-dates input[type=date]{height:48px;min-height:0;border:0;background:transparent;font-size:17px;font-weight:800;color:#16233a;padding:0 4px;width:auto}
+.guard-dates>span{font-weight:800;color:#6b7a90}
+.guard-dates .icon-btn{width:44px;height:44px}
+.guard-search{flex:1;min-width:260px;height:64px}
+.guard-sec{margin-bottom:22px}
+.guard-sec-h{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#16233a;margin:4px 0 12px}
+.guard-sec-h svg{width:22px;height:22px}
+.guard-sec-h.in svg{color:#16a34a}.guard-sec-h.out svg{color:#1d4ed8}
+.guard-sec-h b{min-width:30px;height:30px;padding:0 8px;border-radius:15px;background:#e7ebf2;display:grid;place-items:center;font-size:14px}
+.guard-sec-empty{color:#6b7a90;font-weight:700;margin:0 0 8px}
+.guard-left.muted{color:#5b6b82;background:#eef1f6}
+.guard-rep{display:flex;flex-direction:column;gap:14px}
+.guard-rep-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.guard-rep .gd-group{background:#fff}
+html[data-theme="dark"] .guard-dates{background:#1c1f26;border-color:#283649}
+html[data-theme="dark"] .guard-dates input[type=date]{color:#eef1f6;color-scheme:dark}
+html[data-theme="dark"] .guard-sec-h{color:#eef1f6}
+html[data-theme="dark"] .guard-sec-h b{background:#252933}
+html[data-theme="dark"] .guard-sec-empty{color:#c4cdd9}
+html[data-theme="dark"] .guard-left.muted{background:#252933;color:#c4cdd9}
+html[data-theme="dark"] .guard-rep .gd-group{background:#1c1f26}
+@media (max-width:760px){.guard-head{position:static}.guard-dates{width:100%;display:grid;grid-template-columns:38px minmax(0,1fr) 10px minmax(0,1fr) 38px;align-items:center;gap:4px;padding:6px}.guard-dates .icon-btn{width:38px;height:38px}.guard-dates input[type=date]{width:100%;min-width:0;font-size:14px;height:42px;padding:0}.guard-dates>span{text-align:center}.guard-dates .btn{grid-column:1/-1;justify-content:center}.guard-search{min-width:0;flex-basis:100%}}

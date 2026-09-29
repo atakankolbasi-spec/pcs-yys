@@ -133,8 +133,13 @@
         if (params.p_token !== cfg.guardToken) return guardErr('42501', 'Güvenlik linki geçersiz');
         const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
         const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, exit_at: v.exit_at || null });
-        if (name === 'guard_board') return { data: { today, now: now(), visits: db.visits.filter(v => v.visit_date === today || (v.visit_date >= back(3) && v.visit_date < today && v.onsite_at && !v.exit_at)).map(pick) }, error: null };
-        const v = db.visits.find(x => x.id === params.p_visit_id && x.visit_date >= back(3) && x.visit_date <= today);
+        if (name === 'guard_board') {
+          if (cfg.guardOldSql && params.p_from) return guardErr('PGRST202', 'Could not find the function public.guard_board(p_from, p_to, p_token)');
+          const f = params.p_from || today, t = params.p_to || f;
+          if (t < f) return guardErr('22023', 'Bitiş tarihi başlangıçtan önce olamaz');
+          return { data: { today, from: f, to: t, now: now(), visits: db.visits.filter(v => (v.visit_date >= f && v.visit_date <= t) || (t >= today && v.visit_date >= back(7) && v.visit_date < f && v.onsite_at && !v.exit_at)).map(pick) }, error: null };
+        }
+        const v = db.visits.find(x => x.id === params.p_visit_id && x.visit_date >= back(7) && x.visit_date <= back(-1));
         if (!v) return guardErr('P0002', 'Araç bulunamadı');
         const recent = t => t && Date.now() - Date.parse(t) < 15 * 60000;
         const a = params.p_action;

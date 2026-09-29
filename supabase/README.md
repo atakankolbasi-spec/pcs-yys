@@ -119,7 +119,9 @@ Kurulum adımları `WHATSAPP.md` dosyasında. Kurulmadıkça site bu özelliği 
 `guvenlik-kurulumu.sql` dosyasını SQL Editor'de bir kez çalıştırın. Ardından **Ayarlar → Güvenlik linki**
 bölümünden linki alıp kapıdaki güvenliğe gönderin. Güvenlik linki giriş yapmadan açar; yalnızca **GİRİŞ**
 (araç TESİSTE olur) ve **ÇIKIŞ** (ayrı çıkış saati yazılır) düğmelerine basabilir. "İşlemler bitti" saati
-ayrı kalır. Kurulmadıkça site bu özelliği kapalı tutar.
+ayrı kalır. Giriş ve çıkış bekleyenler tek ekrandadır; tarih aralığı seçilebilir ve "Rapor" sekmesinden
+giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Kurulmadıkça site bu özelliği kapalı
+tutar. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
 
 ## Bu klasördeki dosyalar
 

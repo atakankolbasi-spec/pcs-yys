@@ -538,34 +538,33 @@ test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async 
   expect(problems).toEqual([]);
 });
 
-test('güvenlik linki: GİRİŞ aracı tesiste yapar, ÇIKIŞ ayrı saat yazar; başka bilgi görünmez', async ({ page }) => {
+test('güvenlik linki: tek ekranda GİRİŞ (tesiste) ve ÇIKIŞ (ayrı saat); başka bilgi görünmez', async ({ page }) => {
   const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
   await expect(page.locator('.guard')).toBeVisible();
   await expect(page.locator('#auth-form')).toHaveCount(0);
-  const tab = k => page.locator(`[data-action="guard-tab"][data-k="${k}"]`);
+  const sec = t => page.locator('.guard-sec', { has: page.locator('.guard-sec-h', { hasText: t }) });
   const card = () => page.locator('.guard-card', { hasText: 'CB 1234 AB' });
   const v6 = () => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'));
-  // Bugün 3 araç: biri giriş bekliyor; iki gün önce girip çıkışı işlenmemiş araç da "İçeride" görünür.
-  await expect(tab('wait').locator('b')).toHaveText('1');
-  await expect(tab('in').locator('b')).toHaveText('3');
+  // Bekleyenler tek ekranda: giriş bekleyen 1, çıkış bekleyen 3 (bugün içeride 2 + iki gün önce girip çıkmamış 1)
+  await expect(sec('Giriş bekleyen').locator('.guard-sec-h b')).toHaveText('1');
+  await expect(sec('Çıkış bekleyen').locator('.guard-sec-h b')).toHaveText('3');
+  await expect(sec('Giriş bekleyen').locator('.guard-card')).toContainText('CB 1234 AB');
 
-  // GİRİŞ -> TESİSTE + giriş saati; "işlemler bitti"ye dokunulmaz
+  // GİRİŞ -> TESİSTE + giriş saati; araç aynı ekranda "çıkış bekleyen"e geçer
   await card().locator('[data-k="giris"]').click();
   await expect(page.locator('#toast')).toContainText('giriş yaptı, tesiste');
   let v = await v6();
   expect([v.onsite, !!v.onsite_at, v.done, v.exit_at || null]).toEqual([true, true, false, null]);
-  await tab('in').click();
-  await expect(card()).toContainText('İşlemleri sürüyor');
-  await expect(card().locator('[data-k="giris_geri"]')).toBeVisible();
+  await expect(sec('Çıkış bekleyen').locator('.guard-card', { hasText: 'CB 1234 AB' })).toContainText('İşlemleri sürüyor');
+  await expect(sec('Giriş bekleyen').locator('.guard-card')).toHaveCount(0);
 
-  // ÇIKIŞ -> ayrı çıkış saati; araç "bitti" olmaz
+  // ÇIKIŞ -> ayrı çıkış saati; araç "bitti" olmaz ve "Çıkanlar"a geçer
   await card().locator('[data-k="cikis"]').click();
   await expect(page.locator('#toast')).toContainText('çıkış yaptı');
   v = await v6();
   expect([!!v.exit_at, v.done, v.done_at || null]).toEqual([true, false, null]);
-  await tab('out').click();
+  await page.locator('[data-action="guard-tab"][data-k="out"]').click();
   await expect(card()).toContainText('Çıktı');
-  // yanlış basıldıysa geri alınır
   await card().locator('[data-k="cikis_geri"]').click();
   await expect(page.locator('#toast')).toContainText('çıkışı geri alındı');
   expect((await v6()).exit_at).toBeNull();
@@ -573,6 +572,44 @@ test('güvenlik linki: GİRİŞ aracı tesiste yapar, ÇIKIŞ ayrı saat yazar; 
   // Güvenlik ekranı yalnızca kendi fonksiyonlarını çağırır; tablolar ve beyanname gibi bilgiler görünmez.
   expect(await page.evaluate(() => window.__calls.filter(c => c.table).length)).toBe(0);
   await expect(page.locator('body')).not.toContainText('26341200EX0001');
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik: tarih aralığı seçilir, giriş-çıkışlar müşteri bazında kopyalanır', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const data = sampleData();
+  Object.assign(data.visits[2], { onsite_at: '2026-09-22T07:30:00Z', done_at: '2026-09-22T09:00:00Z', exit_at: '2026-09-22T09:20:00Z' });
+  const problems = await openApp(page, { session: false, guardToken: 'g1', data }, '/?guvenlik=g1');
+  await expect(page.locator('.guard-card').first()).toBeVisible();
+  await page.locator('#guard-from').fill('2026-09-21');
+  await page.locator('#guard-to').fill('2026-09-22');
+  await expect(page.locator('.saha-date b')).toHaveText(/21 Eyl.*22 Eyl/i);
+  const last = await page.evaluate(() => window.__calls.filter(c => c.rpc === 'guard_board').pop().params);
+  expect([last.p_from, last.p_to]).toEqual(['2026-09-21', '2026-09-22']);
+  // eski günlerin araçlarında düğme yoktur ama saatler görünür (bu örnekte 21-22 Eylül 7 günlük pencerede)
+  await page.locator('[data-action="guard-tab"][data-k="rep"]').click();
+  const grp = page.locator('.gd-group', { hasText: 'LİN LOJ' });
+  await expect(grp.locator('tbody tr')).toHaveCount(1);
+  await expect(grp).toContainText('22.09.2026  12:20');
+  await grp.locator('[data-action="guard-rep-copy"]').click();
+  await expect(page.locator('#toast')).toContainText('1 aracın giriş-çıkış bilgisi kopyalandı');
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  expect(clip).toContain('TESİS GİRİŞ TARİH SAAT : 22.09.2026  10:30');
+  expect(clip).toContain('TESİS ÇIKIŞ TARİH SAAT : 22.09.2026  12:20');
+  expect(clip).toContain('MÜŞTERİ : LİN LOJ');
+  // Bugün'e dönüş
+  await page.locator('[data-action="guard-today"]').click();
+  await expect(page.locator('.saha-date b')).toHaveText(/23 Eyl/i);
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik: veritabanı eski sürümdeyse tarih seçimi bugüne döner, ekran çalışmaya devam eder', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1', guardOldSql: true }, '/?guvenlik=g1');
+  await expect(page.locator('.guard-card').first()).toBeVisible();
+  await page.locator('#guard-from').fill('2026-09-21');
+  await expect(page.locator('#toast')).toContainText('guvenlik-kurulumu.sql');
+  await expect(page.locator('#guard-from')).toHaveValue('2026-09-23');
+  await expect(page.locator('.guard-card').first()).toBeVisible();
   expect(problems).toEqual([]);
 });
 
