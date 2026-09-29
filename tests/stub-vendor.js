@@ -90,7 +90,10 @@
     auth: {
       onAuthStateChange(cb) { listeners.push(cb); setTimeout(() => cb('INITIAL_SESSION', session), 0); return { data: { subscription: { unsubscribe() {} } } }; },
       async getSession() { return { data: { session } }; },
-      async signInWithPassword() { session = { user: { id: 'u1', email: 'test@ornek.com' }, access_token: 'x' }; emit('SIGNED_IN'); return { error: null }; },
+      async signInWithPassword() {
+        if (cfg.authError) return { data: null, error: { ...cfg.authError } }; // ör. { code: 'invalid_credentials', message: 'Invalid login credentials' }
+        session = { user: { id: 'u1', email: 'test@ornek.com' }, access_token: 'x' }; emit('SIGNED_IN'); return { error: null };
+      },
       async signOut() { session = null; emit('SIGNED_OUT'); return { error: null }; },
       async resetPasswordForEmail() { return { error: null }; },
       async updateUser() { return { error: null }; }

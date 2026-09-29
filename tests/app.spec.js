@@ -812,9 +812,32 @@ test('güvenlik hesabı: giriş yapınca yalnızca güvenlik ekranı açılır, 
   expect(problems).toEqual([]);
 });
 
+for (const [err, text] of [[{ code: 'invalid_credentials', message: 'Invalid login credentials' }, 'E-posta ya da şifre hatalı'],
+                           [{ code: 'email_not_confirmed', message: 'Email not confirmed' }, 'Auto Confirm User']]) {
+  test(`giriş hatası Türkçe ve ne yapılacağını söyler (${err.code})`, async ({ page }) => {
+    const problems = await openApp(page, { session: false, authError: err });
+    await page.locator('#email').fill('guv@ornek.com');
+    await page.locator('#password').fill('12345678');
+    await page.getByRole('button', { name: 'Giriş yap' }).click();
+    await expect(page.locator('#auth-message')).toContainText(text);
+    expect(problems).toEqual([]);
+  });
+}
+
+test('güvenlik hesabı: sunucu reddederse sebep ve ofiste yapılacak yazılır', async ({ page }) => {
+  const problems = await openApp(page, { guardAccount: { name: 'Tepecik', active: true } });
+  await page.evaluate(() => { window.__PCS_STUB.guardAccount.active = false; }); // ofis erişimi durdurdu
+  await page.clock.runFor(11000);
+  await expect(page.locator('.guard-fatal')).toContainText('erişimi yok');
+  await expect(page.locator('.guard-fatal-help')).toContainText('Güvenlik hesapları');
+  await expect(page.locator('.guard-fatal-help small')).toContainText('Güvenlik linki geçersiz');
+  expect(problems).toEqual([]);
+});
+
 test('güvenlik hesabı kapatılmışsa ekran açılmaz, çıkış yapılabilir', async ({ page }) => {
   const problems = await openApp(page, { guardAccount: { name: 'Tepecik', active: false } });
-  await expect(page.locator('.guard-fatal')).toContainText('kapatılmış');
+  await expect(page.locator('.guard-fatal')).toContainText('ofis tarafından durdurulmuş');
+  await expect(page.locator('.guard-fatal')).toContainText('Erişimi aç');
   await expect(page.locator('.guard-fatal [data-action="guard-signout"]')).toBeVisible();
   await expect(page.locator('.guard-card')).toHaveCount(0);
   expect(await page.evaluate(() => window.__calls.filter(c => c.table).length)).toBe(0);
@@ -844,7 +867,7 @@ test('ayarlar: güvenlik hesabı eklenir, kapatılır, açılır ve silinir', as
   // kapat -> aç
   page.once('dialog', d => d.accept());
   await row.locator('[data-action="gacc-off"]').click();
-  await expect(row.locator('.gacc-st')).toHaveText(/kapalı/i);
+  await expect(row.locator('.gacc-st')).toHaveText(/erişim durduruldu/i);
   await row.locator('[data-action="gacc-on"]').click();
   await expect(row.locator('.gacc-st')).toHaveText(/kullanıcı yok/i);
   // Supabase'de kullanıcısı olmayan hesap silinebilir

@@ -295,6 +295,13 @@ async function syncData(opts={}){
  }catch(e){syncPrint='';if(stamp===generation){if(!VIEW_TOKEN&&isNetErr(e)&&!realState.visits.length&&!realState.registry.length&&loadCache()){render();return;}storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
  finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor'){maybeCarry();waTick();}}
 }
+/* Supabase giriş hataları: İngilizce ham mesaj yerine ne yapılacağını söyleyen Türkçe metin */
+function authMsg(e){const c=e?.code||'',m=String(e?.message||'');
+ if(c==='invalid_credentials'||/invalid login credentials/i.test(m))return 'E-posta ya da şifre hatalı. Şifrede büyük/küçük harfe dikkat edin; hesap Supabase’de açılmadıysa ofise haber verin.';
+ if(c==='email_not_confirmed'||/email not confirmed/i.test(m))return 'Bu hesap onaylanmamış. Ofis, Supabase’de kullanıcıyı “Auto Confirm User” işaretli açmalı.';
+ if(c==='user_banned'||/banned/i.test(m))return 'Bu hesap Supabase’de engellenmiş (ban). Ofis, Authentication → Users’ta engeli kaldırmalı.';
+ if(c==='over_request_rate_limit'||/rate limit|too many/i.test(m))return 'Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin.';
+ return friendly(e);}
 function friendly(e){if(isNetErr(e))return 'İnternet bağlantısı yok. Bağlantı gelince tekrar deneyin.';if(e.code==='23505')return 'Bu plaka zaten kayıtlı.';if(e.code==='42501')return 'Bu işlem için düzenleyici yetkisi gerekli.';if(e.code==='23514')return 'Plaka, müşteri ve Pazartesi–Cumartesi tarihini kontrol edin.';return e.message||'Bağlantıyı kontrol edip yeniden deneyin.';}
 function payload(r,table){const fields=['plate','customer','declaration','carrier','registration'];const p=Object.fromEntries(fields.map(k=>[k,r[k]||'']));if(table==='visits') Object.assign(p,{visit_date:r.date,visit_time:r.time||null,onsite:r.onsite,t1:r.t1,done:r.done,note:r.note||''});return p;}
 async function mutate(fn){
@@ -479,7 +486,7 @@ document.addEventListener('click',async e=>{
  }
 },true);
 document.addEventListener('submit',async e=>{
- if(e.target.id==='auth-form'){e.preventDefault();e.stopImmediatePropagation();const form=e.target,b=form.querySelector('[type=submit]');b.disabled=true;try{const {error}=await client.auth.signInWithPassword({email:form.elements.email.value.trim(),password:form.elements.password.value});if(error)throw error;}catch(err){document.getElementById('auth-message').textContent=friendly(err);}finally{b.disabled=false;}}
+ if(e.target.id==='auth-form'){e.preventDefault();e.stopImmediatePropagation();const form=e.target,b=form.querySelector('[type=submit]');b.disabled=true;try{const {error}=await client.auth.signInWithPassword({email:form.elements.email.value.trim(),password:form.elements.password.value});if(error)throw error;}catch(err){document.getElementById('auth-message').textContent=authMsg(err);}finally{b.disabled=false;}}
  else if(e.target.id==='recovery-form'){e.preventDefault();e.stopImmediatePropagation();const {error}=await client.auth.updateUser({password:e.target.elements.password.value});if(error)toast(friendly(error),true);else{closeModal();toast('Parola güncellendi.');}}
  else if(!canEdit()){e.preventDefault();e.stopImmediatePropagation();}
 },true);
@@ -1206,7 +1213,7 @@ setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
    müşteri bazında kopyalanır / WhatsApp'ta paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
    (sunucu da aynı kuralları uygular). Liste 10 sn'de bir yenilenir. */
 const GUARD_UNDO_MS=15*60000,GUARD_POLL_MS=10000;
-const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true};
+const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',why:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true};
 const gView=()=>GUARD_VIEW||!guard.canMark; // izleme linki: GİRİŞ / ÇIKIŞ yok
 const gIn=v=>!!(v.onsite||v.onsite_at),gOut=v=>!!v.exit_at,gNow=()=>Date.now()+guard.skew;
 const gToday=()=>guard.today||localToday();
@@ -1216,10 +1223,10 @@ const gCanMark=v=>!gView()&&!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&
 async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
  try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
   const was=guard.loaded?new Map(guard.rows.map(v=>[v.id,!!v.done])):null;
-  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',at:timeNow(),canMark:data?.can_mark!==false});
+  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',why:'',at:timeNow(),canMark:data?.can_mark!==false});
   if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());}
  catch(e){if(seq!==guard.seq)return;
-  if(e?.code==='42501')guard.fatal=GUARD_ACCT?'Bu hesabın güvenlik ekranı kapatılmış. Ofise haber verin.':'Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.';
+  if(e?.code==='42501'){const off=GUARD_ACCT&&!GUARD_ACCT.active;guard.fatal=!GUARD_ACCT?'Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.':off?'Bu hesabın erişimi ofis tarafından durdurulmuş.':'Bu hesabın güvenlik ekranına erişimi yok.';guard.why=GUARD_ACCT&&!off?String(e?.message||''):'';}
   else if(e?.code==='PGRST202'&&guard.from){guard.from=guard.to='';toast('Tarih seçimi için ofisin Supabase’de guvenlik-kurulumu.sql dosyasının yeni halini çalıştırması gerekiyor.',true);return guardLoad();}
   else if(e?.code==='PGRST202')guard.fatal='Güvenlik ekranı henüz kurulmadı. Ofis, Supabase’de guvenlik-kurulumu.sql dosyasını çalıştırmalı.';
   else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
@@ -1256,7 +1263,7 @@ function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardR
   :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
 function renderGuard(){const app=document.getElementById('app');document.title=gView()?'Güvenlik izleme · PCS TRANSİT':'Güvenlik · PCS TRANSİT';
  const out=GUARD_ACCT?`<button type="button" class="saha-icon guard-signout" data-action="guard-signout" aria-label="Çıkış yap" title="Çıkış yap">${icon('logout')}</button>`:'';
- if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b>${GUARD_ACCT?`<button type="button" class="btn" data-action="guard-signout">${icon('logout')}Çıkış yap</button>`:''}</div></div>`;return;}
+ if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b>${GUARD_ACCT?`<p class="guard-fatal-help">Ofiste: <b>Ayarlar → Güvenlik hesapları</b> bölümünde bu e-posta listede olmalı ve durumu “Açık” olmalı; değilse “Erişimi aç”a basılır.${guard.why?`<small>Sunucu yanıtı: ${esc(guard.why)}</small>`:''}</p><button type="button" class="btn" data-action="guard-signout">${icon('logout')}Çıkış yap</button>`:''}</div></div>`;return;}
  const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange(),week=guardWeek();
  const match=v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q);
  const inRange=v=>v.visit_date>=from&&v.visit_date<=to,isOut=v=>gOut(v)&&inRange(v),isAll=v=>inRange(v)||!gOut(v);
@@ -1297,7 +1304,7 @@ async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guar
  try{const {data,error}=await client.rpc('guard_mark',{p_token:GUARD_TOKEN||null,p_visit_id:id,p_action:k});if(error)throw error;
   if(data&&typeof data==='object')Object.assign(v,data);justChangedMap.set(id,Date.now());guard.q='';
   toast(`${v.plate} ${{giris:'giriş yaptı, tesiste.',cikis:'çıkış yaptı.',giris_geri:'girişi geri alındı.',cikis_geri:'çıkışı geri alındı.'}[k]}`);}
- catch(e){toast(e?.code==='42501'?(GUARD_ACCT?'Bu hesabın güvenlik yetkisi kapatılmış.':'Bu güvenlik linki artık geçersiz.'):isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
+ catch(e){toast(e?.code==='42501'?(GUARD_ACCT?'İşlem reddedildi: '+(e?.message||'yetki yok'):'Bu güvenlik linki artık geçersiz.'):isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
  finally{guard.busy.delete(id);}
  await guardLoad();}
 function guardShare(how,cust){const rows=guardRepRows(guard.repSt||'',cust==null?null:cust);if(!rows.length)return;const text=rows.map(gateText).join('\n\n');
@@ -1310,7 +1317,7 @@ function guardStart(){if(guard.started)return;guard.started=true;document.docume
    fonksiyon yoksa (SQL eski) herkes eskisi gibi ofis panosuna girer. */
 async function guardAccountCheck(){try{const {data,error}=await client.rpc('guard_account');if(error){if(!isNetErr(error))guardChecked=true;return null;}guardChecked=true;return data&&typeof data==='object'?data:null;}catch(e){if(!isNetErr(e))guardChecked=true;return null;}}
 function enterGuardAccount(g){GUARD_ACCT={name:String(g.name||'').trim()||'Güvenlik',active:g.active!==false};stopRealtime();state=realState=emptyState();clearCache();closeModal();
- if(!GUARD_ACCT.active)guard.fatal='Bu güvenlik hesabı kapatılmış. Ofise haber verin.';guardStart();}
+ if(!GUARD_ACCT.active)guard.fatal='Bu hesabın erişimi ofis tarafından durdurulmuş.';guardStart();}
 document.addEventListener('click',e=>{if(!inGuard())return;const b=e.target.closest('[data-action^="guard-"]');if(!b||b.disabled)return;const a=b.dataset.action;
  if(a==='guard-signout'){b.disabled=true;(async()=>{try{await client.auth.signOut();}catch(_){}location.reload();})();return;}
  if(a==='guard-tab'){guard.tab=b.dataset.k;return renderGuard();}
@@ -1357,16 +1364,16 @@ async function loadGuardAccounts(){gAccts.state='loading';
  catch(e){gAccts.list=[];gAccts.state=e?.code==='PGRST202'?'missing':'error';}
  if(ui.page==='settings')render();}
 function guardAccountsEditor(){if(role!=='editor'||VIEW_TOKEN)return '';if(gAccts.state==='idle')setTimeout(loadGuardAccounts,0);
- const st=a=>!a.active?['off','Kapalı']:!a.has_user?['warn','Supabase’de kullanıcı yok']:['ok',a.last_sign_in_at?'Açık · son giriş '+tsText(a.last_sign_in_at):'Açık · henüz giriş yapmadı'];
+ const st=a=>!a.active?['off','Erişim durduruldu']:!a.has_user?['warn','Supabase’de kullanıcı yok']:['ok',a.last_sign_in_at?'Açık · son giriş '+tsText(a.last_sign_in_at):'Açık · henüz giriş yapmadı'];
  const rows=gAccts.state==='missing'?`<div class="notice">${icon('info')}<div>Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.</div></div>`
   :gAccts.state==='error'?`<p class="help-note">Liste alınamadı. ${button('gacc-reload','Tekrar dene','refresh','small')}</p>`
   :gAccts.state!=='ready'?'<p class="help-note">Yükleniyor…</p>'
-  :gAccts.list.length?`<div class="gacc-list">${gAccts.list.map(a=>{const [k,t]=st(a),e=esc(a.email);return `<div class="gacc-row${a.active?'':' off'}"><span class="gacc-ic">${icon('user')}</span><div class="gacc-who"><b>${esc(a.name||a.email.split('@')[0])}</b><small>${e}</small></div><span class="gacc-st ${k}">${esc(t)}</span><div class="gacc-acts"><button type="button" class="btn small" data-action="${a.active?'gacc-off':'gacc-on'}" data-email="${e}" data-name="${esc(a.name)}">${a.active?'Kapat':'Aç'}</button>${a.has_user?'':`<button type="button" class="btn small danger" data-action="gacc-del" data-email="${e}">Sil</button>`}</div></div>`;}).join('')}</div>`
+  :gAccts.list.length?`<div class="gacc-list">${gAccts.list.map(a=>{const [k,t]=st(a),e=esc(a.email);return `<div class="gacc-row${a.active?'':' off'}"><span class="gacc-ic">${icon('user')}</span><div class="gacc-who"><b>${esc(a.name||a.email.split('@')[0])}</b><small>${e}</small></div><span class="gacc-st ${k}">${esc(t)}</span><div class="gacc-acts"><button type="button" class="btn small" data-action="${a.active?'gacc-off':'gacc-on'}" data-email="${e}" data-name="${esc(a.name)}">${a.active?'Erişimi durdur':'Erişimi aç'}</button>${a.has_user?'':`<button type="button" class="btn small danger" data-action="gacc-del" data-email="${e}">Sil</button>`}</div></div>`;}).join('')}</div>`
   :'<p class="help-note">Henüz güvenlik hesabı yok.</p>';
  return `<p class="help-note" style="margin:0 0 10px">Görevli kendi e-postası ve şifresiyle giriş yapınca <b>yalnızca güvenlik ekranını</b> görür: gelecek, tesisteki ve çıkışa hazır araçlar, GİRİŞ / ÇIKIŞ, çıkanlar ve rapor. Ofis panosu, beyanname ve nakliyeci bilgisi kapalıdır. İşlem geçmişinde “Güvenlik · ad” yazılır.</p>
  <ol class="gacc-steps"><li>Supabase → Authentication → Users → <b>Add user → Create new user</b>: görevlinin e-postası ve şifresi, “Auto Confirm User” işaretli.</li><li>Aynı e-postayı aşağıya yazıp <b>Ekle</b>’ye basın.</li><li>Görevli sitede bu e-posta ve şifreyle giriş yapar.</li></ol>
  <div class="gacc-form"><input id="gacc-email" type="email" placeholder="guvenlik@ornek.com" autocomplete="off" spellcheck="false" aria-label="Güvenlik hesabının e-postası"><input id="gacc-name" type="text" placeholder="Görevlinin adı (ör. Tepecik kapı)" maxlength="60" autocomplete="off" aria-label="Görevlinin adı">${button('gacc-add','Ekle','plus','primary')}</div>
- ${rows}<p class="help-note" style="margin-top:10px">Görevli ayrılırsa ya da telefon kaybolursa “Kapat” deyin; o an güvenlik ekranını açamaz. Listeden tamamen silmek için önce kullanıcıyı Supabase’den silin.</p>`;}
+ ${rows}<p class="help-note" style="margin-top:10px">Görevli ayrılırsa ya da telefon kaybolursa “Erişimi durdur”a basın; o an güvenlik ekranını açamaz. Listeden tamamen silmek için önce kullanıcıyı Supabase’den silin.</p>`;}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="gacc-"]');if(!b||b.disabled)return;const a=b.dataset.action;
  if(a==='gacc-reload'){gAccts.state='idle';return render();}
  if(!canEdit())return;let email=b.dataset.email||'',name=b.dataset.name||'',active=a!=='gacc-off';
@@ -1374,11 +1381,11 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Geçerli bir e-posta yazın.',true);document.getElementById('gacc-email')?.focus();return;}
   if(email===String(account?.email||'').toLowerCase()){toast('Kendi hesabınızı güvenlik hesabı yapamazsınız.',true);return;}
   if(!window.confirm(`${email} güvenlik hesabı yapılsın mı?\n\nBu hesap bundan sonra yalnızca güvenlik ekranını görür; ofis panosunu, beyanname ve nakliyeci bilgisini göremez.`))return;}
- if(a==='gacc-off'&&!window.confirm(`${email} kapatılsın mı? Görevli güvenlik ekranını o an açamaz.`))return;
+ if(a==='gacc-off'&&!window.confirm(`${email} için erişim durdurulsun mu? Görevli güvenlik ekranını o an açamaz.`))return;
  if(a==='gacc-del'&&!window.confirm(`${email} listeden silinsin mi?`))return;
  busy=true;onlineUI();
  try{const {error}=a==='gacc-del'?await client.rpc('delete_guard_account',{p_email:email}):await client.rpc('save_guard_account',{p_email:email,p_name:name,p_active:active});if(error)throw error;
-  toast(a==='gacc-add'?'Güvenlik hesabı eklendi.':a==='gacc-off'?'Hesap kapatıldı.':a==='gacc-on'?'Hesap açıldı.':'Hesap listeden silindi.');}
+  toast(a==='gacc-add'?'Güvenlik hesabı eklendi.':a==='gacc-off'?'Erişim durduruldu.':a==='gacc-on'?'Erişim açıldı.':'Hesap listeden silindi.');}
  catch(err){toast(err?.code==='PGRST202'?'Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.':err?.message&&err.code==='22023'?err.message:friendly(err),true);}
  finally{busy=false;}
  await loadGuardAccounts();});
