@@ -534,6 +534,27 @@ test('ruhsat okuma: alan harfi plakaya yapışmaz, katar ağırlığı alınmaz,
   expect(r.vote).toEqual([6520, 7358]);
 });
 
+test('ruhsat okuma: ruhsattaki cins yazısı, dorsenin kayıtta önde yazılmasından önce gelir', async ({ page }) => {
+  const data = sampleData();
+  // Dorse (AG 08 PLS) kayıtlarda başka bir satırda yanlışlıkla önde yazılmış.
+  data.registry.push({ id: 'r7', plate: 'AG 08 PLS - AG 05 PLS', customer: 'PLASTNAK LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const r = await page.evaluate(() => {
+    const T = window.PCS_TEST, pick = ({ tractor, trailer, reg, tractorReg, trailerReg }) => ({ tractor, trailer, reg: !!reg, tractorReg: tractorReg?.customer || '', trailerReg: trailerReg?.customer || '' });
+    // Romen ruhsatı: dorse kartı üstte (SEMIREMORCA), çekici altta (AUTOUTILITARA)
+    const ro = ['A AG-08-PLS', 'J SEMIREMORCA O4', 'D.1 KOGEL', '', 'A B-939-PLS', 'J AUTOUTILITARA N3', 'D.1 SCANIA'].join('\n');
+    const cands = T.ruhsatRank([ro, ro]);
+    const both = pick(T.ruhsatResolve(cands, T.ruhsatKinds(ro, {}), cands.strong));
+    // dorse kartının cins satırı okunamamış: çekici belli, kayıtlı öbür plaka dorse sayılır
+    const partial = ro.replace('J SEMIREMORCA O4', 'J 5EM1');
+    const c2 = T.ruhsatRank([partial]);
+    return { both, partial: pick(T.ruhsatResolve(c2, T.ruhsatKinds(partial, {}), c2.strong)) };
+  });
+  expect(r.both).toEqual({ tractor: 'B939PLS', trailer: 'AG08PLS', reg: false, tractorReg: '', trailerReg: 'PLASTNAK LOJ' });
+  expect(r.partial).toEqual({ tractor: 'B939PLS', trailer: 'AG08PLS', reg: false, tractorReg: '', trailerReg: 'PLASTNAK LOJ' });
+});
+
 test('ruhsat fotoğrafı Ctrl+V ile yapıştırılabilir; görüntüleyici ekleyemez', async ({ page, browser, context }) => {
   const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
   const paste = p => p.evaluate(b64 => {
