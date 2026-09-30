@@ -161,10 +161,14 @@
         return { data: name === 'list_guard_accounts' ? clone(list) : null, error: null };
       }
       if (name === 'guard_board' || name === 'guard_mark') {
-        const acct = params.p_token == null && !!session && !!cfg.guardAccount && cfg.guardAccount.active !== false;
+        const acct = params.p_token == null && !!session && !!cfg.guardAccount && cfg.guardAccount.active !== false && !cfg.guardOldBoard;
         const canMark = acct || (!!cfg.guardToken && params.p_token === cfg.guardToken);
         const viewOk = name === 'guard_board' && !!cfg.guardViewToken && params.p_token === cfg.guardViewToken;
-        if (!canMark && !viewOk) return guardErr('42501', 'Güvenlik linki geçersiz');
+        if (!canMark && !viewOk) {
+          // cfg.guardOldBoard: veritabanında guard_board'un eski (yalnızca linkle çalışan) sürümü duruyor
+          if (params.p_token == null && !cfg.guardOldBoard) return guardErr('42501', 'Güvenlik hesabı listede yok ya da erişimi durdurulmuş');
+          return guardErr('42501', 'Güvenlik linki geçersiz');
+        }
         const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
         const ymdIst = iso => new Date(Date.parse(iso) + 3 * 36e5).toISOString().slice(0, 10); // İstanbul (UTC+3) günü
         const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, registration: v.registration || '', visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, exit_at: v.exit_at || null });

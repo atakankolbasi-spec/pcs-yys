@@ -196,6 +196,9 @@ begin
     where g.id = 1 and (g.token = p_token or g.view_token = p_token);
   end if;
   if can_mark is null then
+    if p_token is null then
+      raise exception 'Güvenlik hesabı listede yok ya da erişimi durdurulmuş' using errcode = '42501';
+    end if;
     raise exception 'Güvenlik linki geçersiz' using errcode = '42501';
   end if;
   if t < f then raise exception 'Bitiş tarihi başlangıçtan önce olamaz' using errcode = '22023'; end if;
@@ -285,9 +288,12 @@ end $$;
 
 -- Güvenlik hesapları tablolara doğrudan erişemez: her tabloya "kısıtlayıcı" kural eklenir. Mevcut kurallar
 -- olduğu gibi kalır; bu kural yalnızca listedeki hesapları durdurur (düzenleyici ve diğer hesaplar etkilenmez).
+-- Sahibi başka rol olan ya da bir eklentiye ait tablolar atlanır (kural eklenemez; kontrol satırı bildirir).
 do $$ declare r record; begin
   for r in select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
-           where n.nspname = 'public' and c.relkind in ('r', 'p') loop
+           where n.nspname = 'public' and c.relkind in ('r', 'p')
+             and pg_has_role(c.relowner, 'MEMBER')
+             and not exists (select 1 from pg_depend d where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'e') loop
     execute format('drop policy if exists guvenlik_hesabi_erisemez on public.%I', r.relname);
     execute format('create policy guvenlik_hesabi_erisemez on public.%I as restrictive for all to authenticated '
                    'using (not (select public.is_guard_account())) with check (not (select public.is_guard_account()))', r.relname);
@@ -368,12 +374,18 @@ $function$;
 -- Sitenin yeni fonksiyonları hemen görmesi için Supabase'in fonksiyon listesini yenile
 notify pgrst, 'reload schema';
 
--- Kontrol: beş satır da "tamam" olmalı. Son satırda "UYARI · RLS kapalı" yazan tablo varsa o tabloyu sitedeki
--- anahtarı bilen herkes okuyabilir ve güvenlik hesapları da engellenemez (README bölüm 2).
+-- Kontrol: beş satır da "tamam" olmalı. Dosyanın TAMAMINI çalıştırın (editörde bir kısmı seçiliyse yalnızca o
+-- kısım çalışır); "güvenlik fonksiyonları" satırı EKSİK derse eski sürüm duruyor demektir. Son satırda
+-- "UYARI · RLS kapalı" yazan tabloyu sitedeki anahtarı bilen herkes okuyabilir ve güvenlik hesapları da
+-- engellenemez (README bölüm 2); "kural eklenemedi" yazan tablonun sahibi başka bir roldür.
 select 'çıkış saati sütunu' as kontrol,
        case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'visits' and column_name = 'exit_at') then 'tamam' else 'EKSİK' end as durum
 union all
-select 'güvenlik fonksiyonları', case when count(*) = 11 then 'tamam' else 'EKSİK' end
+select 'güvenlik fonksiyonları (güncel sürüm)',
+       case when count(*) = 11
+             and pg_get_functiondef('public.guard_board(text,date,date)'::regprocedure) like '%guard_account()%'
+             and pg_get_functiondef('public.guard_mark(text,text,text)'::regprocedure) like '%guard_account()%'
+            then 'tamam' else 'EKSİK · dosyanın tamamını yeniden çalıştırın' end
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname in ('get_guard_link', 'rotate_guard_link', 'get_guard_view_link', 'rotate_guard_view_link', 'guard_board', 'guard_mark',
                                               'guard_account', 'is_guard_account', 'list_guard_accounts', 'save_guard_account', 'delete_guard_account')
@@ -383,8 +395,12 @@ union all
 select 'işlem geçmişi (çıkış)', case when pg_get_functiondef('public.pcs_log_visit'::regproc) like '%exit_on%' then 'tamam' else 'EKSİK' end
 union all
 select 'güvenlik hesapları tablolara erişemez',
-       coalesce('UYARI · RLS kapalı: ' || string_agg(c.relname, ', ' order by c.relname)
-                filter (where not c.relrowsecurity
-                          and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'select'))), 'tamam')
-  from pg_class c join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = 'public' and c.relkind in ('r', 'p');
+       coalesce(nullif(concat_ws(' · ',
+         'UYARI · RLS kapalı: ' || string_agg(t.relname, ', ' order by t.relname) filter (where not t.rls),
+         'UYARI · kural eklenemedi: ' || string_agg(t.relname, ', ' order by t.relname) filter (where t.rls and not t.kural)), ''), 'tamam')
+  from (select c.relname, c.relrowsecurity as rls,
+               exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname
+                        and p.policyname = 'guvenlik_hesabi_erisemez') as kural
+          from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relkind in ('r', 'p')
+           and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'select'))) t;
