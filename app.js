@@ -230,7 +230,7 @@ document.addEventListener('submit',async e=>{
  if(e.target.id==='registry-form'){e.preventDefault();const f=e.target,fd=new FormData(f),id=f.dataset.id;const r={id:id||uid(),plate:plateText(fd.get('plate')),customer:String(fd.get('customer')||'').trim(),declaration:String(fd.get('declaration')||'').trim(),carrier:String(fd.get('carrier')||'').trim(),registration:kgText(fd.get('registration'))};if(!norm(r.plate)||!r.customer)return formError('Plaka ve m\u00fc\u015fteri zorunludur.');if(state.registry.some(x=>x.id!==id&&norm(x.plate)===norm(r.plate)))return formError('Bu plaka zaten kay\u0131tl\u0131. Mevcut kayd\u0131 d\u00fczenleyin.');if(!id&&state.registry.length>=10000)return formError('10.000 plaka s\u0131n\u0131r\u0131na ula\u015f\u0131ld\u0131.');if(await mutate(s=>{if(id)s.registry=s.registry.map(x=>x.id===id?r:x);else s.registry.push(r);})){const pending=pendingVisit;pendingVisit=null;closeModal();toast('Plaka kayd\u0131 kaydedildi.');if(pending)openVisitForm(pending.editingId||null,pending.date,{...pending,plate:r.plate});}return;}
  if(e.target.id==='visit-form'){e.preventDefault();const f=e.target,id=f.dataset.id,v=visitFields(f);const source=matchPlate(v.plate);if(source)v.plate=source.plate;if(!validDate(v.date))return formError('Ge\u00e7erli bir geli\u015f tarihi se\u00e7in.');if(weekday(v.date)===0)return formError('Pazar g\u00fcn\u00fc kay\u0131t al\u0131nmaz. Pazartesi\u2013Cumartesi aras\u0131nda bir g\u00fcn se\u00e7in.');const reg=matchPlate(v.plate);const skipReg=!reg&&id&&f.dataset.original===norm(v.plate);if(!v.customer)return formError('M\u00fc\u015fteri ad\u0131 zorunludur.');if(state.visits.some(x=>x.id!==id&&x.date===v.date&&norm(x.plate)===norm(v.plate))&&!window.confirm('Bu plaka i\u00e7in ayn\u0131 g\u00fcnde ba\u015fka bir geli\u015f kayd\u0131 var. Ayr\u0131 bir geli\u015f olarak kaydetmek istiyor musunuz?'))return;let regNote='';if(!skipReg){if(!reg)v.plate=plateText(v.plate);const ch=registryChange(reg,v);if(ch){if(!await writeRegistry(ch))return;await syncData();regNote=ch.insert?'Ara\u00e7 geli\u015fi kaydedildi ve plaka kay\u0131tlar\u0131na eklendi.':'Ara\u00e7 geli\u015fi kaydedildi; plaka kayd\u0131ndaki bo\u015f bilgiler tamamland\u0131.';}}const prev=id?state.visits.find(x=>x.id===id):null;v.id=id||uid();v.createdAt=prev?.createdAt||new Date().toISOString();if(await mutate(s=>{if(id)s.visits=s.visits.map(x=>x.id===id?v:x);else s.visits.push(v);})){const w=weekInfo(v.date);if(w.year!==ui.year||w.week!==ui.week){ui.year=w.year;ui.week=w.week;ui.day=v.date;}else if(ui.day!=='all')ui.day=v.date;ui.collapsed.delete(v.date);closeModal();render();toast(regNote||'Ara\u00e7 geli\u015fi kaydedildi.');ruhsatAfterSave();}return;}
 });
-window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
+window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,ruhsatRank,ruhsatWeights,ruhsatPickWeights,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
 const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
@@ -997,12 +997,12 @@ async function ruhsatEnhance(file,rot=0){const bmp=await createImageBitmap(file)
  for(let i=0;i<n;i++)g[i]=(g[i]-lo)*k;
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let v=g[i];if(x>0&&y>0&&x<w-1&&y<h-1)v=v+0.5*(4*g[i]-g[i-1]-g[i+1]-g[i-w]-g[i+w]);const q=i*4;d[q]=d[q+1]=d[q+2]=v<0?0:v>255?255:v;}
  cx.putImageData(img,0,0);cv.srcW=w/sc;cv.srcH=h/sc;return cv;}
-/* Keskinleştirmesiz, renk desenini bastıran okuma: her noktanın en parlak renk kanalı alınır. Sarı, pembe, mavi
-   güvenlik çizgileri böylece beyaza yaklaşır, siyah yazı koyu kalır. */
+/* Keskinleştirmesiz okuma: yalnızca gri ton ve kontrast. Keskinleştirme Bulgar/Romen ruhsatlarındaki ince
+   güvenlik çizgilerini de belirginleştirip yazıyı bastırabiliyor; bu okuma o fotoğrafları kurtarır. */
 async function ruhsatClean(file,rot=0){const bmp=await createImageBitmap(file);const sc=Math.min(3,Math.max(1,2000/(rot%180?bmp.height:bmp.width)));
  const {cv,cx,w,h}=ruhsatDraw(bmp,rot,sc);if(bmp.close)bmp.close();
  const img=cx.getImageData(0,0,w,h),d=img.data,n=w*h,g=new Uint8ClampedArray(n),hist=new Uint32Array(256);
- for(let i=0,j=0;i<n;i++,j+=4){const v=d[j]>d[j+1]?(d[j]>d[j+2]?d[j]:d[j+2]):(d[j+1]>d[j+2]?d[j+1]:d[j+2]);g[i]=v;hist[v]++;}
+ for(let i=0,j=0;i<n;i++,j+=4){const v=(d[j]*299+d[j+1]*587+d[j+2]*114)/1000;g[i]=v;hist[g[i]]++;}
  let lo=0,hi=255,acc=0;while(lo<254&&(acc+=hist[lo])<n*0.01)lo++;acc=0;while(hi>lo+1&&(acc+=hist[hi])<n*0.01)hi--;const k=255/(hi-lo);
  for(let i=0,q=0;i<n;i++,q+=4)d[q]=d[q+1]=d[q+2]=(g[i]-lo)*k;
  cx.putImageData(img,0,0);return cv;}
@@ -1131,8 +1131,7 @@ function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=docu
  ruhsatRefresh();ruhsatRun();}
 async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada'&&(!x.wa||ruhsatAllowed()))))await (it.wa?waProcess(it):ruhsatProcess(it));}finally{ruhsat.running=false;}}
 /* Fotoğraf birkaç farklı biçimde okunur ve sonuçlar birleştirilir; her biçim başka fotoğraflarda iyi sonuç verir:
-   keskinleştirilmiş, hiç dokunulmamış ve renk desenleri bastırılmış (Bulgar/Romen ruhsatlarındaki sarı-pembe güvenlik
-   çizgileri keskinleştirmeyle yazıdan baskın çıkabiliyor). Yön seçimi okumanın kendi güven puanına göre değil,
+   keskinleştirilmiş, hiç dokunulmamış ve keskinleştirmesiz gri. Yön seçimi okumanın kendi güven puanına göre değil,
    bulunan plaka ve ağırlığa göre yapılır: güven puanı anlamsız okumada da yüksek çıkabiliyor. */
 const ruhsatQuality=text=>ruhsatRank([text]).strong+Math.min(2,ruhsatWeights(text).length);
 async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunuyor':'Okuma programı hazırlanıyor (ilk kullanımda ~6 MB iner)';ruhsatUpdateCard(it);
