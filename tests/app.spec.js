@@ -743,6 +743,49 @@ test('WhatsApp: eski sürümün yanlış okuduğu fotoğraf "Yeniden oku" ile ba
   expect(problems).toEqual([]);
 });
 
+test('yapay zekâ (Gemini) kuruluysa WhatsApp fotoğrafı onunla okunur; okuyamadığı dorse kayıttan önerilir', async ({ page, browser }) => {
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r6', plate: 'TR 35 WLF - TR 47 WLF', customer: 'ETL LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.incoming_ruhsat = [waRow('w6')];
+  // Fotoğrafın kendisi önemsiz: okumayı sahte Gemini cevabı verir (bu bilgisayardaki okuma hiç çalışmamalı).
+  const files = { '2026-09-22/w6.png': (await fakeRuhsat(browser, ['XX0000XX', 1], ['YY0000YY', 1])).toString('base64') };
+  const ai = { vehicles: [{ plate: 'PB5678CD', kind: 'trailer', empty_weight_kg: 6700, country: 'BG' }, { plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8150, country: 'BG' }], problem: '' };
+  const problems = await openApp(page, { data, files, ai });
+  const row = id => page.evaluate(i => window.__db.incoming_ruhsat.find(r => r.id === i), id);
+  await expect.poll(async () => (await row('w6')).status, { timeout: 30000 }).toBe('eklendi');
+  expect((await row('w6')).tractor).toBe('PB1234AB');
+  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  expect(inserted.map(v => [v.plate, v.customer, v.registration])).toEqual([['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG']]);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.type))).toEqual(['image/png']);
+  expect(await page.evaluate(() => typeof window.Tesseract)).toBe('undefined');
+
+  // Elle eklenen fotoğraf: dorse kartı parlamada kalmış, Gemini yalnızca çekiciyi okuyup nedenini yazmış.
+  await page.evaluate(() => { window.__PCS_STUB.ai = { vehicles: [{ plate: 'TR35WLF', kind: 'tractor', empty_weight_kg: 7860, country: 'RO' }], problem: 'Üstteki dorse kartı parlama yüzünden okunamıyor.' }; });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await expect(page.locator('.modal-header')).toContainText('yapay zekâyla (Google Gemini)');
+  await page.locator('#ruhsat-file').setInputFiles([{ name: 'wlf.png', mimeType: 'image/png', buffer: Buffer.from(files['2026-09-22/w6.png'], 'base64') }]);
+  const card = page.locator('.rs-item').last();
+  await expect(card.locator('.rs-status')).toHaveText('Okundu · yapay zekâ');
+  await expect(card.locator('input').nth(1)).toHaveValue('TR 47 WLF');
+  await expect(card).toContainText('kayıttaki dorsesi');
+  await expect(card).toContainText('Yapay zekâ: Üstteki dorse kartı parlama yüzünden okunamıyor.');
+  expect(problems).toEqual([]);
+});
+
+test('yapay zekânın kullanım sınırı dolunca fotoğraf bu bilgisayarda okunur', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
+  const problems = await openApp(page, { ai: { status: 429 } });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await page.locator('#ruhsat-file').setInputFiles([{ name: 'r.png', mimeType: 'image/png', buffer: img }]);
+  const card = page.locator('.rs-item');
+  await expect(card.locator('.rs-status')).toHaveText('Okundu', { timeout: 120000 });
+  await expect(card).toContainText('8150 kg + 6700 kg = 14850 kg');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);
+  expect(problems.filter(p => !p.includes('Yapay zekâ okuması kullanılamadı'))).toEqual([]);
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');

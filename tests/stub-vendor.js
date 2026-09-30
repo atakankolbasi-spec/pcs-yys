@@ -114,6 +114,19 @@
         };
       }
     },
+    // Sunucu fonksiyonları. cfg.ai: ruhsat-oku cevabı ({ vehicles, problem }) ya da { status: 429 } gibi hata;
+    // verilmezse fonksiyon kurulmamış gibi 404 döner (site bu bilgisayarda okur).
+    functions: {
+      async invoke(name, opts = {}) {
+        calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size });
+        if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
+        const r = name === 'ruhsat-oku' ? cfg.ai : null;
+        const err = status => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(null, { status }) } });
+        if (!r) return err(404);
+        if (r.status) return err(r.status);
+        return { data: clone(r), error: null };
+      }
+    },
     // Realtime: testler window.__rtEmit(tablo) ile "başka kullanıcı değiştirdi" bildirimi gönderebilir.
     channel(name) {
       const handlers = [];

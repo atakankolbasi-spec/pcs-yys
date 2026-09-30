@@ -13,6 +13,8 @@
      "Hemen ekle", "Formda aç" ya da "Listeden çıkar" denir. Gönderenin numarası Ayarlar'daki WhatsApp
      numaraları listesinde bir müşteriye aitse, formda o müşteri seçili gelir.
 
+Okumayı iyileştirmek için isteğe bağlı olarak Google Gemini kurulabilir: `supabase/GEMINI.md`.
+
 **Önemli:**
 - Bu numara mevcut WhatsApp grubunuza eklenemez; fotoğraflar numaraya doğrudan gönderilmelidir.
   Gruptaki fotoğrafları ofisten bu numaraya topluca iletmek de olur: fotoğrafları seçin → İlet.

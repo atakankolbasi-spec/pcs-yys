@@ -969,8 +969,9 @@ async function importRegistry(){const plan=importPlan;if(!plan||!plan.add.length
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action="import-confirm"]');if(b&&!b.disabled&&canEdit())importRegistry();});
 
 /* ===== Ruhsattan araç ekleme =====
-   Ruhsat fotoğrafı (WhatsApp Web'den kopyala-yapıştır, sürükle-bırak ya da dosya seç) bu bilgisayarda
-   Tesseract ile okunur; fotoğraf hiçbir yere gönderilmez. Okunan plakalar plaka kayıtlarıyla eşleştirilir:
+   Ruhsat fotoğrafı (WhatsApp Web'den kopyala-yapıştır, sürükle-bırak ya da dosya seç) kuruluysa yapay zekâyla
+   (Gemini, ruhsatAi) okunur; kurulu değilse ya da okuyamazsa bu bilgisayarda Tesseract ile okunur (fotoğraf bu
+   durumda hiçbir yere gönderilmez). Okunan plakalar plaka kayıtlarıyla eşleştirilir:
    kayıtlı araç tek tıkla eklenir, yeni araçta plaka ve boş ağırlık toplamı forma doldurulur. */
 const OCR_BASE=new URL('ocr/',location.href).href;
 const WASM_SIMD_TEST=new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]);
@@ -1106,6 +1107,7 @@ function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor'||it.stat
  else if(it.trailerReg)h+=`<div class="rs-match warn">${icon('info')}<span>Dorse kayıtlı (<b>${esc(it.trailerReg.customer)}</b>) ama bu çekiciyle kaydı yok. Formda kontrol edin.</span></div>`;
  else if(it.tractor)h+=`<div class="rs-match new">${icon('info')}<span>Yeni araç: plaka kayıtlarında yok. Müşteriyi formda seçin.</span></div>`;
  else h+=`<div class="rs-match bad">${icon('info')}<span>Plaka okunamadı. Plakayı elle yazın ya da daha net, düz çekilmiş bir fotoğraf deneyin.</span></div>`;
+ if(it.aiNote&&(!it.tractor||!it.trailer||it.weights.length<2))h+=`<div class="rs-note">Yapay zekâ: ${esc(it.aiNote)}</div>`;
  if(it.guess)h+=`<div class="rs-note warn">Dorse fotoğrafta okunamadı; çekicinin kayıttaki dorsesi (<b>${esc(fmtCompactPlate(it.trailer))}</b>) yazıldı. Çekici dorse değiştirmiş olabilir, kontrol edin.</div>`;
  else if(it.fuzzy)h+=`<div class="rs-note warn">Plaka fotoğrafta tam okunamadı; en yakın kayıtlı plaka seçildi. Lütfen kontrol edin.</div>`;
  if(it.status!=='hata')h+=`<div class="rs-note">${it.weights.length?`Okunan boş ağırlık: ${it.weights.map(v=>v+' kg').join(' + ')}${it.sum?` = <b>${it.sum} kg</b>`:''}`:'Boş ağırlık fotoğraftan okunamadı.'}</div>`;
@@ -1117,13 +1119,13 @@ function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor'||it.stat
   h+=`<div class="rs-note${cur&&kg&&!kgSame(cur,kg)?' warn':''}">Panodaki ruhsat: <b>${cur?esc(kgText(cur)):'boş'}</b>${kg?` · okunan: <b>${esc(kg)}</b>`:' · ruhsat kilosu okunamadı, formda elle girin'}</div>`;}
  if(!done)h+=`<div class="rs-acts">${ex?(kg&&!kgSame(ex.registration,kg)?`<button type="button" class="btn primary small" data-action="ruhsat-kg" data-id="${it.id}">${icon('check')}Ruhsatı kayda işle (${esc(kg)})</button>`:kg?`<button type="button" class="btn primary small" data-action="ruhsat-kg-ok" data-id="${it.id}">${icon('check')}Ruhsat zaten aynı, kapat</button>`:''):it.reg&&it.reg.customer?`<button type="button" class="btn primary small" data-action="ruhsat-add" data-id="${it.id}">${icon('plus')}Hemen ekle</button>`:''}<button type="button" class="btn small" data-action="ruhsat-form" data-id="${it.id}">${icon('doc')}Formda aç</button>${it.file||it.wa?.media_path?`<button type="button" class="btn text small" data-action="ruhsat-reread" data-id="${it.id}" title="Fotoğrafı sitenin güncel okumasıyla baştan okur">${icon('refresh')}Yeniden oku</button>`:''}${it.wa?`<button type="button" class="btn text small" data-action="ruhsat-dismiss" data-id="${it.id}" title="Bu fotoğrafı eklemeden listeden kaldırır (ör. aynı ruhsat iki kez gönderildiyse)">${icon('close')}Listeden çıkar</button>`:''}</div>`;
  return h;}
-function ruhsatStatusText(it){return it.status==='uzakta'?'Başka bir ekranda okunuyor':it.status==='sirada'?'Sırada':it.status==='okunuyor'?`${it.phase||'Okunuyor'}${it.progress?` · %${it.progress}`:''}`:it.status==='hata'?`Okunamadı: ${it.error}`:it.status==='eklendi'?(it.kgSet?`✓ Ruhsat panodaki kayda işlendi · ${it.kgSet}`:it.dup?'✓ Bu gün zaten panodaydı, tekrar eklenmedi':`✓ Panoya eklendi${it.wa?' · '+fmt(waDate(it.wa),{weekday:'long',day:'numeric',month:'long'}):''}`):'Okundu';}
+function ruhsatStatusText(it){return it.status==='uzakta'?'Başka bir ekranda okunuyor':it.status==='sirada'?'Sırada':it.status==='okunuyor'?`${it.phase||'Okunuyor'}${it.progress?` · %${it.progress}`:''}`:it.status==='hata'?`Okunamadı: ${it.error}`:it.status==='eklendi'?(it.kgSet?`✓ Ruhsat panodaki kayda işlendi · ${it.kgSet}`:it.dup?'✓ Bu gün zaten panodaydı, tekrar eklenmedi':`✓ Panoya eklendi${it.wa?' · '+fmt(waDate(it.wa),{weekday:'long',day:'numeric',month:'long'}):''}`):it.ai?'Okundu · yapay zekâ':'Okundu';}
 function ruhsatCard(it){const ready=it.status==='tamam'||it.status==='hata';
  return `<article class="rs-item${it.status==='eklendi'?' is-done':''}${it.wa?' is-wa':''}" id="${it.id}">${it.url?`<img class="rs-thumb" src="${it.url}" alt="Ruhsat fotoğrafı"${it.rot?` style="transform:rotate(${it.rot}deg)"`:''}>`:`<div class="rs-thumb rs-thumb-empty">${icon('wa')}</div>`}<div class="rs-main">${it.wa?waSource(it.wa):''}<div class="rs-status ${it.status}">${esc(ruhsatStatusText(it))}</div>${ready?`<div class="rs-fields"><label>Çekici<input data-rs="${it.id}" data-k="tractor" value="${esc(fmtCompactPlate(it.tractor))}" maxlength="15" autocomplete="off" spellcheck="false"></label><label>Dorse<input data-rs="${it.id}" data-k="trailer" value="${esc(fmtCompactPlate(it.trailer))}" maxlength="15" autocomplete="off" spellcheck="false"></label></div>`:''}<div class="rs-info">${ruhsatInfo(it)}</div></div></article>`;}
 function ruhsatListHTML(){const own=ruhsat.items.filter(x=>!x.wa);return own.length?`<p class="rs-day">Araçlar <b>${esc(fmt(defaultDate(),{weekday:'long',day:'numeric',month:'long'}))}</b> gününe eklenir.</p>${own.map(ruhsatCard).join('')}`:'';}
 /* WhatsApp'tan gelenler pencerenin en üstünde durur; kontrol bekleyen varsa ilk o görülsün. */
 function waListHTML(){const wa=ruhsat.items.filter(x=>x.wa);return wa.length?`<p class="rs-day rs-wa-head">${icon('wa')}<b>WhatsApp'tan gelenler</b> · kayıtlı araçlar panoya kendiliğinden eklenir, diğerleri burada kontrol bekler.</p>${wa.map(ruhsatCard).join('')}`:'';}
-function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle','Fotoğraf bu bilgisayarda okunur, hiçbir yere gönderilmez. Kayıtlı plakalar otomatik tanınır.')}<div class="modal-body" id="ruhsat-box"><div id="ruhsat-wa">${waListHTML()}</div><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
+function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle',ai.state==='on'?'Fotoğraflar yapay zekâyla (Google Gemini) okunur; okuyamazsa bu bilgisayarda okunur. Kayıtlı plakalar otomatik tanınır.':'Fotoğraf bu bilgisayarda okunur. Kayıtlı plakalar otomatik tanınır.')}<div class="modal-body" id="ruhsat-box"><div id="ruhsat-wa">${waListHTML()}</div><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
 function ruhsatRefresh(){const l=document.getElementById('ruhsat-list');if(l)l.innerHTML=ruhsatListHTML();const w=document.getElementById('ruhsat-wa');if(w)w.innerHTML=waListHTML();onlineUI();}
 function ruhsatUpdateCard(it){const el=document.getElementById(it.id);if(!el)return;el.outerHTML=ruhsatCard(it);onlineUI();}
 function ruhsatAllowed(){return !VIEW_TOKEN&&canEdit();}
@@ -1138,18 +1140,39 @@ async function ruhsatFromClipboard(){if(!navigator.clipboard?.read){toast('Bu ta
 function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=document.getElementById('modal');
  if(!document.getElementById('ruhsat-box')){if(m.open){toast('Önce açık pencereyi kapatın, sonra fotoğrafı yapıştırın.',true);return;}openRuhsat();}
  for(const f of files.slice(0,10)){if(f.size>20*1024*1024){toast('Fotoğraf çok büyük (en fazla 20 MB).',true);continue;}
-  ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,error:''});}
+  ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,ai:false,aiNote:'',error:''});}
  ruhsatRefresh();ruhsatRun();}
 async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada'&&(!x.wa||ruhsatAllowed()))))await (it.wa?waProcess(it):ruhsatProcess(it));}finally{ruhsat.running=false;}}
 /* Fotoğraf birkaç farklı biçimde okunur ve sonuçlar birleştirilir; her biçim başka fotoğraflarda iyi sonuç verir:
    keskinleştirilmiş, hiç dokunulmamış ve keskinleştirmesiz gri. Yön seçimi okumanın kendi güven puanına göre değil,
    bulunan plaka ve ağırlığa göre yapılır: güven puanı anlamsız okumada da yüksek çıkabiliyor. */
 const ruhsatQuality=text=>ruhsatRank([text]).strong+Math.min(2,ruhsatWeights(text).length);
-async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunuyor':'Okuma programı hazırlanıyor (ilk kullanımda ~6 MB iner)';ruhsatUpdateCard(it);
+/* Yapay zekâ ile okuma (Google Gemini, sunucu fonksiyonu supabase/functions/ruhsat-oku, kurulum supabase/GEMINI.md).
+   Kurulu değilse ya da okuyamazsa fotoğraf eskisi gibi bu bilgisayarda okunur. "Kurulu değil" cevabı gelince bu
+   oturumda bir daha denenmez; kullanım sınırı dolduysa (429) bir dakika bu bilgisayarda okunur. */
+const ai={state:'?',pauseUntil:0};
+async function ruhsatAi(file){if(ai.state==='off'||Date.now()<ai.pauseUntil||!client?.functions)return null;
+ try{const {data,error}=await client.functions.invoke('ruhsat-oku',{body:file,headers:{'Content-Type':file.type||'image/jpeg'}});
+  if(error){const st=error.context?.status;if([401,403,404,501].includes(st))ai.state='off';else if(st===429)ai.pauseUntil=Date.now()+60000;console.warn('Yapay zekâ okuması kullanılamadı:',st||error.message);return null;}
+  ai.state='on';return data;}
+ catch(e){console.warn('Yapay zekâ okuması kullanılamadı:',e?.message||e);return null;}}
+/* Gemini'nin kart listesinden çekici, dorse ve ağırlıklar. Plaka kayıtlarıyla eşleştirme (tek harf düzeltme, kayıttaki
+   dorse önerisi) bu bilgisayardaki okumayla aynı yoldan geçer. Hiç plaka ve ağırlık yoksa null (bu bilgisayarda okunur). */
+function ruhsatFromAi(r){const vs=(r?.vehicles||[]).map(v=>({p:compactPlate(v.plate),k:v.kind,kg:+v.empty_weight_kg||0}));
+ const plated=vs.filter(v=>v.p.length>=4);if(!plated.length&&!vs.some(v=>v.kg))return null;
+ const kinds={};plated.forEach(v=>{if(v.k==='tractor'||v.k==='trailer')kinds[v.p]=v.k;});
+ const cands=[...new Set(plated.map(v=>v.p))],res=ruhsatResolve(cands,kinds,cands.length);
+ const t=vs.find(v=>v.k==='tractor'),d=vs.find(v=>v.k==='trailer');let ws=[t?.kg,d?.kg].filter(Boolean);
+ if(ws.length<2){const all=vs.map(v=>v.kg).filter(Boolean);if(all.length<=2)ws=all;}
+ return {...res,weights:ws,sum:ws.length===2?ws[0]+ws[1]:null,ai:true,aiNote:String(r.problem||'')};}
+async function ruhsatProcess(it){it.status='okunuyor';it.phase=ai.state!=='off'?'Yapay zekâ ile okunuyor':ocrWorkerP?'Okunuyor':'Okuma programı hazırlanıyor (ilk kullanımda ~6 MB iner)';ruhsatUpdateCard(it);
  const texts=[];let last=0,done=0,total=3;
  const status=()=>{const el=document.querySelector(`#${it.id} .rs-status`);if(el)el.textContent=ruhsatStatusText(it);};
  ocrOnProgress=m=>{const p=m.status==='recognizing text'?Math.round((done+m.progress)/total*100):Math.round(m.progress*100);if(Date.now()-last<250&&p<100)return;last=Date.now();it.progress=p;status();};
- try{const w=await ocrWorker();it.phase='Okunuyor';
+ try{const got=ruhsatFromAi(await ruhsatAi(it.file));
+  if(got){Object.assign(it,got,{rot:0});it.status='tamam';}
+  else{it.ai=false;it.phase=ocrWorkerP?'Okunuyor':'Okuma programı hazırlanıyor (ilk kullanımda ~6 MB iner)';status();
+  const w=await ocrWorker();it.phase='Okunuyor';
   const read=async src=>{const d=(await w.recognize(src)).data;done++;return d;};
   const pass=async rot=>{const cv=await ruhsatEnhance(it.file,rot),d=await read(cv);return {rot,cv,text:d.text,conf:+d.confidence||0,q:ruhsatQuality(d.text)};};
   /* Yan ya da ters çekilmiş fotoğraf: düz okumada ne plaka ne ağırlık çıkıyorsa döndürülerek yeniden okunur. */
@@ -1160,7 +1183,7 @@ async function ruhsatProcess(it){it.status='okunuyor';it.phase=ocrWorkerP?'Okunu
   it.rot=best.rot;it.size=[Math.round(best.cv.srcW),Math.round(best.cv.srcH)];
   texts.push(best.text,(await read(await ruhsatRotated(it.file,best.rot))).text,(await read(await ruhsatClean(it.file,best.rot))).text);
   const cands=ruhsatRank(texts),kinds=texts.reduce((k,t)=>ruhsatKinds(t,k),{}),ws=ruhsatPickWeights(texts);
-  Object.assign(it,{weights:ws,sum:ws.length===2?ws[0]+ws[1]:null},ruhsatResolve(cands,kinds,cands.strong));it.status='tamam';}
+  Object.assign(it,{weights:ws,sum:ws.length===2?ws[0]+ws[1]:null},ruhsatResolve(cands,kinds,cands.strong));it.status='tamam';}}
  catch(e){it.status='hata';it.error=e?.message||String(e);}
  finally{ocrOnProgress=null;}
  ruhsatUpdateCard(it);}
@@ -1230,7 +1253,7 @@ function waFill(it,row){const w=(row.weights||[]).map(Number).filter(Boolean);
 function waSync(rows){const ids=new Set(),before=waPending();let changed=false;
  for(const row of rows){const id='wa-'+row.id;ids.add(id);let it=ruhsat.items.find(x=>x.id===id);
   const free=row.status==='yeni'||(row.status==='okunuyor'&&Date.parse(row.claimed_at||0)<Date.now()-WA_STALE_MS);
-  if(!it){it={id,wa:row,file:null,url:'',status:free?'sirada':'uzakta',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,error:''};
+  if(!it){it={id,wa:row,file:null,url:'',status:free?'sirada':'uzakta',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,ai:false,aiNote:'',error:''};
    if(row.status==='bekliyor')waFill(it,row);ruhsat.items.push(it);changed=true;continue;}
   it.wa=row;if(it.status==='okunuyor'||it.status==='eklendi')continue;
   if(row.status==='bekliyor'&&(it.status==='sirada'||it.status==='uzakta')){waFill(it,row);changed=true;}
@@ -1254,7 +1277,7 @@ async function waMark(it,status,extra={}){const patch={status,...extra};
    veritabanında yeniden "yeni" olur; hangi ekran önce üstlenirse o okur, kayıtlı araçsa panoya eklenir. */
 async function ruhsatReread(it){if(!ruhsatAllowed()||it.status==='okunuyor'||it.status==='sirada')return;
  if(it.wa){if(!await waMark(it,'yeni',{claimed_at:null,claimed_by:null,note:''}))return;}else if(!it.file)return;
- Object.assign(it,{status:'sirada',progress:0,phase:'',tractor:'',trailer:'',weights:[],sum:null,reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,error:'',dup:false,kgSet:''});
+ Object.assign(it,{status:'sirada',progress:0,phase:'',tractor:'',trailer:'',weights:[],sum:null,reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,ai:false,aiNote:'',error:'',dup:false,kgSet:''});
  ruhsatUpdateCard(it);ruhsatRun();}
 async function waDismiss(it){if(!canEdit())return;if(await waMark(it,'yoksayildi')){ruhsat.items=ruhsat.items.filter(x=>x!==it);if(it.url)URL.revokeObjectURL(it.url);ruhsatRefresh();waBadge();}}
 async function waProcess(it){const row=it.wa;it.status='okunuyor';it.phase='WhatsApp fotoğrafı alınıyor';ruhsatUpdateCard(it);
