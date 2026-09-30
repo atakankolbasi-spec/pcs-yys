@@ -114,7 +114,7 @@
         };
       }
     },
-    // Sunucu fonksiyonları. cfg.ai: ruhsat-oku cevabı ({ vehicles, problem }) ya da { status: 429 } gibi hata;
+    // Sunucu fonksiyonları. cfg.ai: ruhsat-oku cevabı ({ vehicles, problem }) ya da { status: 429, body: {...} } gibi hata;
     // verilmezse fonksiyon kurulmamış gibi 404 döner (site bu bilgisayarda okur).
     functions: {
       async invoke(name, opts = {}) {
@@ -122,9 +122,9 @@
         if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
         // dizi verilirse sırayla kullanılır (ör. önce 429, sonra cevap); son eleman tekrar eder
         const r = name !== 'ruhsat-oku' ? null : Array.isArray(cfg.ai) ? (cfg.ai.length > 1 ? cfg.ai.shift() : cfg.ai[0]) : cfg.ai;
-        const err = status => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(null, { status }) } });
+        const err = (status, body) => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(body ? JSON.stringify(body) : null, { status }) } });
         if (!r) return err(404);
-        if (r.status) return err(r.status);
+        if (r.status) return err(r.status, r.body);
         return { data: clone(r), error: null };
       }
     },

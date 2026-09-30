@@ -3,17 +3,18 @@
 Şoför ya da müşteri ruhsat fotoğrafını şirketin WhatsApp numarasına gönderir, gerisi kendiliğinden olur:
 
 1. Fotoğraf Supabase'e kaydedilir ve gönderenin mesajına ✅ ile tepki verilir.
-2. Panonun açık olduğu bir düzenleyici bilgisayarı fotoğrafı okur. Okuma ücretsiz programla bu
-   bilgisayarda yapılır, fotoğraf başka bir yere gönderilmez.
-3. Sonuç şöyle işlenir:
-   - **Çekici + dorse plaka kayıtlarında müşterisiyle varsa**, araç fotoğrafın geldiği güne panoya eklenir.
-     Pazar günü gelen fotoğraf Pazartesi'ye eklenir.
-   - **Araç o gün zaten panodaysa** tekrar eklenmez.
-   - **Diğerleri** (yeni araç, okunamayan plaka) "Ruhsattan ekle" düğmesinde rozetle görünür. Oradan
-     "Hemen ekle", "Formda aç" ya da "Listeden çıkar" denir. Gönderenin numarası Ayarlar'daki WhatsApp
-     numaraları listesinde bir müşteriye aitse, formda o müşteri seçili gelir.
-
-Okumayı iyileştirmek için isteğe bağlı olarak Google Gemini kurulabilir: `supabase/GEMINI.md`.
+2. Panonun açık olduğu bir düzenleyici bilgisayarı fotoğrafı okur: Google Gemini kuruluysa onunla
+   (`supabase/GEMINI.md`), değilse ücretsiz programla bu bilgisayarda.
+3. **Hiçbir araç sorulmadan panoya eklenmez.** Okunan fotoğraflar "Ruhsattan ekle" düğmesinde rozetle
+   görünür ve onay bekler:
+   - **Çekici + dorse plaka kayıtlarında müşterisiyle varsa** kartta **Panoya ekle** çıkar. Birden fazlaysa
+     pencerenin üstündeki **Hepsini panoya ekle** ile tek onayla eklenir (aynı aracın iki fotoğrafı bir kez
+     eklenir). Araç fotoğrafın geldiği güne ve saate eklenir; Pazar günü gelen fotoğraf Pazartesi'ye.
+   - **Araç o gün zaten panodaysa** tekrar eklenmez. Ruhsat kilosu farklıysa ya da panoda boşsa kartta
+     **Ruhsatı kayda işle** çıkar. Kilo aynıysa yapılacak bir şey olmadığından fotoğraf kendiliğinden kapanır.
+   - **Diğerleri** (yeni araç, okunamayan plaka) için **Formda aç** ya da **Listeden çıkar** denir.
+     Gönderenin numarası Ayarlar'daki WhatsApp numaraları listesinde bir müşteriye aitse, formda o müşteri
+     seçili gelir.
 
 **Önemli:**
 - Bu numara mevcut WhatsApp grubunuza eklenemez; fotoğraflar numaraya doğrudan gönderilmelidir.
@@ -28,7 +29,7 @@ Okumayı iyileştirmek için isteğe bağlı olarak Google Gemini kurulabilir: `
 | WhatsApp'a gelen mesajlar, ✅ tepkisi ve yardım cevabı | Ücretsiz (hepsi gönderenin mesajına verilen cevap) |
 | Meta hesabı, uygulama, numara bağlama | Ücretsiz |
 | Telefon hattı | WhatsApp'ta kullanılmayan bir numara gerekir. Şirketin sabit hattı olur (sesli aramayla doğrulanır) |
-| Fotoğrafı okuma | Ücretsiz (tarayıcıda) |
+| Fotoğrafı okuma | Ücretsiz (tarayıcıda ya da Gemini'nin ücretsiz kullanımıyla) |
 | Supabase | Ücretsiz plan yeter. Fotoğraflar 60 gün sonra kendiliğinden silinir; okunan bilgiler kalır |
 
 Meta fiyatlarını zaman zaman değiştiriyor. Bu sistem yalnızca gelen mesaja cevap veriyor, kendiliğinden
@@ -145,8 +146,8 @@ Meta'nın deneme numarası (+1 555 …) WhatsApp'ta aranınca "WhatsApp kullanm�
 Gerçek numarada bu adıma gerek yoktur.
 
 1. Telefonunuzdan numaraya bir ruhsat fotoğrafı gönderin. Birkaç saniye içinde fotoğrafa ✅ tepkisi gelmeli.
-2. Siteyi düzenleyici hesabıyla açın. Araç kayıtlıysa panoya eklenir ve ekranda "WhatsApp: … eklendi"
-   yazısı çıkar. Değilse **Ruhsattan ekle** düğmesinde rozet çıkar.
+2. Siteyi düzenleyici hesabıyla açın. Birkaç saniye içinde **Ruhsattan ekle** düğmesinde rozet çıkar;
+   pencerede okunan plakalar görünür. Kayıtlı araçsa **Panoya ekle** ile ekleyin.
 
 **✅ gelmediyse:**
 - Supabase'de **Edge Functions → whatsapp-webhook → Logs** sayfasına bakın.

@@ -444,7 +444,7 @@ test('araç o gün panodaysa ruhsattan yeni kayıt açılmaz, ruhsat kilosu mevc
   expect(problems).toEqual([]);
 });
 
-test('WhatsApp: araç o gün panodaysa ruhsat kilosu mevcut kayda kendiliğinden işlenir', async ({ page, browser }) => {
+test('WhatsApp: araç o gün panodaysa ruhsat kilosu kendiliğinden yazılmaz, tek tıkla işlenir', async ({ page, browser }) => {
   test.setTimeout(150000);
   const data = sampleData();
   // Araç bugün (Çarşamba) panoda, ruhsatı boş; fotoğraf da bugün geldi. Panodaki araç plaka kayıtlarında da var.
@@ -453,10 +453,19 @@ test('WhatsApp: araç o gün panodaysa ruhsat kilosu mevcut kayda kendiliğinden
   data.incoming_ruhsat = [waRow('w1', { created_at: '2026-09-23T06:30:00Z' })];
   const files = { '2026-09-22/w1.png': (await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700])).toString('base64') };
   const problems = await openApp(page, { data, files });
-  await expect.poll(() => page.evaluate(() => window.__db.incoming_ruhsat[0].status), { timeout: 120000 }).toBe('mevcut');
+  const row = () => page.evaluate(() => window.__db.incoming_ruhsat[0]);
+  // Okunur ama panodaki kayda dokunulmaz: onay bekler.
+  await expect.poll(async () => (await row()).status, { timeout: 120000 }).toBe('bekliyor');
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v8').registration)).toBe('');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && (c.op === 'insert' || c.op === 'update')).length)).toBe(0);
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const card = page.locator('#wa-w1');
+  await expect(card).toContainText('zaten panoda');
+  await expect(card.locator('[data-action="ruhsat-add"]')).toHaveCount(0);
+  await card.locator('[data-action="ruhsat-kg"]').click();
+  await expect(page.locator('#toast')).toContainText('14850 KG olarak panodaki kayda işlendi');
   expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v8').registration)).toBe('14850 KG');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
-  await expect(page.locator('#toast')).toContainText('ruhsat 14850 KG olarak işlendi');
+  expect((await row()).status).toBe('mevcut');
   expect(problems).toEqual([]);
 });
 
@@ -642,41 +651,55 @@ const waRow = (id, extra = {}) => ({
   created_at: '2026-09-22T06:30:00Z', updated_at: '2026-09-22T06:30:00Z', ...extra
 });
 
-test('WhatsApp: kayıtlı araç panoya kendiliğinden eklenir, yeni araç kontrole düşer', async ({ page, browser }) => {
+test('WhatsApp: hiçbir araç sorulmadan panoya eklenmez; kayıtlı olanlar tek onayla, yeni araç formla eklenir', async ({ page, browser }) => {
   test.setTimeout(150000);
   const data = sampleData();
   data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: 'KARGO SRL', registration: '14850 KG', updated_at: '2026-09-01T08:00:00Z' });
   data.app_settings.push({ key: 'customer_contacts', value: { numbers: { 'YENİ LOJ': '0532 111 22 33' } }, updated_at: '2026-09-01T08:00:00Z' });
-  data.incoming_ruhsat = [waRow('w1'), waRow('w2', { created_at: '2026-09-22T06:31:00Z' })];
-  const files = {
-    '2026-09-22/w1.png': (await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700])).toString('base64'),
-    '2026-09-22/w2.png': (await fakeRuhsat(browser, ['PB4321AB', 7900], ['PB8765CD', 6100])).toString('base64')
-  };
+  // w1 ve w3 aynı kayıtlı aracın iki fotoğrafı (şoför iki kez göndermiş)
+  data.incoming_ruhsat = [waRow('w1'), waRow('w2', { created_at: '2026-09-22T06:31:00Z' }), waRow('w3', { created_at: '2026-09-22T06:32:00Z' })];
+  const kayitli = (await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700])).toString('base64');
+  const files = { '2026-09-22/w1.png': kayitli, '2026-09-22/w3.png': kayitli, '2026-09-22/w2.png': (await fakeRuhsat(browser, ['PB4321AB', 7900], ['PB8765CD', 6100])).toString('base64') };
   const problems = await openApp(page, { data, files });
   const row = id => page.evaluate(i => window.__db.incoming_ruhsat.find(r => r.id === i), id);
 
-  // 1) Kayıtlı çift: fotoğrafın geldiği güne (Salı), geldiği saatle eklenir; kutudaki satır kapanır.
-  await expect.poll(async () => (await row('w1')).status, { timeout: 120000 }).toBe('eklendi');
-  await expect.poll(async () => (await row('w2')).status, { timeout: 120000 }).toBe('bekliyor');
-  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
-  expect(inserted.map(v => [v.plate, v.customer, v.registration, v.visit_date, v.visit_time])).toEqual([
-    ['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG', '2026-09-22', '09:30']
-  ]);
-  expect((await row('w1')).visit_id).toBe(inserted[0].id);
-
-  // 2) Yeni araç: okunan plaka ve ağırlıklar kaydedilir, düğmede rozet çıkar.
+  // 1) Üçü de okunur ve onay bekler; panoya hiçbir şey eklenmez.
+  for (const id of ['w1', 'w2', 'w3']) await expect.poll(async () => (await row(id)).status, { timeout: 120000 }).toBe('bekliyor');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
   const w2 = await row('w2');
   expect([w2.tractor, w2.trailer, w2.weights]).toEqual(['PB4321AB', 'PB8765CD', [7900, 6100]]);
   const open = page.locator('.heading [data-action="ruhsat-open"]');
-  await expect(open.locator('.rs-badge')).toHaveText('1');
+  await expect(open.locator('.rs-badge')).toHaveText('3');
+  await expect(page.locator('#toast')).toContainText('onayınızı bekliyor');
 
-  // 3) Pencerede kontrol: gönderen görünür, müşteri gönderenin numarasından gelir, gün Salı olur.
+  // 2) Pencerede: kayıtlı araç için "Panoya ekle", hepsi için tek onay. Aynı araç bir kez eklenir.
   await open.click();
+  await expect(page.locator('.rs-wa-head')).toContainText('siz onaylamadan panoya eklenmez');
+  await expect(page.locator('#wa-w1 [data-action="ruhsat-add"]')).toHaveText('Panoya ekle');
+  const bulk = page.locator('[data-action="ruhsat-add-all"]');
+  await expect(bulk).toHaveText('Hepsini panoya ekle (2)');
+  let asked = '';
+  page.once('dialog', d => { asked = d.message(); d.accept(); });
+  await bulk.click();
+  await expect(page.locator('#toast')).toContainText('1 araç panoya eklendi');
+  expect(asked).toContain('Şu 1 araç panoya eklensin mi?');
+  expect(asked).toContain('PB 1234 AB - PB 5678 CD · RUHSAT LOJ');
+  expect(asked).toContain('aynı aracın tekrarı');
+  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  // gün ve saat fotoğrafın geldiği an (Salı 09:30)
+  expect(inserted.map(v => [v.plate, v.customer, v.registration, v.visit_date, v.visit_time])).toEqual([
+    ['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG', '2026-09-22', '09:30']
+  ]);
+  expect([(await row('w1')).status, (await row('w3')).status]).toEqual(['eklendi', 'mevcut']);
+  expect((await row('w1')).visit_id).toBe(inserted[0].id);
+  await expect(page.locator('#wa-w1')).toContainText('Panoya eklendi');
+  await expect(bulk).toHaveCount(0);
+
+  // 3) Yeni araç: müşteri gönderenin numarasından gelir, gün Salı olur.
   const card = page.locator('#wa-w2');
   await expect(card).toContainText('Ali Şoför');
   await expect(card).toContainText('YENİ LOJ');
   await expect(card).toContainText('7900 kg + 6100 kg = 14000 kg');
-  await expect(page.locator('#wa-w1')).toContainText('Panoya eklendi');
   await card.locator('[data-action="ruhsat-form"]').click();
   const form = page.locator('#visit-form');
   await expect(form.locator('[name="plate"]')).toHaveValue('PB 4321 AB - PB 8765 CD');
@@ -734,10 +757,15 @@ test('WhatsApp: eski sürümün yanlış okuduğu fotoğraf "Yeniden oku" ile ba
   const card = page.locator('#wa-w5');
   await expect(card.locator('input').first()).toHaveValue('APB 1234 AB');
   await card.locator('[data-action="ruhsat-reread"]').click();
-  // Baştan okunur; kayıtlı çift olduğu için panoya kendiliğinden eklenir.
-  await expect.poll(async () => (await row()).status, { timeout: 120000 }).toBe('eklendi');
-  expect((await row()).tractor).toBe('PB1234AB');
+  // Bu ekran üstlenip baştan okur; sonuç yine onay bekler.
+  await expect.poll(async () => (await row()).claimed_by, { timeout: 30000 }).toBe('u1');
+  await expect.poll(async () => (await row()).tractor, { timeout: 120000 }).toBe('PB1234AB');
+  expect((await row()).status).toBe('bekliyor');
+  await expect(card.locator('input').first()).toHaveValue('PB 1234 AB');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
+  await card.locator('[data-action="ruhsat-add"]').click();
   await expect(card).toContainText('Panoya eklendi');
+  expect((await row()).status).toBe('eklendi');
   const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
   expect(inserted.map(v => [v.plate, v.customer, v.registration])).toEqual([['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG']]);
   expect(problems).toEqual([]);
@@ -753,10 +781,9 @@ test('yapay zekâ (Gemini) kuruluysa WhatsApp fotoğrafı onunla okunur; okuyama
   const ai = { vehicles: [{ plate: 'PB5678CD', kind: 'trailer', empty_weight_kg: 6700, country: 'BG' }, { plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8150, country: 'BG' }], problem: '' };
   const problems = await openApp(page, { data, files, ai });
   const row = id => page.evaluate(i => window.__db.incoming_ruhsat.find(r => r.id === i), id);
-  await expect.poll(async () => (await row('w6')).status, { timeout: 30000 }).toBe('eklendi');
-  expect((await row('w6')).tractor).toBe('PB1234AB');
-  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
-  expect(inserted.map(v => [v.plate, v.customer, v.registration])).toEqual([['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG']]);
+  await expect.poll(async () => (await row('w6')).status, { timeout: 30000 }).toBe('bekliyor');
+  expect([(await row('w6')).tractor, (await row('w6')).trailer, (await row('w6')).weights]).toEqual(['PB1234AB', 'PB5678CD', [8150, 6700]]);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
   expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.type))).toEqual(['image/png']);
   expect(await page.evaluate(() => typeof window.Tesseract)).toBe('undefined');
 
@@ -764,39 +791,97 @@ test('yapay zekâ (Gemini) kuruluysa WhatsApp fotoğrafı onunla okunur; okuyama
   await page.evaluate(() => { window.__PCS_STUB.ai = { vehicles: [{ plate: 'TR35WLF', kind: 'tractor', empty_weight_kg: 7860, country: 'RO' }], problem: 'Üstteki dorse kartı parlama yüzünden okunamıyor.' }; });
   await page.locator('.heading [data-action="ruhsat-open"]').click();
   await expect(page.locator('.modal-header')).toContainText('yapay zekâyla (Google Gemini)');
+  await expect(page.locator('.modal-header')).toContainText('siz onaylayınca eklenir');
   await page.locator('#ruhsat-file').setInputFiles([{ name: 'wlf.png', mimeType: 'image/png', buffer: Buffer.from(files['2026-09-22/w6.png'], 'base64') }]);
   const card = page.locator('.rs-item').last();
   await expect(card.locator('.rs-status')).toHaveText('Okundu · yapay zekâ');
   await expect(card.locator('input').nth(1)).toHaveValue('TR 47 WLF');
   await expect(card).toContainText('kayıttaki dorsesi');
   await expect(card).toContainText('Yapay zekâ: Üstteki dorse kartı parlama yüzünden okunamıyor.');
+  // dorsesi tahmin edilen araç topluca eklenmez (tek tek bakılmalı); WhatsApp'taki kayıtlı araç eklenir
+  await expect(page.locator('[data-action="ruhsat-add-all"]')).toHaveText('Hepsini panoya ekle (1)');
+
+  // Gemini fotoğrafta ruhsat bulamadıysa bu bilgisayarda okumaya geçilmez, nedeni yazar.
+  await page.evaluate(() => { window.__PCS_STUB.ai = { vehicles: [], problem: 'Fotoğrafta ruhsat görünmüyor.' }; });
+  await page.locator('#ruhsat-file').setInputFiles([{ name: 'bos.png', mimeType: 'image/png', buffer: Buffer.from(files['2026-09-22/w6.png'], 'base64') }]);
+  await expect(page.locator('.rs-item').last().locator('.rs-status')).toHaveText('Okunamadı: Yapay zekâ ruhsatı okuyamadı · Fotoğrafta ruhsat görünmüyor.');
+  expect(await page.evaluate(() => typeof window.Tesseract)).toBe('undefined');
   expect(problems).toEqual([]);
 });
 
-test('yapay zekânın kullanım sınırı dolunca beklenip yeniden denenir; hep doluysa bu bilgisayarda okunur ve nedeni yazar', async ({ page, browser }) => {
+test('Gemini hata verince beklenip yeniden denenir; hiç olmazsa bu bilgisayarda okunmaz, istenirse okunur', async ({ page, browser }) => {
   test.setTimeout(150000);
   const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
   const ok = { vehicles: [{ plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8150 }, { plate: 'PB5678CD', kind: 'trailer', empty_weight_kg: 6700 }], problem: '' };
-  const problems = await openApp(page, { ai: [{ status: 429 }, ok] });
+  const problems = await openApp(page, { ai: [{ status: 429, body: { error: 'Gemini 429', retry_after: 20 } }, { status: 503 }, ok] });
   await page.locator('.heading [data-action="ruhsat-open"]').click();
   const add = name => page.locator('#ruhsat-file').setInputFiles([{ name, mimeType: 'image/png', buffer: img }]);
   const status = page.locator('.rs-item .rs-status');
+  const calls = () => page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
 
-  // 1) Sınır doldu: beklenir (yedek okumaya geçilmez), sonra yapay zekâ okur.
+  // 1) Sınır doldu: Gemini'nin söylediği süre (+2 sn) beklenir; sonra Google yoğun: giderek uzayan aralıkla
+  //    (ikinci beklemede 15 sn) beklenir; sonra okur.
   await add('a.png');
-  await expect(status.first()).toContainText('Yapay zekâ sınırı doldu, 20 sn bekleniyor');
-  await page.clock.fastForward(21000);
-  await expect(status.first()).toHaveText('Okundu · yapay zekâ');
+  await expect(status.first()).toContainText('Gemini ücretsiz kullanım sınırı doldu; 22 sn sonra yeniden denenecek (deneme 2/6)');
+  await page.clock.fastForward(23000);
+  await expect(status.first()).toContainText(/Gemini şu an çok yoğun; 1[45] sn sonra yeniden denenecek \(deneme 3\/6\)/);
+  await page.clock.fastForward(16000);
+  await expect(status.first()).toHaveText('Okundu · yapay zekâ', { timeout: 20000 });
   await expect(page.locator('.rs-item').first()).toContainText('8150 kg + 6700 kg = 14850 kg');
+  expect(await calls()).toBe(3);
 
-  // 2) Sınır hep dolu: üç denemeden (iki beklemeden) sonra bu bilgisayarda okunur, kartta nedeni yazar.
+  // 2) Sınır hep dolu: altı deneme (beş bekleme) yapılır; bu bilgisayarda okumaya geçilmez.
   await page.evaluate(() => { window.__PCS_STUB.ai = { status: 429 }; });
   await add('b.png');
-  for (let i = 0; i < 2; i++) { await expect(status.nth(1)).toContainText('bekleniyor'); await page.clock.fastForward(21000); }
+  for (const sec of [15, 30, 45, 60, 90]) { await expect(status.nth(1)).toContainText(`${sec} sn sonra yeniden denenecek`, { timeout: 20000 }); await page.clock.fastForward(sec * 1000 + 1000); }
+  await expect(status.nth(1)).toHaveText('Okunamadı: Gemini şu an okuyamadı (Gemini ücretsiz kullanım sınırı doldu)', { timeout: 20000 });
+  expect(await calls()).toBe(3 + 6);
+  expect(await page.evaluate(() => typeof window.Tesseract)).toBe('undefined');
+  const card = page.locator('.rs-item').nth(1);
+  await expect(card).toContainText('Gemini birkaç kez denendi');
+
+  // 3) Hemen ardından gelen fotoğraf (Google hâlâ cevap vermiyor) üç denemeyle yetinir; iki kart okunamayınca
+  //    hepsini yeniden okuma düğmesi çıkar.
+  await add('c.png');
+  for (const sec of [15, 30]) { await expect(status.nth(2)).toContainText(`${sec} sn sonra yeniden denenecek (deneme`, { timeout: 20000 }); await page.clock.fastForward(sec * 1000 + 1000); }
+  await expect(status.nth(2)).toContainText('Okunamadı: Gemini şu an okuyamadı', { timeout: 20000 });
+  expect(await calls()).toBe(3 + 6 + 3);
+  await expect(page.locator('[data-action="ruhsat-reread-all"]')).toBeVisible();
+
+  // 4) "Bu bilgisayarda oku": Gemini beklenmeden eski yoldan okunur ve kontrol edilmesi istenir.
+  await card.locator('[data-action="ruhsat-ocr"]').click();
   await expect(status.nth(1)).toHaveText('Okundu', { timeout: 120000 });
-  await expect(page.locator('.rs-item').nth(1)).toContainText('Yapay zekâ kullanılamadı (ücretsiz kullanım sınırı doldu)');
-  await expect(page.locator('.rs-item').nth(1)).toContainText('8150 kg + 6700 kg = 14850 kg');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(2 + 3);
+  await expect(card).toContainText('yapay zekâ yerine bu bilgisayarda okundu');
+  await expect(card).toContainText('8150 kg + 6700 kg = 14850 kg');
+  expect(await calls()).toBe(3 + 6 + 3);
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp: Gemini’nin okuyamadığı fotoğraf 10 dakika sonra kendiliğinden yeniden okunur', async ({ page, browser }) => {
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  // 1 saat önce gelmiş, 5 dakika önce Gemini'ye son kez denenmiş ve olmamış
+  data.incoming_ruhsat = [waRow('w7', { status: 'bekliyor', note: 'Gemini şu an okuyamadı (Gemini şu an çok yoğun)', created_at: '2026-09-23T06:00:00Z', updated_at: '2026-09-23T06:55:00Z' })];
+  const files = { '2026-09-22/w7.png': (await fakeRuhsat(browser, ['XX0000XX', 1], ['YY0000YY', 1])).toString('base64') };
+  const ai = { vehicles: [{ plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8150 }, { plate: 'PB5678CD', kind: 'trailer', empty_weight_kg: 6700 }], problem: '' };
+  const problems = await openApp(page, { data, files, ai });
+  const row = () => page.evaluate(() => window.__db.incoming_ruhsat.find(r => r.id === 'w7'));
+  const calls = () => page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const card = page.locator('#wa-w7');
+  await expect(card.locator('.rs-status')).toHaveText('Okunamadı: Gemini şu an okuyamadı (Gemini şu an çok yoğun)');
+  await expect(card).toContainText('Gemini birkaç kez denendi');
+  await expect(card.locator('[data-action="ruhsat-ocr"]')).toBeVisible();
+  expect(await calls()).toBe(0);
+  // 10 dakika dolunca kendiliğinden yeniden okunur; sonuç yine onay bekler
+  await page.clock.fastForward(6 * 60000);
+  await expect.poll(async () => (await row()).tractor, { timeout: 30000 }).toBe('PB1234AB');
+  expect(await calls()).toBe(1);
+  expect((await row()).status).toBe('bekliyor');
+  expect((await row()).note).toBe('');
+  await expect(card.locator('.rs-status')).toHaveText('Okundu · yapay zekâ');
+  await expect(card.locator('[data-action="ruhsat-add"]')).toBeVisible();
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
   expect(problems).toEqual([]);
 });
 

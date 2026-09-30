@@ -4,8 +4,22 @@ Kurulunca "Ruhsattan ekle"ye eklenen ve WhatsApp'tan gelen ruhsat fotoğrafları
 Gemini fotoğraftaki her ruhsat kartı için plakayı, cinsini (çekici / dorse) ve boş ağırlığı çıkarır. Parlama,
 eğik çekim, Kiril harf ve farklı ülke ruhsatlarında bilgisayardaki okuma programından çok daha iyi okur.
 
-Gemini kurulmamışsa, kullanım sınırı dolmuşsa ya da fotoğraftan hiçbir şey çıkaramazsa site eskisi gibi
-fotoğrafı kendi bilgisayarında okur. Yani kurulum hiçbir şeyi bozmaz, yalnızca okumayı iyileştirir.
+Gemini kurulunca fotoğraflar **yalnızca Gemini ile** okunur; bilgisayardaki eski okuma programına kendiliğinden
+geçilmez. Gemini hata verirse (ücretsiz kullanımın dakikalık sınırı, Google'ın yoğunluğu) pes edilmez:
+- Sunucu fonksiyonu önce aynı modeli bir kez daha, sonra sırayla yedek modelleri (`gemini-2.5-flash`,
+  `gemini-flash-lite-latest`) dener. Her modelin ayrı kullanım sınırı vardır.
+- Hepsi doluysa site, Gemini'nin söylediği süre kadar bekleyip yeniden dener; en fazla altı deneme (yaklaşık
+  4 dakika). Kartta kaç saniye sonra yeniden deneneceği yazar.
+- Yine olmazsa kart "Gemini şu an okuyamadı" olur. **Yeniden oku** ile tekrar denenir. Beklemek istemezseniz
+  **Bu bilgisayarda oku** ile eski yoldan okunur (daha az güvenilir).
+- WhatsApp'tan gelen fotoğraf Gemini'ye okutulamadıysa panonun açık olduğu bir bilgisayarda 10 dakikada bir
+  kendiliğinden yeniden denenir (fotoğraf geldikten sonra 12 saat boyunca).
+
+Gemini hiç kurulmamışsa (fonksiyon yok ya da anahtar tanımlı değil) site eskisi gibi fotoğrafı kendi
+bilgisayarında okur.
+
+Hangi yolla okunursa okunsun, hiçbir araç siz onaylamadan panoya eklenmez: kartta **Panoya ekle** ya da
+pencerenin üstündeki **Hepsini panoya ekle** ile eklersiniz.
 
 **Gizlilik:** Kurulunca ruhsat fotoğrafları okunmak üzere Google'a gönderilir. Google'ın **ücretsiz**
 kullanımında gönderilen içerik Google'ın ürünlerini geliştirmek için kullanılabilir ve çalışanlarınca
@@ -37,8 +51,16 @@ Siteyi yenileyin (Ctrl + F5), **Ruhsattan ekle**'ye birkaç ruhsat fotoğrafı s
 **"Okundu · yapay zekâ"** yazar. Pencerenin üst yazısı da "yapay zekâyla (Google Gemini) okunur" olur.
 Önceden okunmuş fotoğrafları **Yeniden oku** ile Gemini'ye okutabilirsiniz.
 
-**"Okundu · yapay zekâ" yazmıyorsa:** Supabase'de **Edge Functions → ruhsat-oku → Logs**'a bakın.
+**Güncelleme:** `supabase/functions/ruhsat-oku/index.ts` değiştiğinde fonksiyonun sayfasında **Code**
+sekmesine girin, eski kodu tamamen silip yenisini yapıştırın ve **Deploy**'a basın.
+
+**"Okundu · yapay zekâ" yazmıyorsa:** kartta nedeni yazar. Ayrıntı için Supabase'de
+**Edge Functions → ruhsat-oku → Logs**'a bakın.
 - Hiç kayıt yoksa fonksiyon adı yanlıştır (tam olarak `ruhsat-oku` olmalı).
 - `GEMINI_API_KEY tanımlı değil`: 2. adım.
-- `Gemini 400` / `403`: anahtar yanlış ya da etkin değil.
-- `Gemini 429`: ücretsiz kullanım sınırı doldu; o fotoğraflar bu bilgisayarda okunur, bir süre sonra düzelir.
+- `Gemini 400` / `403` ("anahtar geçersiz"): anahtar yanlış ya da etkin değil; beklemekle düzelmez.
+- `Gemini 429`: ücretsiz kullanım sınırı doldu. Dakikalık sınırsa site bekleyip kendisi yeniden dener.
+  Kartta "günlük ücretsiz sınır doldu" yazıyorsa o gün beklemenin anlamı yok; sınır Türkiye saatiyle
+  10:00–11:00 arasında sıfırlanır. Sık oluyorsa Google AI Studio'da faturalandırmayı açın (ücretli kullanım
+  sınırları çok daha yüksektir).
+- `Gemini 503`: Google o an çok yoğun; site bekleyip yeniden dener.
