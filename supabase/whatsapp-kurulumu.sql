@@ -53,6 +53,14 @@ alter table public.incoming_ruhsat enable row level security;
 revoke all on public.incoming_ruhsat from anon;
 grant select, update on public.incoming_ruhsat to authenticated;
 
+-- Sunucu fonksiyonu (service_role) satır ekler, okur ve eski fotoğrafları boşaltır. Yeni Supabase
+-- projeleri yeni tablolara bu yetkiyi kendiliğinden vermediği için açıkça verilir.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant select, insert, update on public.incoming_ruhsat to service_role';
+  end if;
+end $$;
+
 drop policy if exists incoming_ruhsat_editor_read on public.incoming_ruhsat;
 create policy incoming_ruhsat_editor_read on public.incoming_ruhsat
   for select to authenticated using ((select private.is_editor()));
@@ -82,8 +90,13 @@ begin
   end if;
 end $$;
 
--- Kontrol: dört satır da "tamam" olmalı.
+-- Kontrol: beş satır da "tamam" olmalı.
 select 'tablo' as kontrol, case when to_regclass('public.incoming_ruhsat') is not null then 'tamam' else 'EKSİK' end as durum
+union all
+select 'sunucu fonksiyonu yetkisi', case when exists (select 1 from pg_roles where rolname = 'service_role')
+    and has_table_privilege('service_role', 'public.incoming_ruhsat', 'SELECT')
+    and has_table_privilege('service_role', 'public.incoming_ruhsat', 'INSERT')
+    and has_table_privilege('service_role', 'public.incoming_ruhsat', 'UPDATE') then 'tamam' else 'EKSİK' end
 union all
 select 'yetki kuralları', case when count(*) = 2 then 'tamam' else 'EKSİK' end
   from pg_policies where schemaname = 'public' and tablename = 'incoming_ruhsat'
