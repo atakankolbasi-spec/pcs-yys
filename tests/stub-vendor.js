@@ -6,7 +6,8 @@
  *     guardToken: 'g1', today: '2026-09-23',  // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
  *     guardViewToken: 'gv1',                   // güvenlik ekranı izleme linki (yalnızca görüntüleme)
  *     guardAccount: { name: 'Tepecik', active: true },  // giriş yapan kullanıcı güvenlik hesabı
- *     guardAccounts: [{ email, name, active, has_user, last_sign_in_at }] }  // Ayarlar > Güvenlik hesapları
+ *     guardAccounts: [{ email, name, active, has_user, last_sign_in_at }],  // Ayarlar > Güvenlik hesapları
+ *     report: { enabled, recipients, token, last_run_at, last_ok, last_note } }  // Ayarlar > Otomatik günlük rapor
  * Yapılan her çağrı window.__calls dizisine yazılır. */
 (() => {
   const cfg = window.__PCS_STUB || {};
@@ -140,6 +141,18 @@
         if ((cfg.missing || []).includes('guard-view')) return guardErr('PGRST202', 'Could not find the function');
         if (name === 'rotate_guard_view_link' || !cfg.guardViewToken) cfg.guardViewToken = 'izle' + Date.now();
         return { data: cfg.guardViewToken, error: null };
+      }
+      // Otomatik günlük rapor ayarları (supabase/gunluk-rapor-kurulumu.sql'in sade karşılığı)
+      if (name === 'get_report_settings' || name === 'save_report_settings' || name === 'rotate_report_token') {
+        if ((cfg.missing || []).includes('report')) return guardErr('PGRST202', 'Could not find the function');
+        const r = (cfg.report = cfg.report || { enabled: false, recipients: [], token: 'rapor1', last_run_at: null, last_ok: null, last_note: null });
+        if (name === 'rotate_report_token') { r.token = 'rapor' + Date.now(); return { data: r.token, error: null }; }
+        if (name === 'save_report_settings') {
+          const list = [...new Set((params.p_recipients || []).map(x => String(x).trim().toLowerCase()).filter(Boolean))].sort();
+          if (list.some(x => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))) return guardErr('22023', 'Geçersiz e-posta adresi var; her satıra bir adres yazın');
+          Object.assign(r, { enabled: !!params.p_enabled, recipients: list });
+        }
+        return { data: clone(r), error: null };
       }
       // Güvenlik hesapları: cfg.guardAccount = { name, active } ise giriş yapan kullanıcı güvenlik hesabıdır
       if (name === 'guard_account') {

@@ -972,6 +972,53 @@ test('ayarlar: güvenlik hesapları görüntüleyiciye görünmez', async ({ pag
   expect(problems).toEqual([]);
 });
 
+test('ayarlar: otomatik günlük rapor alıcıları kaydedilir, anahtar gösterilir ve yenilenir', async ({ page }) => {
+  const problems = await openApp(page, { report: { enabled: false, recipients: [], token: 'rapor1', last_run_at: '2026-09-22T20:59:30Z', last_ok: true, last_note: '22.09.2026: 2 alıcıya gönderildi · 7 araç.' } });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('details[data-panel="report"] > summary').click();
+  const panel = page.locator('details[data-panel="report"]');
+  await expect(panel.locator('.rep-last.ok')).toContainText('2 alıcıya gönderildi');
+  await expect(panel).toContainText('23:59');
+  // geçersiz adres ve boş liste reddedilir
+  await page.locator('#rep-enabled').check();
+  await page.locator('[data-action="rep-save"]').click();
+  await expect(page.locator('#toast')).toContainText('en az bir alıcı');
+  await page.locator('#rep-to').fill('evren@ornek.com\nyanlis-adres');
+  await page.locator('[data-action="rep-save"]').click();
+  await expect(page.locator('#toast')).toContainText('Geçersiz e-posta: yanlis-adres');
+  // kaydet: boşluk/virgülle ayrılmış adresler, küçük harf
+  await page.locator('#rep-to').fill('Evren@Ornek.com, ofis@ornek.com\n\n');
+  await page.locator('[data-action="rep-save"]').click();
+  await expect(page.locator('#toast')).toContainText('2 alıcıya gidecek');
+  const saved = await page.evaluate(() => window.__calls.filter(c => c.rpc === 'save_report_settings').at(-1).params);
+  expect(saved).toEqual({ p_enabled: true, p_recipients: ['evren@ornek.com', 'ofis@ornek.com'] });
+  await expect(page.locator('#rep-to')).toHaveValue('evren@ornek.com\nofis@ornek.com');
+  // anahtar: gizli, göster, yenile
+  await expect(page.locator('#rep-token')).toHaveAttribute('type', 'password');
+  await page.locator('[data-action="rep-show"]').click();
+  await expect(page.locator('#rep-token')).toHaveAttribute('type', 'text');
+  await expect(page.locator('#rep-token')).toHaveValue('rapor1');
+  page.once('dialog', d => d.accept());
+  await page.locator('[data-action="rep-rotate"]').click();
+  await expect(page.locator('#rep-token')).toHaveValue(/^rapor\d+$/);
+  expect(problems).toEqual([]);
+});
+
+test('ayarlar: günlük rapor kurulmamışsa SQL dosyası istenir; görüntüleyiciye bölüm görünmez', async ({ page, browser }) => {
+  const problems = await openApp(page, { missing: ['report'] });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('details[data-panel="report"] > summary').click();
+  await expect(page.locator('details[data-panel="report"] .notice')).toContainText('gunluk-rapor-kurulumu.sql');
+  await expect(page.locator('details[data-panel="report"] .rep-setup')).toHaveAttribute('open', '');
+  expect(problems).toEqual([]);
+  const viewer = await browser.newPage();
+  await openApp(viewer, { role: 'viewer' });
+  await viewer.locator('.nav-item[data-page="settings"]').click();
+  await expect(viewer.locator('details[data-panel="report"]')).toHaveCount(0);
+  expect(await viewer.evaluate(() => window.__calls.filter(c => c.rpc === 'get_report_settings').length)).toBe(0);
+  await viewer.close();
+});
+
 test('çıkış saati panoda, raporda ve formda işlemler bitti saatinden ayrı görünür', async ({ page }) => {
   const data = sampleData();
   // v5: 08:05 giriş, 09:10 işlemler bitti, 09:30 güvenlik çıkışı (İstanbul saati)

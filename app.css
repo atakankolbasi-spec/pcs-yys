@@ -2151,3 +2151,20 @@ html[data-theme="dark"] .gacc-st{background:#262b35;color:#e6ebf2}
 html[data-theme="dark"] .gacc-st.ok{background:#0f2e1b;color:#86efac}
 html[data-theme="dark"] .gacc-st.warn{background:#3b2a0a;color:#fcd34d}
 html[data-theme="dark"] .gacc-st.off{background:#2a2d33;color:#d1d5db}
+/* Ayarlar: otomatik günlük rapor */
+.rep-on{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px;cursor:pointer}
+.rep-on input{width:18px;height:18px;min-height:0}
+.rep-label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}.rep-label small{font-weight:500;color:#5b6b82}
+#rep-to{width:100%;min-height:96px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:13px;text-transform:none!important}
+#rep-token{text-transform:none!important}
+.rep-last{display:flex;align-items:center;gap:8px;margin:12px 0 0;padding:9px 12px;border-radius:10px;font-size:12px;font-weight:600}
+.rep-last svg{width:16px;height:16px;flex:none}
+.rep-last.ok{background:#dcfce7;color:#166534}.rep-last.bad{background:#fee2e2;color:#991b1b}
+.rep-setup{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.rep-setup summary{cursor:pointer;font-size:13px;font-weight:700}
+.rep-setup ol{margin-top:10px}.rep-setup a{color:var(--c-accent,#3453d1);text-decoration:underline}
+html[data-theme="dark"] .rep-label small{color:#cacfd7}
+html[data-theme="dark"] .rep-last.ok{background:#0f2e1b;color:#86efac}
+html[data-theme="dark"] .rep-last.bad{background:#3b1111;color:#fca5a5}
+html[data-theme="dark"] .rep-setup a{color:#8fb3ff}
+.rep-setup,.rep-setup *{text-transform:none!important}

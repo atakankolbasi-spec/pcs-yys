@@ -164,13 +164,41 @@ silip aynı e-postayla yeniden açmak yeterlidir; listedeki kayıt durur.
 - **SQL dosyaları:** GitHub'da düzenlemeyin (kalem simgesi). Dosyanın tamamını "kopyala" simgesiyle alıp
   SQL Editor'deki eski içeriğin yerine yapıştırın; kontrol satırlarının hepsi "tamam" demeli.
 
+## 10. Otomatik günlük rapor (e-posta)
+
+Her iş günü (Pazartesi–Cumartesi) 23:59'da günün raporu e-postayla gider: günün özeti, müşteri bazında
+sayılar, araçların tesis giriş – işlem bitti – tesis çıkış – kalma saatleri ve ekte günlük Excel. Araç olmayan
+günlerde gönderilmez. Gönderimi GitHub'daki "Günlük rapor maili" görevi yapar
+(`.github/workflows/gunluk-rapor.yml`, betik `scripts/gunluk-rapor/gonder.mjs`).
+
+Kurulum (bir kez):
+
+1. `gunluk-rapor-kurulumu.sql` dosyasının **tamamını** SQL Editor'de çalıştırın (iki satır "tamam").
+2. Gönderen Gmail hesabında **2 Adımlı Doğrulama** açık olmalı. https://myaccount.google.com/apppasswords
+   sayfasında "PCS Rapor" adıyla bir uygulama şifresi oluşturun ve 16 harfli şifreyi kopyalayın (normal Gmail
+   şifresi çalışmaz).
+3. GitHub'da depo → **Settings → Secrets and variables → Actions → New repository secret** ile üç değer ekleyin:
+   - `GMAIL_ADRES`: gönderen Gmail adresi
+   - `GMAIL_UYGULAMA_SIFRESI`: 16 harfli uygulama şifresi
+   - `PCS_RAPOR_ANAHTARI`: sitede **Ayarlar → Otomatik günlük rapor → Rapor anahtarı** ("Kopyala")
+4. Sitede aynı bölümde alıcıları yazın (her satıra bir e-posta), "Günlük rapor gönderilsin"i işaretleyip
+   **Kaydet**'e basın.
+5. Denemek için GitHub → **Actions → Günlük rapor maili → Run workflow** (tarih boşsa bugün). Sonuç sitede
+   "Son çalışma" satırında görünür.
+
+Gizli değerler girilmeden görev hiçbir şey göndermeden biter. Gönderim başarısız olursa görev kırmızı olur,
+GitHub e-posta gönderir ve sebep Ayarlar'da "Son çalışma" satırında yazar. Rapor anahtarını bilen günlerin araç
+listesini okuyabilir; yanlış ellere geçerse Ayarlar'dan "Yeni anahtar" deyip GitHub'daki değeri güncelleyin.
+Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI` değerini de güncelleyin.
+
 ## Bu klasördeki dosyalar
 
 | Dosya | Ne işe yarar |
 |---|---|
 | `islem-gecmisi-duzeltmesi.sql` | "Kaydı düzenle"deki `malformed array literal` hatasını düzelten işlem geçmişi tetikleyicisi |
 | `anlik-guncelleme-kurulumu.sql` | Tabloları Realtime yayınına ekler (anlık güncelleme) |
-| `guvenlik-kurulumu.sql` | Güvenlik linki (GİRİŞ / ÇIKIŞ ekranı) ve ayrı çıkış saati |
+| `guvenlik-kurulumu.sql` | Güvenlik linki, güvenlik hesapları (GİRİŞ / ÇIKIŞ ekranı) ve ayrı çıkış saati |
+| `gunluk-rapor-kurulumu.sql` | Otomatik günlük rapor maili: alıcılar, rapor anahtarı, günün verisi |
 | `plaka-harf-duzeltmesi.sql` | Eski kayıtlardaki Kiril / Yunan harfli plakaları Latin harfe çevirir (isteğe bağlı) |
 | `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |
 | `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |
