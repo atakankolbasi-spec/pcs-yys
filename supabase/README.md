@@ -145,6 +145,25 @@ hesabın tablolara erişim engeli sürer. Listeden tamamen silmek için önce ku
 halde o kullanıcı normal hesap gibi tablolara erişebilirdi). Şifreyi değiştirmek için kullanıcıyı Supabase'den
 silip aynı e-postayla yeniden açmak yeterlidir; listedeki kayıt durur.
 
+## 9. Ücretsiz planda uzun süre sorunsuz kullanım
+
+- **Duraklama:** Supabase'in ücretsiz planı 7 gün hiç kullanılmayan projeyi duraklatır. GitHub'daki
+  "Supabase'i canlı tut" görevi (`.github/workflows/supabase-canli-tut.yml`) her gün 08:23'te veritabanına kısa
+  bir okuma isteği atar; hiçbir veriyi değiştirmez. Proje yine de duraklarsa görev kırmızı olur ve GitHub
+  e-posta gönderir: Supabase panelinde projeyi açıp **Restore project** deyin. GitHub, depoda 60 gün hiç
+  değişiklik olmazsa zamanlanmış görevleri durdurup e-postayla haber verir; **Actions** sekmesinden tek
+  tıkla yeniden açılır.
+- **Veri aktarımı:** Site, değişiklik olmadıkça hiçbir şey indirmez; değişiklikte yalnızca son değişen
+  kayıtları çeker, tüm tabloları en geç 10 dakikada bir baştan indirir. Kayıt sayısı arttıkça aylık aktarım
+  büyümez.
+- **Kontrol:** Ayda bir Supabase → **Organization → Usage** sayfasına bakın; bir çubuk %70'i geçerse
+  geliştiriciye haber verin.
+- **Yedek:** Ücretsiz planda Supabase indirilebilir yedek tutmaz; sitenin gece aldığı yedekler de aynı
+  veritabanındadır. Haftada bir sitede **Veri ve yedek** sayfasından yedeği indirip bilgisayara ya da
+  Drive'a koyun.
+- **SQL dosyaları:** GitHub'da düzenlemeyin (kalem simgesi). Dosyanın tamamını "kopyala" simgesiyle alıp
+  SQL Editor'deki eski içeriğin yerine yapıştırın; kontrol satırlarının hepsi "tamam" demeli.
+
 ## Bu klasördeki dosyalar
 
 | Dosya | Ne işe yarar |

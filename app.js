@@ -253,11 +253,25 @@ function onlineUI(){if(GUARD_ACCT)return;document.documentElement.classList.togg
 }
 function mapRow(r,table){return {...r,...(table==='visits'?{date:r.visit_date,time:(r.visit_time||'').slice(0,5),createdAt:r.created_at}:{}),customer:r.customer||'',declaration:r.declaration||'',carrier:r.carrier||'',registration:r.registration||'',note:r.note||''};}
 async function fetchAll(table){let rows=[];for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('*').order('id').range(start,start+999);if(error)throw error;rows.push(...data.map(r=>mapRow(r,table)));if(data.length<1000)return rows;}}
-/* Hafif senkron: 15 sn'lik yoklamada önce tabloların satır sayısı + son updated_at değerine bakılır;
-   değişiklik yoksa tüm tablolar yeniden indirilmez. Güvenlik için en geç 2 dakikada bir tam senkron yapılır. */
-let syncPrint='',fullSyncAt=0;const FULL_SYNC_MS=120000;
-async function tablePrint(t){const {data,count,error}=await client.from(t).select('updated_at',{count:'exact'}).order('updated_at',{ascending:false,nullsFirst:false}).limit(1);if(error)throw error;return `${count}:${data?.[0]?.updated_at||''}`;}
-async function remotePrint(){const [a,b,c]=await Promise.all([tablePrint('registry'),tablePrint('visits'),tablePrint('app_settings').catch(()=>'-')]);return `${a}|${b}|${c}`;}
+/* Hafif senkron: 15 sn'lik yoklamada önce tabloların satır sayısı + son updated_at değerine bakılır (parmak izi);
+   değişiklik yoksa hiçbir şey indirilmez. Değişiklik varsa ya da anlık bildirim gelirse tablonun tamamı değil, yalnızca
+   son değişen satırlar (en yeni kaydın 2 dk öncesinden bu yana güncellenenler) indirilip listeye işlenir; satır sayısı
+   tutmazsa (silinen kayıt) yalnızca id listesi çekilir. Aynı anda kaydedilen işlemlerin sırası karışabildiği için 2 dk
+   geriye bakılır. Güvenlik için en geç 10 dakikada bir tüm tablolar baştan indirilir. Böylece Supabase'in aylık veri
+   aktarımı, kayıt sayısı arttıkça büyümez. */
+let syncPrint=null,syncUid='',fullSyncAt=0;const FULL_SYNC_MS=600000,SYNC_LOOKBACK_MS=120000;
+async function tablePrint(t){const {data,count,error}=await client.from(t).select('updated_at',{count:'exact'}).order('updated_at',{ascending:false,nullsFirst:false}).limit(1);if(error)throw error;return {count,max:data?.[0]?.updated_at||''};}
+async function remotePrint(){const [registry,visits,app_settings]=await Promise.all([tablePrint('registry'),tablePrint('visits'),tablePrint('app_settings').catch(()=>null)]);return {registry,visits,app_settings};}
+const printPart=(p,t)=>p?.[t]?`${p[t].count}:${p[t].max}`:'-';
+const tsMs=v=>{const n=Date.parse(v||'');return isNaN(n)?0:n;};
+const byId=(a,b)=>a.id<b.id?-1:a.id>b.id?1:0; // Postgres'in uuid sırası (fetchAll ile aynı)
+async function fetchChanged(table,cur,remote){let since=0;for(const r of cur){const n=tsMs(r.updated_at);if(n>since)since=n;}
+ if(!since)return fetchAll(table);
+ const got=[];for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('*').gte('updated_at',new Date(since-SYNC_LOOKBACK_MS).toISOString()).order('id').range(start,start+999);if(error)throw error;got.push(...data.map(r=>mapRow(r,table)));if(data.length<1000)break;}
+ const m=new Map(cur.map(r=>[r.id,r]));for(const r of got)m.set(r.id,r);let rows=[...m.values()];
+ if(remote&&rows.length!==remote.count){const ids=new Set();for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('id').order('id').range(start,start+999);if(error)throw error;data.forEach(r=>ids.add(r.id));if(data.length<1000)break;}
+  rows=rows.filter(r=>ids.has(r.id));if(rows.length!==ids.size)return fetchAll(table);}
+ return rows.sort(byId);}
 /* Çevrimdışı okuma: son başarılı senkronun kopyası bu cihazda saklanır (son 60 gün + bitmemiş araçlar).
    İnternet yokken uygulama açılırsa bu kopya gösterilir; değişiklik yapılamaz. Çıkış yapınca silinir. */
 const CACHE_KEY=STORE+'.cache';let lastSettings=null;
@@ -275,7 +289,7 @@ let syncRun=0,syncStarted=0;const SYNC_STUCK_MS=25000;
    Tablolar Supabase'de "supabase_realtime" yayınına eklenmemişse bildirim gelmez; 15 sn'lik yoklama yine çalışır. */
 let rtChannel=null,rtTimer=null;
 function startRealtime(){if(VIEW_TOKEN||rtChannel||typeof client.channel!=='function')return;
- const ping=()=>{clearTimeout(rtTimer);rtTimer=setTimeout(()=>{if(!document.hidden)syncData({remote:true,poll:true});},400);};
+ const ping=()=>{clearTimeout(rtTimer);rtTimer=setTimeout(()=>{if(!document.hidden)syncData({remote:true,poll:true,changed:true});},400);};
  try{rtChannel=client.channel('pcs-degisiklikler');for(const table of ['visits','registry','app_settings'])rtChannel.on('postgres_changes',{event:'*',schema:'public',table},ping);rtChannel.subscribe();}catch(_){rtChannel=null;}}
 function stopRealtime(){clearTimeout(rtTimer);if(rtChannel){try{client.removeChannel(rtChannel);}catch(_){}rtChannel=null;}waStop();}
 async function syncData(opts={}){
@@ -284,15 +298,21 @@ async function syncData(opts={}){
  try{if(VIEW_TOKEN){const {data,error}=await client.rpc('public_board',{p_token:VIEW_TOKEN});if(error)throw error;if(stamp!==generation)return;
  role='viewer';state=realState={...emptyState(),registry:[],visits:(data?.visits||[]).map(r=>mapRow(r,'visits')),updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();applySettings(data?.settings||{});
  }else{if(!guardChecked){const g=await guardAccountCheck();if(stamp!==generation)return;if(g){enterGuardAccount(g);return;}}
- let fp='';try{fp=await remotePrint();}catch(_){fp='';}
- if(opts.poll&&fp&&fp===syncPrint&&!storageError&&Date.now()-fullSyncAt<FULL_SYNC_MS){lastSync=timeNow();const sd=document.querySelector('.saha-date small');if(sd)sd.textContent='Güncel · '+lastSync;return;}
- const [{data:nextRole,error},registry,visits]=await Promise.all([client.rpc('current_app_role'),fetchAll('registry'),fetchAll('visits')]);if(error)throw error;if(stamp!==generation)return;
- role=nextRole==='editor'?'editor':'viewer';state=realState={...emptyState(),registry,visits,updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();syncPrint=fp;fullSyncAt=Date.now();
- try{const {data:sRows,error:sErr}=await client.from('app_settings').select('*');if(!sErr&&Array.isArray(sRows)){lastSettings=Object.fromEntries(sRows.map(s=>[s.key,s.value]));applySettings(lastSettings);}else if(sErr)console.warn('Ayarlar okunamadı (ayar-okuma-duzeltmesi.sql çalıştırılmalı):',sErr.message);}catch(e){}}
+ let fp=null;try{fp=await remotePrint();}catch(_){fp=null;}
+ const same=t=>printPart(fp,t)===printPart(syncPrint,t);
+ const full=!!opts.full||!fp||!syncPrint||syncUid!==account.id||!!storageError||Date.now()-fullSyncAt>=FULL_SYNC_MS;
+ if(!full&&opts.poll&&!opts.changed&&same('registry')&&same('visits')&&same('app_settings')){lastSync=timeNow();const sd=document.querySelector('.saha-date small');if(sd)sd.textContent='Güncel · '+lastSync;return;}
+ let registry,visits;const getSettings=full||!same('app_settings');
+ if(full){let nextRole,error;[{data:nextRole,error},registry,visits]=await Promise.all([client.rpc('current_app_role'),fetchAll('registry'),fetchAll('visits')]);if(error)throw error;if(stamp!==generation)return;
+  role=nextRole==='editor'?'editor':'viewer';fullSyncAt=Date.now();syncUid=account.id;}
+ else{const every=!opts.poll||!!opts.changed,cur=realState;
+  [registry,visits]=await Promise.all([every||!same('registry')?fetchChanged('registry',cur.registry,fp.registry):cur.registry,every||!same('visits')?fetchChanged('visits',cur.visits,fp.visits):cur.visits]);if(stamp!==generation)return;}
+ state=realState={...emptyState(),registry,visits,updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();syncPrint=fp;
+ if(getSettings)try{const {data:sRows,error:sErr}=await client.from('app_settings').select('*');if(!sErr&&Array.isArray(sRows)){lastSettings=Object.fromEntries(sRows.map(s=>[s.key,s.value]));applySettings(lastSettings);}else if(sErr)console.warn('Ayarlar okunamadı (ayar-okuma-duzeltmesi.sql çalıştırılmalı):',sErr.message);}catch(e){}}
  if(prevVisits)try{liveDiff(prevVisits,state.visits);}catch(_){}
  if(!VIEW_TOKEN)saveCache();
  render();
- }catch(e){syncPrint='';if(stamp===generation){if(!VIEW_TOKEN&&isNetErr(e)&&!realState.visits.length&&!realState.registry.length&&loadCache()){render();return;}storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
+ }catch(e){syncPrint=null;if(stamp===generation){if(!VIEW_TOKEN&&isNetErr(e)&&!realState.visits.length&&!realState.registry.length&&loadCache()){render();return;}storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
  finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor'){maybeCarry();waTick();}}
 }
 /* Supabase giriş hataları: İngilizce ham mesaj yerine ne yapılacağını söyleyen Türkçe metin */
@@ -478,7 +498,7 @@ function footer(){return `<footer class="footnote"><span>Supabase ortak veri tab
 document.addEventListener('click',async e=>{
  const b=e.target.closest('[data-action]');if(!b)return;const action=b.dataset.action;
  if(disabledActions.has(action)||(writeActions.has(action)&&!canEdit())||(!account&&!GUARD_TOKEN&&action!=='reset-password')){e.preventDefault();e.stopImmediatePropagation();return;}
- if(action==='refresh'){e.stopImmediatePropagation();await syncData();}
+ if(action==='refresh'){e.stopImmediatePropagation();await syncData({full:true});}
  if(action==='signout'){e.stopImmediatePropagation();const {error}=await client.auth.signOut();if(error)toast(friendly(error),true);}
  if(action==='reset-password'){
   e.stopImmediatePropagation();const form=document.getElementById('auth-form');const msg=document.getElementById('auth-message');if(!form.elements.email.reportValidity())return;b.disabled=true;

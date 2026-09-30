@@ -31,7 +31,7 @@
   function logic(s, any) { const parts = splitTop(s).map(p => { const m = /^(and|or)\((.*)\)$/.exec(p); return m ? logic(m[2], m[1] === 'or') : cond(p); }); return r => (any ? parts.some(f => f(r)) : parts.every(f => f(r))); }
 
   function query(table) {
-    const st = { table, op: 'select', filters: [], order: null, from: 0, to: Infinity, count: null, cols: '*', rows: null, patch: null };
+    const st = { table, op: 'select', filters: [], order: null, from: 0, to: Infinity, count: null, cols: '*', rows: null, patch: null, gte: null };
     const rowsNow = () => (db[table] || []).filter(r => st.filters.every(f => f(r)));
     const q = {
       select(cols, opts) { if (st.op === 'select') st.cols = cols || '*'; if (opts && opts.count) st.count = opts.count; return q; },
@@ -40,6 +40,7 @@
       limit(n) { st.to = st.from + n - 1; return q; },
       eq(col, val) { st.filters.push(r => r[col] === val); return q; },
       in(col, vals) { st.filters.push(r => vals.includes(r[col])); return q; },
+      gte(col, val) { st.gte = { col, val }; st.filters.push(r => r[col] != null && Date.parse(r[col]) >= Date.parse(val)); return q; },
       or(expr) { st.filters.push(logic(expr, true)); return q; },
       insert(rows) { st.op = 'insert'; st.rows = Array.isArray(rows) ? rows : [rows]; return q; },
       update(patch) { st.op = 'update'; st.patch = patch; return q; },
@@ -47,7 +48,7 @@
       then(resolve, reject) { return Promise.resolve().then(run).then(resolve, reject); }
     };
     function run() {
-      calls.push({ table, op: st.op, cols: st.cols, count: st.count, rows: st.rows && clone(st.rows) });
+      calls.push({ table, op: st.op, cols: st.cols, count: st.count, rows: st.rows && clone(st.rows), gte: st.gte });
       if (window.__hang) return new Promise(() => {}); // takılan istek: hiç cevap gelmez
       if (cfg.offline) return netError();
       if ((cfg.missing || []).includes(table)) return { data: null, count: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` } };
