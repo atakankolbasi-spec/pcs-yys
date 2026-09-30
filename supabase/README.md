@@ -202,4 +202,5 @@ Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI`
 | `plaka-harf-duzeltmesi.sql` | Eski kayıtlardaki Kiril / Yunan harfli plakaları Latin harfe çevirir (isteğe bağlı) |
 | `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |
 | `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |
+| `functions/ruhsat-oku/index.ts` | Ruhsat fotoğrafını Google Gemini ile okuyan sunucu fonksiyonu (isteğe bağlı). Kurulum: `GEMINI.md` |
 | `WHATSAPP.md` | WhatsApp kurulum rehberi (Meta + Supabase) |
