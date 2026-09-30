@@ -87,6 +87,7 @@ select 'tablo' as kontrol, case when to_regclass('public.incoming_ruhsat') is no
 union all
 select 'yetki kuralları', case when count(*) = 2 then 'tamam' else 'EKSİK' end
   from pg_policies where schemaname = 'public' and tablename = 'incoming_ruhsat'
+    and policyname in ('incoming_ruhsat_editor_read', 'incoming_ruhsat_editor_update')
 union all
 select 'fotoğraf deposu', case when exists (select 1 from storage.buckets where id = 'ruhsat-gelen' and not public) then 'tamam' else 'EKSİK' end
 union all
