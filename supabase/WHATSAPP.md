@@ -117,14 +117,15 @@ API Setup sayfasındaki geçici anahtar 24 saatte biter; ilk denemede kullanıla
 4. Çıkan anahtarı Supabase'de `WA_TOKEN` olarak kaydedin. Anahtar bir daha gösterilmez; kimseyle
    paylaşmayın.
 
-### B7. Uygulamayı yayına alma (gerekirse)
-Meta bazı hesaplarda gerçek kişilerden gelen mesajları ancak uygulama **Live** moddayken iletiyor.
-Deneme mesajı geliyor ama gerçek numaradan gelmiyorsa **App settings → Basic**'e gidin:
-- **Privacy Policy URL** doldurun.
-- Kategoriyi seçin.
-- Sayfanın üstündeki **App Mode**'u **Live** yapın.
+### B7. Uygulamayı yayına alma
+Uygulama yayınlanmadan (Unpublished) Meta gerçek mesajları, yöneticinin kendi telefonundan gelenleri
+bile, webhook'a iletmez. **App settings → Basic**'te şunları doldurun:
+- **Privacy Policy URL**: `https://atakankolbasi-spec.github.io/pcs-yys/gizlilik.html`
+- **User data deletion → Data deletion instructions URL**:
+  `https://atakankolbasi-spec.github.io/pcs-yys/gizlilik.html#veri-silme`
+- **Category**: Business and pages (İşletme ve Sayfalar)
 
-Gizlilik politikası sayfası yoksa bana şirket unvanını ve iletişim e-postasını yazın, sitede hazırlayayım.
+Sonra soldaki **Publish / Yayın** sayfasından uygulamayı yayınlayın.
 
 ---
 
