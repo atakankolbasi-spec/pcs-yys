@@ -129,6 +129,7 @@
     removeChannel(ch) { window.__channels = (window.__channels || []).filter(c => c !== ch); return Promise.resolve('ok'); },
     async rpc(name, params = {}) {
       calls.push({ rpc: name, params: clone(params) });
+      if (window.__hangRpc) return new Promise(() => {}); // takılan istek: hiç cevap gelmez
       if (cfg.offline) return netError();
       // Güvenlik linki (supabase/guvenlik-kurulumu.sql'deki fonksiyonların sade karşılığı)
       const guardErr = (code, message) => ({ data: null, error: { code, message } });

@@ -1246,10 +1246,15 @@ const gToday=()=>guard.today||localToday();
 function guardRange(){const f=guard.from||gToday();return {from:f,to:guard.to||f};}
 function guardWeek(){const t=gToday(),m=addDays(t,-((weekday(t)+6)%7));return {from:m,to:weekday(t)===0?t:addDays(m,5)};}
 const gCanMark=v=>!gView()&&!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&v.visit_date<=addDays(gToday(),1);
+/* Zayıf mobil bağlantıda cevapsız kalan istek ekranı kilitlemesin: süre dolunca bırakılır, yenisi denenir */
+function guardRpc(name,params,ms){let t;const ac=typeof AbortController==='function'?new AbortController():null;let q=client.rpc(name,params);if(ac&&typeof q?.abortSignal==='function')q=q.abortSignal(ac.signal);
+ return Promise.race([Promise.resolve(q),new Promise((_,rej)=>{t=setTimeout(()=>{ac?.abort();rej(Object.assign(new Error('Sunucu yanıt vermedi'),{code:'TIMEOUT'}));},ms);})]).finally(()=>clearTimeout(t));}
+const timeNowSec=()=>new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
 async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
- try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
+ guard.loading=true;guard.lastLoad=Date.now();document.querySelector('[data-action="guard-refresh"]')?.classList.add('spin');
+ try{const {data,error}=await guardRpc('guard_board',params,15000);if(error)throw error;if(seq!==guard.seq)return;
   const was=guard.loaded?new Map(guard.rows.map(v=>[v.id,!!v.done])):null;
-  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',why:'',sqlOld:false,at:timeNow(),canMark:data?.can_mark!==false});
+  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',why:'',sqlOld:false,at:timeNowSec(),canMark:data?.can_mark!==false});
   if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());}
  catch(e){if(seq!==guard.seq)return;
   if(e?.code==='42501'){const off=GUARD_ACCT&&!GUARD_ACCT.active,msg=String(e?.message||'');
@@ -1259,8 +1264,8 @@ async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.fro
   else if(e?.code==='PGRST202'&&guard.from){guard.from=guard.to='';toast('Tarih seçimi için ofisin Supabase’de guvenlik-kurulumu.sql dosyasının yeni halini çalıştırması gerekiyor.',true);return guardLoad();}
   else if(e?.code==='PGRST202')guard.fatal='Güvenlik ekranı henüz kurulmadı. Ofis, Supabase’de guvenlik-kurulumu.sql dosyasını çalıştırmalı.';
   else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
-  else guard.error=isNetErr(e)?'İnternet bağlantısı yok. Bağlantı gelince liste kendiliğinden yenilenir.':'Liste yenilenemedi: '+(e?.message||e);}
- renderGuard();}
+  else guard.error=e?.code==='TIMEOUT'?'Bağlantı yavaş; liste birkaç saniye içinde yeniden denenecek.':isNetErr(e)?'İnternet bağlantısı yok. Bağlantı gelince liste kendiliğinden yenilenir.':'Liste yenilenemedi: '+(e?.message||e);}
+ guard.loading=false;renderGuard();}
 /* Kart: GİRİŞ ve ÇIKIŞ yan yana, aynı blokta. Basılan düğme saatini gösterir ("✓ GİRİŞ 10:29").
    ÇIKIŞ, giriş yapılmadan basılamaz. Eski günlerin araçlarında düğmeler yalnızca bilgi gösterir.
    Çıkış yapan aracın kartında giriş-çıkış bilgisini WhatsApp'ta paylaşma düğmesi vardır. */
@@ -1317,7 +1322,7 @@ function renderGuard(){const app=document.getElementById('app');document.title=g
   body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
  const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;
  const focus=document.activeElement?.id,sel=document.activeElement?.selectionStart;
- app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>${gView()?'Güvenlik · izleme':GUARD_ACCT?'Güvenlik · '+esc(GUARD_ACCT.name):'Güvenlik · giriş-çıkış'}</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small>${gView()?'<span class="guard-view-pill">Yalnızca görüntüleme</span>':''}</div><div class="saha-top-btns"><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button>${out}</div></header>
+ app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>${gView()?'Güvenlik · izleme':GUARD_ACCT?'Güvenlik · '+esc(GUARD_ACCT.name):'Güvenlik · giriş-çıkış'}</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small>${gView()?'<span class="guard-view-pill">Yalnızca görüntüleme</span>':''}</div><div class="saha-top-btns"><button type="button" class="saha-icon guard-refresh${guard.loading?' spin':''}" data-action="guard-refresh" aria-label="Listeyi şimdi yenile" title="Şimdi yenile (liste 10 sn’de bir kendiliğinden yenilenir)">${icon('refresh')}</button><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button>${out}</div></header>
  <div class="guard-bar"><div class="guard-dates" role="group" aria-label="Tarih aralığı"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="-1" aria-label="Önceki">${icon('left')}</button><input type="date" id="guard-from" value="${esc(from)}" max="${esc(addDays(today,7))}" aria-label="Başlangıç tarihi"><span>–</span><input type="date" id="guard-to" value="${esc(to)}" max="${esc(addDays(today,7))}" aria-label="Bitiş tarihi"><button type="button" class="icon-btn" data-action="guard-day-step" data-step="1" aria-label="Sonraki">${icon('chevron')}</button></div>
  <div class="guard-presets" role="group" aria-label="Hızlı tarih seçimi">${[['guard-today','Bugün',from===today&&to===today],['guard-week','Bu hafta',from===week.from&&to===week.to]].map(([a,l,on])=>`<button type="button" class="${on?'active':''}" data-action="${a}" aria-pressed="${on}">${l}</button>`).join('')}</div>
  <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
@@ -1330,18 +1335,20 @@ function setGuardRange(f,t){const today=gToday();if(!validDate(f)||!validDate(t)
  if(f<addDays(today,-62)){toast('Güvenlik ekranında en fazla 2 ay öncesi gösterilir.',true);return renderGuard();}
  if(f===today&&t===today)guard.from=guard.to='';else{guard.from=f;guard.to=t;}guard.loaded=false;renderGuard();guardLoad();}
 async function guardMark(id,k){const v=guard.rows.find(x=>x.id===id);if(!v||guard.busy.has(id)||gView())return;guard.busy.add(id);renderGuard();
- try{const {data,error}=await client.rpc('guard_mark',{p_token:GUARD_TOKEN||null,p_visit_id:id,p_action:k});if(error)throw error;
+ try{const {data,error}=await guardRpc('guard_mark',{p_token:GUARD_TOKEN||null,p_visit_id:id,p_action:k},20000);if(error)throw error;
   if(data&&typeof data==='object')Object.assign(v,data);justChangedMap.set(id,Date.now());guard.q='';
   toast(`${v.plate} ${{giris:'giriş yaptı, tesiste.',cikis:'çıkış yaptı.',giris_geri:'girişi geri alındı.',cikis_geri:'çıkışı geri alındı.'}[k]}`);}
- catch(e){toast(e?.code==='42501'?(GUARD_ACCT?'İşlem reddedildi: '+(e?.message||'yetki yok'):'Bu güvenlik linki artık geçersiz.'):isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
+ catch(e){toast(e?.code==='TIMEOUT'?'Bağlantı yavaş; işlem kaydedilmemiş olabilir. Liste yenileniyor, kartı kontrol edin.':e?.code==='42501'?(GUARD_ACCT?'İşlem reddedildi: '+(e?.message||'yetki yok'):'Bu güvenlik linki artık geçersiz.'):isNetErr(e)?'İnternet bağlantısı yok; işlem kaydedilmedi. Tekrar deneyin.':(e?.message||'İşlem kaydedilemedi.'),true);}
  finally{guard.busy.delete(id);}
  await guardLoad();}
 function guardShare(how,cust){const rows=guardRepRows(guard.repSt||'',cust==null?null:cust);if(!rows.length)return;const text=rows.map(gateText).join('\n\n');
  if(how==='wa')waLaunch('',text);else copyOut(text,'',`${rows.length} aracın giriş-çıkış bilgisi kopyalandı.`);}
 function guardStart(){if(guard.started)return;guard.started=true;document.documentElement.classList.add('guard-mode');renderGuard();guardLoad();keepAwake(true);
- setInterval(()=>{if(!document.hidden&&!guard.busy.size)guardLoad();},GUARD_POLL_MS);
+ /* önceki istek bitmeden (ya da 15 sn süresi dolmadan) yenisi başlamaz: bağlantı takılırsa ekranda uyarı çıkar */
+ setInterval(()=>{if(!document.hidden&&!guard.busy.size&&!guard.loading)guardLoad();},GUARD_POLL_MS);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){guardLoad();wakeLock=null;keepAwake(true);}});
- window.addEventListener('online',guardLoad);}
+ window.addEventListener('online',guardLoad);
+ const back=()=>{if(!document.hidden&&Date.now()-(guard.lastLoad||0)>5000)guardLoad();};window.addEventListener('focus',back);window.addEventListener('pageshow',back);}
 /* Giriş yapan kişi güvenlik hesabı mı? Ağ hatasında bir sonraki senkronda yeniden sorulur;
    fonksiyon yoksa (SQL eski) herkes eskisi gibi ofis panosuna girer. */
 async function guardAccountCheck(){try{const {data,error}=await client.rpc('guard_account');if(error){if(!isNetErr(error))guardChecked=true;return null;}guardChecked=true;return data&&typeof data==='object'?data:null;}catch(e){if(!isNetErr(e))guardChecked=true;return null;}}
@@ -1350,6 +1357,7 @@ function enterGuardAccount(g){GUARD_ACCT={name:String(g.name||'').trim()||'Güve
 document.addEventListener('click',e=>{if(!inGuard())return;const b=e.target.closest('[data-action^="guard-"]');if(!b||b.disabled)return;const a=b.dataset.action;
  if(a==='guard-signout'){b.disabled=true;(async()=>{try{await client.auth.signOut();}catch(_){}location.reload();})();return;}
  if(a==='guard-tab'){guard.tab=b.dataset.k;return renderGuard();}
+ if(a==='guard-refresh')return guardLoad();
  if(a==='guard-mark')return guardMark(b.dataset.id,b.dataset.k);
  if(a==='guard-card-wa'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(v)waLaunch('',gateText(v));return;}
  if(a==='guard-rep-st'){guard.repSt=b.dataset.st;return renderGuard();}
