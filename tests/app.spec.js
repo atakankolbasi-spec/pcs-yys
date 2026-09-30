@@ -501,6 +501,39 @@ test('ruhsat okuma: harf sanılan rakam düzelir, çekici/dorse cins yazısında
   expect(r.tr).toEqual(expect.arrayContaining(['34ABC123', '34SB1234']));
 });
 
+test('ruhsat okuma: alan harfi plakaya yapışmaz, katar ağırlığı alınmaz, model satırı plaka sanılmaz', async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const r = await page.evaluate(() => {
+    const T = window.PCS_TEST;
+    // Gerçek fotoğraflardan okunmuş metin parçaları (Bulgar ve Türk ruhsatı).
+    const bg = ['(A) X1580EM', '(E) WKESD000000371611', '(D) NONYPEMAPKE', 'SEMI-TRAILER', '(D.1) SCHMITZ SCS 24 L 13.62 EB',
+      '(G) 6650', '', '{A) X2104MB', '(D) BAEKAY', 'TRACTOR', '(G) 7489'].join('\n');
+    const bg2 = ['X1580EM', 'SCHMITZ SCS 24 L 13.62 EB', 'X2104MB', 'AAS200'].join('\n');
+    const ranked = T.ruhsatRank([bg, bg2]);
+    const kinds = [bg, bg2].reduce((k, t) => T.ruhsatKinds(t, k), {});
+    const pick = ({ tractor, trailer }) => ({ tractor, trailer });
+    return {
+      label: T.ruhsatPlates('(A) X1580EM\nA B-939-PLS\n(A) T 2076 EB'),
+      ranked: ranked.slice(0, ranked.strong),
+      resolved: pick(T.ruhsatResolve(ranked, kinds, ranked.strong)),
+      bgKg: T.ruhsatWeights(bg),
+      // Türk kamyonet ruhsatı: G.1 net ağırlık, (G) katar ağırlığı, F.1 azami yüklü ağırlık
+      trKg: T.ruhsatWeights('(G.1) NET AĞIRLIĞI kg.\n2165\n(G) KATAR AĞIRLIĞI kg.\n6500\n(F.1) AZAMİ YÜKLÜ AĞIRLIĞI 3500'),
+      trOcr: T.ruhsatWeights('(G1) NET AGIRLICI\nkg\n7180'),
+      // bir okumada 6520 "8520" çıkmış: iki okumanın desteklediği çift seçilir
+      vote: T.ruhsatPickWeights(['(G) 8520\n(G) 7358', '(G) 6520\n(G) 7358', '(G) 6520'])
+    };
+  });
+  expect(r.label).toEqual(['X1580EM', 'B939PLS', 'T2076EB']);
+  expect(r.ranked).toEqual(['X1580EM', 'X2104MB']);
+  expect(r.resolved).toEqual({ tractor: 'X2104MB', trailer: 'X1580EM' });
+  expect(r.bgKg).toEqual([6650, 7489]);
+  expect(r.trKg).toEqual([2165]);
+  expect(r.trOcr).toEqual([7180]);
+  expect(r.vote).toEqual([6520, 7358]);
+});
+
 test('ruhsat fotoğrafı Ctrl+V ile yapıştırılabilir; görüntüleyici ekleyemez', async ({ page, browser, context }) => {
   const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
   const paste = p => p.evaluate(b64 => {
