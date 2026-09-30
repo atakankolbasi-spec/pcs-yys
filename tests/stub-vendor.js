@@ -120,7 +120,8 @@
       async invoke(name, opts = {}) {
         calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size });
         if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
-        const r = name === 'ruhsat-oku' ? cfg.ai : null;
+        // dizi verilirse sırayla kullanılır (ör. önce 429, sonra cevap); son eleman tekrar eder
+        const r = name !== 'ruhsat-oku' ? null : Array.isArray(cfg.ai) ? (cfg.ai.length > 1 ? cfg.ai.shift() : cfg.ai[0]) : cfg.ai;
         const err = status => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(null, { status }) } });
         if (!r) return err(404);
         if (r.status) return err(r.status);

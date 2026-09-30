@@ -773,17 +773,31 @@ test('yapay zekâ (Gemini) kuruluysa WhatsApp fotoğrafı onunla okunur; okuyama
   expect(problems).toEqual([]);
 });
 
-test('yapay zekânın kullanım sınırı dolunca fotoğraf bu bilgisayarda okunur', async ({ page, browser }) => {
+test('yapay zekânın kullanım sınırı dolunca beklenip yeniden denenir; hep doluysa bu bilgisayarda okunur ve nedeni yazar', async ({ page, browser }) => {
   test.setTimeout(150000);
   const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
-  const problems = await openApp(page, { ai: { status: 429 } });
+  const ok = { vehicles: [{ plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8150 }, { plate: 'PB5678CD', kind: 'trailer', empty_weight_kg: 6700 }], problem: '' };
+  const problems = await openApp(page, { ai: [{ status: 429 }, ok] });
   await page.locator('.heading [data-action="ruhsat-open"]').click();
-  await page.locator('#ruhsat-file').setInputFiles([{ name: 'r.png', mimeType: 'image/png', buffer: img }]);
-  const card = page.locator('.rs-item');
-  await expect(card.locator('.rs-status')).toHaveText('Okundu', { timeout: 120000 });
-  await expect(card).toContainText('8150 kg + 6700 kg = 14850 kg');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);
-  expect(problems.filter(p => !p.includes('Yapay zekâ okuması kullanılamadı'))).toEqual([]);
+  const add = name => page.locator('#ruhsat-file').setInputFiles([{ name, mimeType: 'image/png', buffer: img }]);
+  const status = page.locator('.rs-item .rs-status');
+
+  // 1) Sınır doldu: beklenir (yedek okumaya geçilmez), sonra yapay zekâ okur.
+  await add('a.png');
+  await expect(status.first()).toContainText('Yapay zekâ sınırı doldu, 20 sn bekleniyor');
+  await page.clock.fastForward(21000);
+  await expect(status.first()).toHaveText('Okundu · yapay zekâ');
+  await expect(page.locator('.rs-item').first()).toContainText('8150 kg + 6700 kg = 14850 kg');
+
+  // 2) Sınır hep dolu: üç denemeden (iki beklemeden) sonra bu bilgisayarda okunur, kartta nedeni yazar.
+  await page.evaluate(() => { window.__PCS_STUB.ai = { status: 429 }; });
+  await add('b.png');
+  for (let i = 0; i < 2; i++) { await expect(status.nth(1)).toContainText('bekleniyor'); await page.clock.fastForward(21000); }
+  await expect(status.nth(1)).toHaveText('Okundu', { timeout: 120000 });
+  await expect(page.locator('.rs-item').nth(1)).toContainText('Yapay zekâ kullanılamadı (ücretsiz kullanım sınırı doldu)');
+  await expect(page.locator('.rs-item').nth(1)).toContainText('8150 kg + 6700 kg = 14850 kg');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(2 + 3);
+  expect(problems).toEqual([]);
 });
 
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
