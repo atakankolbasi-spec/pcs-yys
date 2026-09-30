@@ -91,6 +91,36 @@ test('haftalık Excel dosyası indirilir', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('aylık Excel: seçilen ayın araçları tesis giriş, işlem bitti, tesis çıkış ve kalma süresiyle aktarılır', async ({ page }) => {
+  const data = sampleData();
+  const v1 = data.visits.find(v => v.id === 'v1');
+  v1.exit_at = '2026-09-21T10:30:00Z'; // giriş 05:10Z (08:10), çıkış 10:30Z (13:30) -> kalma 5 sa 20 dk
+  Object.assign(data.visits.find(v => v.id === 'v3'), { onsite_at: '2026-09-22T07:00:00Z', done_at: '2026-09-22T09:15:00Z' }); // çıkış yok -> * ile bitiş saati
+  data.visits.push({ ...data.visits[5], id: 'v-agu', plate: '35 AGU 35', visit_date: '2026-08-28' });
+  data.visits.push({ ...data.visits[5], id: 'v-eki', plate: '35 EKI 35', visit_date: '2026-10-02' });
+  const problems = await openApp(page, { data });
+  await page.locator('.nav-item[data-page="reports"]').click();
+  await page.locator('.heading [data-action="export"]').click();
+  const sel = page.locator('#export-month');
+  await expect(sel).toHaveValue('2026-09');
+  await expect(sel.locator('option[value="2026-09"]')).toHaveText(/Eylül 2026 · 7 araç/);
+  await expect(sel.locator('option[value="2026-08"]')).toHaveText(/Ağustos 2026 · 1 araç/);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#modal [data-action="export-month"]').click()]);
+  expect(download.suggestedFilename()).toBe('PCS_2026_09_AY.xlsx');
+  const xml = fs.readFileSync(await download.path()).toString('utf8'); // dosya sıkıştırmasız: sayfa XML'i düz metin
+  for (const t of ['TESİS GİRİŞ', 'İŞLEM BİTTİ', 'TESİS ÇIKIŞ', 'KALMA (sa:dk)', 'EYLÜL 2026', 'ay toplamı', '34 ABC 123', '06 KL 4567'])
+    expect(xml).toContain(t);
+  expect(xml).not.toContain('35 AGU 35');
+  expect(xml).not.toContain('35 EKI 35');
+  const serial = (y, mo, d, h, mi) => (Date.UTC(y, mo - 1, d, h, mi, 0) - Date.UTC(1899, 11, 30)) / 86400000;
+  expect(xml).toContain(`<v>${serial(2026, 9, 21, 8, 10)}</v>`);          // tesis giriş, İstanbul saati
+  expect(xml).toContain(`<v>${serial(2026, 9, 21, 13, 30)}</v>`);         // tesis çıkış
+  expect(xml).toContain(`<v>${320 / 1440}</v>`);                          // kalma 5:20
+  expect(xml).toMatch(new RegExp(`<c r="M\\d+" s="25"><v>${serial(2026, 9, 22, 12, 15)}</v>`)); // çıkış yok: bitiş saati * biçimiyle
+  expect(xml).toContain('formatCode="[h]:mm"');
+  expect(problems).toEqual([]);
+});
+
 test("Excel'den plaka al: yalnızca yeni plakalar eklenir", async ({ page }) => {
   const problems = await openApp(page);
   await page.locator('.nav-item[data-page="registry"]').click();
@@ -863,6 +893,7 @@ for (const [err, text] of [[{ code: 'invalid_credentials', message: 'Invalid log
 
 test('güvenlik hesabı: sunucu reddederse sebep ve ofiste yapılacak yazılır', async ({ page }) => {
   const problems = await openApp(page, { guardAccount: { name: 'Tepecik', active: true } });
+  await expect(page.locator('.guard-card').first()).toBeVisible(); // önce hesapla ekran açılsın
   await page.evaluate(() => { window.__PCS_STUB.guardAccount.active = false; }); // ofis erişimi durdurdu
   await page.clock.runFor(11000);
   await expect(page.locator('.guard-fatal')).toContainText('erişimi yok');
