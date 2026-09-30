@@ -1101,6 +1101,28 @@ test.describe('service worker', () => {
     await context.setOffline(false);
   });
 
+  test('gizlilik sayfası açılır ve panonun çevrimdışı kopyasının yerine geçmez', async ({ page, context }) => {
+    await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
+    await page.addInitScript(() => { window.__PCS_STUB = { session: false }; });
+    await page.goto('/');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    await page.goto('/gizlilik.html');
+    await expect(page.getByRole('heading', { name: 'Gizlilik Politikası', exact: true })).toBeVisible();
+    await expect(page.locator('#veri-silme')).toBeVisible();
+    await expect(page.locator('#data-deletion')).toContainText('pcstr.atakan@gmail.com');
+    // Önbellekteki pano kopyası hâlâ panonun kendisi olmalı (gizlilik sayfası üzerine yazılmamalı)
+    await page.waitForTimeout(300);
+    const shell = await page.evaluate(() => caches.open('pcs-shell-v1').then(c => c.match('./')).then(r => r ? r.text() : ''));
+    expect(shell).toContain('id="app"');
+    expect(shell).not.toContain('Gizlilik Politikası');
+    await context.setOffline(true);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Giriş yap' })).toBeVisible();
+    await context.setOffline(false);
+  });
+
   test('dosyalar tarayıcı önbelleğine takılmadan sunucudan güncel alınır', async ({ page, request }) => {
     // Test sunucusu, GitHub Pages gibi dosyaları 10 dakika önbelleğe aldırır (max-age=600).
     // page.route tarayıcı önbelleğini kapattığı için bu testte sahte istemci kullanılmaz (oturum yok -> giriş ekranı).

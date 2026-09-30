@@ -23,9 +23,13 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
-  if (new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  const nav = req.mode === 'navigate';
+  /* Panodan başka sayfalar (gizlilik.html gibi) doğrudan ağdan gelir; panonun kopyasının yerine geçmez */
+  if (nav && !/\/(index\.html)?$/.test(url.pathname)) return;
   /* Sayfa istekleri (?izle=... dahil) tek kopya olarak './' anahtarıyla saklanır */
-  const nav = req.mode === 'navigate', key = nav ? './' : req;
+  const key = nav ? './' : req;
   let saved;
   /* Sayfa isteğinin ayarları değiştirilemediği için aynı adrese yeni bir istek yapılır;
      yönlendirme olursa tarayıcı kendisi takip eder (redirect: 'manual'). */
