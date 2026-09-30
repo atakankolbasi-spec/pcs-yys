@@ -678,6 +678,30 @@ test('WhatsApp: başka ekranın okuduğu fotoğrafa dokunulmaz, bekleyen listede
   expect(await viewer.evaluate(() => window.__calls.filter(c => c.table === 'incoming_ruhsat').length)).toBe(0);
 });
 
+test('WhatsApp: eski sürümün yanlış okuduğu fotoğraf "Yeniden oku" ile baştan okunur', async ({ page, browser }) => {
+  test.setTimeout(150000);
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  // Eski okuma: alan harfi plakaya yapışmış, çift kayıtlarda bulunamamış.
+  data.incoming_ruhsat = [waRow('w5', { status: 'bekliyor', tractor: 'APB1234AB', trailer: '', weights: [] })];
+  const files = { '2026-09-22/w5.png': (await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700])).toString('base64') };
+  const problems = await openApp(page, { data, files });
+  const row = () => page.evaluate(() => window.__db.incoming_ruhsat.find(r => r.id === 'w5'));
+  const open = page.locator('.heading [data-action="ruhsat-open"]');
+  await expect(open.locator('.rs-badge')).toHaveText('1');
+  await open.click();
+  const card = page.locator('#wa-w5');
+  await expect(card.locator('input').first()).toHaveValue('APB 1234 AB');
+  await card.locator('[data-action="ruhsat-reread"]').click();
+  // Baştan okunur; kayıtlı çift olduğu için panoya kendiliğinden eklenir.
+  await expect.poll(async () => (await row()).status, { timeout: 120000 }).toBe('eklendi');
+  expect((await row()).tractor).toBe('PB1234AB');
+  await expect(card).toContainText('Panoya eklendi');
+  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  expect(inserted.map(v => [v.plate, v.customer, v.registration])).toEqual([['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '14850 KG']]);
+  expect(problems).toEqual([]);
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
