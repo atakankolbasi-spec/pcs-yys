@@ -233,7 +233,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -404,6 +404,7 @@ function settingsView(){const a=appearance;const lbl=(o,k,d)=>{const v=o[k]||o[d
  ${setPanel('colors','chart','Renkler',`<span class="set-dots">${dots}</span> Durum, ana ve vurgu renkleri`,colors)}
  ${setPanel('customers','registry','Müşteri renkleri ve sıralama',`${custPriorityList.length} öncelikli müşteri · panodaki blok sırası ve renkleri`,priorityEditor())}
  ${setPanel('whatsapp','wa','WhatsApp',`${filled}/${names.length} müşterinin numarası kayıtlı · mesaj şablonu`,contactsEditor())}
+ ${setPanel('report','bell','Otomatik günlük rapor','Her iş günü 23:59’da e-postayla · özet ve günlük Excel',reportEditor())}
  ${setPanel('link','search','Görüntüleme linki','Giriş gerektirmeyen, sadece izleme linki',linkEditor())}
  ${setPanel('guardacct','user','Güvenlik hesapları','Görevli kendi e-posta ve şifresiyle girer · yalnızca güvenlik ekranı',guardAccountsEditor())}
  ${setPanel('guard','tablet','Güvenlik linki','Kapıdaki güvenlik için yalnızca GİRİŞ / ÇIKIŞ ekranı',guardLinkEditor())}
@@ -1417,6 +1418,50 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  catch(err){toast(err?.code==='PGRST202'?'Önce guvenlik-kurulumu.sql dosyasının yeni halini Supabase’de çalıştırın.':err?.message&&err.code==='22023'?err.message:friendly(err),true);}
  finally{busy=false;}
  await loadGuardAccounts();});
+
+/* Ayarlar: otomatik günlük rapor maili (yalnızca düzenleyici). Gönderimi GitHub'daki "Günlük rapor maili" görevi
+   yapar (.github/workflows/gunluk-rapor.yml); burada alıcılar, açık/kapalı durumu ve görevin kullandığı anahtar yönetilir. */
+const repCfg={state:'idle',data:null};
+const REPO_URL='https://github.com/atakankolbasi-spec/pcs-yys';
+async function loadReportCfg(){repCfg.state='loading';
+ try{const {data,error}=await client.rpc('get_report_settings');if(error)throw error;repCfg.data=data||{};repCfg.state='ready';}
+ catch(e){repCfg.data=null;repCfg.state=e?.code==='PGRST202'?'missing':'error';}
+ if(ui.page==='settings')render();}
+function reportEditor(){if(role!=='editor'||VIEW_TOKEN)return '';if(repCfg.state==='idle')setTimeout(loadReportCfg,0);const d=repCfg.data||{};
+ const link=(u,t)=>`<a href="${u}" target="_blank" rel="noopener">${t}</a>`;
+ const setup=`<details class="rep-setup"${repCfg.state==='missing'||!d.last_run_at?' open':''}><summary>Kurulum (bir kez)</summary><ol class="gacc-steps">
+  <li>Supabase → SQL Editor’de <b>gunluk-rapor-kurulumu.sql</b> dosyasının tamamını çalıştırın.</li>
+  <li>Gönderen Gmail hesabında <b>2 Adımlı Doğrulama</b> açık olmalı. ${link('https://myaccount.google.com/apppasswords','Uygulama şifreleri')} sayfasında “PCS Rapor” adıyla bir şifre oluşturun; verilen 16 harfli şifreyi kopyalayın (normal Gmail şifresi çalışmaz).</li>
+  <li>GitHub’da ${link(REPO_URL+'/settings/secrets/actions','Settings → Secrets and variables → Actions')} → <b>New repository secret</b> ile üç değer ekleyin: <b>GMAIL_ADRES</b> (gönderen Gmail adresi), <b>GMAIL_UYGULAMA_SIFRESI</b> (16 harfli şifre), <b>PCS_RAPOR_ANAHTARI</b> (aşağıdaki rapor anahtarı).</li>
+  <li>Denemek için ${link(REPO_URL+'/actions/workflows/gunluk-rapor.yml','Actions → Günlük rapor maili')} → <b>Run workflow</b>. Sonuç burada “Son çalışma” olarak görünür.</li></ol></details>`;
+ if(repCfg.state==='missing')return `<div class="notice">${icon('info')}<div>Önce Supabase’de <b>gunluk-rapor-kurulumu.sql</b> dosyasını çalıştırın.</div></div>${setup}`;
+ if(repCfg.state==='error')return `<p class="help-note">Ayarlar alınamadı. ${button('rep-reload','Tekrar dene','refresh','small')}</p>`;
+ if(repCfg.state!=='ready')return '<p class="help-note">Yükleniyor…</p>';
+ const last=d.last_run_at?`<p class="rep-last ${d.last_ok?'ok':'bad'}">${icon(d.last_ok?'check':'info')}<span>Son çalışma: ${esc(tsText(d.last_run_at))} · ${esc(d.last_note||'')}</span></p>`:'<p class="help-note" style="margin-top:10px">Henüz çalışmadı. Kurulumu tamamlayıp GitHub’dan bir kez deneyin.</p>';
+ return `<p class="help-note" style="margin:0 0 12px">Her iş günü (Pazartesi–Cumartesi) <b>23:59</b>’da günün raporu aşağıdaki adreslere e-postayla gider: günün özeti, müşteri bazında sayılar, araçların giriş–çıkış saatleri ve ekte günlük Excel. Araç olmayan günlerde gönderilmez.</p>
+ <label class="rep-on"><input type="checkbox" id="rep-enabled" ${d.enabled?'checked':''}> Günlük rapor gönderilsin</label>
+ <label class="rep-label" for="rep-to">Alıcılar <small>(her satıra bir e-posta, en fazla 20)</small></label>
+ <textarea id="rep-to" rows="4" spellcheck="false" autocomplete="off" placeholder="ornek@firma.com">${esc((d.recipients||[]).join('\n'))}</textarea>
+ <div class="actions" style="margin-top:10px">${button('rep-save','Kaydet','check','primary')}</div>${last}
+ <h3 class="set-sub">Rapor anahtarı</h3><p class="help-note" style="margin:0 0 8px">GitHub’a <b>PCS_RAPOR_ANAHTARI</b> adıyla girilir. Anahtarı bilen, günlerin araç listesini okuyabilir; yanlış ellere geçerse “Yeni anahtar” deyip GitHub’daki değeri de güncelleyin.</p>
+ <div class="link-row"><input id="rep-token" type="password" readonly value="${esc(d.token||'')}" aria-label="Rapor anahtarı">${button('rep-show','Göster','search')}${button('rep-copy','Kopyala','doc')}</div>
+ <div class="actions" style="margin-top:10px">${button('rep-rotate','Yeni anahtar','refresh','danger')}</div>${setup}`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="rep-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+ if(a==='rep-reload'){repCfg.state='idle';return render();}
+ if(a==='rep-show'){const i=document.getElementById('rep-token');if(!i)return;const show=i.type==='password';i.type=show?'text':'password';b.lastChild.textContent=show?'Gizle':'Göster';return;}
+ if(a==='rep-copy'){try{await navigator.clipboard.writeText(repCfg.data?.token||'');toast('Rapor anahtarı kopyalandı.');}catch(_){const i=document.getElementById('rep-token');if(i){i.type='text';i.select();}toast('Kopyalanamadı; anahtarı seçip Ctrl+C ile kopyalayın.',true);}return;}
+ if(!canEdit())return;
+ if(a==='rep-save'){const list=(document.getElementById('rep-to')?.value||'').split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean),enabled=!!document.getElementById('rep-enabled')?.checked;
+  const bad=list.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));if(bad){toast(`Geçersiz e-posta: ${bad}`,true);return;}
+  if(enabled&&!list.length){toast('Rapor açıkken en az bir alıcı yazın.',true);return;}
+  busy=true;onlineUI();
+  try{const {data,error}=await client.rpc('save_report_settings',{p_enabled:enabled,p_recipients:list});if(error)throw error;repCfg.data=data||repCfg.data;toast(enabled?`Kaydedildi: rapor ${list.length} alıcıya gidecek.`:'Kaydedildi: otomatik rapor kapalı.');}
+  catch(err){toast(err?.code==='PGRST202'?'Önce gunluk-rapor-kurulumu.sql dosyasını Supabase’de çalıştırın.':err?.code==='22023'?err.message:friendly(err),true);}
+  finally{busy=false;}render();return;}
+ if(a==='rep-rotate'){if(!window.confirm('Yeni rapor anahtarı oluşturulsun mu? Eski anahtar hemen çalışmaz olur; GitHub’daki PCS_RAPOR_ANAHTARI değerini de güncellemeniz gerekir.'))return;
+  busy=true;onlineUI();
+  try{const {error}=await client.rpc('rotate_report_token');if(error)throw error;toast('Yeni anahtar oluşturuldu; GitHub’daki değeri güncelleyin.');}
+  catch(err){toast(friendly(err),true);}finally{busy=false;}await loadReportCfg();}});
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));

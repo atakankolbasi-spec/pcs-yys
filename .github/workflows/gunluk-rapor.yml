@@ -1,0 +1,46 @@
+name: Günlük rapor maili
+
+# Her iş günü (Pazartesi–Cumartesi) 23:59'da günün raporunu (özet + günlük Excel) e-postayla gönderir.
+# Alıcılar ve açık/kapalı durumu sitede Ayarlar > Otomatik günlük rapor bölümündedir.
+# Gerekli gizli değerler (Settings > Secrets and variables > Actions): PCS_RAPOR_ANAHTARI, GMAIL_ADRES,
+# GMAIL_UYGULAMA_SIFRESI. Eksikse görev hiçbir şey göndermeden biter. Kurulum: supabase/README.md bölüm 10.
+# Elle denemek için: Actions > Günlük rapor maili > Run workflow (tarih boşsa bugün).
+
+on:
+  schedule:
+    - cron: '59 20 * * 1-6'   # Pazartesi–Cumartesi 23:59 (İstanbul)
+  workflow_dispatch:
+    inputs:
+      tarih:
+        description: 'Rapor günü (YYYY-AA-GG). Boş bırakılırsa bugün.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gunluk-rapor
+  cancel-in-progress: false
+
+jobs:
+  gonder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scripts/gunluk-rapor/package-lock.json
+      - name: Bağımlılıklar
+        run: npm ci --no-audit --no-fund
+        working-directory: scripts/gunluk-rapor
+      - name: Raporu gönder
+        run: node scripts/gunluk-rapor/gonder.mjs
+        env:
+          PCS_RAPOR_ANAHTARI: ${{ secrets.PCS_RAPOR_ANAHTARI }}
+          GMAIL_ADRES: ${{ secrets.GMAIL_ADRES }}
+          GMAIL_UYGULAMA_SIFRESI: ${{ secrets.GMAIL_UYGULAMA_SIFRESI }}
+          RAPOR_TARIHI: ${{ inputs.tarih }}

@@ -1,0 +1,10 @@
+{
+  "name": "pcs-gunluk-rapor",
+  "private": true,
+  "description": "PCS TRANSİT YYS günlük rapor maili (GitHub Actions'ta çalışır)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "nodemailer": "10.0.10"
+  }
+}
