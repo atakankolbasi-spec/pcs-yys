@@ -4,8 +4,8 @@
 // Meta, WhatsApp numarasına her mesaj geldiğinde bu adrese haber verir. Fonksiyon:
 //   1. İsteğin gerçekten Meta'dan geldiğini imzadan doğrular (WA_APP_SECRET).
 //   2. Fotoğrafı WhatsApp'tan indirip "ruhsat-gelen" deposuna koyar.
-//   3. incoming_ruhsat tablosuna bir satır ekler. Fotoğrafı panonun açık olduğu bilgisayar okur;
-//      kayıtlı araçları panoya ekler, diğerlerini "Ruhsattan ekle" penceresinde kontrole bırakır.
+//   3. incoming_ruhsat tablosuna bir satır ekler. Fotoğrafı panonun açık olduğu bilgisayar okur ve
+//      "Ruhsattan ekle" penceresinde onaya bırakır; hiçbir araç sorulmadan panoya eklenmez.
 //   4. Fotoğrafa ✅ ile tepki verir; fotoğraf dışı mesajlara ne gönderileceğini yazar
 //      (WA_REPLY=kapali ile kapatılır).
 //   5. 60 günden eski fotoğrafları depodan siler (WA_KEEP_DAYS ile değişir); okunan bilgiler kalır.

@@ -2,9 +2,8 @@
 --
 -- WhatsApp numarasına gelen her ruhsat fotoğrafı "whatsapp-webhook" sunucu fonksiyonu tarafından
 -- "ruhsat-gelen" deposuna kaydedilir ve bu tabloya bir satır eklenir. Panonun açık olduğu bir
--- düzenleyici bilgisayarı fotoğrafı tarayıcıda okur:
---   * plaka kayıtlarında çekici + dorse çifti varsa araç panoya otomatik eklenir,
---   * yoksa "Ruhsattan ekle" penceresinde kontrol bekler.
+-- düzenleyici bilgisayarı fotoğrafı okur (Gemini kuruluysa onunla) ve "Ruhsattan ekle" penceresinde
+-- onaya bırakır. Hiçbir araç sorulmadan panoya eklenmez.
 --
 -- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
 
