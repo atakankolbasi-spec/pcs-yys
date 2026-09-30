@@ -27,10 +27,18 @@ jobs:
           URL="$(grep -o "https://[a-z0-9]*\.supabase\.co" app.js | head -1)"
           KEY="$(grep -o "sb_publishable_[A-Za-z0-9_-]*" app.js | head -1)"
           if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "::error::app.js içinde Supabase adresi ya da anahtarı bulunamadı."; exit 1; fi
-          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 20 --retry-all-errors \
-                 -H "apikey: $KEY" "$URL/rest/v1/registry?select=id&limit=1" || true)
-          echo "Supabase yanıtı: HTTP $code"
-          if [ -z "$code" ] || [ "$code" = "000" ] || [ "$code" -ge 500 ]; then
-            echo "::error::Supabase'e ulaşılamadı (HTTP $code). Proje duraklamış olabilir: Supabase panelinde projeyi açıp 'Restore project' deyin."
-            exit 1
+          # Güvenlik ekranı fonksiyonu geçersiz bir anahtarla çağrılır: fonksiyon veritabanında çalışır ve
+          # "Güvenlik linki geçersiz" (42501) der. Bu yanıt isteğin veritabanına gerçekten ulaştığını gösterir.
+          code=$(curl -sS -o yanit.json -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 20 \
+                 -X POST -H "apikey: $KEY" -H "Content-Type: application/json" -d '{"p_token":"canli-tut"}' \
+                 "$URL/rest/v1/rpc/guard_board" || true)
+          if grep -q '42501' yanit.json 2>/dev/null; then
+            echo "Supabase yanıtı: HTTP $code · $(head -c 200 yanit.json)"
+            echo "Veritabanı çalışıyor."
+            exit 0
           fi
+          echo "Supabase yanıtı: HTTP $code"
+          [ "$code" = "200" ] && { echo "Veritabanı çalışıyor."; exit 0; }
+          head -c 300 yanit.json 2>/dev/null; echo
+          echo "::error::Supabase'e ulaşılamadı ya da beklenmeyen yanıt (HTTP $code). Proje duraklamış olabilir: Supabase panelinde projeyi açıp 'Restore project' deyin."
+          exit 1
