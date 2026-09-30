@@ -37,7 +37,7 @@ mesaj başlatmıyor; bu tür mesajlar şu an ücretsiz. Yine de başlamadan Meta
 ## A. Supabase tarafı (yaklaşık 10 dakika)
 
 ### A1. Veritabanı
-**SQL Editor**'de `supabase/whatsapp-kurulumu.sql` dosyasının tamamını çalıştırın. En altta dört satır
+**SQL Editor**'de `supabase/whatsapp-kurulumu.sql` dosyasının tamamını çalıştırın. En altta beş satır
 çıkar ve hepsi **tamam** olmalı.
 
 ### A2. Sunucu fonksiyonu
@@ -100,6 +100,14 @@ Bu adımdan önce A2 ve A3'teki `WA_VERIFY_TOKEN` hazır olmalı.
 3. **Verify token**: A3'te `WA_VERIFY_TOKEN` için yazdığınız parolanın aynısı.
 4. **Verify and save**'e basın. Hata verirse A2'nin 4. adımını (JWT kapalı) ve parolayı kontrol edin.
 5. Aynı sayfada **Webhook fields** listesinde **messages** satırını **Subscribe** yapın.
+6. WhatsApp hesabının uygulamaya abone olduğunu kontrol edin. Meta bunu her zaman kendisi yapmıyor;
+   yapılmazsa hiçbir mesaj gelmez.
+   - [Graph API Explorer](https://developers.facebook.com/tools/explorer/)'ı açın.
+   - **Access Token** kutusuna B6'daki gibi sistem kullanıcısından alınmış bir anahtar yapıştırın
+     (`whatsapp_business_management` izni olsun; 60 günlük olması yeterli).
+   - **GET** ile `<WhatsApp Business Account ID>/subscribed_apps` adresini sorgulayın. Hesap kimliği
+     API Setup / Try it out sayfasında yazar.
+   - Listede kendi uygulamanız yoksa aynı adresi **POST** ile gönderin. Cevap `{"success": true}` olmalı.
 
 ### B5. Uygulama anahtarı (App secret)
 **App settings → Basic** → **App secret** yanındaki **Show**'a basın. Çıkan değeri Supabase'de
@@ -130,6 +138,10 @@ Sonra soldaki **Publish / Yayın** sayfasından uygulamayı yayınlayın.
 ---
 
 ## C. Deneme
+Meta'nın deneme numarası (+1 555 …) WhatsApp'ta aranınca "WhatsApp kullanmıyor" görünür. Önce
+**Try it out** sayfasından **Send message** ile kendi numaranıza mesaj gönderin, sonra o sohbete yazın.
+Gerçek numarada bu adıma gerek yoktur.
+
 1. Telefonunuzdan numaraya bir ruhsat fotoğrafı gönderin. Birkaç saniye içinde fotoğrafa ✅ tepkisi gelmeli.
 2. Siteyi düzenleyici hesabıyla açın. Araç kayıtlıysa panoya eklenir ve ekranda "WhatsApp: … eklendi"
    yazısı çıkar. Değilse **Ruhsattan ekle** düğmesinde rozet çıkar.
@@ -138,7 +150,8 @@ Sonra soldaki **Publish / Yayın** sayfasından uygulamayı yayınlayın.
 - Supabase'de **Edge Functions → whatsapp-webhook → Logs** sayfasına bakın.
   - `İmza geçersiz`: `WA_APP_SECRET` yanlış.
   - `Fotoğraf bilgisi alınamadı: 401`: `WA_TOKEN` yanlış ya da süresi bitmiş.
-  - Hiç kayıt yoksa Meta bildirimi göndermiyordur: B4'ü ve B7'yi kontrol edin.
+  - `permission denied for table incoming_ruhsat`: A1'deki SQL dosyasının güncel halini tekrar çalıştırın.
+  - Hiç kayıt yoksa Meta bildirimi göndermiyordur: B4 (özellikle 6. adım) ve B7'yi kontrol edin.
 - ✅ geldiyse ama sitede görünmüyorsa: A1'deki kontrol satırlarına bakın ve siteyi yenileyin.
 
 ## Saklama ve gizlilik
