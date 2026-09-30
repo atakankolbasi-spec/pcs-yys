@@ -745,6 +745,41 @@ test('güvenlik: ofisin "işlemleri bitti" dediği araç "Çıkışa hazır"da e
   expect(problems).toEqual([]);
 });
 
+test('güvenlik ekranı 10 sn’de bir kendiliğinden yenilenir; saat saniyeli, yenile düğmesi çalışır', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  await expect(page.locator('#guard-col-inside')).toContainText('B 123 XYZ');
+  await expect(page.locator('.saha-date small')).toHaveText(/Güncel · \d\d:\d\d:\d\d/);
+  const loads = () => page.evaluate(() => window.__calls.filter(c => c.rpc === 'guard_board').length);
+  // ofis v7'yi "işlemler bitti" yapar -> 10 sn içinde "Çıkışa hazır"a geçer
+  await page.evaluate(() => { const v = window.__db.visits.find(x => x.id === 'v7'); v.done = true; v.done_at = new Date().toISOString(); });
+  await page.clock.runFor(10500);
+  await expect(page.locator('#guard-col-ready')).toContainText('B 123 XYZ');
+  const n = await loads();
+  await page.locator('[data-action="guard-refresh"]').click();
+  await expect.poll(loads).toBe(n + 1);
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik ekranı: cevapsız kalan istek ekranı kilitlemez, bağlantı gelince yenilenmeye devam eder', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  await expect(page.locator('#guard-col-coming')).toContainText('CB 1234 AB');
+  await page.evaluate(() => { window.__hangRpc = true; });
+  // GİRİŞ basıldı ama cevap gelmiyor -> 20 sn sonra bırakılır, düğme yeniden basılabilir
+  await page.locator('.guard-card', { hasText: 'CB 1234 AB' }).locator('[data-k="giris"]').click();
+  await page.clock.runFor(21000);
+  await expect(page.locator('#toast')).toContainText('Bağlantı yavaş');
+  // ardından başlayan liste isteği de cevapsız: 15 sn sonra bırakılır, ekranda uyarı çıkar
+  await page.clock.runFor(16000);
+  await expect(page.locator('.guard-alert')).toContainText('Bağlantı yavaş');
+  // bağlantı düzelir; ofis bir aracı değiştirir -> sonraki yoklamada görünür, uyarı kalkar
+  await page.evaluate(() => { window.__hangRpc = false; const v = window.__db.visits.find(x => x.id === 'v7'); v.done = true; v.done_at = new Date().toISOString(); });
+  await page.clock.runFor(10500);
+  await expect(page.locator('#guard-col-ready')).toContainText('B 123 XYZ');
+  await expect(page.locator('.guard-alert')).toHaveCount(0);
+  await expect(page.locator('.guard-card', { hasText: 'CB 1234 AB' }).locator('[data-k="giris"]')).toBeEnabled();
+  expect(problems).toEqual([]);
+});
+
 test('güvenlik: "Bu hafta" seçilince haftanın çıkanları görünür, "Bugün" yalnızca bugünü gösterir', async ({ page }) => {
   const data = sampleData();
   Object.assign(data.visits[2], { onsite_at: '2026-09-22T07:30:00Z', done_at: '2026-09-22T09:00:00Z', exit_at: '2026-09-22T09:20:00Z' });

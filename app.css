@@ -2168,3 +2168,6 @@ html[data-theme="dark"] .rep-last.ok{background:#0f2e1b;color:#86efac}
 html[data-theme="dark"] .rep-last.bad{background:#3b1111;color:#fca5a5}
 html[data-theme="dark"] .rep-setup a{color:#8fb3ff}
 .rep-setup,.rep-setup *{text-transform:none!important}
+.guard-refresh.spin svg{animation:guardSpin .8s linear infinite}
+@keyframes guardSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.guard-refresh.spin svg{animation:none}}
