@@ -555,6 +555,26 @@ test('ruhsat okuma: ruhsattaki cins yazısı, dorsenin kayıtta önde yazılmas�
   expect(r.partial).toEqual({ tractor: 'B939PLS', trailer: 'AG08PLS', reg: false, tractorReg: '', trailerReg: 'PLASTNAK LOJ' });
 });
 
+test('ruhsat okuma: dorse okunamadıysa çekicinin kayıttaki tek dorsesi önerilir, kesin sayılmaz', async ({ page }) => {
+  const data = sampleData();
+  data.registry.push({ id: 'r8', plate: 'TR 35 WLF - TR 47 WLF', customer: 'ETL LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r9', plate: 'PB 1111 AA - PB 2222 BB', customer: 'İKİ DORSE', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r10', plate: 'PB 1111 AA - PB 3333 CC', customer: 'İKİ DORSE', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const r = await page.evaluate(() => {
+    const T = window.PCS_TEST, pick = ({ tractor, trailer, guess, fuzzy, reg }) => ({ tractor, trailer, guess, fuzzy, reg: reg?.customer || '' });
+    // Dorse kartı parlamada kalmış: yalnızca çekici okunmuş.
+    const one = 'A TR-35-WLF\nJ AUTOUTILITARA N3\nG 7860';
+    const two = 'A PB1111AA\n(D) TRACTOR\n(G) 8000';
+    const c1 = T.ruhsatRank([one]), c2 = T.ruhsatRank([two]);
+    return { one: pick(T.ruhsatResolve(c1, T.ruhsatKinds(one, {}), c1.strong)), two: pick(T.ruhsatResolve(c2, T.ruhsatKinds(two, {}), c2.strong)) };
+  });
+  expect(r.one).toEqual({ tractor: 'TR35WLF', trailer: 'TR47WLF', guess: true, fuzzy: true, reg: 'ETL LOJ' });
+  // Çekicinin iki dorsesi kayıtlıysa tahmin yapılmaz.
+  expect(r.two).toEqual({ tractor: 'PB1111AA', trailer: '', guess: false, fuzzy: false, reg: '' });
+});
+
 test('ruhsat fotoğrafı Ctrl+V ile yapıştırılabilir; görüntüleyici ekleyemez', async ({ page, browser, context }) => {
   const img = await fakeRuhsat(browser, ['PB1234AB', 8150], ['PB5678CD', 6700]);
   const paste = p => p.evaluate(b64 => {
