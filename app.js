@@ -1074,7 +1074,12 @@ function ruhsatResolve(cands,kinds={},strong=cands.length){const parts=new Map()
   tractor=plates.find(p=>kinds[p]==='tractor')||plates.find(p=>role(p)==='tractor')||plates.find(p=>role(p)!=='trailer')||'';const hu=plates.some(p=>plateCountry(p)==='HU'),cc=plateCountry(tractor,hu);
   const rest=plates.filter(p=>p!==tractor&&(!tractor||plateCountry(p,hu)===cc));trailer=rest.find(p=>role(p)==='trailer')||rest.find(p=>role(p)!=='tractor')||(kinds[tractor]==='tractor'&&rest.find(p=>parts.has(p)&&!kinds[p]))||'';
   fuzzy=fixed.some(f=>f.fz&&(f.k===tractor||f.k===trailer));}
- return {tractor,trailer,fuzzy,...ruhsatLookup(tractor,trailer)};}
+ /* Dorse okunamadıysa (parlama, kılıf) ve çekicinin kayıtlarda tek bir dorsesi varsa o yazılır; çekici dorse
+    değiştirmiş olabileceği için kesin sayılmaz (kendiliğinden eklenmez, kişi kontrol eder). */
+ let guess=false;
+ if(tractor&&!trailer){const ds=[...new Set(state.registry.map(r=>splitPlate(r.plate).map(norm)).filter(p=>p[0]===tractor&&p[1]).map(p=>p[1]))];
+  if(ds.length===1){trailer=ds[0];guess=true;fuzzy=true;}}
+ return {tractor,trailer,fuzzy,guess,...ruhsatLookup(tractor,trailer)};}
 const ruhsatPlateText=it=>it.reg?it.reg.plate:[fmtCompactPlate(it.tractor),fmtCompactPlate(it.trailer)].filter(Boolean).join(' - ');
 const ruhsatSmall=it=>!!it.size&&Math.max(...it.size)<1100;
 const ruhsatDate=it=>it.wa?waDate(it.wa):defaultDate();
@@ -1097,11 +1102,12 @@ async function ruhsatSetKg(it){const ex=ruhsatExisting(it),kg=ruhsatKg(it);if(!e
  if(await ruhsatWriteKg(it,ex,kg)){if(it.wa)await waMark(it,'mevcut',{plate:ex.plate,visit_id:ex.id});render();ruhsatUpdateCard(it);toast(`${ex.plate}: ruhsat ${kg} olarak panodaki kayda işlendi.`);}}
 function ruhsatInfo(it){if(it.status==='sirada'||it.status==='okunuyor'||it.status==='uzakta')return '';const done=it.status==='eklendi';let h='';
  if(it.reg)h+=`<div class="rs-match ok">${icon('check')}<span>Kayıtlı araç: <b>${esc(it.reg.customer||'Müşterisiz')}</b>${it.reg.carrier?' · '+esc(it.reg.carrier):''}${it.reg.registration?' · '+esc(kgText(it.reg.registration)):''}</span></div>`;
- else if(it.tractorReg)h+=`<div class="rs-match warn">${icon('info')}<span>Çekici kayıtlı (<b>${esc(it.tractorReg.customer)}</b>) ama bu dorseyle kaydı yok. Formda kontrol edin.</span></div>`;
+ else if(it.tractorReg)h+=`<div class="rs-match warn">${icon('info')}<span>Çekici kayıtlı (<b>${esc(it.tractorReg.customer)}</b>) ${it.trailer?'ama bu dorseyle kaydı yok':'ama dorse fotoğrafta okunamadı'}. Formda kontrol edin.</span></div>`;
  else if(it.trailerReg)h+=`<div class="rs-match warn">${icon('info')}<span>Dorse kayıtlı (<b>${esc(it.trailerReg.customer)}</b>) ama bu çekiciyle kaydı yok. Formda kontrol edin.</span></div>`;
  else if(it.tractor)h+=`<div class="rs-match new">${icon('info')}<span>Yeni araç: plaka kayıtlarında yok. Müşteriyi formda seçin.</span></div>`;
  else h+=`<div class="rs-match bad">${icon('info')}<span>Plaka okunamadı. Plakayı elle yazın ya da daha net, düz çekilmiş bir fotoğraf deneyin.</span></div>`;
- if(it.fuzzy)h+=`<div class="rs-note warn">Plaka fotoğrafta tam okunamadı; en yakın kayıtlı plaka seçildi. Lütfen kontrol edin.</div>`;
+ if(it.guess)h+=`<div class="rs-note warn">Dorse fotoğrafta okunamadı; çekicinin kayıttaki dorsesi (<b>${esc(fmtCompactPlate(it.trailer))}</b>) yazıldı. Çekici dorse değiştirmiş olabilir, kontrol edin.</div>`;
+ else if(it.fuzzy)h+=`<div class="rs-note warn">Plaka fotoğrafta tam okunamadı; en yakın kayıtlı plaka seçildi. Lütfen kontrol edin.</div>`;
  if(it.status!=='hata')h+=`<div class="rs-note">${it.weights.length?`Okunan boş ağırlık: ${it.weights.map(v=>v+' kg').join(' + ')}${it.sum?` = <b>${it.sum} kg</b>`:''}`:'Boş ağırlık fotoğraftan okunamadı.'}</div>`;
  if(it.status==='tamam'&&!it.sum&&ruhsatSmall(it))h+=`<div class="rs-note warn">Fotoğraf çok küçük (${it.size[0]}×${it.size[1]} piksel), rakamlar net okunamıyor. WhatsApp'ta fotoğrafı tam ekran açıp öyle kopyalayın; gönderen kişiden fotoğrafı kırpmadan, yakından çekmesini isteyin.</div>`;
  if(it.wa&&!done&&!it.reg&&!it.tractorReg&&!it.trailerReg&&waCustomer(it.wa))h+=`<div class="rs-note">Gönderen numara <b>${esc(waCustomer(it.wa))}</b> müşterisine kayıtlı; formda müşteri olarak gelir.</div>`;
@@ -1132,7 +1138,7 @@ async function ruhsatFromClipboard(){if(!navigator.clipboard?.read){toast('Bu ta
 function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=document.getElementById('modal');
  if(!document.getElementById('ruhsat-box')){if(m.open){toast('Önce açık pencereyi kapatın, sonra fotoğrafı yapıştırın.',true);return;}openRuhsat();}
  for(const f of files.slice(0,10)){if(f.size>20*1024*1024){toast('Fotoğraf çok büyük (en fazla 20 MB).',true);continue;}
-  ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,error:''});}
+  ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,error:''});}
  ruhsatRefresh();ruhsatRun();}
 async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada'&&(!x.wa||ruhsatAllowed()))))await (it.wa?waProcess(it):ruhsatProcess(it));}finally{ruhsat.running=false;}}
 /* Fotoğraf birkaç farklı biçimde okunur ve sonuçlar birleştirilir; her biçim başka fotoğraflarda iyi sonuç verir:
@@ -1224,7 +1230,7 @@ function waFill(it,row){const w=(row.weights||[]).map(Number).filter(Boolean);
 function waSync(rows){const ids=new Set(),before=waPending();let changed=false;
  for(const row of rows){const id='wa-'+row.id;ids.add(id);let it=ruhsat.items.find(x=>x.id===id);
   const free=row.status==='yeni'||(row.status==='okunuyor'&&Date.parse(row.claimed_at||0)<Date.now()-WA_STALE_MS);
-  if(!it){it={id,wa:row,file:null,url:'',status:free?'sirada':'uzakta',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,error:''};
+  if(!it){it={id,wa:row,file:null,url:'',status:free?'sirada':'uzakta',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,error:''};
    if(row.status==='bekliyor')waFill(it,row);ruhsat.items.push(it);changed=true;continue;}
   it.wa=row;if(it.status==='okunuyor'||it.status==='eklendi')continue;
   if(row.status==='bekliyor'&&(it.status==='sirada'||it.status==='uzakta')){waFill(it,row);changed=true;}
@@ -1248,7 +1254,7 @@ async function waMark(it,status,extra={}){const patch={status,...extra};
    veritabanında yeniden "yeni" olur; hangi ekran önce üstlenirse o okur, kayıtlı araçsa panoya eklenir. */
 async function ruhsatReread(it){if(!ruhsatAllowed()||it.status==='okunuyor'||it.status==='sirada')return;
  if(it.wa){if(!await waMark(it,'yeni',{claimed_at:null,claimed_by:null,note:''}))return;}else if(!it.file)return;
- Object.assign(it,{status:'sirada',progress:0,phase:'',tractor:'',trailer:'',weights:[],sum:null,reg:null,tractorReg:null,trailerReg:null,fuzzy:false,error:'',dup:false,kgSet:''});
+ Object.assign(it,{status:'sirada',progress:0,phase:'',tractor:'',trailer:'',weights:[],sum:null,reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,error:'',dup:false,kgSet:''});
  ruhsatUpdateCard(it);ruhsatRun();}
 async function waDismiss(it){if(!canEdit())return;if(await waMark(it,'yoksayildi')){ruhsat.items=ruhsat.items.filter(x=>x!==it);if(it.url)URL.revokeObjectURL(it.url);ruhsatRefresh();waBadge();}}
 async function waProcess(it){const row=it.wa;it.status='okunuyor';it.phase='WhatsApp fotoğrafı alınıyor';ruhsatUpdateCard(it);
