@@ -111,18 +111,55 @@ test("Excel'den plaka al: yalnızca yeni plakalar eklenir", async ({ page }) => 
   expect(problems).toEqual([]);
 });
 
-test('hafif senkron: değişiklik yokken tablolar yeniden indirilmez', async ({ page }) => {
+// visits tablosundan yapılan indirmeler: tam (tüm tablo) ve artımlı (yalnızca son değişenler)
+const visitFetches = page => page.evaluate(() => {
+  const v = window.__calls.filter(c => c.table === 'visits' && c.op === 'select' && c.cols === '*');
+  return { full: v.filter(c => !c.gte).length, part: v.filter(c => c.gte).length };
+});
+
+test('hafif senkron: değişiklik yokken hiçbir şey indirilmez, değişince yalnızca değişen satırlar gelir', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
-  const fullFetches = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'select' && c.cols === '*').length);
   await page.clock.runFor(2000);
-  const before = await fullFetches();
+  const before = await visitFetches(page);
   await page.clock.runFor(31000); // iki yoklama turu
-  expect(await fullFetches()).toBe(before);
-  // Başka bir kullanıcı bir aracı değiştirsin -> bir sonraki yoklamada tam senkron yapılmalı.
-  await page.evaluate(() => { const v = window.__db.visits.find(x => x.id === 'v6'); v.onsite = true; v.updated_at = '2026-09-23T07:30:00Z'; });
+  expect(await visitFetches(page)).toEqual(before);
+  // Başka bir kullanıcı bir aracı değiştirsin -> bir sonraki yoklamada yalnızca son değişenler indirilir.
+  await page.evaluate(() => { const v = window.__db.visits.find(x => x.id === 'v6'); v.plate = 'CB 5555 AB'; v.updated_at = '2026-09-23T07:30:00Z'; });
   await page.clock.runFor(15500);
-  expect(await fullFetches()).toBe(before + 1);
+  expect(await visitFetches(page)).toEqual({ full: before.full, part: before.part + 1 });
+  await expect(page.locator('#app')).toContainText('CB 5555 AB');
+  expect(problems).toEqual([]);
+});
+
+test('artımlı senkron: silinen kayıt düşer, 10 dakikada bir tüm tablo baştan indirilir, liste tam senkronla aynı kalır', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('B 123 XYZ');
+  await page.clock.runFor(2000);
+  const before = await visitFetches(page);
+  // başka kullanıcı v7'yi siler, v6'yı değiştirir, yeni bir araç ekler
+  await page.evaluate(() => {
+    const db = window.__db, t = new Date().toISOString();
+    db.visits = db.visits.filter(v => v.id !== 'v7');
+    Object.assign(db.visits.find(v => v.id === 'v6'), { onsite: true, onsite_at: t, updated_at: t });
+    db.visits.push({ ...db.visits.find(v => v.id === 'v6'), id: 'v0', plate: '06 YENI 06', onsite: false, onsite_at: null, created_at: t, updated_at: t });
+  });
+  await page.clock.runFor(15500);
+  await expect(page.locator('#app')).toContainText('06 YENI 06');
+  const ids = () => page.evaluate(() => window.PCS_TEST.getState().visits.map(v => v.id));
+  const dbIds = () => page.evaluate(() => window.__db.visits.map(v => v.id).sort());
+  expect(await ids()).toEqual(await dbIds()); // silinen düştü, sıra tam senkronla aynı (id sırası)
+  expect((await page.evaluate(() => window.PCS_TEST.getState().visits.find(v => v.id === 'v6'))).onsite).toBe(true);
+  expect((await visitFetches(page)).full).toBe(before.full);
+  // anlık bildirim: parmak izi değişmese de (ör. sırası karışmış eş zamanlı kayıt) son değişenler çekilir
+  const p0 = (await visitFetches(page)).part;
+  await page.evaluate(() => window.__rtEmit('visits'));
+  await page.clock.runFor(1000);
+  expect((await visitFetches(page)).part).toBe(p0 + 1);
+  // en geç 10 dakikada bir tam senkron
+  await page.clock.runFor(10 * 60000);
+  expect((await visitFetches(page)).full).toBeGreaterThan(before.full);
+  expect(await ids()).toEqual(await dbIds());
   expect(problems).toEqual([]);
 });
 

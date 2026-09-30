@@ -1,0 +1,36 @@
+name: Supabase'i canlı tut
+
+# Supabase'in ücretsiz planı 7 gün hiç kullanılmayan projeyi duraklatır (ör. uzun bir bayram tatilinde
+# site açılmaz). Bu görev her gün veritabanına kısa bir okuma isteği atar; hiçbir veriyi değiştirmez.
+# Proje duraklamışsa ya da ulaşılamıyorsa görev kırmızı olur ve GitHub e-posta gönderir.
+# Adres ve anahtar sitedeki app.js'ten okunur (sitede zaten herkese açık olan "publishable" anahtar).
+
+on:
+  schedule:
+    - cron: '23 5 * * *'   # her gün 08:23 (İstanbul)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: app.js
+          sparse-checkout-cone-mode: false
+      - name: Veritabanına kısa istek
+        run: |
+          URL="$(grep -o "https://[a-z0-9]*\.supabase\.co" app.js | head -1)"
+          KEY="$(grep -o "sb_publishable_[A-Za-z0-9_-]*" app.js | head -1)"
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "::error::app.js içinde Supabase adresi ya da anahtarı bulunamadı."; exit 1; fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 20 --retry-all-errors \
+                 -H "apikey: $KEY" "$URL/rest/v1/registry?select=id&limit=1" || true)
+          echo "Supabase yanıtı: HTTP $code"
+          if [ -z "$code" ] || [ "$code" = "000" ] || [ "$code" -ge 500 ]; then
+            echo "::error::Supabase'e ulaşılamadı (HTTP $code). Proje duraklamış olabilir: Supabase panelinde projeyi açıp 'Restore project' deyin."
+            exit 1
+          fi
