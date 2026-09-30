@@ -1042,7 +1042,7 @@ function ruhsatRank(texts){const score=new Map(),order=[];
     score.set(p,score.get(p)+s);seen.add(p);}
    prev=line;}});
  const ranked=order.map((p,i)=>[p,score.get(p),i]).sort((a,b)=>b[1]-a[1]||a[2]-b[2]),best=ranked[0]?.[1]||0;
- const out=ranked.map(x=>x[0]);out.strong=ranked.filter(x=>x[1]>=Math.max(3,best/4)).length;return out;}
+ const out=ranked.map(x=>x[0]);out.strong=ranked.filter(x=>x[1]>=Math.max(5,best/3)).length;return out;}
 /* Aracın cinsi: plakadan sonra gelen ilk "TRACTOR / ВЛЕКАЧ / ÇEKİCİ" ya da "SEMI-TRAILER / ПОЛУРЕМАРКЕ / RÖMORK"
    yazısı o plakanın çekici mi dorse mi olduğunu söyler (Kiril harfler İngilizce okuyucuda "BAEKAY", "NONYPEMAPKE" gibi çıkar). */
 const KIND_TRAILER=/TRAIL|SEMI|REMAR|PEMAP|REMOR|R[ÖO]MORK|AUFLIEG|ANH[ÄA]NG|ПОЛУРЕМ/,KIND_TRACTOR=/TRA[CK]T|B[AN]EKA|BJIEKA|ВЛЕКА|[CÇ]EK[İI]C[İI]|ZUGMASCH/;
