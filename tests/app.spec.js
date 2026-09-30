@@ -830,6 +830,14 @@ test('güvenlik hesabı: sunucu reddederse sebep ve ofiste yapılacak yazılır'
   await page.clock.runFor(11000);
   await expect(page.locator('.guard-fatal')).toContainText('erişimi yok');
   await expect(page.locator('.guard-fatal-help')).toContainText('Güvenlik hesapları');
+  await expect(page.locator('.guard-fatal-help small')).toContainText('erişimi durdurulmuş');
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik hesabı: veritabanında eski güvenlik fonksiyonu duruyorsa SQL dosyasının yeniden çalıştırılması istenir', async ({ page }) => {
+  const problems = await openApp(page, { guardAccount: { name: 'Tepecik', active: true }, guardOldBoard: true });
+  await expect(page.locator('.guard-fatal')).toContainText('Veritabanı kurulumu tamamlanmamış');
+  await expect(page.locator('.guard-fatal-help')).toContainText('guvenlik-kurulumu.sql');
   await expect(page.locator('.guard-fatal-help small')).toContainText('Güvenlik linki geçersiz');
   expect(problems).toEqual([]);
 });

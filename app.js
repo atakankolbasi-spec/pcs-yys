@@ -1223,10 +1223,13 @@ const gCanMark=v=>!gView()&&!!v.visit_date&&v.visit_date>=addDays(gToday(),-7)&&
 async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.from){params.p_from=guard.from;params.p_to=guard.to||guard.from;}const seq=++guard.seq;
  try{const {data,error}=await client.rpc('guard_board',params);if(error)throw error;if(seq!==guard.seq)return;
   const was=guard.loaded?new Map(guard.rows.map(v=>[v.id,!!v.done])):null;
-  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',why:'',at:timeNow(),canMark:data?.can_mark!==false});
+  Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',why:'',sqlOld:false,at:timeNow(),canMark:data?.can_mark!==false});
   if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());}
  catch(e){if(seq!==guard.seq)return;
-  if(e?.code==='42501'){const off=GUARD_ACCT&&!GUARD_ACCT.active;guard.fatal=!GUARD_ACCT?'Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.':off?'Bu hesabın erişimi ofis tarafından durdurulmuş.':'Bu hesabın güvenlik ekranına erişimi yok.';guard.why=GUARD_ACCT&&!off?String(e?.message||''):'';}
+  if(e?.code==='42501'){const off=GUARD_ACCT&&!GUARD_ACCT.active,msg=String(e?.message||'');
+   /* hesap açıkken "linki geçersiz" yanıtı: veritabanında guard_board'un eski (yalnızca linkle çalışan) sürümü duruyor */
+   const oldSql=!!GUARD_ACCT&&!off&&/linki geçersiz/i.test(msg);guard.sqlOld=oldSql;
+   guard.fatal=!GUARD_ACCT?'Bu güvenlik linki geçersiz ya da yenilenmiş. Yeni linki ofisten isteyin.':off?'Bu hesabın erişimi ofis tarafından durdurulmuş.':oldSql?'Veritabanı kurulumu tamamlanmamış.':'Bu hesabın güvenlik ekranına erişimi yok.';guard.why=GUARD_ACCT&&!off?msg:'';}
   else if(e?.code==='PGRST202'&&guard.from){guard.from=guard.to='';toast('Tarih seçimi için ofisin Supabase’de guvenlik-kurulumu.sql dosyasının yeni halini çalıştırması gerekiyor.',true);return guardLoad();}
   else if(e?.code==='PGRST202')guard.fatal='Güvenlik ekranı henüz kurulmadı. Ofis, Supabase’de guvenlik-kurulumu.sql dosyasını çalıştırmalı.';
   else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
@@ -1263,7 +1266,7 @@ function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardR
   :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
 function renderGuard(){const app=document.getElementById('app');document.title=gView()?'Güvenlik izleme · PCS TRANSİT':'Güvenlik · PCS TRANSİT';
  const out=GUARD_ACCT?`<button type="button" class="saha-icon guard-signout" data-action="guard-signout" aria-label="Çıkış yap" title="Çıkış yap">${icon('logout')}</button>`:'';
- if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b>${GUARD_ACCT?`<p class="guard-fatal-help">Ofiste: <b>Ayarlar → Güvenlik hesapları</b> bölümünde bu e-posta listede olmalı ve durumu “Açık” olmalı; değilse “Erişimi aç”a basılır.${guard.why?`<small>Sunucu yanıtı: ${esc(guard.why)}</small>`:''}</p><button type="button" class="btn" data-action="guard-signout">${icon('logout')}Çıkış yap</button>`:''}</div></div>`;return;}
+ if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b>${GUARD_ACCT?`<p class="guard-fatal-help">${guard.sqlOld?'Ofiste: Supabase → <b>SQL Editor</b>’de <b>guvenlik-kurulumu.sql</b> dosyasının <b>tamamı</b> yeniden çalıştırılmalı; beş kontrol satırı “tamam” olmalı.':'Ofiste: <b>Ayarlar → Güvenlik hesapları</b> bölümünde bu e-posta listede olmalı ve durumu “Açık” olmalı; değilse “Erişimi aç”a basılır.'}${guard.why?`<small>Sunucu yanıtı: ${esc(guard.why)}</small>`:''}</p><button type="button" class="btn" data-action="guard-signout">${icon('logout')}Çıkış yap</button>`:''}</div></div>`;return;}
  const q=norm(guard.q),rows=guard.rows,dark=getTheme()==='dark',today=gToday(),{from,to}=guardRange(),week=guardWeek();
  const match=v=>!q||norm(v.plate).includes(q)||norm(v.customer).includes(q);
  const inRange=v=>v.visit_date>=from&&v.visit_date<=to,isOut=v=>gOut(v)&&inRange(v),isAll=v=>inRange(v)||!gOut(v);
