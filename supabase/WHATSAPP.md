@@ -3,8 +3,12 @@
 Şoför ya da müşteri ruhsat fotoğrafını şirketin WhatsApp numarasına gönderir, gerisi kendiliğinden olur:
 
 1. Fotoğraf Supabase'e kaydedilir ve gönderenin mesajına ✅ ile tepki verilir.
-2. Panonun açık olduğu bir düzenleyici bilgisayarı fotoğrafı okur: Google Gemini kuruluysa onunla
-   (`supabase/GEMINI.md`), değilse ücretsiz programla bu bilgisayarda.
+2. Fotoğraf okunur:
+   - **Google Gemini kuruluysa** (`supabase/GEMINI.md`) fotoğraf birkaç saniye içinde sunucuda okunur;
+     panonun açık olması gerekmez. Fotoğrafta hiç plaka okunamadıysa gönderenin fotoğrafına ⚠️ ile tepki
+     verilir ve ruhsatı yeniden çekip göndermesi istenir (Türkçe ve İngilizce).
+   - Gemini o an okuyamazsa (kullanım sınırı dolu, Google yoğun) ya da kurulu değilse, panonun açık olduğu
+     bir düzenleyici bilgisayarı okur.
 3. **Hiçbir araç sorulmadan panoya eklenmez.** Okunan fotoğraflar "Ruhsattan ekle" düğmesinde rozetle
    görünür ve onay bekler:
    - **Çekici + dorse plaka kayıtlarında müşterisiyle varsa** kartta **Panoya ekle** çıkar. Birden fazlaysa
@@ -19,14 +23,14 @@
 **Önemli:**
 - Bu numara mevcut WhatsApp grubunuza eklenemez; fotoğraflar numaraya doğrudan gönderilmelidir.
   Gruptaki fotoğrafları ofisten bu numaraya topluca iletmek de olur: fotoğrafları seçin → İlet.
-- Fotoğrafların okunması için mesai saatinde en az bir düzenleyicide pano açık olmalı. Açık değilse
-  fotoğraflar bekler, biri siteyi açınca işlenir.
+- Gemini kurulu değilse fotoğrafların okunması için mesai saatinde en az bir düzenleyicide pano açık
+  olmalı. Açık değilse fotoğraflar bekler, biri siteyi açınca işlenir.
 
 ## Ücret
 
 | Kalem | Ücret |
 |---|---|
-| WhatsApp'a gelen mesajlar, ✅ tepkisi ve yardım cevabı | Ücretsiz (hepsi gönderenin mesajına verilen cevap) |
+| WhatsApp'a gelen mesajlar, ✅ / ⚠️ tepkisi, yardım ve "yeniden çekin" cevabı | Ücretsiz (hepsi gönderenin mesajına verilen cevap) |
 | Meta hesabı, uygulama, numara bağlama | Ücretsiz |
 | Telefon hattı | WhatsApp'ta kullanılmayan bir numara gerekir. Şirketin sabit hattı olur (sesli aramayla doğrulanır) |
 | Fotoğrafı okuma | Ücretsiz (tarayıcıda ya da Gemini'nin ücretsiz kullanımıyla) |
@@ -40,8 +44,8 @@ mesaj başlatmıyor; bu tür mesajlar şu an ücretsiz. Yine de başlamadan Meta
 ## A. Supabase tarafı (yaklaşık 10 dakika)
 
 ### A1. Veritabanı
-**SQL Editor**'de `supabase/whatsapp-kurulumu.sql` dosyasının tamamını çalıştırın. En altta beş satır
-çıkar ve hepsi **tamam** olmalı.
+**SQL Editor**'de `supabase/whatsapp-kurulumu.sql` dosyasının tamamını çalıştırın. En altta altı satır
+çıkar ve hepsi **tamam** olmalı. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
 
 ### A2. Sunucu fonksiyonu
 1. Sol menüden **Edge Functions** → **Deploy a new function** → **Via Editor**.
@@ -53,6 +57,9 @@ mesaj başlatmıyor; bu tür mesajlar şu an ücretsiz. Yine de başlamadan Meta
    için bu kapalı olmalı; güvenliği fonksiyon kendisi sağlar (Meta'nın imzasını kontrol eder).
 5. Fonksiyonun adresi şudur:
    `https://ollrccfqiqilbflanuik.supabase.co/functions/v1/whatsapp-webhook`
+
+**Güncelleme:** `index.ts` değiştiğinde fonksiyonun sayfasında **Code** sekmesine girin, eski kodu tamamen
+silip yenisini yapıştırın ve **Deploy**'a basın.
 
 Bilgisayarınızda Node.js varsa aynı işi tek komutla da yapabilirsiniz:
 `npx supabase functions deploy whatsapp-webhook --no-verify-jwt --project-ref ollrccfqiqilbflanuik`
@@ -67,7 +74,9 @@ Bilgisayarınızda Node.js varsa aynı işi tek komutla da yapabilirsiniz:
 | `WA_TOKEN` | B6'da Meta'dan alacaksınız |
 
 İsteğe bağlı ayarlar:
-- `WA_REPLY` = `kapali`: Gönderene hiçbir cevap ve tepki gitmez.
+- `WA_REPLY` = `kapali`: Gönderene hiçbir cevap ve tepki gitmez (okunamayan fotoğraf için yeniden çekme
+  isteği de).
+- `GEMINI_API_KEY`: Fotoğrafların sunucuda hemen okunması için (`supabase/GEMINI.md`).
 - `WA_KEEP_DAYS` = `90`: Fotoğraflar 60 yerine 90 gün saklanır.
 
 ---
