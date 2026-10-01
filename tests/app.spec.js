@@ -647,7 +647,7 @@ test('WhatsApp\'tan kopyalanan resim kutuya, düğmeyle ya da dosya olarak yapı
 // WhatsApp numarasına gelmiş gibi kutuya düşen satır (sunucu fonksiyonunun eklediği biçimde).
 const waRow = (id, extra = {}) => ({
   id, wa_message_id: 'wamid.' + id, from_number: '905321112233', sender_name: 'Ali Şoför', caption: '', media_path: `2026-09-22/${id}.png`, mime: 'image/png',
-  status: 'yeni', claimed_at: null, claimed_by: null, tractor: '', trailer: '', weights: [], fuzzy: false, note: '', plate: '', visit_id: null,
+  status: 'yeni', claimed_at: null, claimed_by: null, tractor: '', trailer: '', weights: [], fuzzy: false, note: '', ai: null, plate: '', visit_id: null,
   created_at: '2026-09-22T06:30:00Z', updated_at: '2026-09-22T06:30:00Z', ...extra
 });
 
@@ -783,6 +783,8 @@ test('yapay zekâ (Gemini) kuruluysa WhatsApp fotoğrafı onunla okunur; okuyama
   const row = id => page.evaluate(i => window.__db.incoming_ruhsat.find(r => r.id === i), id);
   await expect.poll(async () => (await row('w6')).status, { timeout: 30000 }).toBe('bekliyor');
   expect([(await row('w6')).tractor, (await row('w6')).trailer, (await row('w6')).weights]).toEqual(['PB1234AB', 'PB5678CD', [8150, 6700]]);
+  // Gemini'nin ham cevabı da saklanır: başka ekranlar plaka kayıtlarıyla kendileri eşleştirir
+  expect((await row('w6')).ai).toEqual(ai);
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
   expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.type))).toEqual(['image/png']);
   expect(await page.evaluate(() => typeof window.Tesseract)).toBe('undefined');
@@ -881,6 +883,49 @@ test('WhatsApp: Gemini’nin okuyamadığı fotoğraf 10 dakika sonra kendiliği
   expect((await row()).note).toBe('');
   await expect(card.locator('.rs-status')).toHaveText('Okundu · yapay zekâ');
   await expect(card.locator('[data-action="ruhsat-add"]')).toBeVisible();
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp: sunucuda Gemini’yle okunan fotoğraf ekrana gelir; plaka kayıtlarıyla burada eşleştirilir', async ({ page }) => {
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r6', plate: 'TR 35 WLF - TR 47 WLF', customer: 'ETL LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r7', plate: 'PB 4321 AB - PB 8765 CD', customer: 'İKİNCİ LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  // Bugün panoda olan araç (ruhsatı 14000 KG yazılı)
+  data.visits.push({ ...data.visits[5], id: 'v9', plate: 'PB 4321 AB - PB 8765 CD', customer: 'İKİNCİ LOJ', registration: '14000 KG' });
+  const v = (plate, kind, kg) => ({ plate, kind, empty_weight_kg: kg, country: '' });
+  data.incoming_ruhsat = [
+    // sunucu şu an okuyor
+    waRow('w8', { status: 'okunuyor', claimed_at: '2026-09-23T06:59:40Z', claimed_by: null, created_at: '2026-09-23T06:59:30Z' }),
+    // sunucu okumuş: dorse kartı okunamamış, çekicinin kayıttaki dorsesi önerilmeli
+    waRow('w9', { status: 'bekliyor', tractor: 'TR35WLF', weights: [7860], ai: { vehicles: [v('TR35WLF', 'tractor', 7860)], problem: 'Dorse kartı parlıyor.', model: 'gemini-test' } }),
+    // sunucu okumuş: araç bugün zaten panoda ve ruhsatı aynı, yapılacak bir şey yok
+    waRow('w10', { status: 'bekliyor', created_at: '2026-09-23T06:40:00Z', tractor: 'PB4321AB', trailer: 'PB8765CD', weights: [7900, 6100], ai: { vehicles: [v('PB4321AB', 'tractor', 7900), v('PB8765CD', 'trailer', 6100)], problem: '' } })
+  ];
+  const problems = await openApp(page, { data, files: {} });
+  const row = id => page.evaluate(i => window.__db.incoming_ruhsat.find(r => r.id === i), id);
+  await expect.poll(async () => (await row('w10')).status).toBe('mevcut');
+  expect((await row('w10')).visit_id).toBe('v9');
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await expect(page.locator('#wa-w8 .rs-status')).toHaveText('Sunucuda yapay zekâyla okunuyor');
+  const w9 = page.locator('#wa-w9');
+  await expect(w9.locator('.rs-status')).toHaveText('Okundu · yapay zekâ');
+  await expect(w9.locator('input').nth(1)).toHaveValue('TR 47 WLF');
+  await expect(w9).toContainText('kayıttaki dorsesi');
+  await expect(w9).toContainText('Yapay zekâ: Dorse kartı parlıyor.');
+
+  // Sunucu okumayı bitirdi: sonuç anlık bildirimle bu ekrana gelir
+  await page.evaluate(ai => { Object.assign(window.__db.incoming_ruhsat.find(r => r.id === 'w8'), { status: 'bekliyor', claimed_at: null, tractor: 'PB1234AB', trailer: 'PB5678CD', weights: [8150, 6700], ai }); window.__rtEmit('incoming_ruhsat'); },
+    { vehicles: [v('PB5678CD', 'trailer', 6700), v('PB1234AB', 'tractor', 8150)], problem: '' });
+  const w8 = page.locator('#wa-w8');
+  await expect(w8.locator('.rs-status')).toHaveText('Okundu · yapay zekâ');
+  await expect(w8).toContainText('RUHSAT LOJ');
+  await expect(w8).toContainText('8150 kg + 6700 kg = 14850 kg');
+  await expect(w8.locator('[data-action="ruhsat-add"]')).toBeVisible();
+  // bu ekran hiçbir fotoğrafı kendisi okumadı, panoya da bir şey eklemedi
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'incoming_ruhsat' && c.op === 'update').length)).toBe(1);
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
   expect(problems).toEqual([]);
 });

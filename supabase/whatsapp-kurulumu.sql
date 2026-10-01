@@ -1,9 +1,9 @@
 -- WhatsApp'tan otomatik ruhsat aktarma: veritabanı kurulumu.
 --
 -- WhatsApp numarasına gelen her ruhsat fotoğrafı "whatsapp-webhook" sunucu fonksiyonu tarafından
--- "ruhsat-gelen" deposuna kaydedilir ve bu tabloya bir satır eklenir. Panonun açık olduğu bir
--- düzenleyici bilgisayarı fotoğrafı okur (Gemini kuruluysa onunla) ve "Ruhsattan ekle" penceresinde
--- onaya bırakır. Hiçbir araç sorulmadan panoya eklenmez.
+-- "ruhsat-gelen" deposuna kaydedilir ve bu tabloya bir satır eklenir. Google Gemini kuruluysa fotoğraf
+-- hemen sunucuda okunur; değilse (ya da Gemini o an okuyamazsa) panonun açık olduğu bir düzenleyici
+-- bilgisayarı okur. Sonuç "Ruhsattan ekle" penceresinde onay bekler; hiçbir araç sorulmadan panoya eklenmez.
 --
 -- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
 
@@ -24,6 +24,7 @@ create table if not exists public.incoming_ruhsat (
   weights integer[] not null default '{}',
   fuzzy boolean not null default false,
   note text not null default '',
+  ai jsonb,                                    -- yapay zekânın (Gemini) ham cevabı: kartlar, cinsleri, sorun
   plate text not null default '',              -- panoya eklenen plaka
   visit_id text,
   handled_by uuid,
@@ -31,6 +32,9 @@ create table if not exists public.incoming_ruhsat (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Önceki sürümle kurulmuş tabloya sonradan eklenen sütun
+alter table public.incoming_ruhsat add column if not exists ai jsonb;
 
 create index if not exists incoming_ruhsat_acik on public.incoming_ruhsat (created_at)
   where status in ('yeni', 'okunuyor', 'bekliyor');
@@ -89,8 +93,11 @@ begin
   end if;
 end $$;
 
--- Kontrol: beş satır da "tamam" olmalı.
+-- Kontrol: altı satır da "tamam" olmalı.
 select 'tablo' as kontrol, case when to_regclass('public.incoming_ruhsat') is not null then 'tamam' else 'EKSİK' end as durum
+union all
+select 'yapay zekâ sütunu', case when exists (select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'incoming_ruhsat' and column_name = 'ai') then 'tamam' else 'EKSİK' end
 union all
 select 'sunucu fonksiyonu yetkisi', case when exists (select 1 from pg_roles where rolname = 'service_role')
     and has_table_privilege('service_role', 'public.incoming_ruhsat', 'SELECT')

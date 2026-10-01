@@ -15,6 +15,12 @@ geçilmez. Gemini hata verirse (ücretsiz kullanımın dakikalık sınırı, Goo
 - WhatsApp'tan gelen fotoğraf Gemini'ye okutulamadıysa panonun açık olduğu bir bilgisayarda 10 dakikada bir
   kendiliğinden yeniden denenir (fotoğraf geldikten sonra 12 saat boyunca).
 
+**WhatsApp fotoğrafları sunucuda okunur:** Gemini kuruluysa WhatsApp'tan gelen fotoğraf, panonun açık
+olmasını beklemeden birkaç saniye içinde sunucuda okunur. Fotoğrafta hiç plaka okunamazsa gönderene ⚠️ ile
+tepki verilir ve ruhsatı yeniden çekip göndermesi istenir. Bunun için `whatsapp-webhook` fonksiyonunun da
+güncel olması ve `supabase/whatsapp-kurulumu.sql` dosyasının son halinin çalıştırılmış olması gerekir.
+Gemini o an okuyamazsa fotoğraf panonun açık olduğu bilgisayara kalır ve orada denenir.
+
 Gemini hiç kurulmamışsa (fonksiyon yok ya da anahtar tanımlı değil) site eskisi gibi fotoğrafı kendi
 bilgisayarında okur.
 
