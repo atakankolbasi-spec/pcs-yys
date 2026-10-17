@@ -80,7 +80,7 @@ function render(){
  const K=isKule();
  document.getElementById('app').innerHTML=`<aside class="sidebar"><div class="brand">${K?'<div class="brand-mark k-mark" aria-hidden="true">PCS</div>':'<div class="brand-mark"><img src="logo.svg" alt=""></div>'}<div class="brand-text"><div class="brand-name">PCS TRANS\u0130T</div><div class="brand-sub">YYS OPERASYON</div></div></div>${K?kPinButton():''}<div class="nav-label">\u00c7ALI\u015eMA ALANI</div><nav aria-label="Ana gezinme">${nav.map(([key,i,label])=>`<button type="button" title="${label}" data-action="nav" data-page="${key}" class="nav-item ${ui.page===key?'active':''}" ${ui.page===key?'aria-current="page"':''}>${icon(i)}<span class="nav-text">${label}</span>${key==='registry'?`<span class="nav-count">${state.registry.length}</span>`:key==='pending'&&pendingCount?`<span class="nav-count">${pendingCount}</span>`:''}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="sidebar-user"><div class="avatar">OP</div><span>Operasyon masan\u0131z<small>Yetkili tesis y\u00f6netimi</small></span></div></div></aside><div class="shell"><header class="topbar"><div class="breadcrumb">${icon('building')}<span>Yetkili Tesis</span>${icon('chevron')}<strong>${p[0]}</strong></div>${K?kSearchButton():''}<div class="topbar-right"><span class="date-label">${fmt(TODAY,{day:'numeric',month:'long',year:'numeric'})}</span><span class="save-status"><i class="local-dot"></i>${ui.demo?'\u00d6rnek g\u00f6r\u00fcn\u00fcm':storageError?'Kay\u0131t uyar\u0131s\u0131':state.updatedAt?'Yerel kay\u0131t g\u00fcncel':'Yerel kay\u0131t'}</span><button type="button" class="demo-pill" data-action="toggle-demo">${ui.demo?'Ger\u00e7ek kay\u0131tlara d\u00f6n':'\u00d6rnek g\u00f6r\u00fcn\u00fcm'}</button></div></header><main id="main">${K?kHeading(p,titleActions):`<div class="heading"><div><div class="eyebrow">TES\u0130S OPERASYON Y\u00d6NET\u0130M\u0130</div><h1>${p[1]}</h1><p>${p[2]}</p></div><div class="actions">${titleActions}</div></div>`}${ui.demo?`<div class="demo-banner"><span><strong>\u00d6RNEK VER\u0130</strong>G\u00f6rd\u00fc\u011f\u00fcn\u00fcz m\u00fc\u015fteriler ve geli\u015fler kurgusald\u0131r. Ger\u00e7ek kay\u0131tlar\u0131n\u0131z etkilenmez.</span>${button('toggle-demo','\u00d6rnekten \u00e7\u0131k','','small')}</div>`:''}${storageError&&!ui.demo?`<div class="warning-banner">${esc(storageError)}</div>`:''}${!ui.demo?backupReminder():''}${ui.page==='pano'?panoView():ui.page==='pending'?pendingView():ui.page==='registry'?registryView():ui.page==='reports'?reportsView():ui.page==='settings'?settingsView():dataView()}${footer()}</main></div>`;
  onlineUI();
- if(focus && ['board-search','registry-search','wa-search','wa-tpl-single','wa-tpl-multi','quick-plate'].includes(focus)){const input=document.getElementById(focus);input?.focus();if(sel!=null)input?.setSelectionRange(sel,sel);}
+ if(focus && ['board-search','registry-search','wa-search','wa-tpl-single','wa-tpl-multi','quick-plate','set-q'].includes(focus)){const input=document.getElementById(focus);input?.focus();if(sel!=null)input?.setSelectionRange(sel,sel);}
 }
 function periodPanel(){
  const ds=dates(),wv=weekVisits();const yearList=Array.from(new Set([...Array.from({length:16},(_,i)=>weekNow.year-10+i),ui.year,...state.visits.map(v=>weekInfo(v.date).year)])).sort((a,b)=>a-b);
@@ -88,7 +88,7 @@ function periodPanel(){
 }
 function kpis(a,weekly=true){const s=stats(a);const items=[['Toplam ara\u00e7',s.total,'Kay\u0131tl\u0131 geli\u015f say\u0131s\u0131','truck','teal'],['Tesiste i\u015faretli',s.onsite,'TES\u0130STE kutusu i\u015faretli','building','amber'],['T1 yaz\u0131ld\u0131',s.t1,'T1 i\u015flemi i\u015faretli','doc','blue'],['\u0130\u015flemleri bitti',s.done,`%${s.percent} tamamlanma oran\u0131`,'check','green'],['Bekleyen i\u015flem',s.pending,'Hen\u00fcz tamamlanmayan','clock','']];return `<div class="section-label"><h2>${weekly?`${ui.week}. hafta toplamlar\u0131`:'Se\u00e7ili g\u00fcn\u00fcn toplamlar\u0131'}</h2><span>${weekly?'G\u00fcn ve arama filtresinden ba\u011f\u0131ms\u0131z':'Yaln\u0131zca se\u00e7ili tarihin geli\u015fleri'}</span></div><section class="kpi-grid" aria-label="${weekly?'Haftal\u0131k':'G\u00fcnl\u00fck'} \u00f6zet">${items.map(([label,n,note,i,color])=>`<div class="kpi ${color}"><div class="kpi-top"><span>${label}</span><span class="kpi-icon">${icon(i)}</span></div><div class="kpi-num">${n.toLocaleString('tr-TR')}</div><div class="kpi-note">${note}</div>${color==='green'?`<div class="kpi-progress"><span style="width:${s.percent}%"></span></div>`:''}</div>`).join('')}</section>`;}
 function panoView(){const gq=ui.search.trim();if(gq)return searchToolbar()+searchResultsSection(gq);const wv=weekVisits();const ds=ui.day==='all'?dates():[ui.day];const inDay=wv.filter(v=>(ui.day==='all'||v.date===ui.day)&&searchMatch(v,ui.search));const missCount=inDay.filter(isMissing).length;const shown=ui.missingOnly?inDay.filter(isMissing):inDay;const dayStat=ui.day==='all'?null:stats(wv.filter(v=>v.date===ui.day));const pool=ds.flatMap(d=>sortRows(shown.filter(v=>v.date===d)));panelId=ui.selected&&state.visits.some(x=>x.id===ui.selected)?ui.selected:(pool.find(v=>v.date===TODAY)||pool[0])?.id||null;
- return (isKule()?kPanel():periodPanel()+kpis(wv))+(isKule()?periodPanel():'')+(!state.registry.length&&!state.visits.length?`<section class="empty-state"><div class="empty-icon">${icon('truck')}</div><h2>\u0130lk plaka kayd\u0131n\u0131zla ba\u015flay\u0131n</h2><p>M\u00fc\u015fteri, plaka, beyanname, nakliyeci ve ruhsat bilgilerini bir kez kaydedin. Panoda plaka se\u00e7ti\u011finizde bilgiler otomatik gelsin.</p><div class="actions">${button('add-reg','\u0130lk plakay\u0131 kaydet','plus','primary')}${button('import-reg','Excel\u2019den plaka al','upload')}</div></section>`:'')+`<div class="board-layout"><div class="board-main">${quickAdd()}<div class="board-toolbar"><div class="board-title"><h2>${ui.day==='all'?'Haftal\u0131k operasyon ak\u0131\u015f\u0131':`${DAYS[weekday(ui.day)-1]} operasyonu`}</h2><span class="badge">${ui.day==='all'?'6 G\u00dcN':'1 G\u00dcN'}</span></div><button type="button" class="miss-btn${ui.missingOnly?' on':''}" data-action="missing-only" aria-pressed="${!!ui.missingOnly}" title="Beyannamesi, nakliyecisi veya ruhsatı eksik araçları göster">${icon('info')}Eksik bilgiler <b>${missCount}</b></button><div class="view-seg" role="group" aria-label="Pano g\u00f6r\u00fcn\u00fcm\u00fc"><button type="button" data-action="view-mode" data-v="table" aria-pressed="${boardView()==='table'}">${icon('registry')}Tablo</button><button type="button" data-action="view-mode" data-v="cards" aria-pressed="${boardView()==='cards'}">${icon('grid')}Kartlar</button></div><div class="search">${icon('search')}<input id="board-search" type="search" aria-label="Kay\u0131tlarda ara" placeholder="Plaka, m\u00fc\u015fteri veya nakliyeci ara... (t\u00fcm tarihlerde arar)" value="${esc(ui.search)}"></div><button type="button" class="icon-btn kb-btn" data-action="shortcuts" title="Klavye k\u0131sayollar\u0131 (?)" aria-label="Klavye k\u0131sayollar\u0131">${icon('help')}</button></div>${selectedIds.size?`<div class="bulk-bar"><strong>${selectedIds.size} araç seçili</strong>${button('bulk-onsite','Tesiste yap','','small')}${button('bulk-t1','T1 yazıldı yap','','small')}${button('bulk-done','İşlemler bitti yap','','small primary')}${button('bulk-next','Ertesi güne al','chevron','small carry-btn')}${button('bulk-clear','Seçimi temizle','','small text')}</div>`:''}<div class="board-meta"><div class="legend"><span><i class="amber"></i>Tesiste</span><span><i class="blue"></i>T1 yaz\u0131ld\u0131</span><span><i class="green"></i>\u0130\u015flemler bitti</span></div><span>${shown.length} geli\u015f g\u00f6steriliyor \u00b7 Durum kutular\u0131na t\u0131klayarak g\u00fcncelleyin</span></div>${dayStat?`<div class="daily-summary"><strong>${fmt(ui.day)} g\u00fcnl\u00fck \u00f6zet</strong><span>${dayStat.total} ara\u00e7</span><span>${dayStat.t1} T1 yaz\u0131ld\u0131</span><span>${dayStat.done} tamamland\u0131</span><span>${dayStat.pending} bekleyen</span></div>`:''}${ds.map(d=>dayBlock(d,shown.filter(v=>v.date===d),wv.filter(v=>v.date===d))).join('')}</div>${sidePanel()}</div>`;
+ return (isKule()?(kHeroOn()?'':kpis(wv))+kPanel()+periodPanel():periodPanel()+kpis(wv))+(!state.registry.length&&!state.visits.length?`<section class="empty-state"><div class="empty-icon">${icon('truck')}</div><h2>\u0130lk plaka kayd\u0131n\u0131zla ba\u015flay\u0131n</h2><p>M\u00fc\u015fteri, plaka, beyanname, nakliyeci ve ruhsat bilgilerini bir kez kaydedin. Panoda plaka se\u00e7ti\u011finizde bilgiler otomatik gelsin.</p><div class="actions">${button('add-reg','\u0130lk plakay\u0131 kaydet','plus','primary')}${button('import-reg','Excel\u2019den plaka al','upload')}</div></section>`:'')+`<div class="board-layout"><div class="board-main">${quickAdd()}<div class="board-toolbar"><div class="board-title"><h2>${ui.day==='all'?'Haftal\u0131k operasyon ak\u0131\u015f\u0131':`${DAYS[weekday(ui.day)-1]} operasyonu`}</h2><span class="badge">${ui.day==='all'?'6 G\u00dcN':'1 G\u00dcN'}</span></div><button type="button" class="miss-btn${ui.missingOnly?' on':''}" data-action="missing-only" aria-pressed="${!!ui.missingOnly}" title="Beyannamesi, nakliyecisi veya ruhsatı eksik araçları göster">${icon('info')}Eksik bilgiler <b>${missCount}</b></button><div class="view-seg" role="group" aria-label="Pano g\u00f6r\u00fcn\u00fcm\u00fc"><button type="button" data-action="view-mode" data-v="table" aria-pressed="${boardView()==='table'}">${icon('registry')}Tablo</button><button type="button" data-action="view-mode" data-v="cards" aria-pressed="${boardView()==='cards'}">${icon('grid')}Kartlar</button></div><div class="search">${icon('search')}<input id="board-search" type="search" aria-label="Kay\u0131tlarda ara" placeholder="Plaka, m\u00fc\u015fteri veya nakliyeci ara... (t\u00fcm tarihlerde arar)" value="${esc(ui.search)}"></div><button type="button" class="icon-btn kb-btn" data-action="shortcuts" title="Klavye k\u0131sayollar\u0131 (?)" aria-label="Klavye k\u0131sayollar\u0131">${icon('help')}</button></div>${selectedIds.size?`<div class="bulk-bar"><strong>${selectedIds.size} araç seçili</strong>${button('bulk-onsite','Tesiste yap','','small')}${button('bulk-t1','T1 yazıldı yap','','small')}${button('bulk-done','İşlemler bitti yap','','small primary')}${button('bulk-next','Ertesi güne al','chevron','small carry-btn')}${button('bulk-clear','Seçimi temizle','','small text')}</div>`:''}<div class="board-meta"><div class="legend"><span><i class="amber"></i>Tesiste</span><span><i class="blue"></i>T1 yaz\u0131ld\u0131</span><span><i class="green"></i>\u0130\u015flemler bitti</span></div><span>${shown.length} geli\u015f g\u00f6steriliyor \u00b7 Durum kutular\u0131na t\u0131klayarak g\u00fcncelleyin</span></div>${dayStat?`<div class="daily-summary"><strong>${fmt(ui.day)} g\u00fcnl\u00fck \u00f6zet</strong><span>${dayStat.total} ara\u00e7</span><span>${dayStat.t1} T1 yaz\u0131ld\u0131</span><span>${dayStat.done} tamamland\u0131</span><span>${dayStat.pending} bekleyen</span></div>`:''}${ds.map(d=>dayBlock(d,shown.filter(v=>v.date===d),wv.filter(v=>v.date===d))).join('')}</div>${sidePanel()}</div>`;
 }
 function pendingView(){const all=state.visits.filter(v=>!v.done);
  if(!all.length)return `<div class="empty-state"><div class="empty-icon">${icon('check')}</div><h2>Bekleyen araç yok</h2><p>Tüm araçların işlemleri tamamlanmış görünüyor.</p></div>`;
@@ -247,7 +247,7 @@ function onlineUI(){if(GUARD_ACCT)return;document.documentElement.classList.togg
  }
  document.querySelectorAll('[data-check]').forEach(x=>x.disabled=!canEdit());
  document.querySelectorAll('.row-select').forEach(x=>x.disabled=!canEdit());
- document.querySelectorAll('.prio-color,.prio-match,.app-set').forEach(x=>x.disabled=!canEdit());
+ document.querySelectorAll('.prio-color,.prio-match,.app-set,.k-shared').forEach(x=>x.disabled=!canEdit());
  document.querySelectorAll('.wa-phone,.wa-tpl').forEach(x=>x.disabled=!canEdit());
  if(VIEW_TOKEN)document.querySelectorAll('[data-action^="wa-"]').forEach(x=>x.style.display='none');
  if(VIEW_TOKEN){const user=document.querySelector('.sidebar-user');if(user)user.innerHTML=`<span><span class="acct-name">Sadece görüntüleme</span><small>Otomatik güncellenir · ${esc(lastSync)}</small></span>`;const status=document.querySelector('.save-status');if(status)status.textContent=storageError?'Bağlantı kesildi':`Güncel · ${lastSync}`;return;}
@@ -367,7 +367,7 @@ const APP_HEADSTYLE={minimal:'Sade (beyaz başlık, ince renkli çizgi)',band:'R
 const APP_ROWSTYLE={minimal:'Sade (sadece bitenler hafif yeşil)',full:'Renkli (duruma göre tüm satır)'};
 const APP_ONOFF={on:'Açık',off:'Kapalı'};
 const APP_HSTR={hafif:['Hafif','12%'],normal:['Normal','24%'],koyu:['Koyu','45%'],cokkoyu:['Çok koyu','65%']};
-const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',headStyle:'minimal',rowStyle:'minimal',chipStyle:'soft',liveNotify:'on',boardView:'table',plateBand:'on',statusIcons:'on',design:'kule',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
+const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',headStyle:'minimal',rowStyle:'minimal',chipStyle:'soft',liveNotify:'on',boardView:'table',plateBand:'on',statusIcons:'on',design:'kule',radius:'yumusak',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
 const APP_PRESETS={klasik:['Kurumsal (önerilen)',{}],canli:['Canlı',{headStyle:'band',rowStyle:'full',chipStyle:'solid',weight:'bold',tint:'guclu',headStrength:'koyu',colors:{onsite:'#f97316',t1:'#2563eb',done:'#16a34a',brand:'#1e3a8a',accent:'#2563eb'}}],sade:['Sade',{tint:'hafif',headStrength:'hafif',bg:'beyaz',colors:{onsite:'#d97706',t1:'#3b82f6',done:'#059669',brand:'#334155',accent:'#475569'}}],kontrast:['Yüksek kontrast',{weight:'extra',size:'buyuk',plateSize:'buyuk',tint:'cokguclu',headStrength:'koyu',bg:'beyaz',colors:{onsite:'#b45309',t1:'#1e40af',done:'#166534',brand:'#000000',accent:'#1e40af'}}]};
 const APP_COLOR_LABELS=[['onsite','TESİSTE işaretli'],['t1','T1 işaretli'],['done','BİTTİ işaretli'],['brand','Ana renk (düğmeler, seçili gün)'],['accent','Vurgu rengi (menü, seçili satır)']];
 let appearance=structuredClone(APP_DEFAULT);
@@ -389,7 +389,8 @@ function appPreview(){const pc=custPriorityList[0]||{match:'ÖRNEK MÜŞTERİ',c
  const row=(n,cls,st,decl,plate,car)=>`<tr class="${cls}" style="--bc:${esc(pc.color||'#0f766e')}"><td class="num"><span>${n}</span></td><td class="check-cell">${chip('onsite','TESİSTE',st[0])}</td><td class="check-cell">${chip('t1','T1',st[1])}</td><td class="check-cell">${chip('done','BİTTİ',st[2])}</td><td class="info declaration">${decl}</td><td class="info plate"><span class="plate-button">${plateHTML(plate,'sm')}</span></td><td class="info">${car}</td></tr>`;
  return `<div class="set-preview"><span class="set-preview-label">Önizleme</span><div class="table-scroll app-preview"><table class="operations preview-ops"><tbody><tr class="block-head-row"><td colspan="7"><div class="block-head-bar" style="--bc:${esc(pc.color||'#0f766e')}"><span class="block-head-name">${esc(pc.match||'ÖRNEK MÜŞTERİ')}</span><span class="block-head-count">3 araç</span></div></td></tr>${row('01','row-onsite',[1,0,0],'ÖRNEK GIDA','34 ABC 101','ÖRNEK NAKLİYAT')}${row('02','row-t1',[1,1,0],MISSING,'CA 4821 KM - CA 1190 EK','ÖRNEK TRANS SRL')}${row('03','row-done',[1,1,1],'ÖRNEK METAL','X 5530 BM','ÖRNEK LOJİSTİK')}</tbody></table></div></div>`;}
 function setPanel(id,ic,title,desc,body){if(!body)return '';const open=(ui.openPanels||(ui.openPanels=new Set())).has(id);return `<details class="set-panel" data-panel="${id}" ${open?'open':''}><summary><span class="set-ic">${icon(ic)}</span><span class="set-t"><b>${title}</b><small>${desc}</small></span><span class="set-chev">${icon('down')}</span></summary><div class="set-body">${body}</div></details>`;}
-function settingsView(){const a=appearance;const lbl=(o,k,d)=>{const v=o[k]||o[d];return Array.isArray(v)?v[0]:v;};
+function settingsView(){return isKule()?kSettingsView():settingsViewClassic();}
+function settingsViewClassic(){const a=appearance;const lbl=(o,k,d)=>{const v=o[k]||o[d];return Array.isArray(v)?v[0]:v;};
  const names=VIEW_TOKEN?[]:customerNames(),filled=names.filter(n=>customerContacts[n]).length;
  const dots=APP_COLOR_LABELS.map(([k])=>`<i class="set-dot" style="background:var(--c-${k})"></i>`).join('');
  const design=`<h3 class="set-sub">Tasarım</h3><div class="k-designs" role="group" aria-label="Tasarım">${[['kule','Kontrol Kulesi','Koyu yan menü, karşılama bandı, özet kartları ve hızlı arama'],['klasik','Klasik','Önceki görünüm']].map(([k,l,d])=>`<button type="button" class="k-design ${k}${(a.design||'kule')===k?' on':''}" data-action="app-design" data-v="${k}" aria-pressed="${(a.design||'kule')===k}"><i aria-hidden="true"></i><b>${l}</b><small>${d}</small></button>`).join('')}</div><h3 class="set-sub">Renk temaları</h3>`;
@@ -729,7 +730,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action="un
 
 /* gece modu */
 const THEME_KEY=STORE+'.theme';
-function getTheme(){try{return localStorage.getItem(THEME_KEY)==='dark'?'dark':'light';}catch(_){return 'light';}}
+function themePref(){try{const v=localStorage.getItem(THEME_KEY);return v==='dark'||v==='auto'?v:'light';}catch(_){return 'light';}}
+function getTheme(){const v=themePref();return v==='dark'||(v==='auto'&&!!window.matchMedia?.('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{if(themePref()==='auto'){applyAppearance();render();}});
 function liftColor(hex,minL){const n=parseInt(hex.slice(1),16);let r=(n>>16&255)/255,g=(n>>8&255)/255,b=(n&255)/255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;
  if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;}if(l>=minL)return hex;l=minL;
  const k=x=>(x+h/30)%12,a=s*Math.min(l,1-l),f=x=>Math.round((l-a*Math.max(-1,Math.min(k(x)-3,Math.min(9-k(x),1))))*255);return '#'+[f(0),f(8),f(4)].map(x=>x.toString(16).padStart(2,'0')).join('');}
@@ -793,18 +796,22 @@ function isKule(){return appearance?.design!=='klasik';}
 const kGet=k=>{try{return localStorage.getItem(k);}catch(_){return null;}};
 const kSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(_){}};
 const kWide=()=>kGet(K_NAVWIDE)==='1';
+const K_MOTION=STORE+'.motion',K_HERO=STORE+'.hero';
+const kHeroOn=()=>kGet(K_HERO)!=='off';
 function kVars(){const r=document.documentElement,a=appearance,def=a.font==='varsayilan'||!APP_FONTS[a.font];
  const f=def?K_FONT:APP_FONTS[a.font][1],pf=(APP_PLATE_FONTS[a.plateFont]||[])[1];
  r.style.setProperty('--k-font',f);r.style.setProperty('--k-head',def?K_HEAD:f);r.style.setProperty('--k-plate-font',pf||f);
  r.style.setProperty('--k-bg',a.bg==='gri'||!APP_BG[a.bg]?'#eef2f9':APP_BG[a.bg][1]);
- r.style.setProperty('--k-brand',/^#[0-9a-f]{6}$/i.test(a.colors?.brand||'')?a.colors.brand:APP_DEFAULT.colors.brand);}
+ r.style.setProperty('--k-brand',/^#[0-9a-f]{6}$/i.test(a.colors?.brand||'')?a.colors.brand:APP_DEFAULT.colors.brand);
+ r.dataset.radius=['keskin','yuvarlak'].includes(a.radius)?a.radius:'yumusak';r.classList.toggle('k-nomotion',kGet(K_MOTION)==='off');}
 function kGreet(){const h=+new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',hour:'2-digit',hour12:false}).format(new Date());return h<5?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':'İyi akşamlar';}
 function kPinButton(){const w=kWide();return `<button type="button" class="k-pin" data-action="k-navwide" aria-pressed="${w}" title="${w?'Menüyü daralt':'Menüyü açık tut'}" aria-label="${w?'Menüyü daralt':'Menüyü açık tut'}">${icon(w?'left':'chevron')}</button>`;}
 function kSearchButton(){return `<button type="button" class="k-search" data-action="k-search" aria-label="Hızlı ara (Ctrl+K)">${icon('search')}<span>Hızlı ara</span><kbd>Ctrl K</kbd></button>`;}
 /* yoldaki kamyon: her çizimde baştan başlamasın diye animasyon gecikmesi saate göre ayarlanır */
 function kRoute(){return `<div class="k-route" aria-hidden="true"><svg viewBox="0 0 360 90"><path d="M10 70 C 80 10, 160 90, 230 40 S 330 20, 350 30"/><circle cx="10" cy="70" r="5"/><circle class="end" cx="350" cy="30" r="5"/></svg><span class="k-truck" style="animation-delay:-${(Date.now()%9000)/1000}s">🚚</span></div>`;}
 function kHeading(p,actions){
- if(ui.page!=='pano')return `<div class="heading k-pagehead"><div><div class="eyebrow">Tesis operasyon yönetimi</div><h1>${p[1]}</h1><p>${p[2]}</p></div><div class="actions">${actions}</div></div>`;
+ if(ui.page==='settings')actions=`<label class="k-ssearch">${icon('search')}<input id="set-q" type="text" placeholder="Ayar ara…" value="${esc(ui.setQ||'')}" autocomplete="off" aria-label="Ayarlarda ara"></label>`;
+ if(ui.page!=='pano'||!kHeroOn())return `<div class="heading k-pagehead"><div><div class="eyebrow">${ui.page==='settings'?'Tercihler':'Tesis operasyon yönetimi'}</div><h1>${p[1]}</h1><p>${ui.page==='settings'?'Görünüm, yerleşim, müşteriler, WhatsApp, rapor ve güvenlik':p[2]}</p></div><div class="actions">${actions}</div></div>`;
  const s=stats(weekVisits()),today=`${fmt(TODAY,{day:'numeric',month:'long',year:'numeric'})} ${DAYS[weekday(TODAY)-1]||'Pazar'}`;
  const tiles=[[s.total,'Toplam araç','all'],[s.onsite,'Tesiste','onsite'],[s.t1,'T1 yazıldı','t1'],[s.done,`Bitti · %${s.percent}`,'done'],[s.pending,'Bekleyen','pend']];
  return `<div class="heading k-hero"><div class="k-hero-txt"><div class="k-hi">${kGreet()} <span aria-hidden="true">👋</span></div><h1>${p[1]}</h1><div class="k-date">${esc(today)}</div></div>${kRoute()}<div class="k-stats" role="group" aria-label="${ui.week}. hafta özeti"><span class="k-stats-label">${ui.week}. hafta</span>${tiles.map(([n,l,c])=>`<div class="k-stat ${c}"><b>${n.toLocaleString('tr-TR')}</b><i></i><span>${l}</span></div>`).join('')}</div><div class="actions">${actions}</div></div>`;}
@@ -860,6 +867,9 @@ function kSearchOpen(){if(!account||inGuard()||ui.page==='saha')return;let d=doc
  const inp=d.querySelector('input');inp.value='';kq.items=kSearchItems('');kq.sel=0;kSearchList();if(!d.open)d.showModal();inp.focus();}
 function kSearchRun(){const x=kq.items[kq.sel];if(!x)return;document.getElementById('k-qs')?.close();x.run();}
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&e.key.toLowerCase()==='k'&&account&&!inGuard()&&ui.page!=='saha'&&!document.getElementById('modal')?.open){e.preventDefault();kSearchOpen();}});
+/* menüden sayfa seçilince menü hemen daralır (açık kalıp sayfayı örtmesin); fare menüden çıkınca eski haline döner */
+document.addEventListener('click',e=>{if(e.target.closest?.('.sidebar .nav-item')&&document.documentElement.classList.contains('kule'))document.body.classList.add('k-navpick');},true);
+document.addEventListener('mousemove',e=>{if(document.body.classList.contains('k-navpick')&&!e.target.closest?.('.sidebar'))document.body.classList.remove('k-navpick');},{passive:true});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="k-"]');if(!b||b.closest('#k-qs'))return;const a=b.dataset.action;
  if(a==='k-search')return kSearchOpen();
  if(a==='k-navwide'){kSet(K_NAVWIDE,kWide()?null:'1');return render();}
@@ -867,6 +877,102 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="k
  if(a==='k-day')return kGoDay(b.dataset.date);
  if(a==='k-go')return kGoVisit(b.dataset.id);
  if(a==='k-today')return goToday();});
+
+/* ---------- Ayarlar sayfası (Kontrol Kulesi): solda bölümler, sağda satır satır ayarlar ----------
+   "Herkes için" ayarlar (görünüm) ortak kaydedilir: değiştirince alttaki Kaydet çubuğu çıkar.
+   "Bu cihaz" ayarları (tema, menü, karşılama bandı, animasyonlar) yalnızca bu tarayıcıda, hemen geçerli. */
+const K_ACCENTS=[['#3453d1','Mavi'],['#0f9d8a','Turkuaz'],['#f26a1b','Turuncu'],['#7c3aed','Mor'],['#e11d48','Gül']];
+function kSections(){const ed=role==='editor'&&!VIEW_TOKEN;return [
+ {id:'look',ic:'🎨',t:'Görünüm',d:'Tasarım, tema, renk ve genel çalışma hissi'},
+ {id:'layout',ic:'🧭',t:'Yerleşim',d:'Menü, pano ve tablo düzeni'},
+ {id:'font',ic:'🔤',t:'Yazı',d:'Yazı tipi, harf aralığı ve plaka yazısı'},
+ {id:'colors',ic:'🖍️',t:'Renkler',d:'Durum, ana ve vurgu renkleri · hazır temalar',html:()=>kColorsHTML()},
+ {id:'customers',ic:'🏢',t:'Müşteriler',d:'Müşteri renkleri ve pano sırası',html:()=>priorityEditor()},
+ !VIEW_TOKEN&&{id:'whatsapp',ic:'💬',t:'WhatsApp',d:'Müşteri numaraları ve mesaj şablonu',html:()=>contactsEditor()},
+ ed&&{id:'report',ic:'📧',t:'Günlük rapor',d:'Her iş günü 23:59’da e-postayla özet',html:()=>`<div data-panel="report">${reportEditor()}</div>`},
+ ed&&{id:'link',ic:'🔗',t:'Görüntüleme linki',d:'Giriş gerektirmeyen izleme linki',html:()=>`<div data-panel="link">${linkEditor()}</div>`},
+ ed&&{id:'guard',ic:'🛡️',t:'Güvenlik',d:'Kapı görevlisi hesapları ve linkleri',html:()=>`<div data-panel="guardacct"><div class="card-header"><div><h2>Güvenlik hesapları</h2><p>Görevli kendi e-posta ve şifresiyle girer; yalnızca güvenlik ekranını görür.</p></div></div>${guardAccountsEditor()}</div><div data-panel="guard">${guardLinkEditor()}</div><div data-panel="guardview">${guardViewLinkEditor()}</div>`},
+ {id:'keys',ic:'⌨️',t:'Kısayollar',d:'Klavye ile hızlı çalış',html:()=>kKeysHTML()},
+ {id:'about',ic:'ℹ️',t:'Hakkında',d:'Sistem ve hesap bilgileri',html:()=>kAboutHTML()}].filter(Boolean);}
+function kRows(id){const a=appearance,dev=false,sh=true,on=k=>a[k]!=='off';
+ if(id==='look')return [
+  {t:'seg',k:'design',l:'Tasarım',h:'Kontrol Kulesi ya da önceki (klasik) görünüm',o:[['kule','Kontrol Kulesi'],['klasik','Klasik']],v:a.design||'kule',sh},
+  {t:'seg',k:'theme',l:'Tema',h:'Aydınlık, karanlık ya da cihazın ayarını izle',o:[['light','Aydınlık'],['dark','Karanlık'],['auto','Otomatik']],v:themePref(),sh:dev},
+  {t:'acc',k:'accent',l:'Vurgu rengi',h:'Düğmeler, menüde seçili sayfa ve vurgular',sh},
+  {t:'seg',k:'density',l:'Yoğunluk',h:'Pano tablosunda satırların yüksekliği',o:[['sikisik','Sıkı'],['normal','Normal'],['genis','Ferah']],v:a.density,sh},
+  {t:'seg',k:'size',l:'Yazı boyutu',h:'Tüm sayfayı büyütür veya küçültür',o:Object.entries(APP_SIZES).map(([k,x])=>[k,'%'+Math.round(x[1]*100)]),v:a.size,sh},
+  {t:'seg',k:'radius',l:'Köşe yuvarlaklığı',h:'Kartların ve düğmelerin köşe biçimi',o:[['keskin','Keskin'],['yumusak','Yumuşak'],['yuvarlak','Yuvarlak']],v:a.radius||'yumusak',sh},
+  {t:'seg',k:'weight',l:'Yazı kalınlığı',h:'Metinlerin genel kalınlığı',o:Object.entries(APP_WEIGHTS),v:a.weight,sh},
+  {t:'sw',k:'motion',l:'Animasyonlar',h:'Geçişler, yoldaki kamyon ve efektler',v:kGet(K_MOTION)!=='off',sh:dev},
+  {t:'sw',k:'liveNotify',l:'Canlı değişiklik bildirimi',h:'Başka biri bir aracı değiştirince sağ altta kısa bildirim çıkar, satır parlar',v:on('liveNotify'),sh}];
+ if(id==='layout')return [
+  {t:'seg',k:'nav',l:'Sol menü',h:'Menü dar (yalnızca simgeler) mı geniş mi dursun',o:[['narrow','Dar (simge)'],['wide','Geniş']],v:kWide()?'wide':'narrow',sh:dev},
+  {t:'sw',k:'hero',l:'Karşılama bandı',h:'Panonun üstündeki büyük renkli bölüm; kapalıyken haftalık sayılar kart olarak görünür',v:kHeroOn(),sh:dev},
+  {t:'sw',k:'panel',l:'Genel bakış kartları',h:'Panodaki grafik, durum dağılımı, bekleyenler ve bugün kartları',v:kGet(K_PANEL)!=='1',sh:dev},
+  {t:'seg',k:'boardView',l:'Pano açılış görünümü',h:'Panodaki Tablo / Kartlar düğmesiyle her cihaz kendi tercihini de seçebilir',o:Object.entries(APP_BOARDVIEW),v:a.boardView,sh},
+  {t:'seg',k:'rowStyle',l:'Satır renklendirme',h:'Sade: yalnızca bitenler hafif yeşil · Renkli: duruma göre tüm satır',o:[['minimal','Sade'],['full','Renkli']],v:a.rowStyle,sh},
+  {t:'seg',k:'tint',l:'Renkli satırlarda ton',h:'Yalnızca “Renkli” satır renklendirmede kullanılır',o:Object.entries(APP_TINT).map(([k,x])=>[k,x[0]]),v:a.tint,sh},
+  {t:'seg',k:'bg',l:'Sayfa arka planı',h:'Kartların arkasındaki zemin',o:[['gri','Gri'],['beyaz','Beyaz'],['sicak','Krem'],['mavi','Mavi'],['yesil','Yeşil']],v:a.bg,sh},
+  {t:'seg',k:'headStyle',l:'Müşteri başlıkları',h:'Panoda her müşteri bloğunun başlığı',o:[['minimal','Sade'],['band','Renkli şerit']],v:a.headStyle,sh},
+  {t:'seg',k:'headAlign',l:'Başlık hizası',h:'Müşteri adı ortada mı solda mı',o:Object.entries(APP_HALIGN),v:a.headAlign,sh},
+  {t:'seg',k:'headStrength',l:'Renkli şeritte ton',h:'Yalnızca “Renkli şerit” başlıkta kullanılır',o:Object.entries(APP_HSTR).map(([k,x])=>[k,x[0]]),v:a.headStrength,sh},
+  {t:'seg',k:'chipStyle',l:'İşaretli düğme stili',h:'TESİSTE / T1 / BİTTİ düğmeleri işaretliyken',o:[['soft','Yumuşak'],['solid','Dolu renk']],v:a.chipStyle,sh},
+  {t:'sw',k:'statusIcons',l:'Düğmelerde simge',h:'Durum düğmelerinde küçük simgeler',v:on('statusIcons'),sh},
+  {t:'sw',k:'plateBand',l:'Plakada ülke şeridi',h:'Ülke plakanın yazılışından tanınır (TR, BG, RO, GR, HU, AL, UA, MD)',v:on('plateBand'),sh},
+  {t:'html',html:appPreview()}];
+ if(id==='font')return [
+  {t:'sel',k:'font',l:'Yazı tipi',h:'Varsayılan: Kontrol Kulesi’nde Inter, Klasik’te Roboto',o:APP_FONTS,v:a.font,sh},
+  {t:'seg',k:'spacing',l:'Harf aralığı',h:'Harfler arasındaki boşluk',o:Object.entries(APP_SPACING).map(([k,x])=>[k,x[0]]),v:a.spacing,sh},
+  {t:'sel',k:'plateFont',l:'Plaka yazı tipi',h:'Plakalar için ayrı yazı tipi seçilebilir',o:APP_PLATE_FONTS,v:a.plateFont,sh},
+  {t:'seg',k:'plateSize',l:'Plaka yazı boyutu',h:'Tablodaki plakaların büyüklüğü',o:Object.entries(APP_PLATE).map(([k,x])=>[k,x[0]]),v:a.plateSize,sh},
+  {t:'html',html:`<p class="k-note">Yazılar her zaman BÜYÜK HARF gösterilir.</p>`}];
+ return [];}
+function kControl(r){const cls=r.sh?'k-shared':'';
+ if(r.t==='seg')return `<div class="k-seg" data-sk="${r.k}" role="group" aria-label="${esc(r.l)}">${r.o.map(([v,l])=>{const on=String(r.v)===String(v);return `<button type="button" class="${cls}${on?' on':''}" data-v="${esc(v)}" aria-pressed="${on}">${esc(l)}</button>`;}).join('')}</div>`;
+ if(r.t==='sw')return `<label class="k-swt"><input type="checkbox" class="${cls}" data-sw="${r.k}" ${r.v?'checked':''} aria-label="${esc(r.l)}"><i></i></label>`;
+ if(r.t==='sel')return `<select class="app-set" data-k="${r.k}" aria-label="${esc(r.l)}">${Object.entries(r.o).map(([k,v])=>`<option value="${k}" ${k===r.v?'selected':''}>${esc(v[0])}</option>`).join('')}</select>`;
+ if(r.t==='acc'){const cur=String(appearance.colors?.accent||'').toLowerCase(),known=K_ACCENTS.some(([c])=>c===cur);
+  return `<div class="k-accs" role="group" aria-label="Vurgu rengi">${K_ACCENTS.map(([c,n])=>`<button type="button" class="k-shared${c===cur?' on':''}" data-acc="${c}" style="--c:${c}" aria-pressed="${c===cur}" title="${n}"><i></i><span>${n}</span></button>`).join('')}${known?'':`<button type="button" class="on" data-stab="colors" style="--c:${esc(cur)}" title="Özel renk: Renkler bölümünden değiştirin"><i></i><span>Özel</span></button>`}</div>`;}
+ return '';}
+function kRow(r,tag=''){if(r.t==='html')return r.html;
+ return `<div class="k-srow"><div class="k-sl">${tag}<b>${esc(r.l)}${r.sh?'':'<em class="k-scope">Bu cihaz</em>'}</b><small>${esc(r.h||'')}</small></div><div class="k-sc">${kControl(r)}</div></div>`;}
+function kColorsHTML(){const a=appearance;
+ return `<div class="k-srow k-col"><div class="k-sl"><b>Hazır temalar</b><small>Bir temaya tıklayınca bütün görünüm ayarları ona göre dolar; sonra istediğinizi tek tek değiştirebilirsiniz</small></div><div class="k-sc"><div class="app-presets">${Object.entries(APP_PRESETS).map(([k,[l]])=>`<button type="button" class="btn app-preset-btn" data-action="app-preset" data-p="${k}">${l}</button>`).join('')}${button('app-reset','Varsayılana dön','refresh','text')}</div></div></div>
+ <div class="k-srow k-col"><div class="k-sl"><b>Renkler</b><small>Renk kodunu (örneğin #0f766e) yazı kutusuna yapıştırabilirsiniz. Ana renk menüyü ve karşılama bandını, vurgu rengi düğmeleri boyar</small></div><div class="k-sc"><div class="app-colors">${APP_COLOR_LABELS.map(([k,l])=>`<div class="app-color-item"><input type="color" class="app-set" data-k="color-${k}" value="${esc(a.colors[k])}" aria-label="${l}"><div class="app-color-text"><span>${l}</span><input type="text" class="app-set app-hex" data-k="color-${k}" value="${esc(a.colors[k])}" maxlength="7" spellcheck="false" aria-label="${l} kodu"></div><span class="chip-prev ${k}">${['onsite','t1','done'].includes(k)?stIcon(k)+(k==='onsite'?'TESİSTE':k==='t1'?'T1':'BİTTİ'):'Örnek'}</span></div>`).join('')}</div></div></div>${appPreview()}`;}
+function kKeysHTML(){const list=[['Ctrl · K','Hızlı ara'],...SHORTCUTS];
+ return `<ul class="k-keys">${list.map(([k,l])=>`<li><span>${k.split(' · ').map(x=>`<kbd>${esc(x)}</kbd>`).join('')}</span><b>${esc(l)}</b></li>`).join('')}</ul>`;}
+function kAboutHTML(){return `<div class="k-about"><div class="k-about-logo">PCS</div><div><b>PCS TRANSİT YYS · Araç operasyon panosu</b><p>Gelişler, plaka kayıtları, ruhsatlar ve ayarlar Supabase’de ortak saklanır; değişiklikler bütün ekranlara anında yansır. Her gece sunucuda otomatik yedek alınır.</p><small>${esc(displayName(account?.email)||'')}${account?.email?' · ':''}${role==='editor'?'Düzenleyici':'Görüntüleyici'} · Son güncelleme ${esc(lastSync||'—')}</small></div></div>`;}
+function kSettingsView(){const secs=kSections(),q=norm(ui.setQ||'');let body;
+ if(!secs.some(x=>x.id===ui.setTab))ui.setTab='look';
+ if(q){const hits=[];for(const sec of secs){for(const r of kRows(sec.id))if(r.l&&norm(r.l+' '+(r.h||'')+' '+sec.t).includes(q))hits.push(kRow(r,`<span class="k-hit">${esc(sec.t)}</span>`));
+   if(sec.html&&norm(sec.t+' '+sec.d).includes(q))hits.push(`<div class="k-srow"><div class="k-sl"><span class="k-hit">${esc(sec.t)}</span><b>${esc(sec.t)}</b><small>${esc(sec.d)}</small></div><div class="k-sc"><button type="button" class="btn small" data-stab="${sec.id}">Bölüme git</button></div></div>`);}
+  body=`<div class="k-scard"><div class="k-shead"><span>🔎</span><div><h2>Arama sonuçları</h2><p>${hits.length} ayar bulundu</p></div></div>${hits.join('')||'<p class="k-note">Eşleşen ayar yok.</p>'}</div>`;}
+ else{const sec=secs.find(x=>x.id===ui.setTab),rows=kRows(sec.id),resettable=rows.some(r=>r.k);
+  body=`<div class="k-scard" data-sec="${sec.id}"><div class="k-shead"><span>${sec.ic}</span><div><h2>${esc(sec.t)}</h2><p>${esc(sec.d)}</p></div>${resettable?`<button type="button" class="k-link" data-sreset="${sec.id}">Bu bölümü sıfırla</button>`:''}</div>${rows.map(r=>kRow(r)).join('')}${sec.html?`<div class="k-shtml">${sec.html()}</div>`:''}</div>`;}
+ const nav=secs.map(x=>`<button type="button" class="k-stab${x.id===ui.setTab&&!q?' on':''}" data-stab="${x.id}" aria-current="${x.id===ui.setTab&&!q?'page':'false'}"><span>${x.ic}</span><div><b>${esc(x.t)}</b><small>${esc(x.d)}</small></div></button>`).join('');
+ return `<div class="k-set"><nav class="k-snav" aria-label="Ayar bölümleri">${nav}</nav><div class="k-sbody">${body}</div></div>
+ <div class="save-bar${appearanceDirty?' show':''}" id="save-bar" role="status"><span>${icon('info')}Görünüm ayarlarında kaydedilmemiş değişiklik var. Kaydet’e basınca herkes için geçerli olur.</span>${button('app-cancel','Vazgeç')}${button('app-save','Kaydet','check','primary')}</div>`;}
+function kApply(k,v){const a=appearance;let shared=true;
+ if(k==='theme'){shared=false;kSet(THEME_KEY,v==='dark'||v==='auto'?v:'light');}
+ else if(k==='motion'){shared=false;kSet(K_MOTION,v==='off'?'off':null);}
+ else if(k==='nav'){shared=false;kSet(K_NAVWIDE,v==='wide'?'1':null);}
+ else if(k==='hero'){shared=false;kSet(K_HERO,v==='off'?'off':null);}
+ else if(k==='panel'){shared=false;kSet(K_PANEL,v==='off'?'1':null);}
+ else if(k==='accent'){if(!/^#[0-9a-f]{6}$/i.test(v))return;a.colors={...a.colors,accent:v.toLowerCase()};}
+ else if(['statusIcons','plateBand','liveNotify'].includes(k))a[k]=v==='off'?'off':'on';
+ else a[k]=v;
+ if(shared){if(!canEdit())return;appearanceDirty=true;if(k==='boardView')kSet(STORE+'.view',null);}
+ applyAppearance();const y=window.scrollY;render();window.scrollTo(0,y);}
+function kReset(id){const keys=kRows(id).filter(r=>r.k).map(r=>r.k);let shared=false;
+ for(const k of keys){if(['theme','motion','nav','hero','panel'].includes(k)){kSet({theme:THEME_KEY,motion:K_MOTION,nav:K_NAVWIDE,hero:K_HERO,panel:K_PANEL}[k],null);continue;}
+  if(!canEdit())continue;shared=true;if(k==='accent')appearance.colors={...appearance.colors,accent:APP_DEFAULT.colors.accent};else appearance[k]=APP_DEFAULT[k];}
+ if(shared)appearanceDirty=true;applyAppearance();render();toast(`“${kSections().find(x=>x.id===id)?.t||''}” ayarları varsayılana döndü.${shared?' Herkes için kalıcı olması için Kaydet’e basın.':''}`);}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-stab]');if(t){ui.setTab=t.dataset.stab;ui.setQ='';if(ui.page!=='settings')ui.page='settings';render();window.scrollTo(0,0);return;}
+ const sg=e.target.closest('[data-sk] button[data-v]');if(sg&&!sg.disabled){kApply(sg.parentElement.dataset.sk,sg.dataset.v);return;}
+ const ac=e.target.closest('[data-acc]');if(ac&&!ac.disabled){kApply('accent',ac.dataset.acc);return;}
+ const rs=e.target.closest('[data-sreset]');if(rs)kReset(rs.dataset.sreset);});
+document.addEventListener('change',e=>{const t=e.target.closest?.('[data-sw]');if(t&&!t.disabled)kApply(t.dataset.sw,t.checked?'on':'off');});
+document.addEventListener('input',e=>{if(e.target.id!=='set-q')return;ui.setQ=e.target.value;render();});
 
 /* ekrana bağlama */
 const renderBase=render;
