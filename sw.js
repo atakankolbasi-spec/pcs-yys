@@ -6,9 +6,10 @@
  * Supabase istekleri (başka alan adı) önbelleğe alınmaz. */
 const CACHE = 'pcs-shell-v1';
 const SHELL = [
-  './', 'app.css', 'app.js', 'xlsx.js', 'xlsx-templates.js', 'vendor.js',
+  './', 'app.css', 'kule.css', 'app.js', 'xlsx.js', 'xlsx-templates.js', 'vendor.js',
   'manifest.webmanifest', 'logo.svg', 'favicon-48.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png',
-  'fonts/Roboto-Light.woff2', 'fonts/Roboto-Regular.woff2', 'fonts/Roboto-Medium.woff2', 'fonts/Roboto-Bold.woff2'
+  'fonts/Roboto-Light.woff2', 'fonts/Roboto-Regular.woff2', 'fonts/Roboto-Medium.woff2', 'fonts/Roboto-Bold.woff2',
+  'fonts/Inter-latin.woff2', 'fonts/Inter-latin-ext.woff2', 'fonts/PlusJakartaSans-latin.woff2', 'fonts/PlusJakartaSans-latin-ext.woff2'
 ];
 const NETWORK_TIMEOUT = 5000;
 

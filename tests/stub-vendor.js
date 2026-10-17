@@ -221,6 +221,13 @@
         return { data: { id: v.id, onsite: v.onsite, onsite_at: v.onsite_at, exit_at: v.exit_at }, error: null };
       }
       if (name === 'current_app_role') return { data: cfg.role || 'editor', error: null };
+      // Görünüm vb. ortak ayarlar (ayar-kaydetme-kurulumu.sql'in sade karşılığı)
+      if (name === 'save_app_setting') {
+        const rows = (db.app_settings = db.app_settings || []), r = rows.find(x => x.key === params.p_key);
+        const v = { key: params.p_key, value: clone(params.p_value), updated_at: now() };
+        if (r) Object.assign(r, v); else rows.push(v);
+        return { data: null, error: null };
+      }
       if (name === 'list_backups') return { data: [{ id: 1, taken_at: now() }], error: null };
       if (name === 'visit_history') return { data: (cfg.history || {})[params.p_visit_id] || [], error: null };
       return { data: null, error: null };

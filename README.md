@@ -12,13 +12,14 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 |---|---|
 | `index.html` | Sayfa iskeleti ve güvenlik ayarları (CSP) |
 | `gizlilik.html` | Herkese açık gizlilik politikası (Meta/WhatsApp uygulaması bu adresi ister). Veri silme bölümü: `gizlilik.html#veri-silme` |
-| `app.css` | Tüm görünüm / stil |
+| `app.css` | Tüm görünüm / stil (Klasik tasarım) |
+| `kule.css` | "Kontrol Kulesi" tasarımı: yüzen koyu yan menü, cam üst çubuk, karşılama bandı, genel bakış kartları, hızlı arama (Ctrl+K). Varsayılan budur; Ayarlar > Tasarım ve hazır temalar > Klasik ile önceki görünüme dönülür. Güvenlik ve saha ekranını değiştirmez |
 | `app.js` | Uygulamanın kendisi (pano, raporlar, saha modu, senkron) |
 | `xlsx.js` | Excel içe / dışa aktarma |
 | `xlsx-templates.js` | Excel şablonları (openpyxl ile üretildi) |
 | `vendor.js` | Supabase istemcisi |
 | `sw.js` | Service worker: internet yokken sitenin açılmasını sağlar |
-| `fonts/` | Roboto yazı tipi (WOFF2) |
+| `fonts/` | Roboto, Inter ve Plus Jakarta Sans yazı tipleri (WOFF2; Inter ve Plus Jakarta Sans SIL Open Font License, lisans metinleri aynı klasörde) |
 | `ocr/` | "Ruhsattan ekle" için tarayıcıda çalışan metin okuma programı (Tesseract). Ayrıntı: `ocr/README.md` |
 | `_headers` | Sunucu güvenlik başlıkları. **GitHub Pages'te etkisizdir**; site Cloudflare Pages veya Netlify'a taşınırsa kullanılır. Gömülmeye (iframe) karşı koruma bu yüzden `app.js` başında yapılır. |
 | `supabase/` | Veritabanı tarafı notları, kurulum SQL'leri ve WhatsApp sunucu fonksiyonu. WhatsApp kurulumu: `supabase/WHATSAPP.md` |
