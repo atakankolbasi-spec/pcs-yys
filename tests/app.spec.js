@@ -163,9 +163,8 @@ test('hızlı arama (Ctrl+K): geliş, plaka kaydı ve sayfa bulunur', async ({ p
 test('ayarlardan Klasik tasarıma dönülür, seçim herkes için kaydedilir; güvenlik ekranı etkilenmez', async ({ page, context }) => {
   const problems = await openApp(page);
   await page.locator('.nav-item[data-page="settings"]').click();
-  await page.locator('details[data-panel="theme"] > summary').click();
-  await expect(page.locator('[data-action="app-design"][data-v="kule"]')).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('[data-action="app-design"][data-v="klasik"]').click();
+  await expect(page.locator('[data-sk="design"] [data-v="kule"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-sk="design"] [data-v="klasik"]').click();
   expect(await page.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(false);
   await expect(page.locator('.sidebar .brand-mark img')).toHaveCount(1);
   await expect(page.locator('[data-action="k-search"]')).toHaveCount(0);
@@ -184,6 +183,72 @@ test('ayarlardan Klasik tasarıma dönülür, seçim herkes için kaydedilir; g�
   await openApp(guard, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
   await expect(guard.locator('.guard')).toBeVisible();
   expect(await guard.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(false);
+});
+
+test('ayarlar sayfası: bölümler, tema, vurgu rengi, köşe, animasyon, karşılama bandı ve arama', async ({ page }) => {
+  const problems = await openApp(page);
+  await page.locator('.nav-item[data-page="settings"]').click();
+  // sol listede bölümler; ilk açılan Görünüm
+  await expect(page.locator('.k-stab')).toHaveCount(11);
+  await expect(page.locator('.k-stab.on')).toContainText('Görünüm');
+  const html = () => page.evaluate(() => ({ theme: document.documentElement.dataset.theme || 'light', radius: document.documentElement.dataset.radius, nomotion: document.documentElement.classList.contains('k-nomotion'), accent: document.documentElement.style.getPropertyValue('--c-accent') }));
+  // bu cihaz ayarları hemen geçerli, kaydet çubuğu çıkmaz
+  await page.locator('[data-sk="theme"] [data-v="dark"]').click();
+  expect((await html()).theme).toBe('dark');
+  expect(await page.evaluate(() => localStorage.getItem('pcs-transit-yys.v1.theme'))).toBe('dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.locator('[data-sk="theme"] [data-v="auto"]').click();
+  expect((await html()).theme).toBe('light');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect.poll(async () => (await html()).theme).toBe('dark');
+  await page.locator('[data-sk="theme"] [data-v="light"]').click();
+  await page.locator('.k-swt:has([data-sw="motion"])').click();
+  expect((await html()).nomotion).toBe(true);
+  await expect(page.locator('#save-bar')).not.toHaveClass(/show/);
+  // herkes için ayarlar: görünür, Kaydet ile kalıcı olur
+  await page.locator('[data-acc="#0f9d8a"]').click();
+  expect((await html()).accent).toBe('#0f9d8a');
+  await expect(page.locator('[data-acc="#0f9d8a"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-sk="radius"] [data-v="yuvarlak"]').click();
+  expect((await html()).radius).toBe('yuvarlak');
+  await expect(page.locator('#save-bar')).toHaveClass(/show/);
+  await page.locator('[data-action="app-save"]').click();
+  await expect(page.locator('#toast')).toContainText('Görünüm ayarları kaydedildi');
+  const saved = await page.evaluate(() => window.__db.app_settings.find(r => r.key === 'appearance').value);
+  expect([saved.colors.accent, saved.radius]).toEqual(['#0f9d8a', 'yuvarlak']);
+  // bölümü sıfırla
+  await page.locator('[data-sreset="look"]').click();
+  expect((await html()).radius).toBe('yumusak');
+  expect((await html()).nomotion).toBe(false);
+  // yerleşim: karşılama bandı kapanınca haftanın sayıları kart olarak görünür
+  await page.locator('[data-stab="layout"]').click();
+  await page.locator('.k-swt:has([data-sw="hero"])').click();
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(page.locator('.k-hero')).toHaveCount(0);
+  await expect(page.locator('.kpi-grid')).toBeVisible();
+  await expect(page.locator('.heading.k-pagehead [data-action="ruhsat-open"]')).toBeVisible();
+  // arama: ayar adına göre, bölüm etiketiyle
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('#set-q').fill('plaka');
+  await expect(page.locator('.k-hit').first()).toBeVisible();
+  await expect(page.locator('.k-sbody')).toContainText('Plaka yazı boyutu');
+  await expect(page.locator('#set-q')).toBeFocused();
+  // bölüm içindeki eski düzenleyiciler çalışır (müşteri sıralaması)
+  await page.locator('#set-q').fill('');
+  await page.locator('[data-stab="customers"]').click();
+  await expect(page.locator('.k-scard')).toContainText('Öncelikli müşteri sıralaması');
+  expect(problems).toEqual([]);
+});
+
+test('ayarlar: görüntüleyici ortak görünüm ayarlarını değiştiremez, kendi temasını seçebilir', async ({ page }) => {
+  const problems = await openApp(page, { role: 'viewer' });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await expect(page.locator('[data-sk="radius"] [data-v="keskin"]')).toBeDisabled();
+  await expect(page.locator('[data-acc="#0f9d8a"]')).toBeDisabled();
+  await expect(page.locator('[data-sk="theme"] [data-v="dark"]')).toBeEnabled();
+  await page.locator('[data-sk="theme"] [data-v="dark"]').click();
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  expect(problems).toEqual([]);
 });
 
 test('tüm sayfalar hatasız açılır', async ({ page }) => {
@@ -1276,7 +1341,7 @@ test('güvenlik linki geçersizse ekran açılmaz', async ({ page }) => {
 test('ayarlar: güvenlik linki gösterilir ve yenilenir', async ({ page }) => {
   const problems = await openApp(page, { guardToken: 'g1' });
   await page.locator('.nav-item[data-page="settings"]').click();
-  await page.locator('details[data-panel="guard"] summary').click();
+  await page.locator('[data-stab="guard"]').click();
   await page.locator('[data-action="glink-show"]').click();
   await expect(page.locator('#guard-link')).toHaveValue(/\?guvenlik=g1$/);
   page.once('dialog', d => d.accept());
@@ -1285,7 +1350,6 @@ test('ayarlar: güvenlik linki gösterilir ve yenilenir', async ({ page }) => {
   await expect(page.locator('#guard-link')).toHaveValue(/\?guvenlik=yeni\d+$/);
   // İzleme linki ayrı: gösterilir, yenilenir; güvenlik linki değişmez
   const guardValue = await page.locator('#guard-link').inputValue();
-  await page.locator('details[data-panel="guardview"] summary').click();
   await page.locator('[data-action="gvlink-show"]').click();
   await expect(page.locator('#guard-view-link')).toHaveValue(/\?guvenlik-izle=izle\d+$/);
   const firstView = await page.locator('#guard-view-link').inputValue();
@@ -1362,8 +1426,8 @@ test('güvenlik hesabı kapatılmışsa ekran açılmaz, çıkış yapılabilir'
 test('ayarlar: güvenlik hesabı eklenir, kapatılır, açılır ve silinir', async ({ page }) => {
   const problems = await openApp(page);
   await page.locator('.nav-item[data-page="settings"]').click();
-  await page.locator('details[data-panel="guardacct"] summary').click();
-  const panel = page.locator('details[data-panel="guardacct"]');
+  await page.locator('[data-stab="guard"]').click();
+  const panel = page.locator('[data-panel="guardacct"]');
   await expect(panel).toContainText('Henüz güvenlik hesabı yok');
   // kendi hesabı eklenemez
   await page.locator('#gacc-email').fill('test@ornek.com');
@@ -1395,7 +1459,7 @@ test('ayarlar: güvenlik hesabı eklenir, kapatılır, açılır ve silinir', as
 test('ayarlar: Supabase kullanıcısı olan güvenlik hesabı silinemez, yalnızca kapatılır', async ({ page }) => {
   const problems = await openApp(page, { guardAccounts: [{ email: 'guv@ornek.com', name: 'Kapı', active: true, has_user: true, last_sign_in_at: '2026-09-23T06:30:00Z' }] });
   await page.locator('.nav-item[data-page="settings"]').click();
-  await page.locator('details[data-panel="guardacct"] summary').click();
+  await page.locator('[data-stab="guard"]').click();
   const row = page.locator('.gacc-row', { hasText: 'guv@ornek.com' });
   await expect(row.locator('.gacc-st')).toHaveText(/açık · son giriş/i);
   await expect(row.locator('[data-action="gacc-del"]')).toHaveCount(0);
@@ -1406,7 +1470,8 @@ test('ayarlar: Supabase kullanıcısı olan güvenlik hesabı silinemez, yalnız
 test('ayarlar: güvenlik hesapları görüntüleyiciye görünmez', async ({ page }) => {
   const problems = await openApp(page, { role: 'viewer' });
   await page.locator('.nav-item[data-page="settings"]').click();
-  await expect(page.locator('details[data-panel="guardacct"]')).toHaveCount(0);
+  await expect(page.locator('[data-stab="guard"]')).toHaveCount(0);
+  await expect(page.locator('[data-panel="guardacct"]')).toHaveCount(0);
   expect(await page.evaluate(() => window.__calls.filter(c => c.rpc === 'list_guard_accounts').length)).toBe(0);
   expect(problems).toEqual([]);
 });
@@ -1414,8 +1479,8 @@ test('ayarlar: güvenlik hesapları görüntüleyiciye görünmez', async ({ pag
 test('ayarlar: otomatik günlük rapor alıcıları kaydedilir, anahtar gösterilir ve yenilenir', async ({ page }) => {
   const problems = await openApp(page, { report: { enabled: false, recipients: [], token: 'rapor1', last_run_at: '2026-09-22T20:59:30Z', last_ok: true, last_note: '22.09.2026: 2 alıcıya gönderildi · 7 araç.' } });
   await page.locator('.nav-item[data-page="settings"]').click();
-  await page.locator('details[data-panel="report"] > summary').click();
-  const panel = page.locator('details[data-panel="report"]');
+  await page.locator('[data-stab="report"]').click();
+  const panel = page.locator('[data-panel="report"]');
   await expect(panel.locator('.rep-last.ok')).toContainText('2 alıcıya gönderildi');
   await expect(panel).toContainText('23:59');
   // geçersiz adres ve boş liste reddedilir
@@ -1446,14 +1511,14 @@ test('ayarlar: otomatik günlük rapor alıcıları kaydedilir, anahtar gösteri
 test('ayarlar: günlük rapor kurulmamışsa SQL dosyası istenir; görüntüleyiciye bölüm görünmez', async ({ page, browser }) => {
   const problems = await openApp(page, { missing: ['report'] });
   await page.locator('.nav-item[data-page="settings"]').click();
-  await page.locator('details[data-panel="report"] > summary').click();
-  await expect(page.locator('details[data-panel="report"] .notice')).toContainText('gunluk-rapor-kurulumu.sql');
-  await expect(page.locator('details[data-panel="report"] .rep-setup')).toHaveAttribute('open', '');
+  await page.locator('[data-stab="report"]').click();
+  await expect(page.locator('[data-panel="report"] .notice')).toContainText('gunluk-rapor-kurulumu.sql');
+  await expect(page.locator('[data-panel="report"] .rep-setup')).toHaveAttribute('open', '');
   expect(problems).toEqual([]);
   const viewer = await browser.newPage();
   await openApp(viewer, { role: 'viewer' });
   await viewer.locator('.nav-item[data-page="settings"]').click();
-  await expect(viewer.locator('details[data-panel="report"]')).toHaveCount(0);
+  await expect(viewer.locator('[data-stab="report"]')).toHaveCount(0);
   expect(await viewer.evaluate(() => window.__calls.filter(c => c.rpc === 'get_report_settings').length)).toBe(0);
   await viewer.close();
 });

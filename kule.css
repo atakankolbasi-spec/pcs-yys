@@ -65,10 +65,11 @@ html.kule :focus-visible{outline:3px solid color-mix(in srgb,var(--c-accent) 55%
  html.kule .shell{margin-left:calc(var(--k-side) + 28px);transition:margin .32s var(--k-ease)}
  html.kule body.k-wide .shell{margin-left:calc(var(--k-sideW) + 28px)}
  /* dar menüde yazılar gizli; üzerine gelince ya da sabitlenince görünür */
- html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)) :is(.brand-text,.nav-label,.nav-text,.sidebar-user,.local-card){display:none}
- html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)) .nav-item{justify-content:center;padding:0;gap:0}
- html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)) .nav-count{position:absolute;top:3px;right:6px;min-width:18px;height:18px;padding:0 5px;font-size:10px}
- html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)) .brand{justify-content:center}
+ html.kule body.k-navpick:not(.k-wide) .sidebar{width:var(--k-side)}
+ :is(html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)),html.kule body.k-navpick:not(.k-wide) .sidebar) :is(.brand-text,.nav-label,.nav-text,.sidebar-user,.local-card){display:none}
+ :is(html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)),html.kule body.k-navpick:not(.k-wide) .sidebar) .nav-item{justify-content:center;padding:0;gap:0}
+ :is(html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)),html.kule body.k-navpick:not(.k-wide) .sidebar) .nav-count{position:absolute;top:3px;right:6px;min-width:18px;height:18px;padding:0 5px;font-size:10px}
+ :is(html.kule body:not(.k-wide) .sidebar:not(:hover):not(:has(:focus-visible)),html.kule body.k-navpick:not(.k-wide) .sidebar) .brand{justify-content:center}
 }
 html.kule .brand{display:flex;align-items:center;gap:12px;padding:2px 4px 14px;margin:0 0 8px;border-bottom:1px solid #ffffff14}
 html.kule .brand-mark.k-mark{flex:0 0 44px;width:44px;height:44px;display:grid;place-items:center;border-radius:14px;overflow:visible;background-color:var(--k-af)!important;background-image:linear-gradient(135deg,var(--k-af),#22d3ee)!important;color:#fff;font:800 13px/1 var(--k-head,var(--k-font));letter-spacing:.06em;box-shadow:0 8px 22px color-mix(in srgb,var(--c-accent) 45%,transparent),inset 0 1px 0 #ffffff55}
@@ -390,3 +391,120 @@ html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
  html.kule .heading h1{color:#000!important;font-size:23px}
  html.kule :is(.period-panel,.day-block,.kpi,.card,.set-panel,.reg-group){box-shadow:none}
 }
+
+/* ---------- Ayarlar sayfası: solda bölümler, sağda satır satır ayarlar ---------- */
+html.kule .k-ssearch{display:flex;align-items:center;gap:8px;min-width:280px;height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--k-line);background:var(--k-soft)}
+html.kule .k-ssearch svg{width:16px;height:16px;color:var(--k-at)}
+html.kule .k-ssearch input{flex:1;min-height:0;height:100%;border:0!important;box-shadow:none!important;background:transparent!important;padding:0;font-weight:700}
+html.kule .k-set{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start;margin-bottom:90px}
+html.kule .k-snav{position:sticky;top:92px;display:grid;gap:4px;padding:10px;border-radius:var(--k-r);border:1px solid var(--k-line);background:var(--k-card);box-shadow:var(--k-sh1)}
+html.kule .k-stab{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;border-radius:13px;background:transparent;color:var(--k-ink);text-align:left;cursor:pointer;font:inherit;transition:background .18s}
+html.kule .k-stab>span{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:12px;background:var(--k-soft);font-size:18px;line-height:1;text-transform:none;transition:background .18s}
+html.kule .k-stab b{display:block;font-size:12.5px;font-weight:800;letter-spacing:.04em;color:var(--k-ink)}
+html.kule .k-stab small{display:block;margin-top:3px;font-size:10.5px;font-weight:700;letter-spacing:.03em;line-height:1.4;color:var(--k-mut)}
+html.kule .k-stab:hover{background:var(--k-soft)}
+html.kule .k-stab.on{background:linear-gradient(135deg,var(--k-a-soft),var(--k-card));box-shadow:inset 3px 0 0 var(--k-af)}
+html.kule .k-stab.on>span{background-color:var(--k-af);background-image:linear-gradient(135deg,var(--k-af),var(--k-a2));box-shadow:0 6px 14px color-mix(in srgb,var(--c-accent) 30%,transparent)}
+html.kule .k-scard{padding:6px 28px 16px;border-radius:var(--k-r);border:1px solid var(--k-line);background:var(--k-card);box-shadow:var(--k-sh1)}
+html.kule .k-shead{display:flex;align-items:center;gap:16px;padding:20px 0 18px;border-bottom:1px solid var(--k-line)}
+html.kule .k-shead>span{display:grid;place-items:center;flex:0 0 54px;width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,var(--k-a-soft),color-mix(in srgb,var(--c-accent) 18%,var(--k-card)));font-size:25px;line-height:1;text-transform:none}
+html.kule .k-shead h2{margin:0;font-size:21px;font-weight:800;color:var(--k-ink)}
+html.kule .k-shead p{margin:4px 0 0;font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--k-mut)}
+html.kule .k-shead .k-link{margin-left:auto}
+html.kule .k-srow{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 0;border-bottom:1px solid var(--k-line)}
+html.kule .k-srow:last-child{border-bottom:0}
+html.kule .k-srow.k-col{flex-direction:column;align-items:stretch;gap:14px}
+html.kule .k-srow.k-col .k-sc{max-width:none;justify-content:flex-start}
+html.kule .k-sl{flex:1;min-width:0}
+html.kule .k-sl b{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;letter-spacing:.03em;color:var(--k-ink)}
+html.kule .k-sl small{display:block;margin-top:5px;font-size:11px;font-weight:700;letter-spacing:.03em;line-height:1.5;color:var(--k-mut)}
+html.kule .k-scope{font-style:normal;padding:2px 8px;border-radius:99px;background:var(--k-soft);border:1px solid var(--k-line);color:var(--k-mut);font-size:9.5px;letter-spacing:.08em}
+html.kule .k-hit{display:inline-block;margin-bottom:6px;padding:3px 10px;border-radius:99px;background:var(--k-a-soft);color:var(--k-at);font-size:9.5px;font-weight:800;letter-spacing:.1em}
+html.kule .k-sc{flex:0 1 auto;max-width:62%;display:flex;justify-content:flex-end}
+html.kule .k-sc select{min-width:280px;max-width:100%}
+html.kule .k-note{margin:14px 0 4px;color:var(--k-mut);font-size:11px;font-weight:700;letter-spacing:.04em}
+/* düğme grubu */
+html.kule .k-seg{display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:2px;padding:4px;border-radius:14px;background:var(--k-soft);border:1px solid var(--k-line)}
+html.kule .k-seg button{min-height:38px;padding:8px 16px;border:0;border-radius:11px;background:transparent;color:var(--k-ink2);font:800 11.5px var(--k-font);letter-spacing:.06em;cursor:pointer;transition:background .18s,color .18s,box-shadow .18s}
+html.kule .k-seg button:hover:not(:disabled){color:var(--k-ink)}
+html.kule .k-seg button.on{background:var(--k-card);color:var(--k-at);box-shadow:0 2px 8px #0b153022}
+html.kule .k-seg button:disabled,html.kule .k-accs button:disabled{cursor:not-allowed;opacity:.55}
+/* açma-kapama anahtarı */
+html.kule .k-swt{position:relative;display:inline-block;flex:0 0 54px;width:54px;height:30px;cursor:pointer}
+html.kule .k-swt input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:2;min-height:0}
+html.kule .k-swt i{position:absolute;inset:0;border-radius:99px;background:#cfd8e8;transition:background .25s var(--k-ease)}
+html.kule .k-swt i::after{content:'';position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 6px #0b153033;transition:transform .25s var(--k-ease)}
+html.kule .k-swt input:checked+i{background-color:var(--k-af);background-image:linear-gradient(135deg,var(--k-af),var(--k-a2))}
+html.kule .k-swt input:checked+i::after{transform:translateX(24px)}
+html.kule .k-swt input:focus-visible+i{outline:3px solid color-mix(in srgb,var(--c-accent) 50%,transparent);outline-offset:2px}
+html.kule .k-swt input:disabled+i{opacity:.5}
+/* vurgu rengi */
+html.kule .k-accs{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+html.kule .k-accs button{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:70px;padding:9px 10px 8px;border:2px solid transparent;border-radius:16px;background:transparent;cursor:pointer;font:inherit}
+html.kule .k-accs i{display:block;width:36px;height:36px;border-radius:50%;background:var(--c);box-shadow:0 6px 14px color-mix(in srgb,var(--c) 45%,transparent)}
+html.kule .k-accs span{color:var(--k-mut);font-size:10px;font-weight:800;letter-spacing:.08em}
+html.kule .k-accs button:hover:not(:disabled){background:color-mix(in srgb,var(--c) 6%,transparent)}
+html.kule .k-accs button.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 9%,var(--k-card))}
+html.kule .k-accs button.on span{color:var(--k-ink)}
+/* bölüm içindeki eski kartlar düz görünsün */
+html.kule .k-shtml>div>.card,html.kule .k-shtml>.card{margin:0;padding:18px 0;border:0;border-radius:0;background:transparent;box-shadow:none;border-bottom:1px solid var(--k-line)}
+html.kule .k-shtml>div:last-child>.card,html.kule .k-shtml>.card:last-child{border-bottom:0}
+html.kule .k-shtml .card-header{padding:0 0 12px}
+html.kule .k-shtml .card-header h2{font-size:15px;font-weight:800}
+html.kule .k-shtml .card-header p{color:var(--k-mut);font-size:11.5px;font-weight:600}
+html.kule .k-scard .set-preview{margin:16px 0 4px;border-radius:14px}
+html.kule .k-shtml :is(.help-note,p,li){font-size:12px;line-height:1.65}
+html.kule .k-shtml .help-note{color:var(--k-mut);font-weight:600}
+html.kule .k-shtml>div[data-panel]{padding:18px 0;border-bottom:1px solid var(--k-line)}
+html.kule .k-shtml>div[data-panel]:last-child{border-bottom:0}
+html.kule .k-shtml>div[data-panel]>.card{padding:0;border-bottom:0}
+html.kule .k-scard .app-colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;width:100%}
+html.kule .k-scard .app-color-item{border-radius:14px;border:1px solid var(--k-line);background:var(--k-soft)}
+html.kule .k-scard .app-presets{display:flex;flex-wrap:wrap;gap:8px}
+/* kısayollar, hakkında */
+html.kule .k-keys{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 24px}
+html.kule .k-keys li{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--k-line)}
+html.kule .k-keys li span{display:flex;gap:4px;flex:0 0 110px}
+html.kule .k-keys li b{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--k-ink)}
+html.kule .k-about{display:flex;align-items:center;gap:20px;padding:22px 0}
+html.kule .k-about-logo{display:grid;place-items:center;flex:0 0 74px;width:74px;height:74px;border-radius:22px;background-color:var(--k-af);background-image:linear-gradient(135deg,var(--k-af),#22d3ee);color:#fff;font:800 22px var(--k-head,var(--k-font));box-shadow:0 12px 30px color-mix(in srgb,var(--c-accent) 35%,transparent)}
+html.kule .k-about b{font-size:15px;font-weight:800;color:var(--k-ink)}
+html.kule .k-about p{margin:8px 0;max-width:620px;font-size:12px;font-weight:600;line-height:1.6;color:var(--k-ink2)}
+html.kule .k-about small{color:var(--k-mut);font-size:11px;font-weight:700}
+/* kaydet çubuğu */
+@media (min-width:701px){html.kule .save-bar{left:calc(var(--k-side) + 28px + 320px);right:28px;max-width:none}html.kule body.k-wide .save-bar{left:calc(var(--k-sideW) + 28px + 320px)}}
+html.kule .save-bar{border-radius:18px;background-color:var(--k-brand,#16233a);background-image:linear-gradient(120deg,var(--k-brand,#16233a),color-mix(in srgb,var(--k-brand,#16233a) 70%,var(--c-accent)));color:#fff;box-shadow:0 18px 40px #0b153055}
+html.kule .save-bar .btn:not(.primary){background:#ffffff1c;border-color:#ffffff33;color:#fff;box-shadow:none}
+html.kule .save-bar .btn.primary{background:#fff;background-image:none;color:var(--k-brand,#16233a);border-color:#fff}
+/* gece modu */
+html.kule[data-theme="dark"] .k-swt i{background:#33415f}
+html.kule[data-theme="dark"] .k-seg{background:#0f1729;border-color:#2a3757}
+html.kule[data-theme="dark"] .k-seg button.on{background:#1d2945;box-shadow:0 2px 8px #0008}
+html.kule[data-theme="dark"] .k-stab.on{background:linear-gradient(135deg,#1a2644,#121a2e)}
+html.kule[data-theme="dark"] .k-stab>span,html.kule[data-theme="dark"] .k-ssearch{background:#16203a}
+html.kule[data-theme="dark"] .k-snav,html.kule[data-theme="dark"] .k-scard{background:var(--k-card);border-color:var(--k-line)}
+/* dar ekran */
+@media (max-width:1100px){html.kule .k-set{grid-template-columns:240px minmax(0,1fr)}html.kule .k-stab small{display:none}html.kule .k-ssearch{min-width:0}}
+@media (max-width:860px){
+ html.kule .k-set{grid-template-columns:1fr}
+ html.kule .k-snav{position:static;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+ html.kule .k-srow{flex-direction:column;align-items:flex-start;gap:12px}
+ html.kule .k-sc{max-width:100%;justify-content:flex-start}
+ html.kule .k-seg,html.kule .k-accs{justify-content:flex-start}
+ html.kule .k-sc select{min-width:0;width:100%}
+ html.kule .k-scard{padding:4px 18px 12px}
+ html.kule .save-bar{left:12px;right:12px}
+}
+@media (max-width:700px){html.kule .save-bar{bottom:84px}}
+
+/* ---------- Köşe yuvarlaklığı ayarı ---------- */
+html.kule[data-radius="keskin"]{--k-r:8px;--k-r2:6px}
+html.kule[data-radius="keskin"] :is(.heading.k-hero,.heading.k-pagehead,.topbar,.k-scard,.k-snav,.k-card,#modal,.k-qs){border-radius:10px}
+html.kule[data-radius="keskin"] :is(.btn,.hdr-btn,.k-search,.day-tab,.k-seg,.k-seg button,.k-stat,.k-stab,input:not([type=checkbox]):not([type=radio]),select,textarea){border-radius:6px}
+html.kule[data-radius="yuvarlak"]{--k-r:26px;--k-r2:16px}
+html.kule[data-radius="yuvarlak"] :is(.heading.k-hero,.heading.k-pagehead,.k-scard){border-radius:32px}
+html.kule[data-radius="yuvarlak"] :is(.btn,.hdr-btn,.k-search,.day-tab,.k-seg,.k-seg button){border-radius:99px}
+
+/* ---------- Animasyonlar kapalı ---------- */
+html.kule.k-nomotion *,html.kule.k-nomotion *::before,html.kule.k-nomotion *::after{transition:none!important;animation:none!important}
+html.kule.k-nomotion .k-truck{offset-distance:55%}
