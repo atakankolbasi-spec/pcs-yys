@@ -67,6 +67,125 @@ test('pano yüklenir; fontlar ve dosyalar eksiksiz gelir', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test('Kontrol Kulesi tasarımı: karşılama bandı, genel bakış kartları, menü sabitleme', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  expect(await page.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(true);
+  // karşılama bandı: selamlama, bugünün tarihi, haftanın sayıları ve işlemler
+  const hero = page.locator('.heading.k-hero');
+  await expect(hero).toContainText('Günaydın');
+  await expect(hero).toContainText('23 Eylül 2026 Çarşamba');
+  await expect(hero.locator('.k-stat.all b')).toHaveText('7');
+  await expect(hero.locator('.k-stat.done b')).toHaveText('4');
+  await expect(hero.locator('.k-stat.pend b')).toHaveText('3');
+  await expect(hero.locator('[data-action="add-visit"]')).toBeVisible();
+  // genel bakış: bugün 3 araç, bekleyenler, son 14 iş günü
+  await expect(page.locator('.k-today .k-big')).toHaveText('3');
+  await expect(page.locator('.k-waits li')).toHaveCount(3);
+  await expect(page.locator('.k-bar')).toHaveCount(14);
+  // grafikte bir güne tıklayınca o gün açılır
+  await page.locator('.k-bar[data-date="2026-09-22"]').click();
+  await expect(page.locator('.day-tab.active')).toContainText('Salı');
+  // bekleyen araca tıklayınca panoda seçilir
+  await page.locator('.k-waits button', { hasText: 'CB 1234 AB' }).click();
+  await expect(page.locator('.day-tab.active')).toContainText('Çarşamba');
+  await expect(page.locator('.side-panel')).toContainText('CB 1234 AB');
+  // genel bakış gizlenir; tercih hatırlanır
+  await page.locator('[data-action="k-panel"]').click();
+  await expect(page.locator('.k-cards')).toHaveCount(0);
+  // menü açık tutulabilir; tercih hatırlanır
+  await page.locator('[data-action="k-navwide"]').click();
+  await expect(page.locator('body')).toHaveClass(/k-wide/);
+  await page.reload();
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await expect(page.locator('.k-cards')).toHaveCount(0);
+  await expect(page.locator('body')).toHaveClass(/k-wide/);
+  await page.locator('[data-action="k-panel"]').click();
+  await expect(page.locator('.k-cards')).toHaveCount(1);
+  // tasarımın yazı tipleri siteyle birlikte gelir
+  const fonts = await page.evaluate(async () => {
+    const f = [...await document.fonts.load('400 16px "PCS Inter"'), ...await document.fonts.load('800 16px "PCS Jakarta"')];
+    return f.length > 0 && f.every(x => x.status === 'loaded');
+  });
+  expect(fonts).toBe(true);
+  // diğer sayfalarda sade başlık kartı
+  await page.locator('.nav-item[data-page="registry"]').click();
+  await expect(page.locator('.heading.k-pagehead')).toContainText('Plaka kayıtları');
+  expect(problems).toEqual([]);
+});
+
+test('hızlı arama (Ctrl+K): geliş, plaka kaydı ve sayfa bulunur', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const qs = page.locator('#k-qs'), input = page.locator('#k-qs-input');
+  // üst çubuktaki düğme ya da Ctrl+K ile açılır
+  await page.locator('[data-action="k-search"]').click();
+  await expect(qs).toBeVisible();
+  await expect(qs).toContainText('Araç ekle');
+  await page.keyboard.press('Escape');
+  await expect(qs).toBeHidden();
+  await page.keyboard.press('Control+k');
+  await expect(input).toBeFocused();
+  // plaka: önce gelişler (yeniden eskiye), sonra plaka kaydı; Enter ilkini açar
+  await input.fill('06 kl');
+  await expect(qs.locator('.k-qs-item').first()).toContainText('22 Eylül 2026');
+  await expect(qs.locator('.k-qs-g')).toHaveText(['Gelişler', 'Plaka kayıtları']);
+  await page.keyboard.press('Enter');
+  await expect(qs).toBeHidden();
+  await expect(page.locator('.day-tab.active')).toContainText('Salı');
+  await expect(page.locator('.side-panel')).toContainText('06 KL 4567');
+  // başka bir haftadaki geliş de bulunur: hafta değişir
+  await page.locator('[data-action="next-week"]').click();
+  await page.keyboard.press('Control+k');
+  await input.fill('lin loj');
+  await expect(qs.locator('.k-qs-item').first()).toContainText('23 Eylül 2026');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.range-label')).toContainText('21 Eyl');
+  await expect(page.locator('.day-tab.active')).toContainText('Çarşamba');
+  // müşteri adıyla plaka kaydı: oklarla seçilir, kayıtlar sayfasında aranır
+  await page.keyboard.press('Control+k');
+  await input.fill('tornado');
+  const items = qs.locator('.k-qs-item');
+  const n = await items.count();
+  for (let i = 1; i < n; i++) await page.keyboard.press('ArrowDown');
+  await expect(items.last()).toHaveClass(/on/);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.nav-item.active')).toContainText('Plaka Kayıtları');
+  await expect(page.locator('#registry-search')).toHaveValue('CB 1234 AB');
+  // sayfa adı
+  await page.keyboard.press('Control+k');
+  await input.fill('ayar');
+  await qs.locator('.k-qs-item', { hasText: 'Ayarlar' }).click();
+  await expect(page.locator('.nav-item.active')).toContainText('Ayarlar');
+  expect(problems).toEqual([]);
+});
+
+test('ayarlardan Klasik tasarıma dönülür, seçim herkes için kaydedilir; güvenlik ekranı etkilenmez', async ({ page, context }) => {
+  const problems = await openApp(page);
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('details[data-panel="theme"] > summary').click();
+  await expect(page.locator('[data-action="app-design"][data-v="kule"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-action="app-design"][data-v="klasik"]').click();
+  expect(await page.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(false);
+  await expect(page.locator('.sidebar .brand-mark img')).toHaveCount(1);
+  await expect(page.locator('[data-action="k-search"]')).toHaveCount(0);
+  await page.locator('[data-action="app-save"]').click();
+  await expect(page.locator('#toast')).toContainText('Görünüm ayarları kaydedildi');
+  expect(await page.evaluate(() => window.__db.app_settings.find(r => r.key === 'appearance').value.design)).toBe('klasik');
+  // kayıttan sonra ayarlar sunucudan yeniden okunduğunda da Klasik kalır
+  await page.evaluate(() => window.__rtEmit('app_settings'));
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(page.locator('.heading .eyebrow')).toContainText('TESİS OPERASYON YÖNETİMİ');
+  await expect(page.locator('.k-hero')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(false);
+  expect(problems).toEqual([]);
+  // güvenlik ekranına yeni tasarım uygulanmaz
+  const guard = await context.newPage();
+  await openApp(guard, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  await expect(guard.locator('.guard')).toBeVisible();
+  expect(await guard.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(false);
+});
+
 test('tüm sayfalar hatasız açılır', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
