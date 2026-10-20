@@ -826,7 +826,15 @@ function kHeading(p,actions){
  if(ui.page!=='pano'||!kHeroOn())return `<div class="heading k-pagehead"><div><div class="eyebrow">${ui.page==='settings'?'Tercihler':'Tesis operasyon yönetimi'}</div><h1>${p[1]}</h1><p>${ui.page==='settings'?'Görünüm, yerleşim, müşteriler, WhatsApp, rapor ve güvenlik':p[2]}</p></div><div class="actions">${actions}</div></div>`;
  const s=stats(weekVisits()),today=`${fmt(TODAY,{day:'numeric',month:'long',year:'numeric'})} ${DAYS[weekday(TODAY)-1]||'Pazar'}`;
  const tiles=[[s.total,'Toplam araç','all'],[s.onsite,'Tesiste','onsite'],[s.t1,'T1 yazıldı','t1'],[s.done,`Bitti · %${s.percent}`,'done'],[s.pending,'Bekleyen','pend']];
- return `<div class="heading k-hero"><div class="k-hero-txt"><div class="k-hi">${kGreet()} <span aria-hidden="true">👋</span></div><h1>${p[1]}</h1><div class="k-date">${esc(today)}</div></div>${kRoute()}<div class="k-stats" role="group" aria-label="${ui.week}. hafta özeti"><span class="k-stats-label">${ui.week}. hafta</span>${tiles.map(([n,l,c])=>`<div class="k-stat ${c}"><b>${n.toLocaleString('tr-TR')}</b><i></i><span>${l}</span></div>`).join('')}</div><div class="actions">${actions}</div></div>`;}
+ return `<div class="heading k-hero"><div class="k-hero-txt"><div class="k-hi">${kGreet()} <span aria-hidden="true">👋</span></div><h1>${p[1]}</h1><div class="k-date">${esc(today)}</div></div>${kRoute()}<div class="k-stats" role="group" aria-label="${ui.week}. hafta özeti"><span class="k-stats-label">${ui.week}. hafta</span>${tiles.map(([n,l,c])=>`<div class="k-stat ${c}"><b>${n.toLocaleString('tr-TR')}</b><i></i><span>${l}</span></div>`).join('')}</div><div class="actions">${actions}</div></div>`+
+ /* aşağı inilince bandın kısa hali üstte sabit kalır (üst çubuktaki hızlı aramanın yerine) */
+ `<div class="k-pinwrap"><div class="k-pinbar" role="region" aria-label="Pano özeti"><div class="k-pin-t"><b>${p[1]}</b><small>${ui.week}. hafta</small></div><div class="k-pin-stats">${tiles.map(([n,l,c],i)=>`<div class="k-pstat ${c}" title="${esc(l)}"><i></i><b>${n.toLocaleString('tr-TR')}</b><span>${l}</span><span class="k-short">${['Toplam','Tesiste','T1','Bitti','Bekleyen'][i]}</span></div>`).join('')}</div><div class="actions">${actions}</div></div></div>`;}
+/* sabit özet çubuğu: bant ekrandan çıkınca (çubuğun yeri üste yapışınca) görünür */
+function kPinCheck(init){const w=document.querySelector('.k-pinwrap'),top=w?parseFloat(getComputedStyle(w).top):NaN;
+ document.body.classList.toggle('k-hpin',!!w);document.documentElement.classList.toggle('k-pinned',!!w&&w.getBoundingClientRect().top<=top+1);
+ if(init&&w)for(const b of w.querySelectorAll('.btn'))b.title=b.textContent.trim();}
+let kPinRaf=0;const kPinLater=()=>{if(!kPinRaf)kPinRaf=requestAnimationFrame(()=>{kPinRaf=0;kPinCheck();});};
+addEventListener('scroll',kPinLater,{passive:true});addEventListener('resize',kPinLater,{passive:true});
 /* panodaki genel bakış kartları: son 14 iş günü, haftanın durum dağılımı, en uzun bekleyenler, bugün */
 function kPanel(){const hidden=kGet(K_PANEL)==='1';
  const head=`<div class="k-panel-head"><span>Genel bakış</span><button type="button" class="k-link" data-action="k-panel" aria-expanded="${!hidden}">${hidden?'Göster':'Gizle'}</button></div>`;
@@ -988,7 +996,7 @@ document.addEventListener('input',e=>{if(e.target.id!=='set-q')return;ui.setQ=e.
 
 /* ekrana bağlama */
 const renderBase=render;
-render=function(){const K=!!account&&isKule()&&!inGuard()&&ui.page!=='saha';document.documentElement.classList.toggle('kule',K);document.body.classList.toggle('k-wide',K&&kWide());if(inGuard()){renderGuard();return;}if(account&&ui.page==='saha'){renderSaha();return;}renderBase();const tr=document.querySelector('.topbar-right');if(tr&&account)tr.insertAdjacentHTML('afterbegin',headerTools());};
+render=function(){const K=!!account&&isKule()&&!inGuard()&&ui.page!=='saha';document.documentElement.classList.toggle('kule',K);document.body.classList.toggle('k-wide',K&&kWide());if(inGuard())renderGuard();else if(account&&ui.page==='saha')renderSaha();else{renderBase();const tr=document.querySelector('.topbar-right');if(tr&&account)tr.insertAdjacentHTML('afterbegin',headerTools());}kPinCheck(true);};
 document.addEventListener('input',e=>{if(e.target.id!=='saha-plate')return;ui.sahaQ=e.target.value;renderSaha();});
 document.addEventListener('submit',e=>{if(e.target.id!=='saha-add')return;e.preventDefault();sahaSubmit();});
 document.addEventListener('click',async e=>{

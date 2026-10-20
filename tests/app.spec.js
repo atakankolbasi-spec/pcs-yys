@@ -114,6 +114,45 @@ test('Kontrol Kulesi tasarımı: karşılama bandı, genel bakış kartları, me
   expect(problems).toEqual([]);
 });
 
+test('pano: aşağı inince bandın kısa hali üstte sabit kalır, hızlı arama çubuğu kayıp gider', async ({ page }) => {
+  const data = sampleData();
+  for (let i = 0; i < 30; i++) data.visits.push({ ...data.visits[5], id: 'z' + String(i).padStart(2, '0'), plate: `34 ZZ ${100 + i}` });
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  // bandın düğmeleri ve sayıları hiçbir ekran genişliğinde dışarı taşmaz (geniş menüde de)
+  const fits = () => page.locator('.k-hero').evaluate(h => { const r = h.getBoundingClientRect(); return Math.max(...[...h.querySelectorAll('.btn,.k-stat')].map(x => x.getBoundingClientRect().right)) <= r.right; });
+  for (const wide of [false, true]) {
+    if (wide) await page.locator('[data-action="k-navwide"]').click();
+    for (const w of [1280, 1366, 1440, 1536, 1600]) { await page.setViewportSize({ width: w, height: 720 }); expect(await fits(), `${w}px${wide ? ', geniş menü' : ''}`).toBe(true); }
+  }
+  await page.locator('[data-action="k-navwide"]').click();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const bar = page.locator('.k-pinbar');
+  await expect(bar).toBeHidden(); // en üstte bandın kendisi görünür
+  await page.evaluate(() => window.scrollTo(0, 1400));
+  await page.clock.runFor(100);
+  await expect(bar).toBeVisible();
+  await expect.poll(() => bar.evaluate(e => Math.round(e.getBoundingClientRect().top))).toBe(12); // ekranın 12 px altında sabit
+  expect(await page.locator('.topbar').evaluate(e => e.getBoundingClientRect().bottom)).toBeLessThan(0);
+  await expect(bar.locator('.k-pstat')).toHaveCount(5);
+  await expect(bar.locator('.k-pstat.all b')).toHaveText('37');
+  await expect(bar.locator('.k-pstat.pend b')).toHaveText('33');
+  // çubuktaki düğmeler çalışır
+  await bar.locator('[data-action="add-visit"]').click();
+  await expect(page.locator('#visit-form')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#modal')).toBeHidden();
+  // yukarı çıkınca çubuk kaybolur
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.clock.runFor(100);
+  await expect(bar).toBeHidden();
+  // diğer sayfalarda çubuk yok; üst çubuk (hızlı arama) eskisi gibi sabit
+  await page.locator('.nav-item[data-page="registry"]').click();
+  await expect(page.locator('.k-pinbar')).toHaveCount(0);
+  expect(await page.locator('.topbar').evaluate(e => getComputedStyle(e).position)).toBe('sticky');
+  expect(problems).toEqual([]);
+});
+
 test('hızlı arama (Ctrl+K): geliş, plaka kaydı ve sayfa bulunur', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
