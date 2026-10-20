@@ -71,13 +71,14 @@ test('Kontrol Kulesi tasarımı: karşılama bandı, genel bakış kartları, me
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   expect(await page.evaluate(() => document.documentElement.classList.contains('kule'))).toBe(true);
-  // karşılama bandı: selamlama, bugünün tarihi, haftanın sayıları ve işlemler
+  // karşılama bandı: selamlama, bugünün tarihi, bugünün sayıları ve işlemler
   const hero = page.locator('.heading.k-hero');
   await expect(hero).toContainText('Günaydın');
   await expect(hero).toContainText('23 Eylül 2026 Çarşamba');
-  await expect(hero.locator('.k-stat.all b')).toHaveText('7');
-  await expect(hero.locator('.k-stat.done b')).toHaveText('4');
-  await expect(hero.locator('.k-stat.pend b')).toHaveText('3');
+  // bugün 3 araç: 2'si tesiste (v5, v7), 1'i gelecek (v6), tamamlanan yok
+  expect(await hero.locator('.k-stat span').allTextContents()).toEqual(['Toplam araç', 'Tesiste', 'Gelecek', 'Tamamlanan']);
+  expect(await hero.locator('.k-stat b').allTextContents()).toEqual(['3', '2', '1', '0']);
+  await expect(hero.locator('.k-stats-label')).toHaveText('Bugün');
   await expect(hero.locator('[data-action="add-visit"]')).toBeVisible();
   // genel bakış: bugün 3 araç, bekleyenler, son 14 iş günü
   await expect(page.locator('.k-today .k-big')).toHaveText('3');
@@ -134,9 +135,9 @@ test('pano: aşağı inince bandın kısa hali üstte sabit kalır, hızlı aram
   await expect(bar).toBeVisible();
   await expect.poll(() => bar.evaluate(e => Math.round(e.getBoundingClientRect().top))).toBe(12); // ekranın 12 px altında sabit
   expect(await page.locator('.topbar').evaluate(e => e.getBoundingClientRect().bottom)).toBeLessThan(0);
-  await expect(bar.locator('.k-pstat')).toHaveCount(5);
-  await expect(bar.locator('.k-pstat.all b')).toHaveText('37');
-  await expect(bar.locator('.k-pstat.pend b')).toHaveText('33');
+  // bugün: 3 + 30 araç; 2'si tesiste, 31'i gelecek
+  await expect(bar.locator('.k-pstat')).toHaveCount(4);
+  expect(await bar.locator('.k-pstat b').allTextContents()).toEqual(['33', '2', '31', '0']);
   // çubuktaki düğmeler çalışır
   await bar.locator('[data-action="add-visit"]').click();
   await expect(page.locator('#visit-form')).toBeVisible();
@@ -461,6 +462,21 @@ test('takılan bir istek güncellemeleri kalıcı olarak durdurmaz', async ({ pa
   await expect(page.locator('#app')).toContainText('99 YENI 99');
 });
 
+test('form açılırken başka alana geçilirse odak plakaya geri çekilmez', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.clock.pauseAt(new Date('2026-09-23T07:05:00Z')); // ekran kareleri elle ilerletilir
+  await page.locator('[data-action="add-visit"]').first().click();
+  const form = page.locator('#visit-form');
+  await form.locator('[name="customer"]').focus(); // kullanıcı hemen müşteri alanına geçti
+  await page.clock.runFor(100); // bir sonraki ekran karesi
+  expect(await page.evaluate(() => document.activeElement?.name)).toBe('customer');
+  await page.keyboard.type('YENİ LOJ');
+  await expect(form.locator('[name="customer"]')).toHaveValue('YENİ LOJ');
+  await expect(form.locator('[name="plate"]')).toHaveValue('');
+  expect(problems).toEqual([]);
+});
+
 test('kaydet beklemez: kayıt yazılınca form hemen kapanır, liste arkada yenilenir', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
@@ -495,6 +511,8 @@ test('kaydet beklemez: kayıt yazılınca form hemen kapanır, liste arkada yeni
   await page.locator('input[data-check="onsite"][data-id="v6"]').first().evaluate(el => el.click());
   await expect.poll(async () => (await page.evaluate(() => window.PCS_TEST.getState().visits.find(v => v.id === 'v6'))).onsite).toBe(true);
   expect((await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'))).onsite).toBe(true);
+  // banttaki bugünün sayıları da hemen güncellenir: 5 araç, 3 tesiste, 2 gelecek
+  expect(await page.locator('.k-hero .k-stat b').allTextContents()).toEqual(['5', '3', '2', '0']);
 
   // Okuma düzelince arkadaki yenileme tamamlanır; liste sunucuyla aynı kalır.
   await page.evaluate(() => { window.__hangReads = false; });
