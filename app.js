@@ -185,8 +185,8 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='bulk-onsite'||a==='bulk-t1'||a==='bulk-done'){
   const key=a.slice(5);const ids=[...selectedIds];if(!ids.length)return;
   busy=true;onlineUI();
-  try{const {error}=await client.from('visits').update({[key]:true}).in('id',ids).select('id');if(error)throw error;
-   selectedIds.clear();busy=false;await syncData();toast(`${ids.length} araç güncellendi.`);
+  try{const {data,error}=await client.from('visits').update({[key]:true}).in('id',ids).select('*');if(error)throw error;
+   applyLocal('visits',data);selectedIds.clear();busy=false;render();syncData();toast(`${ids.length} araç güncellendi.`);
   }catch(err){toast(friendly(err),true);}
   finally{busy=false;onlineUI();}
   return;
@@ -229,7 +229,7 @@ document.addEventListener('change',async e=>{const t=e.target;if(t.classList.con
 document.addEventListener('input',e=>{if(e.target.id==='board-search'){ui.search=e.target.value;render();}if(e.target.id==='registry-search'){ui.regSearch=e.target.value;render();}if(e.target.id==='f-plate'&&document.getElementById('visit-form'))handlePlate();});
 document.addEventListener('submit',async e=>{
  if(e.target.id==='registry-form'){e.preventDefault();const f=e.target,fd=new FormData(f),id=f.dataset.id;const r={id:id||uid(),plate:plateText(fd.get('plate')),customer:String(fd.get('customer')||'').trim(),declaration:String(fd.get('declaration')||'').trim(),carrier:String(fd.get('carrier')||'').trim(),registration:kgText(fd.get('registration'))};if(!norm(r.plate)||!r.customer)return formError('Plaka ve m\u00fc\u015fteri zorunludur.');if(state.registry.some(x=>x.id!==id&&norm(x.plate)===norm(r.plate)))return formError('Bu plaka zaten kay\u0131tl\u0131. Mevcut kayd\u0131 d\u00fczenleyin.');if(!id&&state.registry.length>=10000)return formError('10.000 plaka s\u0131n\u0131r\u0131na ula\u015f\u0131ld\u0131.');if(await mutate(s=>{if(id)s.registry=s.registry.map(x=>x.id===id?r:x);else s.registry.push(r);})){const pending=pendingVisit;pendingVisit=null;closeModal();toast('Plaka kayd\u0131 kaydedildi.');if(pending)openVisitForm(pending.editingId||null,pending.date,{...pending,plate:r.plate});}return;}
- if(e.target.id==='visit-form'){e.preventDefault();const f=e.target,id=f.dataset.id,v=visitFields(f);const source=matchPlate(v.plate);if(source)v.plate=source.plate;if(!validDate(v.date))return formError('Ge\u00e7erli bir geli\u015f tarihi se\u00e7in.');if(weekday(v.date)===0)return formError('Pazar g\u00fcn\u00fc kay\u0131t al\u0131nmaz. Pazartesi\u2013Cumartesi aras\u0131nda bir g\u00fcn se\u00e7in.');const reg=matchPlate(v.plate);const skipReg=!reg&&id&&f.dataset.original===norm(v.plate);if(!v.customer)return formError('M\u00fc\u015fteri ad\u0131 zorunludur.');if(state.visits.some(x=>x.id!==id&&x.date===v.date&&norm(x.plate)===norm(v.plate))&&!window.confirm('Bu plaka i\u00e7in ayn\u0131 g\u00fcnde ba\u015fka bir geli\u015f kayd\u0131 var. Ayr\u0131 bir geli\u015f olarak kaydetmek istiyor musunuz?'))return;let regNote='';if(!skipReg){if(!reg)v.plate=plateText(v.plate);const ch=registryChange(reg,v);if(ch){if(!await writeRegistry(ch))return;await syncData();regNote=ch.insert?'Ara\u00e7 geli\u015fi kaydedildi ve plaka kay\u0131tlar\u0131na eklendi.':'Ara\u00e7 geli\u015fi kaydedildi; plaka kayd\u0131ndaki bo\u015f bilgiler tamamland\u0131.';}}const prev=id?state.visits.find(x=>x.id===id):null;v.id=id||uid();v.createdAt=prev?.createdAt||new Date().toISOString();if(await mutate(s=>{if(id)s.visits=s.visits.map(x=>x.id===id?v:x);else s.visits.push(v);})){const w=weekInfo(v.date);if(w.year!==ui.year||w.week!==ui.week){ui.year=w.year;ui.week=w.week;ui.day=v.date;}else if(ui.day!=='all')ui.day=v.date;ui.collapsed.delete(v.date);closeModal();render();toast(regNote||'Ara\u00e7 geli\u015fi kaydedildi.');ruhsatAfterSave();}return;}
+ if(e.target.id==='visit-form'){e.preventDefault();const f=e.target,id=f.dataset.id,v=visitFields(f);const source=matchPlate(v.plate);if(source)v.plate=source.plate;if(!validDate(v.date))return formError('Ge\u00e7erli bir geli\u015f tarihi se\u00e7in.');if(weekday(v.date)===0)return formError('Pazar g\u00fcn\u00fc kay\u0131t al\u0131nmaz. Pazartesi\u2013Cumartesi aras\u0131nda bir g\u00fcn se\u00e7in.');const reg=matchPlate(v.plate);const skipReg=!reg&&id&&f.dataset.original===norm(v.plate);if(!v.customer)return formError('M\u00fc\u015fteri ad\u0131 zorunludur.');if(state.visits.some(x=>x.id!==id&&x.date===v.date&&norm(x.plate)===norm(v.plate))&&!window.confirm('Bu plaka i\u00e7in ayn\u0131 g\u00fcnde ba\u015fka bir geli\u015f kayd\u0131 var. Ayr\u0131 bir geli\u015f olarak kaydetmek istiyor musunuz?'))return;let regNote='';if(!skipReg){if(!reg)v.plate=plateText(v.plate);const ch=registryChange(reg,v);if(ch){if(!await writeRegistry(ch))return;regNote=ch.insert?'Ara\u00e7 geli\u015fi kaydedildi ve plaka kay\u0131tlar\u0131na eklendi.':'Ara\u00e7 geli\u015fi kaydedildi; plaka kayd\u0131ndaki bo\u015f bilgiler tamamland\u0131.';}}const prev=id?state.visits.find(x=>x.id===id):null;v.id=id||uid();v.createdAt=prev?.createdAt||new Date().toISOString();if(await mutate(s=>{if(id)s.visits=s.visits.map(x=>x.id===id?v:x);else s.visits.push(v);})){const w=weekInfo(v.date);if(w.year!==ui.year||w.week!==ui.week){ui.year=w.year;ui.week=w.week;ui.day=v.date;}else if(ui.day!=='all')ui.day=v.date;ui.collapsed.delete(v.date);closeModal();render();toast(regNote||'Ara\u00e7 geli\u015fi kaydedildi.');ruhsatAfterSave();}return;}
 });
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,ruhsatRank,ruhsatWeights,ruhsatPickWeights,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
@@ -258,7 +258,12 @@ function onlineUI(){if(GUARD_ACCT)return;document.documentElement.classList.togg
  waBadge();
 }
 function mapRow(r,table){return {...r,...(table==='visits'?{date:r.visit_date,time:(r.visit_time||'').slice(0,5),createdAt:r.created_at}:{}),customer:r.customer||'',declaration:r.declaration||'',carrier:r.carrier||'',registration:r.registration||'',note:r.note||''};}
-async function fetchAll(table){let rows=[];for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('*').order('id').range(start,start+999);if(error)throw error;rows.push(...data.map(r=>mapRow(r,table)));if(data.length<1000)return rows;}}
+/* Tam indirme: satır sayısı (parmak izinden) biliniyorsa 1000'lik sayfalar sırayla değil aynı anda istenir;
+   kayıt arttıkça bekleme süresi uzamaz. Bu arada eklenen satır varsa kalan sayfalar sırayla alınır. */
+async function fetchAll(table,count){const page=start=>client.from(table).select('*').order('id').range(start,start+999).then(({data,error})=>{if(error)throw error;return data;});
+ const n=Math.max(1,Math.ceil((count||0)/1000)),pages=await Promise.all(Array.from({length:n},(_,i)=>page(i*1000)));
+ while(pages[pages.length-1].length===1000)pages.push(await page(pages.length*1000));
+ return pages.flat().map(r=>mapRow(r,table));}
 /* Hafif senkron: 15 sn'lik yoklamada önce tabloların satır sayısı + son updated_at değerine bakılır (parmak izi);
    değişiklik yoksa hiçbir şey indirilmez. Değişiklik varsa ya da anlık bildirim gelirse tablonun tamamı değil, yalnızca
    son değişen satırlar (en yeni kaydın 2 dk öncesinden bu yana güncellenenler) indirilip listeye işlenir; satır sayısı
@@ -272,11 +277,11 @@ const printPart=(p,t)=>p?.[t]?`${p[t].count}:${p[t].max}`:'-';
 const tsMs=v=>{const n=Date.parse(v||'');return isNaN(n)?0:n;};
 const byId=(a,b)=>a.id<b.id?-1:a.id>b.id?1:0; // Postgres'in uuid sırası (fetchAll ile aynı)
 async function fetchChanged(table,cur,remote){let since=0;for(const r of cur){const n=tsMs(r.updated_at);if(n>since)since=n;}
- if(!since)return fetchAll(table);
+ if(!since)return fetchAll(table,remote?.count);
  const got=[];for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('*').gte('updated_at',new Date(since-SYNC_LOOKBACK_MS).toISOString()).order('id').range(start,start+999);if(error)throw error;got.push(...data.map(r=>mapRow(r,table)));if(data.length<1000)break;}
  const m=new Map(cur.map(r=>[r.id,r]));for(const r of got)m.set(r.id,r);let rows=[...m.values()];
  if(remote&&rows.length!==remote.count){const ids=new Set();for(let start=0;;start+=1000){const {data,error}=await client.from(table).select('id').order('id').range(start,start+999);if(error)throw error;data.forEach(r=>ids.add(r.id));if(data.length<1000)break;}
-  rows=rows.filter(r=>ids.has(r.id));if(rows.length!==ids.size)return fetchAll(table);}
+  rows=rows.filter(r=>ids.has(r.id));if(rows.length!==ids.size)return fetchAll(table,ids.size);}
  return rows.sort(byId);}
 /* Çevrimdışı okuma: son başarılı senkronun kopyası bu cihazda saklanır (son 60 gün + bitmemiş araçlar).
    İnternet yokken uygulama açılırsa bu kopya gösterilir; değişiklik yapılamaz. Çıkış yapınca silinir. */
@@ -309,7 +314,7 @@ async function syncData(opts={}){
  const full=!!opts.full||!fp||!syncPrint||syncUid!==account.id||!!storageError||Date.now()-fullSyncAt>=FULL_SYNC_MS;
  if(!full&&opts.poll&&!opts.changed&&same('registry')&&same('visits')&&same('app_settings')){lastSync=timeNow();const sd=document.querySelector('.saha-date small');if(sd)sd.textContent='Güncel · '+lastSync;return;}
  let registry,visits;const getSettings=full||!same('app_settings');
- if(full){let nextRole,error;[{data:nextRole,error},registry,visits]=await Promise.all([client.rpc('current_app_role'),fetchAll('registry'),fetchAll('visits')]);if(error)throw error;if(stamp!==generation)return;
+ if(full){let nextRole,error;[{data:nextRole,error},registry,visits]=await Promise.all([client.rpc('current_app_role'),fetchAll('registry',fp?.registry?.count),fetchAll('visits',fp?.visits?.count)]);if(error)throw error;if(stamp!==generation)return;
   role=nextRole==='editor'?'editor':'viewer';fullSyncAt=Date.now();syncUid=account.id;}
  else{const every=!opts.poll||!!opts.changed,cur=realState;
   [registry,visits]=await Promise.all([every||!same('registry')?fetchChanged('registry',cur.registry,fp.registry):cur.registry,every||!same('visits')?fetchChanged('visits',cur.visits,fp.visits):cur.visits]);if(stamp!==generation)return;}
@@ -329,6 +334,12 @@ function authMsg(e){const c=e?.code||'',m=String(e?.message||'');
  if(c==='over_request_rate_limit'||/rate limit|too many/i.test(m))return 'Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin.';
  return friendly(e);}
 function friendly(e){if(isNetErr(e))return 'İnternet bağlantısı yok. Bağlantı gelince tekrar deneyin.';if(e.code==='23505')return 'Bu plaka zaten kayıtlı.';if(e.code==='42501')return 'Bu işlem için düzenleyici yetkisi gerekli.';if(e.code==='23514')return 'Plaka, müşteri ve Pazartesi–Cumartesi tarihini kontrol edin.';return e.message||'Bağlantıyı kontrol edip yeniden deneyin.';}
+/* Kaydet beklemez: yazılan satır sunucunun döndürdüğü haliyle (yeni updated_at dahil) hemen listeye işlenir,
+   yenileme arkada sürer. Önceden her kayıttan sonra yenileme bitene kadar beklenirdi; 10 dakikada bir sıra tam
+   indirmeye gelince "Kaydet" uzun süre takılı kalıyordu. Yazmadan önce başlamış bir yenilemenin sonucu
+   (generation farkı) yok sayılır, böylece eski liste yeni kaydın üstüne yazılmaz. */
+function applyLocal(table,rows,gone){const m=new Map(realState[table].map(r=>[r.id,r]));if(gone)m.delete(gone);for(const r of rows)m.set(r.id,mapRow(r,table));
+ state=realState={...realState,[table]:[...m.values()].sort(byId),updatedAt:new Date().toISOString()};generation++;saveCache();}
 function payload(r,table){const fields=['plate','customer','declaration','carrier','registration'];const p=Object.fromEntries(fields.map(k=>[k,r[k]||'']));if(table==='visits') Object.assign(p,{visit_date:r.date,visit_time:r.time||null,onsite:r.onsite,t1:r.t1,done:r.done,note:r.note||''});return p;}
 async function mutate(fn){
  if(!canEdit()){toast(navigator.onLine===false?'İnternet bağlantısı yok; değişiklik kaydedilemez. Bağlantı gelince tekrar deneyin.':'Düzenleyici yetkisi gerekli veya kayıt işlemi sürüyor.',true);return false;}
@@ -337,8 +348,8 @@ async function mutate(fn){
  if(changes.length!==1){toast('Her seferinde tek kayıt değiştirin.',true);return false;}
  busy=true;onlineUI();const c=changes[0];
  try{let q;if(!c.prior)q=client.from(c.table).insert({id:c.r.id,...payload(c.r,c.table)});else{q=c.r?client.from(c.table).update(payload(c.r,c.table)):client.from(c.table).delete();q=q.eq('id',c.prior.id).eq('updated_at',formVersion?.id===c.prior.id?formVersion.updated_at:c.prior.updated_at);}
- const {data,error}=await q.select('id');if(error)throw error;if(data.length!==1)throw new Error('Kayıt başka bir kullanıcı tarafından değiştirildi veya silindi. Formu kapatıp güncel kaydı yeniden açın.');
- busy=false;await syncData();return true;
+ const {data,error}=await q.select('*');if(error)throw error;if(data.length!==1)throw new Error('Kayıt başka bir kullanıcı tarafından değiştirildi veya silindi. Formu kapatıp güncel kaydı yeniden açın.');
+ applyLocal(c.table,c.r?data:[],c.r?null:c.prior.id);busy=false;render();syncData();return true;
  }catch(e){toast(friendly(e),true);return false;}finally{busy=false;onlineUI();}
 }
 function dataView(){return `<section class="card"><h2>Ortak veriler</h2><p style="margin:15px 0">${state.registry.length} plaka · ${state.visits.length} geliş. Veriler Supabase üzerinde ortak saklanır. Günlük ve haftalık Excel dosyalarını Raporlar bölümünden indirebilirsiniz.</p>${button('backup','JSON kopyası indir','download','primary')}<p class="help-note">Bu dosya tüm geçmişin kopyasıdır. Toplu geri yükleme yönetici tarafından yapılır.</p></section>`;}
@@ -532,9 +543,9 @@ function registryChange(reg,v){
 async function writeRegistry(ch){
  busy=true;onlineUI();
  try{const q=ch.insert?client.from('registry').insert(ch.insert):client.from('registry').update(ch.fill).eq('id',ch.update.id).eq('updated_at',ch.update.updated_at);
-  const {data,error}=await q.select('id');if(error)throw error;
+  const {data,error}=await q.select('*');if(error)throw error;
   if(data.length!==1)throw new Error('Plaka kayd\u0131 ba\u015fka bir kullan\u0131c\u0131 taraf\u0131ndan de\u011fi\u015ftirildi. Formu kapat\u0131p yeniden deneyin.');
-  return true;
+  applyLocal('registry',data);return true;
  }catch(e){toast(friendly(e),true);return false;}
  finally{busy=false;onlineUI();}
 }let carriedFor='';
@@ -545,8 +556,8 @@ async function maybeCarry(){
  if(!ids.length)return;
  busy=true;onlineUI();
  try{const patch={visit_date:TODAY};if(orderReady())patch.sort_order=null;
-  const {data,error}=await client.from('visits').update(patch).in('id',ids).eq('done',false).select('id');
-  if(error)throw error;busy=false;await syncData();
+  const {data,error}=await client.from('visits').update(patch).in('id',ids).eq('done',false).select('*');
+  if(error)throw error;applyLocal('visits',data);busy=false;render();syncData();
   toast(`${data.length} tamamlanmam\u0131\u015f ara\u00e7 bug\u00fcne aktar\u0131ld\u0131.`);
  }catch(e){toast('Tamamlanmam\u0131\u015f ara\u00e7lar aktar\u0131lamad\u0131: '+friendly(e),true);}
  finally{busy=false;onlineUI();}
@@ -570,7 +581,7 @@ document.addEventListener('click',async e=>{
  const b=e.target.closest('[data-action="clear-order"]');if(!b||!canEdit())return;
  if(!window.confirm('Bu gün için elle ayarlanmış sıra kaldırılsın mı? Durumlara göre otomatik sıralamaya dönülecek.'))return;
  busy=true;onlineUI();
- try{const {error}=await client.from('visits').update({sort_order:null}).eq('visit_date',b.dataset.date).select('id');if(error)throw error;busy=false;await syncData();toast('Bu günün sıralaması otomatiğe döndürüldü.');}
+ try{const {data,error}=await client.from('visits').update({sort_order:null}).eq('visit_date',b.dataset.date).select('*');if(error)throw error;applyLocal('visits',data);busy=false;render();syncData();toast('Bu günün sıralaması otomatiğe döndürüldü.');}
  catch(err){toast(friendly(err),true);}
  finally{busy=false;onlineUI();}
 });
@@ -595,14 +606,14 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='app-design'){const v=b.dataset.v==='klasik'?'klasik':'kule';if(appearance.design===v)return;appearance.design=v;appearanceDirty=true;applyAppearance();render();toast(`${v==='kule'?'Kontrol Kulesi':'Klasik'} görünüm açıldı. Herkes için kalıcı olması için Kaydet’e basın.`);return;}
  if(a==='app-preset'){const p=APP_PRESETS[b.dataset.p];if(!p)return;const d=structuredClone(APP_DEFAULT);appearance={...d,...p[1],design:appearance.design,colors:{...d.colors,...(p[1].colors||{})}};appearanceDirty=true;applyAppearance();render();toast(`“${p[0]}” teması uygulandı. Kalıcı olması için Kaydet’e basın.`);return;}
  if(a==='app-reset'){appearance=structuredClone(APP_DEFAULT);appearanceDirty=true;applyAppearance();render();toast('Varsayılan görünüm yüklendi. Kalıcı olması için Kaydet’e basın.');return;}
- if(a==='app-save'){if(!canEdit())return;busy=true;onlineUI();try{let {error}=await client.rpc('save_app_setting',{p_key:'appearance',p_value:appearance});if(error&&error.code==='PGRST202'){const r=await client.from('app_settings').update({value:appearance,updated_at:new Date().toISOString()}).eq('key','appearance').select('key');error=r.error;if(!error&&!r.data?.length)error={code:'SETUP'};}if(error)throw error;generation++;appearanceDirty=false;busy=false;await syncData();toast('Görünüm ayarları kaydedildi.');}catch(err){toast(err.code==='SETUP'||err.code==='42501'?'Görünüm kaydedilemedi: önce ayar-kaydetme-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
+ if(a==='app-save'){if(!canEdit())return;busy=true;onlineUI();try{let {error}=await client.rpc('save_app_setting',{p_key:'appearance',p_value:appearance});if(error&&error.code==='PGRST202'){const r=await client.from('app_settings').update({value:appearance,updated_at:new Date().toISOString()}).eq('key','appearance').select('key');error=r.error;if(!error&&!r.data?.length)error={code:'SETUP'};}if(error)throw error;generation++;appearanceDirty=false;busy=false;render();syncData();toast('Görünüm ayarları kaydedildi.');}catch(err){toast(err.code==='SETUP'||err.code==='42501'?'Görünüm kaydedilemedi: önce ayar-kaydetme-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
  if(a==='link-show'||a==='link-rotate'){if(!canEdit())return;if(a==='link-rotate'&&!window.confirm('Yeni link oluşturulsun mu? Eski link hemen çalışmaz olur; yeni linki tekrar paylaşmanız gerekir.'))return;busy=true;onlineUI();try{const {data,error}=await client.rpc(a==='link-show'?'get_public_link':'rotate_public_link');if(error)throw error;if(!data)throw new Error('Aktif link bulunamadı. “Yeni link oluştur” ile oluşturun.');publicLink=location.origin+location.pathname+'?izle='+encodeURIComponent(data);busy=false;render();if(a==='link-rotate')toast('Yeni link oluşturuldu; eski link artık çalışmıyor.');}catch(err){toast(err.code==='PGRST202'?'Önce gorunum-linki-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
  if(a==='link-copy'){try{await navigator.clipboard.writeText(publicLink);toast('Link kopyalandı.');}catch(err){const i=document.getElementById('public-link');i?.select();toast('Kopyalanamadı; linki seçip Ctrl+C ile kopyalayın.',true);}return;}
 });
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="wa-"]');if(!b||VIEW_TOKEN)return;const a=b.dataset.action;
  if(a==='wa-send'){const v=state.visits.find(x=>x.id===b.dataset.id);if(v)openWhatsApp([v]);return;}
  if(a==='wa-customer'){openWhatsApp(sortRows(state.visits.filter(v=>v.customer===b.dataset.name&&v.date===b.dataset.date)));return;}
- if(a==='wa-contacts-save'){if(!canEdit())return;const clean=Object.fromEntries(Object.entries(customerContacts).map(([k,v])=>[k,String(v||'').trim()]).filter(([,v])=>v));busy=true;onlineUI();try{const {error}=await client.rpc('save_app_setting',{p_key:'customer_contacts',p_value:{numbers:clean,templates:{single:waTemplates.single,multi:waTemplates.multi}}});if(error)throw error;customerContacts=clean;generation++;contactsDirty=false;busy=false;await syncData();toast('WhatsApp numaraları ve mesaj şablonu kaydedildi.');}catch(err){toast(err.code==='22023'||err.code==='PGRST202'?'Önce whatsapp-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
+ if(a==='wa-contacts-save'){if(!canEdit())return;const clean=Object.fromEntries(Object.entries(customerContacts).map(([k,v])=>[k,String(v||'').trim()]).filter(([,v])=>v));busy=true;onlineUI();try{const {error}=await client.rpc('save_app_setting',{p_key:'customer_contacts',p_value:{numbers:clean,templates:{single:waTemplates.single,multi:waTemplates.multi}}});if(error)throw error;customerContacts=clean;generation++;contactsDirty=false;busy=false;render();syncData();toast('WhatsApp numaraları ve mesaj şablonu kaydedildi.');}catch(err){toast(err.code==='22023'||err.code==='PGRST202'?'Önce whatsapp-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
 });
 var waLastTpl='single';
 document.addEventListener('focusin',e=>{if(e.target.classList?.contains('wa-tpl'))waLastTpl=e.target.dataset.k;});
@@ -615,8 +626,9 @@ const dayLabel=d=>fmt(d,{weekday:'long',day:'numeric',month:'long'});
 async function carryToNext(ids){const groups=new Map();for(const id of ids){const v=state.visits.find(x=>x.id===id);if(!v||v.done)continue;if(!groups.has(v.date))groups.set(v.date,[]);groups.get(v.date).push(v.id);}
  if(!groups.size){toast('Taşınacak, işlemi bitmemiş araç yok.');return false;}
  busy=true;onlineUI();let moved=0;
- try{for(const [d,list] of groups){const patch={visit_date:nextWorkday(d)};if(orderReady())patch.sort_order=null;const {data,error}=await client.from('visits').update(patch).in('id',list).eq('done',false).select('id');if(error)throw error;moved+=data.length;}
-  busy=false;generation++;await syncData();return moved;
+ const rows=[];
+ try{for(const [d,list] of groups){const patch={visit_date:nextWorkday(d)};if(orderReady())patch.sort_order=null;const {data,error}=await client.from('visits').update(patch).in('id',list).eq('done',false).select('*');if(error)throw error;moved+=data.length;rows.push(...data);}
+  applyLocal('visits',rows);busy=false;syncData();return moved;
  }catch(err){toast('Araçlar taşınamadı: '+friendly(err),true);return false;}finally{busy=false;onlineUI();}}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action="carry-next"],[data-action="bulk-next"]');if(!b||!canEdit())return;
  let ids,text;
@@ -1438,10 +1450,12 @@ async function ruhsatAddAll(){if(!canEdit())return;const list=ruhsat.items.filte
  const byKey=new Map(),add=[],dup=[];
  for(const it of list){const k=norm(it.reg.plate)+'|'+ruhsatDate(it);if(byKey.has(k))dup.push([it,byKey.get(k)]);else{const v=ruhsatVisit(it);byKey.set(k,v);add.push([it,v]);}}
  if(!window.confirm(`Şu ${add.length} araç panoya eklensin mi?\n\n${add.map(([,v])=>`• ${v.plate} · ${v.customer} · ${fmt(v.date)}`).join('\n')}${dup.length?`\n\n(${dup.length} fotoğraf aynı aracın tekrarı, ayrıca eklenmez.)`:''}`))return;
- if(!(await mutate(s=>{for(const [,v] of add)s.visits.push(v);})))return;
- for(const [it,v] of add){justChangedMap.set(v.id,Date.now());it.status='eklendi';if(it.wa)await waMark(it,'eklendi',{plate:v.plate,visit_id:v.id});}
- for(const [it,v] of dup){it.status='eklendi';it.dup=true;if(it.wa)await waMark(it,'mevcut',{plate:v.plate,visit_id:v.id});}
- render();ruhsatRefresh();toast(`${add.length} araç panoya eklendi.`);}
+ /* her araç ayrı kayıt olarak sırayla yazılır (mutate tek seferde tek kayıt kabul eder) */
+ const done=new Set();
+ for(const [it,v] of add){if(!(await mutate(s=>{s.visits.push(v);})))break;done.add(v.id);justChangedMap.set(v.id,Date.now());it.status='eklendi';if(it.wa)await waMark(it,'eklendi',{plate:v.plate,visit_id:v.id});}
+ if(!done.size)return;
+ for(const [it,v] of dup)if(done.has(v.id)){it.status='eklendi';it.dup=true;if(it.wa)await waMark(it,'mevcut',{plate:v.plate,visit_id:v.id});}
+ render();ruhsatRefresh();if(done.size===add.length)toast(`${add.length} araç panoya eklendi.`);else toast(`${done.size} araç eklendi; ${add.length-done.size} araç eklenemedi, tekrar deneyin.`,true);}
 function ruhsatForm(it){ruhsat.returnId=it.id;pendingVisit=null;const tr=it.tractorReg||it.trailerReg,ex=ruhsatExisting(it);it.editVisit=ex?ex.id:null;
  if(ex){openVisitForm(ex.id);const f=document.getElementById('visit-form'),kg=ruhsatKg(it);if(f&&kg){f.elements.registration.value=kg.replace(/\D/g,'');f.elements.registration.focus();}return;}
  openVisitForm(null,ruhsatDate(it),{plate:ruhsatPlateText(it),registration:it.sum?String(it.sum):'',customer:tr?.customer||(it.wa?waCustomer(it.wa):'')||'',carrier:tr?.carrier||''});}

@@ -49,8 +49,9 @@
       then(resolve, reject) { return Promise.resolve().then(run).then(resolve, reject); }
     };
     function run() {
-      calls.push({ table, op: st.op, cols: st.cols, count: st.count, rows: st.rows && clone(st.rows), gte: st.gte });
+      calls.push({ table, op: st.op, cols: st.cols, count: st.count, rows: st.rows && clone(st.rows), gte: st.gte, from: st.from });
       if (window.__hang) return new Promise(() => {}); // takılan istek: hiç cevap gelmez
+      if (window.__hangReads && st.op === 'select') return new Promise(() => {}); // yalnızca okuma (yenileme) takılır, yazma çalışır
       if (cfg.offline) return netError();
       if ((cfg.missing || []).includes(table)) return { data: null, count: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` } };
       const t = db[table] || (db[table] = []);
