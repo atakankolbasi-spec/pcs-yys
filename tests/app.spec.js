@@ -377,6 +377,21 @@ test('artımlı senkron: silinen kayıt düşer, 10 dakikada bir tüm tablo baş
   expect(problems).toEqual([]);
 });
 
+test('çok kayıt: 1000’lik sayfalar birlikte istenir, liste eksiksiz ve tekrarsız gelir', async ({ page }) => {
+  const data = sampleData();
+  for (let i = 0; i < 2500; i++) data.registry.push({ id: 'x' + String(i).padStart(5, '0'), plate: `34 TT ${1000 + i}`, customer: 'TOPLU LOJ', declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const ids = await page.evaluate(() => window.PCS_TEST.getState().registry.map(r => r.id));
+  expect(ids.length).toBe(2504);
+  expect(new Set(ids).size).toBe(2504);
+  // üç sayfa art arda istenir (biri bitmeden diğeri başlar), sırayla beklenmez
+  const pages = await page.evaluate(() => window.__calls.map((c, i) => [i, c]).filter(([, c]) => c.table === 'registry' && c.op === 'select' && c.cols === '*').map(([i, c]) => [i, c.from]));
+  expect(pages.slice(0, 3).map(p => p[1])).toEqual([0, 1000, 2000]);
+  expect(pages[2][0] - pages[0][0]).toBe(2);
+  expect(problems).toEqual([]);
+});
+
 test('anlık güncelleme: başka kullanıcının değişikliği 15 sn beklemeden görünür', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
@@ -405,6 +420,51 @@ test('takılan bir istek güncellemeleri kalıcı olarak durdurmaz', async ({ pa
   });
   await page.clock.runFor(35000); // 30 sn sonra takılan senkron bırakılır, yenisi çalışır
   await expect(page.locator('#app')).toContainText('99 YENI 99');
+});
+
+test('kaydet beklemez: kayıt yazılınca form hemen kapanır, liste arkada yenilenir', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.clock.runFor(2000);
+  // Sunucudan okuma (yenileme) çok yavaş: hiç cevap gelmiyor. Yazma çalışıyor.
+  await page.evaluate(() => { window.__hangReads = true; });
+  const visitsOf = plate => page.evaluate(p => window.PCS_TEST.getState().visits.filter(v => v.plate === p), plate);
+  const form = page.locator('#visit-form');
+
+  // 1) Kayıtlı plaka
+  await page.locator('[data-action="add-visit"]').first().click();
+  await form.locator('[name="plate"]').fill('06 KL 4567');
+  await form.locator('[name="customer"]').fill('ABC NAKLİYAT');
+  await form.locator('button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('Araç gelişi kaydedildi');
+  await expect(page.locator('#modal')).toBeHidden();
+  const added = await visitsOf('06 KL 4567');
+  expect(added.map(v => v.date).sort()).toEqual(['2026-09-22', '2026-09-23']);
+  expect(added.find(v => v.date === '2026-09-23').updated_at).toBeTruthy(); // sunucunun verdiği sürüm: hemen yeniden düzenlenebilir
+
+  // 2) Yeni plaka: önce plaka kaydı, sonra geliş yazılır; ikisi de beklemeden listeye girer
+  await page.locator('[data-action="add-visit"]').first().click();
+  await form.locator('[name="plate"]').fill('16 ZZ 1600');
+  await form.locator('[name="customer"]').fill('YENİ MÜŞTERİ');
+  await form.locator('button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('plaka kayıtlarına eklendi');
+  await expect(page.locator('#modal')).toBeHidden();
+  expect((await visitsOf('16 ZZ 1600')).length).toBe(1);
+  expect(await page.evaluate(() => window.PCS_TEST.getState().registry.some(r => r.plate === '16 ZZ 1600'))).toBe(true);
+
+  // 3) Durum kutusu: işaret hemen kaydedilir
+  await page.locator('input[data-check="onsite"][data-id="v6"]').first().evaluate(el => el.click());
+  await expect.poll(async () => (await page.evaluate(() => window.PCS_TEST.getState().visits.find(v => v.id === 'v6'))).onsite).toBe(true);
+  expect((await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'))).onsite).toBe(true);
+
+  // Okuma düzelince arkadaki yenileme tamamlanır; liste sunucuyla aynı kalır.
+  await page.evaluate(() => { window.__hangReads = false; });
+  await page.clock.runFor(35000);
+  const ids = t => page.evaluate(t => window.PCS_TEST.getState()[t].map(r => r.id), t);
+  const dbIds = t => page.evaluate(t => window.__db[t].map(r => r.id).sort(), t);
+  expect(await ids('visits')).toEqual(await dbIds('visits'));
+  expect(await ids('registry')).toEqual(await dbIds('registry'));
+  expect(problems).toEqual([]);
 });
 
 test('çevrimdışı açılış: son kayıtlar cihazdaki kopyadan gösterilir', async ({ page, context }) => {
@@ -1111,6 +1171,33 @@ test('WhatsApp: sunucuda Gemini’yle okunan fotoğraf ekrana gelir; plaka kayı
   expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'incoming_ruhsat' && c.op === 'update').length)).toBe(1);
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp: "Hepsini panoya ekle" birden fazla farklı aracı tek onayla ekler', async ({ page }) => {
+  const data = sampleData();
+  data.registry.push({ id: 'r5', plate: 'PB 1234 AB - PB 5678 CD', customer: 'RUHSAT LOJ', declaration: '', carrier: '', registration: '14850 KG', updated_at: '2026-09-01T08:00:00Z' });
+  data.registry.push({ id: 'r7', plate: 'PB 4321 AB - PB 8765 CD', customer: 'İKİNCİ LOJ', declaration: '', carrier: '', registration: '14000 KG', updated_at: '2026-09-01T08:00:00Z' });
+  const v = (plate, kind, kg) => ({ plate, kind, empty_weight_kg: kg, country: '' });
+  data.incoming_ruhsat = [
+    waRow('w1', { status: 'bekliyor', tractor: 'PB1234AB', trailer: 'PB5678CD', weights: [8150, 6700], ai: { vehicles: [v('PB1234AB', 'tractor', 8150), v('PB5678CD', 'trailer', 6700)], problem: '' } }),
+    waRow('w2', { status: 'bekliyor', created_at: '2026-09-22T06:31:00Z', tractor: 'PB4321AB', trailer: 'PB8765CD', weights: [7900, 6100], ai: { vehicles: [v('PB4321AB', 'tractor', 7900), v('PB8765CD', 'trailer', 6100)], problem: '' } })
+  ];
+  const problems = await openApp(page, { data, files: {} });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const bulk = page.locator('[data-action="ruhsat-add-all"]');
+  await expect(bulk).toHaveText('Hepsini panoya ekle (2)');
+  page.once('dialog', d => d.accept());
+  await bulk.click();
+  await expect(page.locator('#toast')).toContainText('2 araç panoya eklendi');
+  const inserted = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  expect(inserted.map(x => [x.plate, x.customer, x.visit_date])).toEqual([
+    ['PB 1234 AB - PB 5678 CD', 'RUHSAT LOJ', '2026-09-22'],
+    ['PB 4321 AB - PB 8765 CD', 'İKİNCİ LOJ', '2026-09-22']
+  ]);
+  const rows = await page.evaluate(() => window.__db.incoming_ruhsat.map(r => [r.id, r.status, r.visit_id]));
+  expect(rows).toEqual([['w1', 'eklendi', inserted[0].id], ['w2', 'eklendi', inserted[1].id]]);
+  await expect(bulk).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 
