@@ -529,6 +529,53 @@ test('pano: araç çubuğu ve gün başlığı yok; arama, tablo/kart, giriş-ç
   expect(problems).toEqual([]);
 });
 
+test('müşteri başlıkları: ışıltılı koyu şerit ve müşteri renginde çerçeve; ayarlardan önceki stile dönülür', async ({ page }) => {
+  const data = sampleData();
+  data.app_settings.push({ key: 'customer_priority', value: [{ match: 'BULTRANS', color: '#ef4444' }, { match: 'TORNADO', color: '#22c55e' }], updated_at: '2026-09-01T08:00:00Z' });
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  expect(await page.evaluate(() => document.documentElement.dataset.headLook)).toBe('isiltili');
+  const style = loc => loc.evaluate(e => { const s = getComputedStyle(e); return { bw: s.borderTopWidth, bc: s.borderTopColor, bg: s.backgroundImage, fg: s.color }; });
+  // başlık: koyu zemin (gradyan), müşteri renginde 3 px çerçeve
+  const head = page.locator('.day-block .block-head-bar').first();
+  const h = await style(head);
+  expect(h.bw).toBe('3px');
+  expect(h.bg).toContain('gradient');
+  expect(h.fg).toBe('rgb(255, 255, 255)');
+  // BULTRANS (kırmızı): başlığın çerçevesi ve satırların sol/sağ/alt kenarı aynı renkte
+  const bul = page.locator('.day-block tr.block-head-row', { has: page.locator('.block-head-name', { hasText: 'BULTRANS' }) });
+  expect((await style(bul.locator('.block-head-bar'))).bc).toBe('rgb(239, 68, 68)');
+  const rows = page.locator('.day-block tr[data-row-id]', { hasText: '34 ABC 123' });
+  const cell = i => rows.locator('td').nth(i).evaluate((e, i) => { const s = getComputedStyle(e); return [s.borderLeftColor, s.borderRightColor, s.borderBottomColor, s.borderBottomWidth]; }, i);
+  expect((await cell(0))[0]).toBe('rgb(239, 68, 68)'); // sol
+  expect((await cell(8))[1]).toBe('rgb(239, 68, 68)'); // sağ
+  expect(await cell(3)).toEqual([expect.anything(), expect.anything(), 'rgb(239, 68, 68)', '3px']); // grubun son satırı: alt çerçeve
+  // kart görünümünde de aynı çerçeve
+  await page.locator('[data-action="view-mode"][data-v="cards"]').first().click();
+  const grp = page.locator('.card-group', { has: page.locator('.block-head-name', { hasText: 'BULTRANS' }) });
+  const g = await style(grp);
+  expect([g.bw, g.bc]).toEqual(['3px', 'rgb(239, 68, 68)']);
+  await page.locator('[data-action="view-mode"][data-v="table"]').first().click();
+  // ayarlar > yerleşim: yeni seçenek; eski üç ayar yalnızca "Önceki stil"de görünür
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-stab="layout"]').click();
+  const look = page.locator('[data-sk="headLook"]');
+  await expect(look.locator('[data-v="isiltili"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-sk="headAlign"]')).toHaveCount(0);
+  await expect(page.locator('.set-preview .block-head-bar')).toBeVisible();
+  await look.locator('[data-v="eski"]').click();
+  await expect(page.locator('[data-sk="headAlign"]')).toBeVisible();
+  await expect(page.locator('[data-sk="headStyle"]')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.dataset.headLook)).toBe('eski');
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  // önceki stilde koyu şerit ve 3 px çerçeve yoktur
+  const old = await style(page.locator('.day-block .block-head-bar').first());
+  expect(old.bg).not.toContain('gradient');
+  expect(old.bw).not.toBe('3px');
+  expect(problems).toEqual([]);
+});
+
 test('form açılırken başka alana geçilirse odak plakaya geri çekilmez', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');

@@ -387,7 +387,7 @@ const APP_HEADSTYLE={minimal:'Sade (beyaz başlık, ince renkli çizgi)',band:'R
 const APP_ROWSTYLE={minimal:'Sade (sadece bitenler hafif yeşil)',full:'Renkli (duruma göre tüm satır)'};
 const APP_ONOFF={on:'Açık',off:'Kapalı'};
 const APP_HSTR={hafif:['Hafif','12%'],normal:['Normal','24%'],koyu:['Koyu','45%'],cokkoyu:['Çok koyu','65%']};
-const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',headStyle:'minimal',rowStyle:'minimal',chipStyle:'soft',liveNotify:'on',boardView:'table',plateBand:'on',statusIcons:'on',design:'kule',radius:'yumusak',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
+const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',headStyle:'minimal',headLook:'isiltili',rowStyle:'minimal',chipStyle:'soft',liveNotify:'on',boardView:'table',plateBand:'on',statusIcons:'on',design:'kule',radius:'yumusak',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
 const APP_PRESETS={klasik:['Kurumsal (önerilen)',{}],canli:['Canlı',{headStyle:'band',rowStyle:'full',chipStyle:'solid',weight:'bold',tint:'guclu',headStrength:'koyu',colors:{onsite:'#f97316',t1:'#2563eb',done:'#16a34a',brand:'#1e3a8a',accent:'#2563eb'}}],sade:['Sade',{tint:'hafif',headStrength:'hafif',bg:'beyaz',colors:{onsite:'#d97706',t1:'#3b82f6',done:'#059669',brand:'#334155',accent:'#475569'}}],kontrast:['Yüksek kontrast',{weight:'extra',size:'buyuk',plateSize:'buyuk',tint:'cokguclu',headStrength:'koyu',bg:'beyaz',colors:{onsite:'#b45309',t1:'#1e40af',done:'#166534',brand:'#000000',accent:'#1e40af'}}]};
 const APP_COLOR_LABELS=[['onsite','TESİSTE işaretli'],['t1','T1 işaretli'],['done','BİTTİ işaretli'],['brand','Ana renk (düğmeler, seçili gün)'],['accent','Vurgu rengi (menü, seçili satır)']];
 let appearance=structuredClone(APP_DEFAULT);
@@ -397,7 +397,7 @@ function applyAppearance(){const r=document.documentElement,a=appearance,pick=(o
  set('--ui-scale',String(pick(APP_SIZES,a.size,'normal')[1]));r.dataset.weight=APP_WEIGHTS[a.weight]?a.weight:'normal';
  const sp=pick(APP_SPACING,a.spacing,'normal')[1];set('--ui-spacing',sp);if(sp==='0')delete r.dataset.spacing;else r.dataset.spacing='1';
  set('--plate-size',pick(APP_PLATE,a.plateSize,'normal')[1]);set('--row-pad',pick(APP_DENSITY,a.density,'normal')[1]);set('--tint',pick(APP_TINT,a.tint,'normal')[1]);
- set('--bg',pick(APP_BG,a.bg,'gri')[1]);r.dataset.headAlign=APP_HALIGN[a.headAlign]?a.headAlign:'center';r.dataset.stIcons=a.statusIcons==='off'?'off':'on';r.dataset.headStyle=a.headStyle==='band'?'band':'minimal';r.dataset.chipStyle=a.chipStyle==='solid'?'solid':'soft';r.dataset.rowStyle=a.rowStyle==='full'?'full':'minimal';set('--head-mix',pick(APP_HSTR,a.headStrength,'normal')[1]);
+ set('--bg',pick(APP_BG,a.bg,'gri')[1]);r.dataset.headAlign=APP_HALIGN[a.headAlign]?a.headAlign:'center';r.dataset.stIcons=a.statusIcons==='off'?'off':'on';r.dataset.headStyle=a.headStyle==='band'?'band':'minimal';r.dataset.headLook=a.headLook==='eski'?'eski':'isiltili';r.dataset.chipStyle=a.chipStyle==='solid'?'solid':'soft';r.dataset.rowStyle=a.rowStyle==='full'?'full':'minimal';set('--head-mix',pick(APP_HSTR,a.headStrength,'normal')[1]);
  for(const [k] of APP_COLOR_LABELS){const c=/^#[0-9a-f]{6}$/i.test(a.colors?.[k]||'')?a.colors[k]:APP_DEFAULT.colors[k];set('--c-'+k,c);set('--c-'+k+'-fg',textOn(c));}updateSaveBar();}
 var customerContacts={},contactsDirty=false;
 const WA_DEFAULT={single:'Merhaba\n{PLAKA}\nPlakalı aracınız tesisimize varış yapmıştır.\nTalimat ve beyanname maillerinizi bekliyoruz.',multi:'Merhaba\n{PLAKALAR}\nPlakalı araçlarınız tesisimize varış yapmıştır.\nTalimat ve beyanname maillerinizi bekliyoruz.'};
@@ -949,9 +949,11 @@ function kRows(id){const a=appearance,dev=false,sh=true,on=k=>a[k]!=='off';
   {t:'seg',k:'rowStyle',l:'Satır renklendirme',h:'Sade: yalnızca bitenler hafif yeşil · Renkli: duruma göre tüm satır',o:[['minimal','Sade'],['full','Renkli']],v:a.rowStyle,sh},
   {t:'seg',k:'tint',l:'Renkli satırlarda ton',h:'Yalnızca “Renkli” satır renklendirmede kullanılır',o:Object.entries(APP_TINT).map(([k,x])=>[k,x[0]]),v:a.tint,sh},
   {t:'seg',k:'bg',l:'Sayfa arka planı',h:'Kartların arkasındaki zemin',o:[['gri','Gri'],['beyaz','Beyaz'],['sicak','Krem'],['mavi','Mavi'],['yesil','Yeşil']],v:a.bg,sh},
+  {t:'seg',k:'headLook',l:'Müşteri başlık görünümü',h:'Işıltılı koyu: koyu şerit ve müşterinin renginde çerçeve · Önceki stil: Sade / Renkli şerit seçenekleri',o:[['isiltili','Işıltılı koyu'],['eski','Önceki stil']],v:a.headLook,sh},
+  ...(a.headLook==='eski'?[
   {t:'seg',k:'headStyle',l:'Müşteri başlıkları',h:'Panoda her müşteri bloğunun başlığı',o:[['minimal','Sade'],['band','Renkli şerit']],v:a.headStyle,sh},
   {t:'seg',k:'headAlign',l:'Başlık hizası',h:'Müşteri adı ortada mı solda mı',o:Object.entries(APP_HALIGN),v:a.headAlign,sh},
-  {t:'seg',k:'headStrength',l:'Renkli şeritte ton',h:'Yalnızca “Renkli şerit” başlıkta kullanılır',o:Object.entries(APP_HSTR).map(([k,x])=>[k,x[0]]),v:a.headStrength,sh},
+  {t:'seg',k:'headStrength',l:'Renkli şeritte ton',h:'Yalnızca “Renkli şerit” başlıkta kullanılır',o:Object.entries(APP_HSTR).map(([k,x])=>[k,x[0]]),v:a.headStrength,sh}]:[]),
   {t:'seg',k:'chipStyle',l:'İşaretli düğme stili',h:'TESİSTE / T1 / BİTTİ düğmeleri işaretliyken',o:[['soft','Yumuşak'],['solid','Dolu renk']],v:a.chipStyle,sh},
   {t:'sw',k:'statusIcons',l:'Düğmelerde simge',h:'Durum düğmelerinde küçük simgeler',v:on('statusIcons'),sh},
   {t:'sw',k:'plateBand',l:'Plakada ülke şeridi',h:'Ülke plakanın yazılışından tanınır (TR, BG, RO, GR, HU, AL, UA, MD)',v:on('plateBand'),sh},

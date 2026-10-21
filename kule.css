@@ -403,6 +403,45 @@ html.kule[data-theme="dark"] .k-design.on{border-color:var(--c-accent)}
 html.kule[data-theme="dark"] .k-bar i{background:color-mix(in srgb,var(--c-accent) 35%,#16203a)}
 html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
 
+/* ---------- Müşteri başlıkları: ışıltılı koyu şerit + müşterinin renginde çerçeve ----------
+   Her müşterinin araçları (başlık + satırlar) müşteri renginde tek çerçevenin içindedir. Renk, Ayarlar'daki müşteri
+   öncelik listesinden gelir (--bc). Ayarlar > Yerleşim > "Müşteri başlık görünümü" = "Önceki stil" seçilirse eski
+   Sade / Renkli şerit başlıkları kullanılır. */
+html.kule:not([data-head-look="eski"]) table.operations{border-collapse:separate;border-spacing:0}
+html.kule:not([data-head-look="eski"]) .operations tr.block-head-row>td{padding:22px 0 0!important;background:transparent!important;border:0!important}
+html.kule:not([data-head-look="eski"]) .operations tbody tr.block-head-row:first-child>td{padding-top:0!important}
+html.kule:not([data-head-look="eski"]) .block-head-bar{display:flex;align-items:center;justify-content:flex-start;gap:12px;margin:0;padding:0 16px;min-height:56px;color:#fff;overflow:hidden;
+ border:3px solid var(--bc);border-bottom:0;border-radius:var(--k-r2) var(--k-r2) 0 0;
+ background-color:var(--k-brand,#16233a);background-image:radial-gradient(260px 90px at 0 0,color-mix(in srgb,var(--bc) 55%,transparent),transparent 70%),linear-gradient(110deg,var(--k-brand,#16233a),var(--k-brand2,#1d3158));
+ box-shadow:inset 0 -3px 0 var(--bc)}
+html.kule:not([data-head-look="eski"]) .block-head-name{color:#fff;font:800 15px var(--k-head,inherit);letter-spacing:.07em;text-transform:uppercase}
+html.kule:not([data-head-look="eski"]) .block-head-name:before{content:"";display:inline-block;width:12px;height:12px;margin-right:10px;border-radius:50%;background:var(--bc);box-shadow:0 0 0 4px color-mix(in srgb,var(--bc) 35%,transparent);vertical-align:-1px}
+html.kule:not([data-head-look="eski"]) .block-head-count{background:#ffffff1f;color:#dbe5ff;border:1px solid #ffffff33;padding:4px 12px;font-size:11px;font-weight:800;letter-spacing:.08em}
+html.kule:not([data-head-look="eski"]) .block-head-bar .wa-head{margin-left:auto;background:#ffffff1a;color:#fff;border:1px solid #ffffff40}
+html.kule:not([data-head-look="eski"]) .block-head-bar .wa-head:hover{background:#ffffff33;border-color:#ffffff66}
+/* satırlar: sol-sağ-alt kenar müşteri renginde (eski 6 px'lik renkli kenar çizgileri kalkar) */
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]>td:first-child{border-left:3px solid var(--bc)!important;box-shadow:none!important}
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]>td:last-child{border-right:3px solid var(--bc)!important;box-shadow:-10px 0 10px -10px #16233a1f!important}
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:last-child>td,
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:has(+tr.block-head-row)>td{border-bottom:3px solid var(--bc)!important}
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:last-child>td:first-child,
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:has(+tr.block-head-row)>td:first-child{border-bottom-left-radius:var(--k-r2)}
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:last-child>td:last-child,
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:has(+tr.block-head-row)>td:last-child{border-bottom-right-radius:var(--k-r2)}
+/* beyanname hücresinin renkli sol kenarı (4 px) alt çizgiyle köşede çentik bırakmasın */
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:last-child>td.declaration,
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:has(+tr.block-head-row)>td.declaration{position:relative}
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:last-child>td.declaration::after,
+html.kule:not([data-head-look="eski"]) .operations tr[style*="--bc"]:has(+tr.block-head-row)>td.declaration::after{content:"";position:absolute;left:-4px;bottom:-3px;width:calc(100% + 4px);height:3px;background:var(--bc)}
+/* kart görünümü: müşterinin kartları da aynı çerçevede */
+html.kule:not([data-head-look="eski"]) .card-group{gap:0;border:3px solid var(--bc);border-radius:var(--k-r2);overflow:hidden;background:var(--k-card)}
+html.kule:not([data-head-look="eski"]) .card-group>.block-head-bar{border:0;border-radius:0}
+html.kule:not([data-head-look="eski"]) .card-group>.vcards{padding:14px}
+@media (max-width:700px){html.kule:not([data-head-look="eski"]) .card-group>.vcards{padding:8px;grid-template-columns:minmax(0,1fr)}html.kule:not([data-head-look="eski"]) .card-group>.block-head-bar{padding:0 12px}}
+html.kule:not([data-head-look="eski"]) .card-board{gap:22px}
+/* sabit kaydırma çubuğu altında kalmasın */
+html.kule:not([data-head-look="eski"]) .operations tr.block-head-row{scroll-margin-top:100px}
+
 /* ---------- Dar ekran ve telefon ---------- */
 @media (max-width:1100px){
  html.kule main{padding:18px 16px 40px 0}
@@ -462,6 +501,9 @@ html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
  html.kule .k-panel,html.kule .k-route,html.kule .k-stats,html.kule .k-hi,html.kule .k-date,html.kule .k-pinwrap,.k-qs{display:none!important}
  html.kule .heading.k-hero,html.kule .heading.k-pagehead{display:block;background:none!important;color:#000;box-shadow:none;border:0;border-radius:0;padding:0;margin:0 0 15px}
  html.kule .heading.k-hero::before,html.kule .heading.k-hero::after,html.kule .heading.k-pagehead::before{display:none}
+ html.kule:not([data-head-look="eski"]) .block-head-bar{background:#eef1f7!important;box-shadow:inset 0 -3px 0 var(--bc);color:#000;min-height:0;padding:6px 12px}
+ html.kule:not([data-head-look="eski"]) .block-head-name{color:#000!important}
+ html.kule:not([data-head-look="eski"]) .block-head-count{background:#fff;color:#000;border-color:#999}
  html.kule .print-day{display:block;margin:0 0 8px;padding:6px 10px;font-weight:800;font-size:15px;letter-spacing:.04em;color:#000}
  html.kule .heading h1{color:#000!important;font-size:23px}
  html.kule :is(.period-panel,.day-block,.kpi,.card,.set-panel,.reg-group){box-shadow:none}
