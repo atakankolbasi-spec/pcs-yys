@@ -320,6 +320,8 @@ html.kule table.operations thead th,html.kule .reg-table th,html.kule .report-ta
 html.kule table.operations td{border-color:var(--k-line)}
 html.kule table.operations tbody tr:not(.block-head-row):hover>td{background-color:color-mix(in srgb,var(--c-accent) 4%,transparent)}
 html.kule .board-toolbar .board-title h2,html.kule .section-label h2{font-weight:800;letter-spacing:.02em}
+html.kule .board-toolbar .quick-add .btn{min-height:36px;border-radius:10px}
+html.kule #quick-plate,html.kule #quick-plate:focus{border:0;background:transparent;box-shadow:none;padding:0 6px}
 html.kule .badge{border-radius:99px}
 
 /* ---------- Ayarlar ---------- */

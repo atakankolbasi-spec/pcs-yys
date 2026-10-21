@@ -462,6 +462,30 @@ test('takılan bir istek güncellemeleri kalıcı olarak durdurmaz', async ({ pa
   await expect(page.locator('#app')).toContainText('99 YENI 99');
 });
 
+test('pano araç çubuğu tek satır: hızlı ekleme çubuğun içinde, tekrar eden özet satırları yok', async ({ page, browser }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const bar = page.locator('.board-main .board-toolbar');
+  await expect(bar.locator('#quick-add')).toBeVisible();
+  // gün başlığında zaten olan bilgiler (başlık, renk açıklaması, günlük özet) ayrıca gösterilmez
+  await expect(page.locator('.board-main .board-title, .board-main .board-meta, .board-main .daily-summary')).toHaveCount(0);
+  // hızlı ekleme, eksik bilgiler, tablo/kart ve arama aynı satırda
+  const rows = await bar.locator(':scope > *').evaluateAll(xs => new Set(xs.map(x => { const r = x.getBoundingClientRect(); return Math.round(r.top + r.height / 2); })).size);
+  expect(rows).toBe(1);
+  // hızlı ekleme eskisi gibi çalışır
+  await page.locator('#quick-plate').fill('06 KL 4567');
+  await expect(page.locator('#quick-hint')).toContainText('ABC NAKLİYAT');
+  await page.locator('#quick-plate').press('Enter');
+  await expect(page.locator('#toast')).toContainText('06 KL 4567 · ABC NAKLİYAT, 23 Eylül gününe eklendi');
+  // görüntüleyicide hızlı ekleme yok; başlık yerinde kalır
+  const viewer = await browser.newPage();
+  await openApp(viewer, { role: 'viewer' });
+  await expect(viewer.locator('.board-main .board-title h2')).toHaveText('Çarşamba operasyonu');
+  await expect(viewer.locator('#quick-add')).toHaveCount(0);
+  await viewer.close();
+  expect(problems).toEqual([]);
+});
+
 test('form açılırken başka alana geçilirse odak plakaya geri çekilmez', async ({ page }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
