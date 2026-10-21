@@ -48,7 +48,7 @@ html.kule[data-theme="dark"] body{
   #0a0f1d;
  background-attachment:fixed
 }
-html.kule h1,html.kule h2,html.kule h3,html.kule .brand-name,html.kule .k-stat b,html.kule .k-big,html.kule .kpi-num,html.kule .day-date b{font-family:var(--k-head,var(--k-font))}
+html.kule h1,html.kule h2,html.kule h3,html.kule .brand-name,html.kule .k-stat b,html.kule .kpi-num,html.kule .day-date b{font-family:var(--k-head,var(--k-font))}
 html.kule ::selection{background:color-mix(in srgb,var(--c-accent) 22%,transparent)}
 html.kule main{padding:4px 28px 48px 0;max-width:none}
 html.kule :focus-visible{outline:3px solid color-mix(in srgb,var(--c-accent) 55%,transparent);outline-offset:2px}
@@ -177,7 +177,7 @@ html.kule.k-nomotion .k-pinbar{transition:none}
 html.kule .k-pin-t{display:flex;flex-direction:column;gap:5px;min-width:0;flex:0 1 auto}
 html.kule .k-pin-t b{color:#fff;font:800 15px/1.1 var(--k-head,var(--k-font));letter-spacing:.03em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.kule .k-pin-t small{color:#a9c4ff;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
-html.kule .k-pin-stats{display:flex;gap:8px;flex:1 1 auto;justify-content:center;min-width:0}
+html.kule .k-pin-stats{order:2;display:flex;gap:8px;flex:0 1 auto;justify-content:flex-end;min-width:0}
 html.kule .k-pstat{display:flex;align-items:center;gap:8px;height:48px;padding:0 13px;border-radius:13px;border:1px solid #ffffff26;background-image:linear-gradient(160deg,#ffffff1c,#ffffff08);white-space:nowrap;min-width:0}
 html.kule .k-pstat i{flex:none;width:8px;height:8px;border-radius:50%;background:#7aa2ff;box-shadow:0 0 0 3px #ffffff14}
 html.kule .k-pstat.onsite i{background:var(--c-onsite)}
@@ -185,7 +185,7 @@ html.kule .k-pstat.coming i{background:#7dd3fc}
 html.kule .k-pstat.done i{background:#4ade80}
 html.kule .k-pstat b{font:800 21px/1 var(--k-head,var(--k-font));color:#fff;font-variant-numeric:tabular-nums}
 html.kule .k-pstat span{color:#dbe5ff;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis}
-html.kule .k-pinbar .actions{display:flex;flex-wrap:nowrap;gap:8px;flex:none;margin:0}
+html.kule .k-pinbar .actions{order:1;display:flex;flex-wrap:nowrap;gap:8px;flex:none;margin:0 auto}
 html.kule .k-pinbar .actions .btn{position:relative;min-height:46px;border-radius:13px;border:1px solid #ffffff2e;background-color:transparent;background-image:linear-gradient(#ffffff1f,#ffffff12);color:#fff;box-shadow:none;font-size:11px;white-space:nowrap}
 html.kule .k-pinbar .actions .btn:hover{background-image:linear-gradient(#ffffff2e,#ffffff1f);color:#fff}
 html.kule .k-pinbar .actions .btn.primary{background:#fff;background-image:none;color:var(--k-brand,#16233a);border-color:#fff;box-shadow:0 10px 24px #0b153055}
@@ -196,7 +196,7 @@ html.kule .k-pinbar .actions .btn svg{color:currentColor}
 html.kule .k-pstat .k-short{display:none}
 /* dar alanda sayı üstte, etiket altta */
 @container (max-width:1050px){
- html.kule .k-pin-stats{justify-content:flex-start}
+ html.kule .k-pin-stats{flex:1 1 auto;justify-content:flex-start}
  html.kule .k-pstat{flex:1 1 0;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;padding:0 10px}
  html.kule .k-pstat i{display:none}
  html.kule .k-pstat b{font-size:18px}
@@ -218,7 +218,6 @@ html.kule .k-pstat .k-short{display:none}
 }
 @container (max-width:380px){html.kule .k-pstat{padding:0 4px}html.kule .k-pstat .k-short{font-size:7px;letter-spacing:0}}
 @media (min-width:701px){html.kule body.k-hpin .side-panel{top:104px}}
-@media (min-width:1100px){html.kule body.k-hpin .board-main .operations thead th{top:100px}}
 
 /* ---------- Sayfa başlığı (diğer sayfalar) ---------- */
 html.kule .heading.k-pagehead{position:relative;overflow:hidden;margin:18px 0 20px;padding:24px 28px 24px 32px;border-radius:22px;background:var(--k-card);border:1px solid var(--k-line);box-shadow:var(--k-sh2)}
@@ -233,7 +232,7 @@ html.kule .k-panel-head{display:flex;align-items:center;justify-content:space-be
 html.kule .k-link{border:0;background:none;padding:4px 2px;color:var(--k-at);font:800 10.5px var(--k-font);letter-spacing:.14em;cursor:pointer}
 html.kule .k-link:hover{text-decoration:underline}
 html.kule .k-panel.is-hidden .k-panel-head{margin-bottom:0}
-html.kule .k-cards{display:grid;grid-template-columns:1.3fr 1fr 1.25fr .95fr;gap:14px}
+html.kule .k-cards{display:grid;grid-template-columns:1.2fr .95fr 1.15fr 1.3fr;gap:14px}
 html.kule .k-card{display:flex;flex-direction:column;min-width:0;padding:18px 20px;border-radius:var(--k-r);border:1px solid var(--k-line);background:var(--k-card);box-shadow:var(--k-sh1);text-align:left;color:var(--k-ink);font:inherit}
 html.kule .k-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;color:var(--k-mut);font-size:10.5px;font-weight:800;letter-spacing:.16em}
 html.kule .k-card-h b{color:var(--k-at);font-size:10.5px;letter-spacing:.12em}
@@ -261,14 +260,25 @@ html.kule .k-waits b{font-family:var(--plate-font);font-size:12.5px;font-weight:
 html.kule .k-waits small{color:var(--k-mut);font-size:10.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.kule .k-empty{display:flex;align-items:center;gap:8px;margin:auto 0;color:var(--k-mut);font-size:12px;font-weight:700}
 html.kule .k-empty svg{color:var(--c-done)}
-html.kule .k-card.k-today{cursor:pointer;color:#fff;border-color:transparent;background-color:var(--k-brand,#16233a);background-image:radial-gradient(240px 160px at 100% 0%,color-mix(in srgb,var(--c-accent) 55%,transparent),transparent 70%),linear-gradient(150deg,var(--k-brand2),var(--k-brand,#16233a));box-shadow:0 16px 36px #0b153033;transition:transform .2s var(--k-ease)}
-html.kule .k-card.k-today:hover{transform:translateY(-2px)}
-html.kule .k-today .k-card-h{color:#b9cdfa}
-html.kule .k-big{font-size:46px;line-height:1;font-weight:800;color:#fff;margin:2px 0 6px}
-html.kule .k-sub{color:#dbe5ff;font-size:11px;font-weight:800;letter-spacing:.1em}
-html.kule .k-meter{display:block;height:7px;margin:14px 0 8px;border-radius:99px;background:#ffffff26;overflow:hidden}
-html.kule .k-meter i{display:block;height:100%;border-radius:inherit;background-color:#4ade80;background-image:linear-gradient(90deg,#22d3ee,#4ade80)}
-html.kule .k-today small{color:#c9d7fb;font-size:10.5px;font-weight:800;letter-spacing:.12em}
+html.kule .print-day{display:none}
+/* kontrol kartı (genel bakışta, eski "Bugün" kartının yerinde): arama, tablo/kart, eksik bilgiler, günün düğmeleri */
+html.kule .k-card.k-ctl{color:#fff;border-color:transparent;background-color:var(--k-brand,#16233a);background-image:radial-gradient(240px 160px at 100% 0%,color-mix(in srgb,var(--c-accent) 55%,transparent),transparent 70%),linear-gradient(150deg,var(--k-brand2),var(--k-brand,#16233a));box-shadow:0 16px 36px #0b153033;gap:10px}
+html.kule .k-ctl .k-card-h{color:#b9cdfa;margin-bottom:2px}
+html.kule .k-ctl .k-card-h b{color:#0b1530;background:#7ee2a8;border-radius:99px;padding:3px 9px;letter-spacing:.1em}
+html.kule .k-ctl .search{width:100%}
+html.kule .k-ctl .search svg{color:#c9d7fb}
+html.kule .k-ctl #board-search{min-height:42px;border-color:#ffffff2e;background-color:#ffffff14;color:#fff}
+html.kule .k-ctl #board-search::placeholder{color:#c9d7fbcc}
+html.kule .k-ctl-row{display:flex;flex-wrap:wrap;gap:8px}
+html.kule .k-ctl-row>*{flex:1 1 auto;margin:0}
+html.kule .k-ctl-row:empty{display:none}
+html.kule .k-ctl :is(.btn,.miss-btn){min-height:42px;height:auto;justify-content:center;border-radius:12px;border:1px solid #ffffff2e;background-color:transparent;background-image:linear-gradient(#ffffff1f,#ffffff12);color:#fff;box-shadow:none;font-size:11px}
+html.kule .k-ctl :is(.btn,.miss-btn):hover{background-image:linear-gradient(#ffffff2e,#ffffff1f);color:#fff}
+html.kule .k-ctl :is(.btn,.miss-btn) svg{color:currentColor}
+html.kule .k-ctl .miss-btn.on{background-image:none;background-color:#f59e0b;border-color:#f59e0b;color:#1b1300}
+html.kule .k-ctl .view-seg{display:flex;background:#ffffff14;border-color:#ffffff26}
+html.kule .k-ctl .view-seg button{flex:1;justify-content:center;color:#dbe5ff}
+html.kule .k-ctl .view-seg button[aria-pressed="true"]{background:#fff;color:var(--k-brand,#16233a)}
 @media (max-width:1180px){html.kule .k-cards{grid-template-columns:1fr 1fr}}
 
 /* ---------- Kartlar, kutular ---------- */
@@ -432,6 +442,7 @@ html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
  html.kule .k-stat span{font-size:9.5px;letter-spacing:.06em;white-space:normal}
  html.kule .k-hero .actions{min-width:0}
  html.kule .k-cards{grid-template-columns:1fr}
+ html.kule .k-card.k-ctl{order:-1}
  html.kule .heading.k-pagehead{padding:18px 18px 18px 22px;margin-top:14px}
  html.kule .heading.k-pagehead h1{font-size:22px}
  html.kule .save-status{display:none}
@@ -451,6 +462,7 @@ html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
  html.kule .k-panel,html.kule .k-route,html.kule .k-stats,html.kule .k-hi,html.kule .k-date,html.kule .k-pinwrap,.k-qs{display:none!important}
  html.kule .heading.k-hero,html.kule .heading.k-pagehead{display:block;background:none!important;color:#000;box-shadow:none;border:0;border-radius:0;padding:0;margin:0 0 15px}
  html.kule .heading.k-hero::before,html.kule .heading.k-hero::after,html.kule .heading.k-pagehead::before{display:none}
+ html.kule .print-day{display:block;margin:0 0 8px;padding:6px 10px;font-weight:800;font-size:15px;letter-spacing:.04em;color:#000}
  html.kule .heading h1{color:#000!important;font-size:23px}
  html.kule :is(.period-panel,.day-block,.kpi,.card,.set-panel,.reg-group){box-shadow:none}
 }

@@ -80,8 +80,8 @@ test('Kontrol Kulesi tasarımı: karşılama bandı, genel bakış kartları, me
   expect(await hero.locator('.k-stat b').allTextContents()).toEqual(['3', '2', '1', '0']);
   await expect(hero.locator('.k-stats-label')).toHaveText('Bugün');
   await expect(hero.locator('[data-action="add-visit"]')).toBeVisible();
-  // genel bakış: bugün 3 araç, bekleyenler, son 14 iş günü
-  await expect(page.locator('.k-today .k-big')).toHaveText('3');
+  // genel bakış: bugünün kontrol kartı, bekleyenler, son 14 iş günü
+  await expect(page.locator('.k-card.k-ctl')).toContainText('Bugün');
   await expect(page.locator('.k-waits li')).toHaveCount(3);
   await expect(page.locator('.k-bar')).toHaveCount(14);
   // grafikte bir güne tıklayınca o gün açılır
@@ -138,6 +138,11 @@ test('pano: aşağı inince bandın kısa hali üstte sabit kalır, hızlı aram
   // bugün: 3 + 30 araç; 2'si tesiste, 31'i gelecek
   await expect(bar.locator('.k-pstat')).toHaveCount(4);
   expect(await bar.locator('.k-pstat b').allTextContents()).toEqual(['33', '2', '31', '0']);
+  // sıra: başlık solda, düğmeler ortada, sayılar sağda
+  const x = sel => bar.locator(sel).first().evaluate(e => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; });
+  const [xt, xa, xs] = [await x('.k-pin-t'), await x('.actions'), await x('.k-pin-stats')];
+  expect(xt).toBeLessThan(xa);
+  expect(xa).toBeLessThan(xs);
   // çubuktaki düğmeler çalışır
   await bar.locator('[data-action="add-visit"]').click();
   await expect(page.locator('#visit-form')).toBeVisible();
@@ -462,25 +467,63 @@ test('takılan bir istek güncellemeleri kalıcı olarak durdurmaz', async ({ pa
   await expect(page.locator('#app')).toContainText('99 YENI 99');
 });
 
-test('pano araç çubuğu tek satır: hızlı ekleme çubuğun içinde, tekrar eden özet satırları yok', async ({ page, browser }) => {
+test('pano: araç çubuğu ve gün başlığı yok; arama, tablo/kart, giriş-çıkış, ertesi güne alma ve eksik bilgiler genel bakıştaki kontrol kartında', async ({ page, browser }) => {
   const problems = await openApp(page);
   await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const ctl = page.locator('.k-card.k-ctl');
+  await expect(ctl).toContainText('Çarşamba · 23 Eylül');
+  await expect(ctl.locator('#board-search')).toBeVisible();
+  await expect(ctl.locator('[data-action="view-mode"]')).toHaveCount(2);
+  await expect(ctl.locator('[data-action="missing-only"]')).toBeVisible();
+  await expect(ctl.locator('[data-action="gate-day"]')).toBeVisible();
+  await expect(ctl.locator('[data-action="carry-next"]')).toContainText('Bitmeyenleri ertesi güne al');
+  // tek gün seçiliyken araç çubuğu ve gün başlığı gösterilmez; tablo hemen başlar
+  await expect(page.locator('.board-main .board-toolbar, .board-main .quick-add, .day-header')).toHaveCount(0);
+  await expect(page.locator('.day-block .operations')).toBeVisible();
+  // kartlardaki düğmeler çalışır
+  await ctl.locator('[data-v="cards"]').click();
+  await expect(page.locator('.day-block .vcard').first()).toBeVisible();
+  await ctl.locator('[data-v="table"]').click();
+  await expect(page.locator('.day-block .operations')).toBeVisible();
+  const missing = ctl.locator('[data-action="missing-only"]');
+  await missing.click();
+  await expect(page.locator('.k-card.k-ctl [data-action="missing-only"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.k-card.k-ctl [data-action="missing-only"]').click();
+  await ctl.locator('[data-action="gate-day"]').click();
+  await expect(page.locator('#modal')).toContainText('Günlük giriş – çıkış');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#modal')).toBeHidden();
+  // arama kartın içinden yapılır
+  await ctl.locator('#board-search').fill('b 123');
+  await expect(page.locator('#app')).toContainText('B 123 XYZ');
+  await page.locator('#board-search').fill('');
+  await expect(page.locator('.k-card.k-ctl')).toBeVisible();
+  // haftanın tamamı: günler ayırt edilsin diye gün başlıkları kalır, günün düğmeleri kartta yoktur
+  await page.locator('.day-tab', { hasText: 'Haftanın tamamı' }).click();
+  await expect(page.locator('.day-header').first()).toBeVisible();
+  await expect(page.locator('.k-card.k-ctl')).toContainText('39. hafta · tüm günler');
+  await expect(page.locator('.k-card.k-ctl [data-action="carry-next"]')).toHaveCount(0);
+  await page.locator('.day-tab', { hasText: 'Çarşamba' }).click();
+  // N: hızlı ekleme yoksa yeni araç formu açılır
+  await page.locator('body').press('n');
+  await expect(page.locator('#visit-form')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // genel bakış gizlenirse tek satırlık araç çubuğu (hızlı ekleme dahil) ve gün başlığı geri gelir
+  await page.locator('[data-action="k-panel"]').click();
   const bar = page.locator('.board-main .board-toolbar');
   await expect(bar.locator('#quick-add')).toBeVisible();
-  // gün başlığında zaten olan bilgiler (başlık, renk açıklaması, günlük özet) ayrıca gösterilmez
-  await expect(page.locator('.board-main .board-title, .board-main .board-meta, .board-main .daily-summary')).toHaveCount(0);
-  // hızlı ekleme, eksik bilgiler, tablo/kart ve arama aynı satırda
+  await expect(page.locator('.day-header')).toHaveCount(1);
   const rows = await bar.locator(':scope > *').evaluateAll(xs => new Set(xs.map(x => { const r = x.getBoundingClientRect(); return Math.round(r.top + r.height / 2); })).size);
   expect(rows).toBe(1);
-  // hızlı ekleme eskisi gibi çalışır
   await page.locator('#quick-plate').fill('06 KL 4567');
   await expect(page.locator('#quick-hint')).toContainText('ABC NAKLİYAT');
   await page.locator('#quick-plate').press('Enter');
   await expect(page.locator('#toast')).toContainText('06 KL 4567 · ABC NAKLİYAT, 23 Eylül gününe eklendi');
-  // görüntüleyicide hızlı ekleme yok; başlık yerinde kalır
+  // görüntüleyicide yazma düğmeleri görünmez
   const viewer = await browser.newPage();
   await openApp(viewer, { role: 'viewer' });
-  await expect(viewer.locator('.board-main .board-title h2')).toHaveText('Çarşamba operasyonu');
+  await expect(viewer.locator('.k-card.k-ctl #board-search')).toBeVisible();
+  await expect(viewer.locator('.k-card.k-ctl [data-action="carry-next"]')).toBeHidden();
   await expect(viewer.locator('#quick-add')).toHaveCount(0);
   await viewer.close();
   expect(problems).toEqual([]);
