@@ -668,6 +668,14 @@ dialog.cp-modal{width:min(860px,calc(100% - 28px))}
 .qa-hint .lp{flex:none}
 .quick-add .btn{min-height:38px;padding:0 16px}
 @media(max-width:760px){.qa-hint{display:none}}
+/* hızlı ekleme araç çubuğunun içinde: ayrı satır kaplamaz; yer kalmazsa alt satıra iner */
+.board-toolbar.has-qa{flex-wrap:wrap}
+.board-toolbar .quick-add{flex:1 1 380px;min-width:0;margin:0;padding:3px 4px 3px 8px}
+.board-toolbar .quick-add .qa-ic{width:28px;height:28px}
+.board-toolbar .quick-add input{min-height:34px;font-size:14px}
+.board-toolbar .quick-add .btn{min-height:34px}
+.board-toolbar .qa-hint{font-size:11px;max-width:40%}
+@media(min-width:761px){.board-toolbar.has-qa .search{width:250px;flex:0 1 250px}}
 /*eksik-bilgi-suzgeci*/
 .miss-btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#3e4c63;font-size:12px;font-weight:800;cursor:pointer;margin-left:auto}
 .miss-btn svg{width:16px;height:16px;color:#b45309}
