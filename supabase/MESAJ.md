@@ -1,4 +1,4 @@
-# WhatsApp mesajından araç ekleme (Gemini): kurulum ve kullanım
+# Mesajdan araç ekleme (Gemini): WhatsApp, sohbet balonu ve yapıştırma
 
 Müşteri şirketin WhatsApp numarasına şöyle bir yazı gönderir:
 
@@ -21,6 +21,31 @@ Gerisi kendiliğinden olur:
    - Her aracın tarihi kutudan değiştirilebilir. Mesajda tarih yoksa mesajın geldiği gün yazılır ve uyarı verilir.
    - Birden fazla araç hazırsa **Hepsini uygula** tek onayla yapar. Silme asla toplu yapılmaz.
 4. **Hiçbir araç siz onaylamadan eklenmez, taşınmaz ya da silinmez.**
+
+## Sohbet balonu: kendiniz yazın, kendiliğinden eklesin
+
+Sayfanın **sağ alt köşesinde** yuvarlak bir sohbet balonu durur (yalnızca düzenleyici hesaplarda; saha ve güvenlik
+ekranlarında yoktur). Tıklayınca küçük bir sohbet penceresi açılır. Oraya kendi cümlenizi yazıp **Enter**'a basın
+(satır atlamak için Shift+Enter):
+
+> Yarın 34 ABC 123 / PB 5678 CD ve CB 1234 AB gelecek. 06 KL 4567 cumaya ertelendi.
+
+Gemini cümleyi okur ve **hazır olanları panoya kendisi işler**:
+- Kayıtlı bir araç gelecekse panoya eklenir; panodaki bir aracın günü değiştiyse yeni güne taşınır.
+- Araç o gün zaten panodaysa dokunulmaz ("Yapılacak bir şey yoktu").
+- Tarih yazmadıysanız bugün yazılır (Pazar ise Pazartesi); sohbette bunun yazdığını görürsünüz.
+
+Bunları yazan siz olduğunuz için ayrıca onay sorulmaz. **Şunlar yine de sorulmadan yapılmaz:**
+- **Silme (iptal):** sohbette **Panodan sil** düğmesi çıkar; onaylarsanız silinir (Ctrl+Z ile geri alınır).
+- **Plakası kayıtlarda olmayan** ya da kayıtlara benzetilerek bulunan araç: **Formda aç** denir.
+- Müşterisi bilinmeyen araç.
+
+Yapılan her şey sohbette araç araç yazar. Sohbet sayfayı yenileyince temizlenir; veritabanına yazılmaz.
+Müşteriden WhatsApp'la gelen mesajlar bekliyorsa balonda kırmızı bir sayı görünür ve panelin üstünde
+"WhatsApp'tan gelen N mesaj onayınızı bekliyor" bağlantısı çıkar (müşteri mesajları yine sizin onayınızla işlenir).
+
+Sohbet balonu WhatsApp kurulumu olmadan da çalışır; yalnızca `ruhsat-oku` fonksiyonunun güncel olması ve
+`GEMINI_API_KEY` yeter.
 
 **Aynı pencereden elle de olur:** WhatsApp dışından gelen bir mesajı (e-posta, başka bir uygulama) **Mesajdan araç
 ekle** kutusuna yapıştırıp **Yapay zekâyla oku**'ya basın; aynı kartlar çıkar. Bu yol WhatsApp kurulumu

@@ -205,4 +205,4 @@ Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI`
 | `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |
 | `functions/ruhsat-oku/index.ts` | Ruhsat fotoğrafını ve müşteri mesajlarını Google Gemini ile okuyan sunucu fonksiyonu (isteğe bağlı). Kurulum: `GEMINI.md`, `MESAJ.md` |
 | `WHATSAPP.md` | WhatsApp kurulum rehberi (Meta + Supabase) |
-| `MESAJ.md` | Müşterinin WhatsApp mesajından araç ekleme (Gemini): kurulum ve kullanım |
+| `MESAJ.md` | Müşterinin WhatsApp mesajından, sohbet balonundan ve yapıştırılan mesajdan araç ekleme (Gemini): kurulum ve kullanım |

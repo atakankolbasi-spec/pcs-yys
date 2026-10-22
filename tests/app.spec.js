@@ -1522,6 +1522,105 @@ test('WhatsApp mesajı: okunamayan mesaj "Yeniden oku" ile okunur; tablo kurulu 
   await other.close();
 });
 
+test('sohbet balonu: yazılan cümle okunur, hazır ekleme ve taşıma kendiliğinden işlenir; silme ve yeni araç sorulur', async ({ page }) => {
+  test.setTimeout(90000);
+  const aiText = { items: [
+    mi('add', '06KL4567', '', '2026-09-24', { time: '09:30' }),   // kayıtlı araç: kendiliğinden eklenir
+    mi('move', 'CB1234AB', '', '2026-09-25'),                      // panoda var: kendiliğinden taşınır
+    mi('add', 'XX9999YY', '', '2026-09-24'),                       // kayıtlı değil: formda eklenir
+    mi('cancel', 'B123XYZ', '', ''),                               // silme: onay ister
+    mi('add', '34ABC123', '', '2026-09-23')                        // zaten panoda: kapatılır
+  ], customer: '', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const fab = page.locator('#chat-fab'), panel = page.locator('#chat-panel');
+  await expect(fab).toBeVisible();
+  await expect(panel).toBeHidden();
+  // sağ alt köşede yuvarlak düğme
+  const box = await fab.boundingBox(), vp = page.viewportSize();
+  expect(box.x + box.width).toBeGreaterThan(vp.width - 40);
+  expect(box.y + box.height).toBeGreaterThan(vp.height - 40);
+  await fab.click();
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Gelecek, ertelenen ya da iptal edilen araçları yazın');
+  await expect(page.locator('#chat-input')).toBeFocused();
+  // örnek cümleye tıklayınca kutuya yazılır
+  await panel.locator('.chat-chip').first().click();
+  await expect(page.locator('#chat-input')).toHaveValue(/34 ABC 123/);
+  // Shift+Enter satır ekler, Enter gönderir
+  await page.locator('#chat-input').fill('');
+  await page.locator('#chat-input').pressSequentially('Yarın 06 KL 4567 saat 09:30 gelecek');
+  await page.keyboard.press('Shift+Enter');
+  await page.locator('#chat-input').pressSequentially('CB 1234 AB cumaya ertelendi, XX 9999 YY gelecek, B 123 XYZ iptal');
+  await expect(page.locator('#chat-input')).toHaveValue(/gelecek\nCB 1234 AB/);
+  await page.keyboard.press('Enter');
+  await expect(panel.locator('.chat-msg.me')).toContainText('Yarın 06 KL 4567 saat 09:30 gelecek');
+  await expect(panel).toContainText('5 araç anladım; 2 tanesini panoya işledim. 2 tanesi için onayınız gerekiyor');
+  // gönderilen metin Gemini'ye bugünün tarihiyle gider
+  const sent = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.text));
+  expect(sent).toEqual([{ text: 'Yarın 06 KL 4567 saat 09:30 gelecek\nCB 1234 AB cumaya ertelendi, XX 9999 YY gelecek, B 123 XYZ iptal', today: '2026-09-23' }]);
+  // kendiliğinden yapılanlar: ekleme + taşıma. Silme ve yeni araç yapılmadı.
+  const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).map(c => ({ op: c.op, rows: c.rows })));
+  const w = await writes();
+  expect(w.map(x => x.op)).toEqual(['insert', 'update']);
+  expect(w[0].rows[0]).toMatchObject({ plate: '06 KL 4567', customer: 'ABC NAKLİYAT', visit_date: '2026-09-24', visit_time: '09:30' });
+  expect((await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'))).visit_date).toBe('2026-09-25');
+  await expect(panel).toContainText('Panoya eklendi');
+  await expect(panel).toContainText('25 Eylül Cuma gününe taşındı');
+  await expect(panel).toContainText('Yapılacak bir şey yoktu'); // 34 ABC 123: bugün zaten panoda; kendiliğinden kapatıldı
+  expect(await page.evaluate(() => window.__db.incoming_messages.length)).toBe(0); // sohbet veritabanına yazılmaz
+  // silme: onay sorulur
+  page.once('dialog', d => { expect(d.message()).toContain('B 123 XYZ için panodaki 23 Eylül gelişi silinsin mi?'); d.accept(); });
+  await panel.locator('[data-action="msg-apply"]', { hasText: 'Panodan sil' }).click();
+  await expect.poll(async () => (await writes()).map(x => x.op).join()).toBe('insert,update,delete');
+  await expect(panel).toContainText('Panodan silindi');
+  // yeni araç: forma düşer
+  await panel.locator('[data-action="msg-form"]').click();
+  await expect(page.locator('#visit-form [name="plate"]')).toHaveValue('XX 9999 YY');
+  await page.keyboard.press('Escape');
+  // kapatma: Esc ya da düğme
+  await page.locator('#chat-input').focus();
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  expect(problems).toEqual([]);
+});
+
+test('sohbet balonu: hata ve boş cevap sohbette yazar, yazılan metin geri gelir; görüntüleyicide ve saha ekranında balon yoktur; bekleyen WhatsApp mesajı bağlantı olur', async ({ page, browser }) => {
+  const data = sampleData();
+  data.incoming_messages = [msgRow('m9', [mi('add', '06KL4567', '', '2026-09-24')])];
+  const problems = await openApp(page, { data, aiText: [{ status: 502, body: { error: 'Gemini 502', fatal: true } }, { items: [], customer: '', problem: 'Mesajda plaka yok.', model: 'x' }] });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  // bekleyen WhatsApp mesajı: balonda rozet, panelde bağlantı
+  await expect(page.locator('#chat-fab .chat-dot')).toHaveText('1');
+  await expect(panel.locator('.chat-pend')).toContainText("WhatsApp'tan gelen 1 mesaj onayınızı bekliyor");
+  // Gemini hatası
+  await page.locator('#chat-input').fill('yarın 06 KL 4567 gelecek');
+  await page.locator('#chat-input').press('Enter');
+  await expect(panel).toContainText('Okuyamadım');
+  await expect(page.locator('#chat-input')).toHaveValue('yarın 06 KL 4567 gelecek'); // yazılan geri gelir
+  // araç yok
+  await page.locator('#chat-input').fill('merhaba nasılsınız 123');
+  await page.locator('#chat-input').press('Enter');
+  await expect(panel).toContainText('Mesajda araç plakası bulamadım (Mesajda plaka yok)');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
+  // bağlantı: WhatsApp mesajlarının onay penceresini açar
+  await panel.locator('.chat-pend').click();
+  await expect(page.locator('#modal .msg-card')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // saha ekranında balon yok
+  await page.locator('[data-action="saha-open"]').first().click();
+  await expect(page.locator('#chat-fab')).toBeHidden();
+  expect(problems).toEqual([]);
+  // görüntüleyici (yalnız okuyabilen hesap) sohbetle değişiklik yapamaz: balon görünmez
+  const viewer = await browser.newPage();
+  await openApp(viewer, { role: 'viewer' });
+  await expect(viewer.locator('#app')).toContainText('34 ABC 123');
+  await expect(viewer.locator('#chat-fab')).toHaveCount(0);
+  await viewer.close();
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
