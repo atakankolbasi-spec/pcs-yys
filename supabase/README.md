@@ -201,6 +201,8 @@ Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI`
 | `gunluk-rapor-kurulumu.sql` | Otomatik günlük rapor maili: alıcılar, rapor anahtarı, günün verisi |
 | `plaka-harf-duzeltmesi.sql` | Eski kayıtlardaki Kiril / Yunan harfli plakaları Latin harfe çevirir (isteğe bağlı) |
 | `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |
+| `mesaj-kurulumu.sql` | WhatsApp'tan gelen müşteri mesajlarından araç ekleme için tablo ve yetki kuralları. Kullanım: `MESAJ.md` |
 | `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |
-| `functions/ruhsat-oku/index.ts` | Ruhsat fotoğrafını Google Gemini ile okuyan sunucu fonksiyonu (isteğe bağlı). Kurulum: `GEMINI.md` |
+| `functions/ruhsat-oku/index.ts` | Ruhsat fotoğrafını ve müşteri mesajlarını Google Gemini ile okuyan sunucu fonksiyonu (isteğe bağlı). Kurulum: `GEMINI.md`, `MESAJ.md` |
 | `WHATSAPP.md` | WhatsApp kurulum rehberi (Meta + Supabase) |
+| `MESAJ.md` | Müşterinin WhatsApp mesajından, sohbet balonundan ve yapıştırılan mesajdan araç ekleme (Gemini): kurulum ve kullanım |

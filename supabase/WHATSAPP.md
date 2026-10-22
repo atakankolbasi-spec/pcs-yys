@@ -20,6 +20,9 @@
      Gönderenin numarası Ayarlar'daki WhatsApp numaraları listesinde bir müşteriye aitse, formda o müşteri
      seçili gelir.
 
+**Yazı mesajları:** Müşteri "yarın şu araçlar gelecek: ..." diye yazarsa mesaj da Gemini'ye okutulur
+(plaka, tarih, saat; gelecek / ertelendi / iptal) ve sitede onay bekler. Kurulum ve kullanım: `supabase/MESAJ.md`.
+
 **Önemli:**
 - Bu numara mevcut WhatsApp grubunuza eklenemez; fotoğraflar numaraya doğrudan gönderilmelidir.
   Gruptaki fotoğrafları ofisten bu numaraya topluca iletmek de olur: fotoğrafları seçin → İlet.

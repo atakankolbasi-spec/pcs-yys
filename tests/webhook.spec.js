@@ -17,12 +17,14 @@ const realConsoleError = console.error;
 
 // read: ruhsat-oku fonksiyonunun cevapları sırayla ({ status, body }); son eleman tekrar eder.
 // noAiCol: tabloda "ai" sütunu yokmuş gibi davranır.
-async function setup({ env = {}, existing = [], old = [], mediaFails = false, read = [], noAiCol = false } = {}) {
+// msgExisting: kayıtlı mesaj kimlikleri · msgRecent: bu numaradan son saatteki mesaj sayısı · noMsgTable: tablo kurulu değil
+async function setup({ env = {}, existing = [], old = [], mediaFails = false, read = [], noAiCol = false, msgExisting = [], msgRecent = 0, noMsgTable = false } = {}) {
   globalThis.Deno = { env: { get: k => ({ ...ENV, ...env })[k] } };
   const log = [];
   const rows = [];
   const errors = [];
   const patches = [];
+  const msgRows = [], msgPatches = [], msgDeletes = [];
   console.error = (...a) => errors.push(a.join(' ')); // fonksiyonun hata kayıtları test çıktısını kirletmesin
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input), method = init.method || 'GET', headers = init.headers || {};
@@ -34,6 +36,14 @@ async function setup({ env = {}, existing = [], old = [], mediaFails = false, re
     if (url.startsWith(ENV.SUPABASE_URL + '/rest/v1/incoming_ruhsat?select=id&wa_message_id=')) return json(existing.filter(id => url.endsWith(encodeURIComponent(id))).map(id => ({ id })));
     if (url.startsWith(ENV.SUPABASE_URL + '/rest/v1/incoming_ruhsat?select=id,media_path')) return json(old);
     if (url.startsWith(ENV.SUPABASE_URL + '/rest/v1/incoming_ruhsat?on_conflict=') && method === 'POST') { rows.push(JSON.parse(init.body)); return new Response(null, { status: 201 }); }
+    if (url.startsWith(ENV.SUPABASE_URL + '/rest/v1/incoming_messages')) {
+      if (noMsgTable) return json({ code: 'PGRST205', message: "Could not find the table 'public.incoming_messages' in the schema cache" }, 404);
+      if (url.includes('?select=id&wa_message_id=')) return json(msgExisting.filter(id => url.endsWith(encodeURIComponent(id))).map(id => ({ id })));
+      if (url.includes('?select=id&from_number=')) return json(Array.from({ length: Math.min(msgRecent, 20) }, (_, i) => ({ id: 'r' + i })));
+      if (url.includes('?on_conflict=') && method === 'POST') { msgRows.push(JSON.parse(init.body)); return new Response(null, { status: 201 }); }
+      if (method === 'PATCH') { msgPatches.push({ url, body: JSON.parse(init.body) }); return new Response(null, { status: 204 }); }
+      if (method === 'DELETE') { msgDeletes.push(url); return new Response(null, { status: 204 }); }
+    }
     if (url.startsWith(ENV.SUPABASE_URL + '/storage/v1/object/ruhsat-gelen')) return json({ Key: 'ok' });
     if (url.startsWith(ENV.SUPABASE_URL + '/rest/v1/incoming_ruhsat?id=in.') && method === 'PATCH') return new Response(null, { status: 204 });
     if (url.startsWith(ENV.SUPABASE_URL + '/rest/v1/incoming_ruhsat?wa_message_id=eq.') && method === 'PATCH') {
@@ -56,7 +66,7 @@ async function setup({ env = {}, existing = [], old = [], mediaFails = false, re
     const sig = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
     return mod.handle(new Request('https://proje.supabase.co/functions/v1/whatsapp-webhook', { method: 'POST', body, headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': sig } }));
   };
-  return { mod, log, rows, errors, patches, post };
+  return { mod, log, rows, errors, patches, msgRows, msgPatches, msgDeletes, post };
 }
 
 // Meta'nın gönderdiği biçimde bildirim
@@ -203,5 +213,88 @@ test.describe('WhatsApp sunucu fonksiyonu', () => {
     await none.mod.idle();
     expect('status' in none.rows[0]).toBe(false);
     expect(none.log.some(l => l.url.includes('/functions/v1/'))).toBe(false);
+  });
+
+  // ---- Yazı mesajları (müşterinin "bu araçlar gelecek" yazısı) ----
+  const GEMINI = { GEMINI_API_KEY: 'gemini-anahtari' };
+  const text = (id, body, extra = {}) => ({ from: '905321112233', id, timestamp: '1790058600', type: 'text', text: { body }, ...extra });
+  const sentToWa = log => log.filter(l => l.url.endsWith('/PHONE1/messages')).map(l => JSON.parse(l.body));
+  const LIST = 'Yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD ve CB 1234 AB';
+  const READ_OK = { body: { items: [{ action: 'add', tractor: '34ABC123', trailer: 'PB5678CD', date: '2026-10-23', time: '', note: '' }, { action: 'add', tractor: 'CB1234AB', trailer: '', date: '2026-10-23', time: '', note: '' }], customer: 'ETL LOJ', problem: '', model: 'gemini-test' } };
+
+  test('yazı mesajı kaydedilir, Gemini’ye okutulur, sonuç satıra yazılır ve gönderene ✅ ile tepki verilir', async () => {
+    const { mod, log, msgRows, msgPatches, post } = await setup({ env: GEMINI, read: [READ_OK] });
+    expect((await post(notify(text('wamid.M1', LIST)))).status).toBe(200);
+    await mod.idle();
+    // satır "okunuyor" olarak açılır; mesajın yazısı, gönderen ve zaman kaydedilir
+    expect(msgRows).toEqual([{ wa_message_id: 'wamid.M1', from_number: '905321112233', sender_name: 'Ali Şoför', body: LIST, status: 'okunuyor', created_at: '2026-09-22T06:30:00.000Z' }]);
+    // ruhsat-oku'ya mesaj modunda (JSON) gider; fotoğraf indirilmez
+    const call = log.find(l => l.url.endsWith('/functions/v1/ruhsat-oku'));
+    expect(call.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(call.body)).toEqual({ text: LIST });
+    expect(log.some(l => l.url.includes('lookaside') || l.url.includes('storage'))).toBe(false);
+    // okunan araçlar satıra yazılır: onay bekler
+    expect(msgPatches.length).toBe(1);
+    expect(msgPatches[0].url).toContain('incoming_messages?wa_message_id=eq.wamid.M1&status=eq.okunuyor');
+    expect(msgPatches[0].body.status).toBe('bekliyor');
+    expect(msgPatches[0].body.ai.items.map(v => [v.tractor, v.trailer, v.date])).toEqual([['34ABC123', 'PB5678CD', '2026-10-23'], ['CB1234AB', '', '2026-10-23']]);
+    expect(msgPatches[0].body.ai.customer).toBe('ETL LOJ');
+    // gönderene ✅ ile tepki; yazılı cevap gitmez
+    expect(sentToWa(log)).toEqual([{ messaging_product: 'whatsapp', recipient_type: 'individual', to: '905321112233', type: 'reaction', reaction: { message_id: 'wamid.M1', emoji: '✅' } }]);
+  });
+
+  test('mesajda araç yoksa satır yoksayılır ve gönderene ne gönderebileceği yazılır; rakamsız yazı Gemini’ye gitmez', async () => {
+    const a = await setup({ env: GEMINI, read: [{ body: { items: [], customer: '', problem: 'Mesajda plaka yok.', model: 'gemini-test' } }] });
+    await a.post(notify(text('wamid.M2', 'Merhaba, yarın görüşelim saat 10'))); await a.mod.idle();
+    expect(a.msgPatches[0].body).toMatchObject({ status: 'yoksayildi', note: 'Araç bulunamadı · Mesajda plaka yok.' });
+    const reply = sentToWa(a.log)[0];
+    expect(reply.type).toBe('text');
+    expect(reply.context).toEqual({ message_id: 'wamid.M2' });
+    expect(reply.text.body).toContain('gelecek araçların plakalarını');
+    // rakam içermeyen yazı: kaydedilmez, Gemini'ye gitmez, yalnızca yönlendirme gider
+    const b = await setup({ env: GEMINI, read: [READ_OK] });
+    await b.post(notify(text('wamid.M3', 'Teşekkürler, iyi çalışmalar'))); await b.mod.idle();
+    expect(b.msgRows).toEqual([]);
+    expect(b.log.some(l => l.url.endsWith('/functions/v1/ruhsat-oku'))).toBe(false);
+    expect(sentToWa(b.log)[0].text.body).toContain('gelecek araçların plakalarını');
+  });
+
+  test('Gemini mesajı okuyamazsa satır "hata" olur (siteden yeniden okutulur); tekrarlanan bildirim ikinci kez işlenmez', async () => {
+    const a = await setup({ env: GEMINI, read: [{ status: 502, body: { error: 'Gemini 502', fatal: true } }] });
+    expect((await a.post(notify(text('wamid.M4', LIST)))).status).toBe(200);
+    await a.mod.idle();
+    expect(a.msgPatches[0].body).toEqual({ status: 'hata', note: 'Yapay zekâ mesajı okuyamadı' });
+    expect(sentToWa(a.log)).toEqual([]); // okunamayan mesaja tepki verilmez
+    const b = await setup({ env: GEMINI, read: [READ_OK], msgExisting: ['wamid.M4'] });
+    await b.post(notify(text('wamid.M4', LIST))); await b.mod.idle();
+    expect(b.msgRows).toEqual([]);
+    expect(b.log.some(l => l.url.endsWith('/functions/v1/ruhsat-oku'))).toBe(false);
+  });
+
+  test('aynı numaradan saatte 20’den fazla mesaj okunmaz; tablo kurulu değilse ya da Gemini yoksa eski cevap gider', async () => {
+    const a = await setup({ env: GEMINI, read: [READ_OK], msgRecent: 20 });
+    await a.post(notify(text('wamid.M5', LIST))); await a.mod.idle();
+    expect(a.msgRows).toEqual([]);
+    expect(a.log.some(l => l.url.endsWith('/functions/v1/ruhsat-oku'))).toBe(false);
+    expect(sentToWa(a.log)).toEqual([]);
+    // tablo kurulu değil: mesaj kaydedilemez, gönderen eski yönlendirmeyi alır (sessiz kalmaz)
+    const b = await setup({ env: GEMINI, read: [READ_OK], noMsgTable: true });
+    expect((await b.post(notify(text('wamid.M6', LIST)))).status).toBe(200);
+    expect(sentToWa(b.log)[0].text.body).toContain('ruhsatının fotoğrafını gönderin');
+    expect(b.errors.join('\n')).toContain('mesaj-kurulumu.sql');
+    // Gemini kurulu değil: yazı hiç kaydedilmez
+    const c = await setup({ read: [READ_OK] });
+    await c.post(notify(text('wamid.M7', LIST))); await c.mod.idle();
+    expect(c.log.some(l => l.url.includes('incoming_messages'))).toBe(false);
+    expect(sentToWa(c.log)[0].text.body).toContain('ruhsatının fotoğrafını gönderin');
+  });
+
+  test('uzun yazı 4000 karaktere kırpılır; kapanmış 60 günden eski mesajlar silinir', async () => {
+    const { mod, log, msgRows, msgDeletes, post } = await setup({ env: GEMINI, read: [READ_OK] });
+    await post(notify(text('wamid.M8', '34 ABC 123 ' + 'x'.repeat(5000)))); await mod.idle();
+    expect(msgRows[0].body.length).toBe(4000);
+    expect(msgDeletes.length).toBe(1);
+    expect(msgDeletes[0]).toMatch(/incoming_messages\?status=in\.\(eklendi,yoksayildi,hata\)&created_at=lt\./);
+    expect(log.find(l => l.url.includes('incoming_messages') && l.method === 'DELETE').headers.Prefer).toBe('return=minimal');
   });
 });

@@ -24,10 +24,14 @@ Gemini o an okuyamazsa fotoğraf panonun açık olduğu bilgisayara kalır ve or
 Gemini hiç kurulmamışsa (fonksiyon yok ya da anahtar tanımlı değil) site eskisi gibi fotoğrafı kendi
 bilgisayarında okur.
 
+**Mesajlar da okunur:** Müşterinin WhatsApp'tan ya da başka yerden yazdığı "şu araçlar gelecek" gibi mesajlar da
+aynı fonksiyonla (`ruhsat-oku`, mesaj modu) okunur: plaka, tarih, saat ve gelecek / ertelendi / iptal. Kurulum ve
+kullanım: `supabase/MESAJ.md`.
+
 Hangi yolla okunursa okunsun, hiçbir araç siz onaylamadan panoya eklenmez: kartta **Panoya ekle** ya da
 pencerenin üstündeki **Hepsini panoya ekle** ile eklersiniz.
 
-**Gizlilik:** Kurulunca ruhsat fotoğrafları okunmak üzere Google'a gönderilir. Google'ın **ücretsiz**
+**Gizlilik:** Kurulunca ruhsat fotoğrafları ve (mesaj özelliği kuruluysa) müşteri mesajlarının metni okunmak üzere Google'a gönderilir. Google'ın **ücretsiz**
 kullanımında gönderilen içerik Google'ın ürünlerini geliştirmek için kullanılabilir ve çalışanlarınca
 incelenebilir; faturalandırma açık (ücretli) kullanımda kullanılmaz. Ruhsatlarda kişisel veri bulunduğu için
 denemeden sonra ücretli kullanıma geçmeniz önerilir. Güncel koşullar: [ai.google.dev](https://ai.google.dev/gemini-api/terms).
