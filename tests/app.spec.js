@@ -1372,6 +1372,156 @@ test('WhatsApp: "Hepsini panoya ekle" birden fazla farklı aracı tek onayla ekl
   expect(problems).toEqual([]);
 });
 
+// Müşterinin WhatsApp'tan yazdığı mesaj (sunucu fonksiyonunun Gemini ile okuyup yazdığı biçimde).
+const msgRow = (id, items, extra = {}) => ({
+  id, wa_message_id: 'wamid.' + id, from_number: '905321112233', sender_name: 'Ali Şoför', body: 'Yarın şu araçlar gelecek ...', status: 'bekliyor',
+  ai: { items, customer: '', problem: '', model: 'gemini-test' }, applied: {}, note: '', handled_by: null, handled_at: null,
+  created_at: '2026-09-23T06:30:00Z', updated_at: '2026-09-23T06:30:00Z', ...extra
+});
+const mi = (action, tractor, trailer, date, extra = {}) => ({ action, tractor, trailer, date, time: '', note: '', ...extra });
+
+test('WhatsApp mesajı: gelecek, tarihi değişen, iptal ve yeni araç madde madde onaya düşer; hiçbiri sorulmadan değişmez', async ({ page }) => {
+  test.setTimeout(90000);
+  const data = sampleData();
+  data.incoming_messages = [msgRow('m1', [
+    mi('add', '06KL4567', '', '2026-09-24', { time: '09:30', note: 'Şoför Ali' }),   // 0: kayıtlı araç, o gün panoda yok
+    mi('move', 'CB1234AB', '', '2026-09-25'),                                         // 1: panoda 23'ünde; 25'ine alınacak
+    mi('add', 'XX9999YY', '', '2026-09-24'),                                          // 2: yeni araç
+    mi('cancel', 'B123XYZ', '', ''),                                                  // 3: panodaki geliş silinecek
+    mi('add', '34ABC123', '', '2026-09-23')                                           // 4: zaten panoda
+  ], { body: 'Yarın 06 KL 4567 gelecek, CB 1234 AB cuma günü gelecek, XX 9999 YY de yarın. B 123 XYZ iptal. 34 ABC 123 bugün.' })];
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const calls = fn => page.evaluate(fn);
+  // hiçbir şey kendiliğinden değişmez; "Ruhsattan ekle" düğmesinde bekleyen mesaj sayısı görünür
+  await expect(page.locator('.heading .rs-badge').first()).toHaveText('1');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const card = page.locator('#msg-m1');
+  await expect(page.locator('.rs-wa-head', { hasText: 'WhatsApp mesajları' })).toContainText('siz onaylamadan');
+  await expect(card).toContainText('Ali Şoför');
+  await expect(card.locator('.msg-item')).toHaveCount(5);
+  const item = n => card.locator('.msg-item').nth(n);
+  await expect(item(0)).toContainText('Kayıtlı araç: ABC NAKLİYAT');
+  await expect(item(0)).toContainText('Saat: 09:30');
+  await expect(item(0).locator('input[type="date"]')).toHaveValue('2026-09-24');
+  await expect(item(1)).toContainText('Panoda şu an 23 Eylül Çarşamba gününde');
+  await expect(item(1)).toContainText('25 Eylül Cuma gününe taşınır');
+  await expect(item(2)).toContainText('Yeni araç: plaka kayıtlarında yok');
+  await expect(item(2).locator('[data-action="msg-apply"]')).toHaveCount(0);   // müşteri bilinmiyor: yalnızca formda eklenir
+  await expect(item(3)).toContainText('silinir');
+  await expect(item(4)).toContainText('zaten panoda');
+
+  // toplu: yalnızca hazır olanlar (ekleme + taşıma); silme ve yeni araç dışarıda
+  const all = card.locator('[data-action="msg-all"]');
+  await expect(all).toHaveText('Hepsini uygula (2)');
+  let asked = '';
+  page.once('dialog', d => { asked = d.message(); d.accept(); });
+  await all.click();
+  await expect(page.locator('#toast')).toContainText('2 araç işlendi');
+  expect(asked).toContain('06 KL 4567 · ABC NAKLİYAT');
+  expect(asked).toContain('CB 1234 AB: 23 Eylül → 25 Eylül gününe taşınsın');
+  expect(asked).not.toContain('B 123 XYZ');
+  const writes = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).map(c => ({ op: c.op, rows: c.rows })));
+  expect(writes.map(w => w.op)).toEqual(['insert', 'update']);
+  expect(writes[0].rows[0]).toMatchObject({ plate: '06 KL 4567', customer: 'ABC NAKLİYAT', visit_date: '2026-09-24', visit_time: '09:30', note: 'Şoför Ali' });
+  const v6 = await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'));
+  expect(v6.visit_date).toBe('2026-09-25');
+  // satırda araç araç ne yapıldığı yazılır
+  const applied = () => page.evaluate(() => window.__db.incoming_messages[0].applied);
+  expect(Object.keys(await applied()).sort()).toEqual(['0', '1']);
+  expect((await applied())['1']).toMatchObject({ r: 'tasindi', visit_id: 'v6' });
+
+  // iptal: onay sorulur; silinen geliş geri alınabilir olarak panodan gider
+  page.once('dialog', d => { expect(d.message()).toContain('B 123 XYZ için panodaki 23 Eylül gelişi silinsin mi?'); d.accept(); });
+  await item(3).locator('[data-action="msg-apply"]').click();
+  await expect(page.locator('#toast')).toContainText('panodan silindi');
+  expect(await page.evaluate(() => window.__db.visits.some(v => v.id === 'v7'))).toBe(false);
+  // zaten panoda olan madde kapatılır; yeni araç formda açılır
+  await item(4).locator('[data-action="msg-apply"]').click();
+  await item(2).locator('[data-action="msg-form"]').click();
+  const form = page.locator('#visit-form');
+  await expect(form.locator('[name="plate"]')).toHaveValue('XX 9999 YY');
+  await expect(form.locator('[name="date"]')).toHaveValue('2026-09-24');
+  await form.locator('[name="customer"]').fill('YENİ LOJ');
+  await form.locator('button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('kaydedildi');
+  // hepsi bitince mesaj kapanır (satır "eklendi" olur) ve düğmedeki sayı kalkar
+  await expect.poll(async () => (await page.evaluate(() => window.__db.incoming_messages[0])).status).toBe('eklendi');
+  expect((await applied())['2']).toMatchObject({ r: 'eklendi' });
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.plate === 'XX 9999 YY').length)).toBe(1);
+  await expect(page.locator('.heading .rs-badge')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp mesajı: elle yapıştırılan mesaj yapay zekâyla okunur, onaylanınca eklenir; veritabanına yazılmaz', async ({ page }) => {
+  const aiText = { items: [mi('add', '06KL4567', '', '2026-09-24', { time: '09:30', note: 'Şoför Ali' }), mi('add', 'CB1234AB', '', '')], customer: 'ABC', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  await page.locator('.msg-paste summary').click();
+  await page.locator('#msg-text').fill('Yarın 06 KL 4567 geliyor (09:30), CB 1234 AB de bugün.');
+  await page.locator('[data-action="msg-read"]').click();
+  const card = page.locator('.msg-card');
+  await expect(card).toContainText('Yapıştırılan mesaj');
+  const asked = await page.evaluate(() => window.__calls.find(c => c.fn === 'ruhsat-oku').text);
+  expect(asked).toEqual({ text: 'Yarın 06 KL 4567 geliyor (09:30), CB 1234 AB de bugün.', today: '2026-09-23' });
+  // tarih yazmayan madde: mesajın geldiği gün (bugün) yazılır; araç o gün zaten panodaysa tekrar eklenmez
+  await expect(card.locator('.msg-item').nth(1)).toContainText('Mesajda tarih yok; 23 Eylül Çarşamba');
+  await expect(card.locator('.msg-item').nth(1)).toContainText('zaten panoda');
+  // gün seçilebilir; seçilen güne göre durum yeniden hesaplanır ve o gün eklenir
+  await card.locator('.msg-item').nth(1).locator('input[type="date"]').fill('2026-09-26');
+  await expect(card.locator('.msg-item').nth(1)).toContainText('Kayıtlı araç: TORNADO');
+  page.once('dialog', d => d.accept());
+  await expect(card.locator('[data-action="msg-all"]')).toHaveText('Hepsini uygula (2)');
+  await card.locator('[data-action="msg-all"]').click();
+  await expect(page.locator('#toast')).toContainText('2 araç işlendi');
+  const ins = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+  expect(ins.map(v => [v.plate, v.visit_date])).toEqual([['06 KL 4567', '2026-09-24'], ['CB 1234 AB', '2026-09-26']]);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'incoming_messages' && c.op !== 'select').length)).toBe(0);
+  await expect(card).toHaveCount(0);
+  // mesajda araç yoksa kart açılmaz
+  await page.evaluate(() => { window.__PCS_STUB.aiText = { items: [], customer: '', problem: 'Mesajda plaka yok.', model: 'x' }; });
+  expect(problems).toEqual([]);
+});
+
+test('WhatsApp mesajı: okunamayan mesaj "Yeniden oku" ile okunur; tablo kurulu değilse yalnızca yapıştırma kutusu çalışır', async ({ page, browser }) => {
+  const data = sampleData();
+  data.incoming_messages = [msgRow('m2', [], { status: 'hata', ai: null, note: 'Yapay zekâ mesajı okuyamadı', body: 'Perşembe CB 1234 AB gelecek' })];
+  const aiText = { items: [mi('add', 'CB1234AB', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { data, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const card = page.locator('#msg-m2');
+  await expect(card).toContainText('Yapay zekâ mesajı okuyamadı');
+  await card.locator('[data-action="msg-reread"]').click();
+  await expect(card.locator('.msg-item')).toHaveCount(1);
+  await expect(card.locator('.msg-item')).toContainText('Kayıtlı araç: TORNADO');
+  const row = await page.evaluate(() => window.__db.incoming_messages[0]);
+  expect(row.status).toBe('bekliyor');
+  expect(row.ai.items[0].tractor).toBe('CB1234AB');
+  // mesajı kapatma: satır "yoksayıldı" olur, pano değişmez
+  await card.locator('[data-action="msg-dismiss"]').click();
+  await expect(card).toHaveCount(0);
+  expect((await page.evaluate(() => window.__db.incoming_messages[0])).status).toBe('yoksayildi');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
+  expect(problems).toEqual([]);
+
+  // tablo kurulu değil: sessizce devre dışı; yapıştırma kutusu yine çalışır. Yapay zekâ kurulu değilse (404) kutu hata söyler.
+  const other = await browser.newPage();
+  const p2 = await openApp(other, { missing: ['incoming_messages'] });
+  await expect(other.locator('#app')).toContainText('34 ABC 123');
+  await expect(other.locator('.heading .rs-badge')).toHaveCount(0);
+  await other.locator('.heading [data-action="ruhsat-open"]').click();
+  await other.locator('.msg-paste summary').click();
+  await other.locator('#msg-text').fill('Yarın 06 KL 4567 gelecek');
+  await other.locator('[data-action="msg-read"]').click();
+  await expect(other.locator('#toast')).toContainText('Yapay zekâ kurulu değil');
+  await expect(other.locator('.msg-card')).toHaveCount(0);
+  expect(p2).toEqual([]);
+  await other.close();
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');

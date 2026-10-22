@@ -2,6 +2,7 @@
  * Ayarlar sayfa açılmadan önce window.__PCS_STUB ile verilir:
  *   { session: true|false, role: 'editor'|'viewer', data: {registry, visits, app_settings, incoming_ruhsat}, offline: false,
  *     files: { 'depo/yolu.png': base64 },   // storage.download için dosyalar
+ *     aiText: { items: [...], customer, problem },  // ruhsat-oku mesaj modu cevabı (ya da { status, body } hata)
  *     missing: ['incoming_ruhsat'],         // "tablo yok" hatası veren tablolar (kurulum yapılmamış gibi)
  *     guardToken: 'g1', today: '2026-09-23',  // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
  *     guardViewToken: 'gv1',                   // güvenlik ekranı izleme linki (yalnızca görüntüleme)
@@ -16,7 +17,8 @@
     registry: (cfg.data && cfg.data.registry) || [],
     visits: (cfg.data && cfg.data.visits) || [],
     app_settings: (cfg.data && cfg.data.app_settings) || [],
-    incoming_ruhsat: (cfg.data && cfg.data.incoming_ruhsat) || []
+    incoming_ruhsat: (cfg.data && cfg.data.incoming_ruhsat) || [],
+    incoming_messages: (cfg.data && cfg.data.incoming_messages) || []
   });
   const netError = () => ({ data: null, count: null, error: { message: 'TypeError: Failed to fetch', code: '' } });
   const clone = v => JSON.parse(JSON.stringify(v));
@@ -119,10 +121,13 @@
     // verilmezse fonksiyon kurulmamış gibi 404 döner (site bu bilgisayarda okur).
     functions: {
       async invoke(name, opts = {}) {
-        calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size });
+        // mesaj modu: gövde JSON yazıdır ({ text, today }); cevabı cfg.aiText verir. Fotoğraf modunda cfg.ai kullanılır.
+        const isText = !!(opts.headers && opts.headers['Content-Type'] === 'application/json');
+        calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size, text: isText ? JSON.parse(opts.body) : undefined });
         if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
         // dizi verilirse sırayla kullanılır (ör. önce 429, sonra cevap); son eleman tekrar eder
-        const r = name !== 'ruhsat-oku' ? null : Array.isArray(cfg.ai) ? (cfg.ai.length > 1 ? cfg.ai.shift() : cfg.ai[0]) : cfg.ai;
+        const src = isText ? cfg.aiText : name !== 'ruhsat-oku' ? null : cfg.ai;
+        const r = Array.isArray(src) ? (src.length > 1 ? src.shift() : src[0]) : src;
         const err = (status, body) => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(body ? JSON.stringify(body) : null, { status }) } });
         if (!r) return err(404);
         if (r.status) return err(r.status, r.body);

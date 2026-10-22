@@ -243,7 +243,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,ruhsatRank,ruhsatWeights,ruhsatPickWeights,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','app-design','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok','ruhsat-reread']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','app-design','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','msg-read','msg-apply','msg-all','msg-form','msg-skip','msg-dismiss','msg-reread','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok','ruhsat-reread']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -1362,7 +1362,7 @@ function ruhsatCard(it){const ready=it.status==='tamam'||it.status==='hata';
 function ruhsatListHTML(){const own=ruhsat.items.filter(x=>!x.wa);return own.length?`<p class="rs-day">Araçlar <b>${esc(fmt(defaultDate(),{weekday:'long',day:'numeric',month:'long'}))}</b> gününe eklenir.</p>${own.map(ruhsatCard).join('')}`:'';}
 /* WhatsApp'tan gelenler pencerenin en üstünde durur; kontrol bekleyen varsa ilk o görülsün. */
 function waListHTML(){const wa=ruhsat.items.filter(x=>x.wa);return wa.length?`<p class="rs-day rs-wa-head">${icon('wa')}<b>WhatsApp'tan gelenler</b> · hiçbiri siz onaylamadan panoya eklenmez.</p>${wa.map(ruhsatCard).join('')}`:'';}
-function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsattan araç ekle',ai.state==='on'?'Fotoğraflar yapay zekâyla (Google Gemini) okunur, kayıtlı plakalar otomatik tanınır. Araçlar panoya siz onaylayınca eklenir.':ai.state==='none'?'Fotoğraf bu bilgisayarda okunur, kayıtlı plakalar otomatik tanınır. Araçlar panoya siz onaylayınca eklenir.':'Kayıtlı plakalar otomatik tanınır. Araçlar panoya siz onaylayınca eklenir.')}<div class="modal-body" id="ruhsat-box"><div id="ruhsat-bulk">${ruhsatBulkHTML()}</div><div id="ruhsat-wa">${waListHTML()}</div><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
+function openRuhsat(){ruhsat.returnId=null;openModal(`${modalHeader('Ruhsat ya da mesajdan araç ekle',ai.state==='on'?'Fotoğraflar yapay zekâyla (Google Gemini) okunur, kayıtlı plakalar otomatik tanınır. Araçlar panoya siz onaylayınca eklenir.':ai.state==='none'?'Fotoğraf bu bilgisayarda okunur, kayıtlı plakalar otomatik tanınır. Araçlar panoya siz onaylayınca eklenir.':'Kayıtlı plakalar otomatik tanınır. Araçlar panoya siz onaylayınca eklenir.')}<div class="modal-body" id="ruhsat-box"><div id="msg-list">${wmListHTML()}</div><div id="ruhsat-bulk">${ruhsatBulkHTML()}</div><div id="ruhsat-wa">${waListHTML()}</div><div id="msg-box">${wmBoxHTML()}</div><div class="rs-drop">${icon('upload')}<b>Ruhsat fotoğrafını ekleyin</b><div id="ruhsat-paste" class="rs-paste" contenteditable="true" inputmode="none" role="textbox" aria-label="Ruhsat fotoğrafını buraya yapıştırın" data-ph="Buraya tıklayıp Ctrl+V yapın ya da sağ tık → Yapıştır" autofocus></div><div class="rs-drop-acts"><button type="button" class="btn small" data-action="ruhsat-clip">${icon('copy')}Panodan yapıştır</button><label class="btn small" for="ruhsat-file">${icon('upload')}Fotoğraf seç</label></div><span>WhatsApp'ta fotoğrafı açıp sağ tıklayın → <b>Resmi kopyala</b> (masaüstü uygulamasında <b>Kopyala</b>), sonra buraya yapıştırın. Sürükleyip bırakmak da olur. Telefonda <b>Fotoğraf seç</b> ile galeriden seçin. Her fotoğraf bir araç (çekici + dorse) sayılır.</span></div><input type="file" id="ruhsat-file" accept="image/*" multiple hidden><div id="ruhsat-list">${ruhsatListHTML()}</div></div><div class="modal-footer">${button('ruhsat-clear','Bitenleri temizle','close','text')}${button('close-modal','Kapat')}</div>`);onlineUI();}
 function ruhsatBulkRefresh(){const b=document.getElementById('ruhsat-bulk');if(b)b.innerHTML=ruhsatBulkHTML();}
 function ruhsatRefresh(){const l=document.getElementById('ruhsat-list');if(l)l.innerHTML=ruhsatListHTML();const w=document.getElementById('ruhsat-wa');if(w)w.innerHTML=waListHTML();ruhsatBulkRefresh();onlineUI();}
 function ruhsatUpdateCard(it){const el=document.getElementById(it.id);if(!el)return;el.outerHTML=ruhsatCard(it);ruhsatBulkRefresh();onlineUI();}
@@ -1488,7 +1488,7 @@ async function ruhsatAddAll(){if(!canEdit())return;const list=ruhsat.items.filte
 function ruhsatForm(it){ruhsat.returnId=it.id;pendingVisit=null;const tr=it.tractorReg||it.trailerReg,ex=ruhsatExisting(it);it.editVisit=ex?ex.id:null;
  if(ex){openVisitForm(ex.id);const f=document.getElementById('visit-form'),kg=ruhsatKg(it);if(f&&kg){f.elements.registration.value=kg.replace(/\D/g,'');f.elements.registration.focus();}return;}
  openVisitForm(null,ruhsatDate(it),{plate:ruhsatPlateText(it),registration:it.sum?String(it.sum):'',customer:tr?.customer||(it.wa?waCustomer(it.wa):'')||'',carrier:tr?.carrier||''});}
-function ruhsatAfterSave(){const id=ruhsat.returnId;if(!id)return;ruhsat.returnId=null;const it=ruhsat.items.find(x=>x.id===id);if(it){it.status='eklendi';const v=it.editVisit&&state.visits.find(x=>x.id===it.editVisit);if(v){it.kgSet=kgText(v.registration)||'';it.dup=true;}
+function ruhsatAfterSave(){wmAfterSave();const id=ruhsat.returnId;if(!id)return;ruhsat.returnId=null;const it=ruhsat.items.find(x=>x.id===id);if(it){it.status='eklendi';const v=it.editVisit&&state.visits.find(x=>x.id===it.editVisit);if(v){it.kgSet=kgText(v.registration)||'';it.dup=true;}
   if(it.wa)waMark(it,v?'mevcut':'eklendi',v?{plate:v.plate,visit_id:v.id}:{plate:ruhsatPlateText(it)});}
  if(ruhsat.items.some(x=>x.status!=='eklendi'))setTimeout(()=>{if(!document.getElementById('modal').open)openRuhsat();},300);}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="ruhsat-"]');if(!b||b.disabled)return;const a=b.dataset.action;
@@ -1527,10 +1527,10 @@ function waCustomer(row){const n=String(row?.from_number||'').replace(/\D/g,'').
 function waSource(row){const who=[row.sender_name,row.from_number?'+'+row.from_number:''].filter(Boolean).join(' · ');
  return `<div class="rs-src">${icon('wa')}<span>WhatsApp${who?' · '+esc(who):''} · ${esc(tsText(row.created_at))}${row.caption?` · <i>“${esc(row.caption)}”</i>`:''}</span></div>`;}
 const waPending=()=>ruhsat.items.filter(x=>x.wa&&(x.status==='tamam'||x.status==='hata')).length;
-function waBadge(){const n=role==='editor'&&!VIEW_TOKEN?waPending():0;
+function waBadge(){const n=role==='editor'&&!VIEW_TOKEN?waPending()+wmPending():0;
  for(const b of document.querySelectorAll('[data-action="ruhsat-open"]')){let s=b.querySelector('.rs-badge');if(!n){s?.remove();continue;}
-  if(!s){s=document.createElement('b');s.className='rs-badge';b.appendChild(s);}s.textContent=n;s.title=`WhatsApp'tan gelen ${n} ruhsat kontrol bekliyor`;}}
-function waTick(){if(Date.now()-wa.loadedAt>=WA_POLL_MS)waLoad();}
+  if(!s){s=document.createElement('b');s.className='rs-badge';b.appendChild(s);}s.textContent=n;s.title=`WhatsApp'tan gelen ${n} kayıt (ruhsat ya da mesaj) kontrol bekliyor`;}}
+function waTick(){if(Date.now()-wa.loadedAt>=WA_POLL_MS)waLoad();if(Date.now()-wmsg.loadedAt>=WA_POLL_MS)wmLoad();}
 async function waLoad(){if(VIEW_TOKEN||!account||role!=='editor'||wa.ready===false||wa.loading)return;wa.loading=true;wa.loadedAt=Date.now();
  try{const {data,error}=await client.from(WA_TABLE).select('*').in('status',['yeni','okunuyor','bekliyor']).order('created_at').limit(200);
   if(error){if(/PGRST205|42P01/.test(error.code||'')||/does not exist|schema cache/i.test(error.message||''))wa.ready=false;return;}
@@ -1540,7 +1540,7 @@ async function waLoad(){if(VIEW_TOKEN||!account||role!=='editor'||wa.ready===fal
 function waStart(){if(wa.channel||typeof client.channel!=='function')return;
  try{wa.channel=client.channel('pcs-whatsapp').on('postgres_changes',{event:'*',schema:'public',table:WA_TABLE},()=>{clearTimeout(wa.timer);wa.timer=setTimeout(waLoad,400);});wa.channel.subscribe();}catch(_){wa.channel=null;}}
 /* çıkışta: kanal kapanır, liste temizlenir (aynı sayfada başka kullanıcı girerse öncekinin listesi görünmesin) */
-function waStop(){clearTimeout(wa.timer);if(wa.channel){try{client.removeChannel(wa.channel);}catch(_){}wa.channel=null;}
+function waStop(){wmStop();clearTimeout(wa.timer);if(wa.channel){try{client.removeChannel(wa.channel);}catch(_){}wa.channel=null;}
  Object.assign(wa,{ready:null,loadedAt:0});for(const x of ruhsat.items)if(x.wa&&x.url)URL.revokeObjectURL(x.url);ruhsat.items=ruhsat.items.filter(x=>!x.wa);}
 /* Okunmuş satırı karta doldurur. Yapay zekânın ham cevabı (ai sütunu) varsa plaka kayıtlarıyla eşleştirme bu ekranda
    yeniden yapılır (tek harf düzeltme, kayıttaki dorse önerisi); yoksa satırdaki plaka ve ağırlıklar kullanılır. */
@@ -1608,6 +1608,163 @@ function waSettle(it,read={}){const ex=it.status==='tamam'&&!it.fuzzy&&ruhsatAll
  if(!ex||(kg&&!kgSame(ex.registration,kg)))return false;
  it.status='eklendi';it.dup=true;waMark(it,'mevcut',{plate:ex.plate,visit_id:ex.id,...read});toast(`WhatsApp: ${ex.plate} ${fmt(waDate(it.wa))} gününde zaten panoda, tekrar eklenmedi.`);return true;}
 setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
+
+/* WhatsApp mesajından araç ekleme (kurulum: supabase/mesaj-kurulumu.sql ve supabase/GEMINI.md).
+   Müşteri WhatsApp numarasına "yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD ..." diye yazınca sunucu mesajı
+   incoming_messages tablosuna koyar ve Gemini'ye okutur (plaka, tarih, saat; gelecek / tarihi değişti / iptal).
+   Sonuç "Ruhsattan ekle" penceresinin üstündeki "WhatsApp mesajları" bölümünde araç araç onay bekler: hiçbir araç siz
+   onaylamadan eklenmez, taşınmaz ya da silinmez. Aynı pencereden herhangi bir mesaj (WhatsApp, e-posta...) yapıştırılıp
+   yapay zekâya okutulabilir; bu yol tablo kurulu olmasa da çalışır. Kayıtlı plakalar ruhsat fotoğraflarındakiyle aynı
+   kurallarla tanınır (tek harf düzeltme, kayıttaki dorse önerisi); düzeltilmiş ya da tahmin edilmiş plaka toplu işleme
+   girmez, tek tek onaylanır. İptal (silme) hiçbir zaman toplu yapılmaz. */
+const MSG_TABLE='incoming_messages',WM_STALE_MS=180000;
+const wmsg={ready:null,loading:false,loadedAt:0,channel:null,timer:null,rows:[],local:[],seq:0,dates:{},reading:false,returnKey:'',text:''};
+const wmAll=()=>[...wmsg.rows,...wmsg.local];
+const wmDone=r=>!!r.ai?.items?.length&&r.ai.items.every((_,i)=>r.applied?.[i]);
+const wmOpen=()=>wmAll().filter(r=>r.status==='bekliyor'&&!wmDone(r));
+const wmPending=()=>role==='editor'&&!VIEW_TOKEN?wmOpen().length:0;
+/* Bir mesaj satırındaki i. aracın bugünkü durumu: plaka kayıtlarıyla eşleşme, panoda ne var, ne yapılabilir. */
+function wmItem(row,i){const it=row.ai.items[i],t=compactPlate(it.tractor),d=compactPlate(it.trailer),cands=[t,d].filter(Boolean),kinds={};
+ if(t)kinds[t]='tractor';if(d)kinds[d]='trailer';
+ const res=ruhsatResolve(cands,kinds,cands.length),plate=res.reg?res.reg.plate:[fmtCompactPlate(res.tractor),fmtCompactPlate(res.trailer)].filter(Boolean).join(' - ');
+ const given=wmsg.dates[row.id+'.'+i]||it.date||'',base=given||(row.local?defaultDate():waDate(row)),sun=weekday(base)===0,date=sun?addDays(base,1):base;
+ const t0=res.tractor||t,cars=state.visits.filter(v=>norm(v.plate)===norm(plate)||(t0&&norm(splitPlate(v.plate)[0]||'')===t0));
+ const onDate=cars.find(v=>v.date===date)||null,open=cars.filter(v=>!v.done&&v.date>=addDays(TODAY,-3)).sort((a,b)=>a.date.localeCompare(b.date));
+ const pick=l=>l.find(v=>v.date>=TODAY)||l[l.length-1]||null,from=open.filter(v=>v.date!==date);
+ let mode;if(it.action==='cancel')mode=(given&&onDate)||open.length?'cancel':'none';else if(it.action==='move'&&!onDate&&from.length)mode='move';else mode=onDate?'mevcut':'add';
+ const target=mode==='cancel'?((given&&onDate)||pick(open)):mode==='move'?pick(from):null;
+ const customer=res.reg?.customer||res.tractorReg?.customer||res.trailerReg?.customer||'';
+ const ready=!res.fuzzy&&!res.guess&&((mode==='move'&&!!target)||(mode==='add'&&!!res.reg?.customer));
+ return {i,it,res,plate,date,noDate:!given,sun,onDate,target,mode,customer,ready,moveMiss:it.action==='move'&&mode==='add'};}
+function wmVisit(x){const r=x.res.reg;return {id:uid(),plate:r?r.plate:x.plate,customer:r?.customer||'',declaration:r?.declaration||'',carrier:r?.carrier||'',registration:kgText(r?.registration||''),date:x.date,time:x.it.time||'',note:x.it.note||'',onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};}
+/* Aracın sonucunu mesaj satırına yazar; hepsi bitince satır kapanır. Pano değişikliği zaten yapıldığı için veritabanı
+   yazılamasa da kayıt bu ekranda işlenmiş sayılır (aynı araç ikinci kez eklenmesin). */
+async function wmMark(row,i,res){row.applied={...(row.applied||{}),[i]:res};const done=wmDone(row),patch={applied:row.applied};
+ if(done)Object.assign(patch,{status:'eklendi',handled_by:account?.id||null,handled_at:new Date().toISOString()});
+ if(row.local){if(done)wmsg.local=wmsg.local.filter(x=>x!==row);return true;}
+ try{const {error}=await client.from(MSG_TABLE).update(patch).eq('id',row.id).select('id');if(error)throw error;if(done)Object.assign(row,patch);if(done)wmsg.rows=wmsg.rows.filter(x=>x!==row);}
+ catch(e){toast('Mesaj kaydı güncellenemedi: '+friendly(e),true);}
+ return true;}
+/* Tek aracı uygular (pano değişir). Başarılıysa sonuç, olmadıysa false döner. */
+async function wmApply(row,i){if(!canEdit()||row.applied?.[i])return false;const x=wmItem(row,i);let ok=false,res={};
+ if(x.mode==='add'){if(!x.res.reg?.customer)return false;const v=wmVisit(x);ok=await mutate(s=>{s.visits.push(v);});if(ok){justChangedMap.set(v.id,Date.now());res={r:'eklendi',visit_id:v.id,plate:v.plate,date:x.date};}}
+ else if(x.mode==='move'&&x.target){const id=x.target.id;ok=await mutate(s=>{const v=s.visits.find(y=>y.id===id);if(v)v.date=x.date;});if(ok){justChangedMap.set(id,Date.now());res={r:'tasindi',visit_id:id,plate:x.target.plate,date:x.date};}}
+ else if(x.mode==='cancel'&&x.target){const id=x.target.id;ok=await mutate(s=>{s.visits=s.visits.filter(y=>y.id!==id);});if(ok)res={r:'silindi',plate:x.target.plate,date:x.target.date};}
+ else{ok=true;res={r:'mevcut'};}
+ if(!ok)return false;await wmMark(row,i,res);return res;}
+async function wmApplyAll(row){if(!canEdit())return;const xs=row.ai.items.map((_,i)=>wmItem(row,i)).filter(x=>!row.applied?.[x.i]&&x.ready);if(!xs.length)return;
+ const lines=xs.map(x=>x.mode==='move'?`• ${x.plate}: ${fmt(x.target.date)} → ${fmt(x.date)} gününe taşınsın`:`• ${x.plate} · ${x.customer} · ${fmt(x.date)} gününe eklensin`);
+ if(!window.confirm(`Şu ${xs.length} işlem yapılsın mı?\n\n${lines.join('\n')}`))return;
+ let n=0;for(const x of xs){if(!(await wmApply(row,x.i)))break;n++;}
+ wmRefresh();toast(n===xs.length?`${n} araç işlendi.`:`${n} araç işlendi; ${xs.length-n} araç işlenemedi, tekrar deneyin.`,n!==xs.length);}
+function wmForm(row,i){const x=wmItem(row,i);wmsg.returnKey=row.id+'|'+i;pendingVisit=null;
+ openVisitForm(null,x.date,{plate:x.plate,customer:x.customer||waCustomer(row)||'',registration:'',note:x.it.note||'',time:x.it.time||''});}
+/* Formdan kaydedilince: o araç için yeni bir geliş gerçekten açıldıysa madde "eklendi" olur ve pencere geri gelir. */
+function wmAfterSave(){const k=wmsg.returnKey;if(!k)return;wmsg.returnKey='';const [rid,i]=k.split('|'),row=wmAll().find(r=>r.id===rid);if(!row)return;
+ const x=wmItem(row,+i),t=compactPlate(x.res.tractor||x.it.tractor);
+ if(!state.visits.some(v=>norm(splitPlate(v.plate)[0]||'')===t&&Date.now()-Date.parse(v.createdAt||0)<300000))return;
+ wmMark(row,+i,{r:'eklendi',plate:x.plate,date:x.date}).then(()=>{if(wmOpen().length)setTimeout(()=>{if(!document.getElementById('modal').open)openRuhsat();},300);});}
+const WM_ACT={add:'Gelecek',move:'Tarih değişti',cancel:'İptal'};
+function wmResultText(d){return d.r==='eklendi'?`✓ Panoya eklendi${d.date?' · '+fmt(d.date,{weekday:'long',day:'numeric',month:'long'}):''}`:d.r==='tasindi'?`✓ ${fmt(d.date,{weekday:'long',day:'numeric',month:'long'})} gününe taşındı`:d.r==='silindi'?'✓ Panodan silindi':d.r==='atlandi'?'Atlandı':'✓ Yapılacak bir şey yoktu';}
+function wmItemHTML(row,i){const x=wmItem(row,i),it=x.it,done=row.applied?.[i],rid=esc(row.id),dayName=d=>fmt(d,{weekday:'long',day:'numeric',month:'long'});
+ const badge=`<span class="msg-act ${esc(it.action)}">${WM_ACT[it.action]||'Gelecek'}</span>`,fields=`data-row="${rid}" data-i="${i}"`;
+ if(done)return `<div class="msg-item is-done"><div class="msg-plate">${plateHTML(x.plate||'—','sm')}</div><div class="msg-what">${badge}<div class="rs-status eklendi">${esc(wmResultText(done))}</div></div></div>`;
+ let info='';const ok=t=>`<div class="rs-match ok">${icon('check')}<span>${t}</span></div>`,warn=t=>`<div class="rs-match warn">${icon('info')}<span>${t}</span></div>`,nw=t=>`<div class="rs-match new">${icon('info')}<span>${t}</span></div>`;
+ if(x.mode==='move')info+=ok(`Panoda şu an <b>${esc(dayName(x.target.date))}</b> gününde (${esc(x.target.customer||'Müşterisiz')}); <b>${esc(dayName(x.date))}</b> gününe taşınır.`);
+ else if(x.mode==='cancel')info+=warn(`Panodaki <b>${esc(dayName(x.target.date))}</b> geliş (${esc(x.target.customer||'Müşterisiz')}) <b>silinir</b>. Geri alınabilir (Ctrl+Z).`);
+ else if(x.mode==='none')info+=`<div class="rs-match bad">${icon('info')}<span>Panoda bu araç için açık kayıt yok; yapılacak bir şey yok.</span></div>`;
+ else if(x.mode==='mevcut')info+=ok(`Bu araç <b>${esc(dayName(x.date))}</b> gününde zaten panoda; tekrar eklenmez.`);
+ else if(x.res.reg)info+=ok(`Kayıtlı araç: <b>${esc(x.res.reg.customer||'Müşterisiz')}</b>${x.res.reg.carrier?' · '+esc(x.res.reg.carrier):''}`);
+ else if(x.res.tractorReg)info+=warn(`Çekici kayıtlı (<b>${esc(x.res.tractorReg.customer)}</b>) ama bu dorseyle kaydı yok. Formda kontrol edin.`);
+ else if(x.res.trailerReg)info+=warn(`Dorse kayıtlı (<b>${esc(x.res.trailerReg.customer)}</b>) ama bu çekiciyle kaydı yok. Formda kontrol edin.`);
+ else info+=nw(`Yeni araç: plaka kayıtlarında yok. Müşteriyi formda seçin.${waCustomer(row)?` Gönderen numara <b>${esc(waCustomer(row))}</b> müşterisine kayıtlı; formda müşteri olarak gelir.`:''}`);
+ if(x.moveMiss)info+=warn('Mesajda tarih değişikliği yazıyor ama panoda bu araç için açık kayıt yok; yeni geliş olarak eklenir.');
+ if(x.res.guess)info+=`<div class="rs-note warn">Mesajda yalnız çekici yazıyor; çekicinin kayıttaki dorsesi (<b>${esc(fmtCompactPlate(x.res.trailer))}</b>) yazıldı. Kontrol edin.</div>`;
+ else if(x.res.fuzzy)info+=`<div class="rs-note warn">Plaka kayıtlardaki en yakın plakayla eşleştirildi. Lütfen kontrol edin.</div>`;
+ if(x.noDate&&x.mode!=='none'&&x.mode!=='cancel')info+=`<div class="rs-note warn">Mesajda tarih yok; ${esc(dayName(x.date))} (mesajın geldiği gün) yazıldı. Gerekirse tarihi değiştirin.</div>`;
+ if(x.sun)info+=`<div class="rs-note warn">Pazar günü kayıt alınmaz; Pazartesi gününe alındı.</div>`;
+ if(it.time||it.note)info+=`<div class="rs-note">${it.time?`Saat: <b>${esc(it.time)}</b>`:''}${it.time&&it.note?' · ':''}${it.note?`Not: ${esc(it.note)}`:''}</div>`;
+ const keep=x.mode==='mevcut'||x.mode==='none',main=x.mode==='move'?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('check')}Tarihi değiştir</button>`
+  :x.mode==='cancel'?`<button type="button" class="btn danger small" data-action="msg-apply" ${fields}>${icon('trash')}Panodan sil</button>`
+  :keep?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('check')}Tamam, kapat</button>`
+  :x.res.reg?.customer?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('plus')}Panoya ekle</button>`:'';
+ const acts=`<div class="rs-acts">${main}${x.mode==='add'?`<button type="button" class="btn small" data-action="msg-form" ${fields}>${icon('doc')}Formda aç</button>`:''}${keep?'':`<button type="button" class="btn text small" data-action="msg-skip" ${fields}>${icon('close')}Atla</button>`}</div>`;
+ const dateBox=x.mode==='cancel'||keep&&x.mode==='none'?'':`<label class="msg-date">Tarih<input type="date" data-msgdate="${rid}.${i}" value="${esc(x.date)}"></label>`;
+ return `<div class="msg-item"><div class="msg-plate">${plateHTML(x.plate||'—','sm')}${badge}</div><div class="msg-what">${info}${acts}</div>${dateBox}</div>`;}
+function wmCardHTML(row){const items=row.ai?.items||[],rid=esc(row.id),cust=waCustomer(row),who=[row.sender_name,row.from_number?'+'+row.from_number:''].filter(Boolean).join(' · ');
+ const head=`<div class="rs-src">${icon('wa')}<span>${row.local?'Yapıştırılan mesaj':'WhatsApp'}${who?' · '+esc(who):''}${cust?' · <b>'+esc(cust)+'</b>':''} · ${esc(tsText(row.created_at))}</span></div>`;
+ const text=`<details class="msg-text"><summary>“${esc(String(row.body||'').replace(/\s+/g,' ').slice(0,110))}${String(row.body||'').length>110?'…':''}”</summary><pre>${esc(row.body||'')}</pre></details>`;
+ let body='';const bulk=items.filter((_,i)=>!row.applied?.[i]&&wmItem(row,i).ready).length;
+ if(row.status==='okunuyor'){const stale=Date.now()-Date.parse(row.created_at||0)>WM_STALE_MS;body=`<div class="rs-status uzakta">${stale?'Sunucu mesajı okuyamadı gibi görünüyor':'Sunucuda yapay zekâyla okunuyor…'}</div>${stale?`<div class="rs-acts"><button type="button" class="btn small" data-action="msg-reread" data-row="${rid}">${icon('refresh')}Yeniden oku</button></div>`:''}`;}
+ else if(row.status==='hata')body=`<div class="rs-match bad">${icon('info')}<span>${esc(row.note||'Yapay zekâ mesajı okuyamadı')}. Biraz sonra <b>Yeniden oku</b>'ya basın.</span></div><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-reread" data-row="${rid}">${icon('refresh')}Yeniden oku</button></div>`;
+ else{body=items.map((_,i)=>wmItemHTML(row,i)).join('');if(row.ai?.problem)body+=`<div class="rs-note">Yapay zekâ: ${esc(row.ai.problem)}</div>`;}
+ const foot=row.status==='bekliyor'?`<div class="rs-acts msg-foot">${bulk>1?`<button type="button" class="btn primary small" data-action="msg-all" data-row="${rid}">${icon('check')}Hepsini uygula (${bulk})</button>`:''}<button type="button" class="btn text small" data-action="msg-dismiss" data-row="${rid}" title="Mesajı işlem yapmadan listeden kaldırır">${icon('close')}Mesajı kapat</button></div>`:`<div class="rs-acts msg-foot"><button type="button" class="btn text small" data-action="msg-dismiss" data-row="${rid}">${icon('close')}Mesajı kapat</button></div>`;
+ return `<article class="msg-card" id="msg-${rid}">${head}${text}${body}${foot}</article>`;}
+function wmListHTML(){const rows=wmAll().filter(r=>r.status!=='yoksayildi'&&!wmDone(r));
+ return rows.length?`<p class="rs-day rs-wa-head">${icon('wa')}<b>WhatsApp mesajları</b> · hiçbir araç siz onaylamadan eklenmez, taşınmaz ya da silinmez.</p>${rows.map(wmCardHTML).join('')}`:'';}
+function wmBoxHTML(){return ai.state==='none'?'':`<details class="msg-paste"><summary>${icon('doc')}<b>Mesajdan araç ekle</b> · müşterinin yazdığı listeyi yapıştırın</summary><textarea id="msg-text" rows="5" maxlength="6000" placeholder="Örn: Yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD, CB 1234 AB. Perşembedeki 06 KL 4567 iptal.">${esc(wmsg.text)}</textarea><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-read">${icon('refresh')}Yapay zekâyla oku</button></div></details>`;}
+function wmRefresh(){const l=document.getElementById('msg-list');if(l)l.innerHTML=wmListHTML();waBadge();onlineUI();}
+/* Mesaj metnini Gemini'ye okutur (ruhsat-oku, mesaj modu). Sonuç: {data} · {none:true} kurulu değil · {err:'neden'} */
+async function wmAi(text,onPhase=()=>{}){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='';
+ for(let i=1;i<=3;i++){let st=0,body=null;
+  try{const {data,error}=await client.functions.invoke('ruhsat-oku',{body:JSON.stringify({text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:150000});
+   if(!error&&Array.isArray(data?.items)){ai.state='on';return {data};}
+   if(error){st=error.context?.status||0;if(typeof error.context?.json==='function')body=await error.context.json().catch(()=>null);}}
+  catch(_){st=0;}
+  last=body?.reason||AI_REASON[st]||(st?'sunucu hatası '+st:AI_REASON[0]);
+  /* ruhsat-oku fonksiyonunun mesaj modundan önceki sürümü hâlâ yüklüyse mesajı "dosya türü" diye reddeder */
+  if(st===400&&/Desteklenmeyen dosya/.test(body?.error||''))last='ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)';
+  if(st===404||st===501){ai.state='none';return {none:true};}
+  if(st===401&&!refreshed){refreshed=true;try{await client.auth.refreshSession();}catch(_){}i--;continue;}
+  if(body?.fatal||!(st===429||st>=500||st===0)||i===3)break;
+  await aiCountdown(Math.min(40,st===429?Math.max(5,+body?.retry_after||15):8)*1000,n=>onPhase(`${n} sn sonra yeniden denenecek`));}
+ return {err:last};}
+async function wmReadPaste(b){if(!canEdit()||wmsg.reading)return;const ta=document.getElementById('msg-text'),text=String(ta?.value||'').trim();wmsg.text=text;
+ if(text.length<6){toast('Önce müşterinin mesajını yapıştırın.',true);return;}
+ wmsg.reading=true;const label=b.innerHTML;b.disabled=true;b.textContent='Okunuyor…';
+ try{const r=await wmAi(text,t=>{b.textContent=t;});
+  if(r.none){toast('Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).',true);return;}
+  if(r.err){toast('Mesaj okunamadı: '+r.err,true);return;}
+  const d=r.data;if(!d.items.length){toast('Mesajda araç bulunamadı'+(d.problem?': '+String(d.problem).replace(/[.\s]+$/,''):'.'),true);return;}
+  wmsg.local.push({id:'lokal-'+(++wmsg.seq),local:true,from_number:'',sender_name:'',body:text,status:'bekliyor',applied:{},created_at:new Date().toISOString(),ai:{items:d.items,customer:d.customer||'',problem:d.problem||'',model:d.model||''}});
+  wmsg.text='';if(ta)ta.value='';wmRefresh();document.getElementById('msg-list')?.scrollIntoView({block:'nearest',behavior:'smooth'});}
+ finally{wmsg.reading=false;b.disabled=false;b.innerHTML=label;}}
+async function wmReread(row){if(!canEdit()||wmsg.reading||row.local)return;wmsg.reading=true;
+ try{const r=await wmAi(row.body);if(!r.data){toast(r.none?'Yapay zekâ kurulu değil.':'Mesaj okunamadı: '+r.err,true);return;}
+  const d=r.data,ai2={items:d.items,customer:d.customer||'',problem:d.problem||'',model:d.model||''};
+  const patch=d.items.length?{status:'bekliyor',note:'',ai:ai2,applied:{}}:{status:'yoksayildi',note:('Araç bulunamadı'+(d.problem?' · '+d.problem:'')).slice(0,300),ai:ai2};
+  const {error}=await client.from(MSG_TABLE).update(patch).eq('id',row.id).select('id');if(error)throw error;
+  Object.assign(row,patch);if(patch.status==='yoksayildi'){wmsg.rows=wmsg.rows.filter(x=>x!==row);toast('Mesajda araç bulunamadı.',true);}}
+ catch(e){toast('Mesaj kaydı güncellenemedi: '+friendly(e),true);}
+ finally{wmsg.reading=false;wmRefresh();}}
+async function wmDismiss(row){if(!canEdit())return;
+ if(!row.local){try{const {error}=await client.from(MSG_TABLE).update({status:'yoksayildi',handled_by:account?.id||null,handled_at:new Date().toISOString()}).eq('id',row.id).select('id');if(error)throw error;}catch(e){toast('Mesaj kaydı güncellenemedi: '+friendly(e),true);return;}}
+ wmsg.rows=wmsg.rows.filter(x=>x!==row);wmsg.local=wmsg.local.filter(x=>x!==row);wmRefresh();}
+function wmSync(rows){const before=wmPending(),old=new Map(wmsg.rows.map(r=>[r.id,r]));
+ wmsg.rows=rows.map(r=>{const o=old.get(r.id);return o&&o.updated_at===r.updated_at?o:r;});wmRefresh();
+ const after=wmPending();if(after>before&&!document.getElementById('ruhsat-box'))toast(`WhatsApp'tan gelen ${after} mesaj onayınızı bekliyor. "Ruhsattan ekle"ye bakın.`);}
+async function wmLoad(){if(VIEW_TOKEN||!account||role!=='editor'||wmsg.ready===false||wmsg.loading)return;wmsg.loading=true;wmsg.loadedAt=Date.now();
+ try{const {data,error}=await client.from(MSG_TABLE).select('*').in('status',['okunuyor','bekliyor','hata']).order('created_at').limit(100);
+  if(error){if(/PGRST205|42P01/.test(error.code||'')||/does not exist|schema cache/i.test(error.message||''))wmsg.ready=false;return;}
+  if(!wmsg.ready){wmsg.ready=true;wmStart();}wmSync(data||[]);}
+ catch(_){}finally{wmsg.loading=false;}}
+/* ayrı anlık bildirim kanalı: tablo yoksa ana kanal bozulmasın diye yalnızca tablo varken açılır */
+function wmStart(){if(wmsg.channel||typeof client.channel!=='function')return;
+ try{wmsg.channel=client.channel('pcs-mesaj').on('postgres_changes',{event:'*',schema:'public',table:MSG_TABLE},()=>{clearTimeout(wmsg.timer);wmsg.timer=setTimeout(wmLoad,400);});wmsg.channel.subscribe();}catch(_){wmsg.channel=null;}}
+function wmStop(){clearTimeout(wmsg.timer);if(wmsg.channel){try{client.removeChannel(wmsg.channel);}catch(_){}wmsg.channel=null;}Object.assign(wmsg,{ready:null,loadedAt:0,rows:[],local:[],dates:{},returnKey:''});}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="msg-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+ if(a==='msg-read')return wmReadPaste(b);
+ const row=wmAll().find(r=>r.id===b.dataset.row);if(!row)return;const i=+b.dataset.i;
+ if(a==='msg-all')return wmApplyAll(row);
+ if(a==='msg-dismiss')return wmDismiss(row);
+ if(a==='msg-reread')return wmReread(row);
+ if(a==='msg-form')return wmForm(row,i);
+ if(a==='msg-skip'){await wmMark(row,i,{r:'atlandi'});return wmRefresh();}
+ if(a==='msg-apply'){const x=wmItem(row,i);
+  if(x.mode==='cancel'&&!window.confirm(`${x.plate} için panodaki ${fmt(x.target.date)} gelişi silinsin mi?`))return;
+  const r=await wmApply(row,i);wmRefresh();
+  if(r&&r.r==='eklendi')toast(`${r.plate} · ${fmt(r.date)} gününe eklendi.`);else if(r&&r.r==='tasindi')toast(`${r.plate} ${fmt(r.date)} gününe taşındı.`);else if(r&&r.r==='silindi')toast(`${r.plate} panodan silindi.`);}});
+document.addEventListener('change',e=>{const k=e.target.dataset?.msgdate;if(!k||!e.target.value)return;wmsg.dates[k]=e.target.value;wmRefresh();});
 
 /* Güvenlik ekranı (?guvenlik=ANAHTAR, kurulum: supabase/guvenlik-kurulumu.sql).
    Giriş yapmadan açılır; güvenlik yalnızca plaka, müşteri, ruhsat (kilo) ve saatleri görür, yalnızca iki şey yapabilir:

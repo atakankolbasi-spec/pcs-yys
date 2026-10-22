@@ -11,9 +11,16 @@
 //      Gemini o an okuyamazsa (sınır dolu, Google yoğun) fotoğrafı panonun açık olduğu bilgisayara bırakır;
 //      o bilgisayar bekleyip yeniden dener. Gemini kurulu değilse fotoğrafı hep o bilgisayar okur.
 //      Okunan fotoğraf "Ruhsattan ekle" penceresinde onay bekler; hiçbir araç sorulmadan panoya eklenmez.
-//   5. Fotoğraf dışı mesajlara ne gönderileceğini yazar. WA_REPLY=kapali ile gönderene hiçbir cevap ve
-//      tepki gitmez.
-//   6. 60 günden eski fotoğrafları depodan siler (WA_KEEP_DAYS ile değişir); okunan bilgiler kalır.
+//   5. Yazı mesajları (ör. "yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD"): Gemini kuruluysa ve mesaj
+//      incoming_messages tablosu (supabase/mesaj-kurulumu.sql) kuruluysa mesaj kaydedilir ve arka planda ruhsat-oku
+//      fonksiyonunun mesaj moduyla okunur (plaka, tarih, saat; gelecek / ertelendi / iptal). Araç bulunduysa gönderene
+//      ✅ ile tepki verilir; sonuç sitede onay bekler, hiçbir araç sorulmadan eklenmez, değiştirilmez ya da silinmez.
+//      Araç bulunamadıysa (ya da yazıda hiç rakam yoksa) gönderene ne gönderebileceği yazılır. Bir numaradan saatte
+//      20'den fazla mesaj okunmaz.
+//   6. Diğer mesajlara (video, ses, dosya, Gemini kurulu değilken yazı) ne gönderileceğini yazar. WA_REPLY=kapali ile
+//      gönderene hiçbir cevap ve tepki gitmez.
+//   7. 60 günden eski fotoğrafları depodan siler, kapanmış eski mesajları tablodan kaldırır (WA_KEEP_DAYS ile değişir);
+//      fotoğraflardan okunan bilgiler kalır.
 //
 // Dışarıdan paket kullanmaz ve tek dosyadır: Supabase panelindeki düzenleyiciye olduğu gibi
 // yapıştırılabilir. Kod bilerek düz JavaScript yazıldı; testler Node'da da çalıştırabiliyor.
@@ -27,8 +34,12 @@
 
 const BUCKET = 'ruhsat-gelen';
 const TABLE = 'incoming_ruhsat';
+const MSG_TABLE = 'incoming_messages';
+const MSG_MAX_CHARS = 4000;       // daha uzun yazı kırpılır
+const MSG_PER_HOUR = 20;          // bir numaradan saatte okunacak en çok mesaj (Gemini kullanımı tükenmesin)
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'image/gif': 'gif' };
 const HELP = 'Bu numara araç ruhsatı fotoğraflarını otomatik olarak sisteme aktarır. Lütfen çekici ve dorse ruhsatının fotoğrafını gönderin.';
+const HELP_AI = 'Bu numara araç ruhsatı fotoğraflarını ve gelecek araç listelerini otomatik olarak sisteme aktarır. Ruhsatın fotoğrafını ya da gelecek araçların plakalarını (tarihiyle birlikte) yazarak gönderebilirsiniz.';
 const HELP_FILE = 'Bu dosya okunamıyor. Lütfen ruhsatı fotoğraf (resim) olarak gönderin.';
 const RETAKE = problem => `⚠️ Bu fotoğraftaki ruhsat okunamadı${problem ? ` (${problem.replace(/[.\s]+$/, '').slice(0, 150)})` : ''}. ` +
   'Lütfen ruhsatı düz, yakından, parlama olmadan ve kenarlarını kesmeden yeniden çekip gönderin.\n\n' +
@@ -128,31 +139,34 @@ async function saveImage(msg, media, contact, phoneId) {
   if (readHere) later(readOnServer({ id, bytes, mime, to: msg.from, phoneId }));
 }
 
-// Fotoğrafı ruhsat-oku fonksiyonuna (Gemini) okutur. ruhsat-oku yedek modelleri kendisi dener; burada yalnızca
-// hepsinin sınırı doluysa ya da Google yoğunsa biraz beklenip yeniden sorulur. Okunamazsa null.
-async function readPhoto(bytes, mime) {
+// ruhsat-oku fonksiyonuna (Gemini) bir fotoğraf ya da mesaj okutur. ruhsat-oku yedek modelleri kendisi dener; burada
+// yalnızca hepsinin sınırı doluysa ya da Google yoğunsa biraz beklenip yeniden sorulur. valid(cevap) cevabın beklenen
+// biçimde olup olmadığını söyler. Okunamazsa null.
+async function readWith(body, contentType, valid) {
   const key = env('SUPABASE_SERVICE_ROLE_KEY'), start = Date.now(), left = () => READ_BUDGET_MS - (Date.now() - start);
   for (let i = 0; i < 3 && left() > 20000; i++) {
     let res;
     try {
       res = await fetch(env('SUPABASE_URL') + '/functions/v1/ruhsat-oku', {
-        method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': mime }, body: bytes,
+        method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': contentType }, body,
         signal: AbortSignal.timeout(left())
       });
     } catch (e) {
       console.error('ruhsat-oku cevap vermedi:', e?.name || e);
       return null;
     }
-    const body = await res.json().catch(() => null);
-    if (res.ok && Array.isArray(body?.vehicles)) return body;
-    console.error('ruhsat-oku okuyamadı:', res.status, body?.error || '', body?.reason || '');
-    if (body?.fatal || !(res.status === 429 || res.status >= 500)) return null;
-    const wait = 1000 * Math.min(40, res.status === 429 ? Math.max(1, Number(body?.retry_after) || 15) : 10);
+    const out = await res.json().catch(() => null);
+    if (res.ok && valid(out)) return out;
+    console.error('ruhsat-oku okuyamadı:', res.status, out?.error || '', out?.reason || '');
+    if (out?.fatal || !(res.status === 429 || res.status >= 500)) return null;
+    const wait = 1000 * Math.min(40, res.status === 429 ? Math.max(1, Number(out?.retry_after) || 15) : 10);
     if (left() - wait < 20000) return null;
     await sleep(wait);
   }
   return null;
 }
+const readPhoto = (bytes, mime) => readWith(bytes, mime, b => Array.isArray(b?.vehicles));
+const readMessage = text => readWith(JSON.stringify({ text }), 'application/json', b => Array.isArray(b?.items));
 
 // Arka planda okuma: sonucu satıra yazar. Okunamazsa satırı açık ekranlara bırakır ("yeni").
 // Satır bu arada bir ekran tarafından üstlenildiyse (claimed_by dolu) dokunulmaz.
@@ -184,10 +198,64 @@ async function readOnServer({ id, bytes, mime, to, phoneId }) {
   }
 }
 
+// Yazı mesajını kaydeder ve arka planda okutur. Kaydedildiyse (ya da bu mesaj zaten kayıtlıysa) true; tablo kurulu
+// değilse false döner (çağıran eski cevabı gönderir).
+async function saveText(msg, contact, phoneId) {
+  const id = String(msg.id || '');
+  const text = String(msg.text?.body || '').trim().slice(0, MSG_MAX_CHARS);
+  const from = String(msg.from || '').replace(/\D/g, '');
+  if (!id || !text) return true;
+  const seen = await supabase(`/rest/v1/${MSG_TABLE}?select=id&wa_message_id=eq.${encodeURIComponent(id)}`);
+  if (!seen.ok) {
+    const detail = await seen.text().catch(() => '');
+    if (/PGRST205|42P01|does not exist|schema cache/i.test(detail)) { console.error('incoming_messages tablosu yok (supabase/mesaj-kurulumu.sql çalıştırılmamış).'); return false; }
+    throw new Error(`Mesaj kontrolü: ${seen.status} ${detail.slice(0, 300)}`);
+  }
+  if ((await seen.json()).length) return true;
+
+  // Rakam içermeyen ya da çok kısa yazılar ("tamam", "teşekkürler") plaka ya da tarih taşımaz: kaydedilmez, Gemini'ye
+  // gitmez; gönderene ne gönderebileceği yazılır.
+  if (!/\d/.test(text) || text.length < 6) { await send(phoneId, { to: msg.from, type: 'text', text: { body: HELP_AI } }); return true; }
+  // Aynı numaradan saatte çok mesaj gelirse okunmaz (Gemini'nin ücretsiz kullanımı tükenmesin).
+  if (from) {
+    const since = new Date(Date.now() - 3600000).toISOString();
+    const recent = await must(await supabase(`/rest/v1/${MSG_TABLE}?select=id&from_number=eq.${from}&created_at=gte.${encodeURIComponent(since)}&limit=${MSG_PER_HOUR}`), 'Mesaj sıklığı kontrolü');
+    if ((await recent.json()).length >= MSG_PER_HOUR) { console.error('Çok sık mesaj, okunmadı:', from); return true; }
+  }
+  const sentAt = new Date((Number(msg.timestamp) || Date.now() / 1000) * 1000);
+  await must(await supabase(`/rest/v1/${MSG_TABLE}?on_conflict=wa_message_id`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify({
+      wa_message_id: id, from_number: from, sender_name: String(contact?.profile?.name || '').slice(0, 200), body: text,
+      status: 'okunuyor', created_at: sentAt.toISOString()
+    })
+  }), 'Mesaj kaydedilemedi');
+  later(readMessageOnServer({ id, text, to: msg.from, phoneId }));
+  return true;
+}
+
+// Arka planda mesaj okuma: sonucu satıra yazar. Okunamazsa satır "hata" olur; siteden "Yeniden oku" ile denenir.
+async function readMessageOnServer({ id, text, to, phoneId }) {
+  const where = `/rest/v1/${MSG_TABLE}?wa_message_id=eq.${encodeURIComponent(id)}&status=eq.okunuyor`;
+  const update = async body => must(await supabase(where, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) }), 'Mesaj satırı güncellenemedi');
+  const r = await readMessage(text);
+  if (!r) { await update({ status: 'hata', note: 'Yapay zekâ mesajı okuyamadı' }); return; }
+  const problem = String(r.problem || '').trim();
+  if (!r.items.length) {
+    await update({ status: 'yoksayildi', note: ('Araç bulunamadı' + (problem ? ' · ' + problem : '')).slice(0, 300), ai: { items: [], customer: '', problem, model: String(r.model || '') } });
+    await send(phoneId, { to, type: 'text', context: { message_id: id }, text: { body: HELP_AI } });
+    return;
+  }
+  await update({ status: 'bekliyor', ai: { items: r.items, customer: String(r.customer || ''), problem, model: String(r.model || '') } });
+  await send(phoneId, { to, type: 'reaction', reaction: { message_id: id, emoji: '✅' } });
+}
+
 async function handleMessage(msg, contact, phoneId) {
   const media = msg.type === 'image' ? msg.image
     : msg.type === 'document' && /^image\//i.test(msg.document?.mime_type || '') ? msg.document : null;
   if (media?.id) return saveImage(msg, media, contact, phoneId);
+  if (msg.type === 'text' && env('GEMINI_API_KEY') && await saveText(msg, contact, phoneId)) return;
   if (msg.type === 'text' || msg.type === 'video' || msg.type === 'audio') await send(phoneId, { to: msg.from, type: 'text', text: { body: HELP } });
   else if (msg.type === 'document') await send(phoneId, { to: msg.from, type: 'text', text: { body: HELP_FILE } });
 }
@@ -205,6 +273,14 @@ async function cleanup() {
   await must(await supabase(`/rest/v1/${TABLE}?id=in.(${rows.map(r => r.id).join(',')})`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ media_path: null })
   }), 'Kayıtlar güncellenemedi');
+}
+
+// Kapanmış (eklendi / yoksayıldı / hata) eski mesajları siler. Okunmayı ya da onayı bekleyenlere dokunulmaz.
+async function cleanupMessages() {
+  const days = Math.max(7, Number(env('WA_KEEP_DAYS')) || 60);
+  const before = new Date(Date.now() - days * 86400000).toISOString();
+  const res = await supabase(`/rest/v1/${MSG_TABLE}?status=in.(eklendi,yoksayildi,hata)&created_at=lt.${encodeURIComponent(before)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  if (!res.ok && !/PGRST205|42P01|schema cache/i.test(await res.text().catch(() => ''))) console.error('Eski mesajlar silinemedi:', res.status);
 }
 
 export async function handle(req) {
@@ -236,6 +312,7 @@ export async function handle(req) {
     }
   }
   if (messages) await cleanup().catch(e => console.error(e?.message || e));
+  if (messages && env('GEMINI_API_KEY')) await cleanupMessages().catch(e => console.error(e?.message || e));
   // Hata olursa 500 döneriz; Meta aynı bildirimi bir süre sonra yeniden gönderir.
   return failed ? new Response('Bazı mesajlar işlenemedi', { status: 500 }) : new Response('ok');
 }
