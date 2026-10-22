@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2b1d22">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>S&#304;YA | G&#252;zellik&amp;Kuaf&#246;r &middot; M&#252;&#351;teri Kay&#305;tlar&#305;</title>
+<link rel="icon" type="image/svg+xml" href="siya.svg">
+<link rel="stylesheet" href="siya.css">
+</head>
+<body>
+<a class="skip" href="#liste">&#304;&#231;eri&#287;e ge&#231;</a>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">S</span>
+    <div>
+      <h1>S&#304;YA</h1>
+      <p>G&#252;zellik &amp; Kuaf&#246;r</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button class="btn ghost" id="btn-yedek" type="button">Yedekle / Aktar</button>
+    <button class="btn primary" id="btn-yeni" type="button">+ Yeni M&#252;&#351;teri</button>
+  </div>
+</header>
+
+<main>
+  <section class="stats" id="stats" aria-label="&#214;zet"></section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <label class="search">
+        <span class="sr">M&#252;&#351;teri ara</span>
+        <input id="ara" type="search" placeholder="&#304;sim, telefon, hizmet veya not ara&#8230;" autocomplete="off">
+      </label>
+      <div class="chips" id="filtreler" role="group" aria-label="Filtre"></div>
+      <label class="sort">
+        <span class="sr">S&#305;rala</span>
+        <select id="sirala">
+          <option value="ad">&#304;sme g&#246;re (A&#8211;Z)</option>
+          <option value="son">Son ziyarete g&#246;re</option>
+          <option value="harcama">Toplam harcamaya g&#246;re</option>
+          <option value="ziyaret">Ziyaret say&#305;s&#305;na g&#246;re</option>
+          <option value="yeni">Yeni eklenenler</option>
+        </select>
+      </label>
+    </div>
+    <div id="liste" class="list" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer class="foot">Veriler yaln&#305;zca bu cihaz&#305;n taray&#305;c&#305;s&#305;nda saklan&#305;r. D&#252;zenli olarak <b>Yedekle</b> d&#252;&#287;mesini kullan&#305;n.</footer>
+
+<dialog id="modal" aria-labelledby="modal-baslik"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="dosya" accept=".json,application/json" hidden>
+<script src="siya.js"></script>
+<noscript>Bu sayfay&#305; kullanmak i&#231;in JavaScript a&#231;&#305;k olmal&#305;d&#305;r.</noscript>
+</body>
+</html>
