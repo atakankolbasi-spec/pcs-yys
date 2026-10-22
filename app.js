@@ -242,10 +242,10 @@ document.addEventListener('submit',async e=>{
  if(e.target.id==='registry-form'){e.preventDefault();const f=e.target,fd=new FormData(f),id=f.dataset.id;const r={id:id||uid(),plate:plateText(fd.get('plate')),customer:String(fd.get('customer')||'').trim(),declaration:String(fd.get('declaration')||'').trim(),carrier:String(fd.get('carrier')||'').trim(),registration:kgText(fd.get('registration'))};if(!norm(r.plate)||!r.customer)return formError('Plaka ve m\u00fc\u015fteri zorunludur.');if(state.registry.some(x=>x.id!==id&&norm(x.plate)===norm(r.plate)))return formError('Bu plaka zaten kay\u0131tl\u0131. Mevcut kayd\u0131 d\u00fczenleyin.');if(!id&&state.registry.length>=10000)return formError('10.000 plaka s\u0131n\u0131r\u0131na ula\u015f\u0131ld\u0131.');if(await mutate(s=>{if(id)s.registry=s.registry.map(x=>x.id===id?r:x);else s.registry.push(r);})){const pending=pendingVisit;pendingVisit=null;closeModal();toast('Plaka kayd\u0131 kaydedildi.');if(pending)openVisitForm(pending.editingId||null,pending.date,{...pending,plate:r.plate});}return;}
  if(e.target.id==='visit-form'){e.preventDefault();const f=e.target,id=f.dataset.id,v=visitFields(f);const source=matchPlate(v.plate);if(source)v.plate=source.plate;if(!validDate(v.date))return formError('Ge\u00e7erli bir geli\u015f tarihi se\u00e7in.');if(weekday(v.date)===0)return formError('Pazar g\u00fcn\u00fc kay\u0131t al\u0131nmaz. Pazartesi\u2013Cumartesi aras\u0131nda bir g\u00fcn se\u00e7in.');const reg=matchPlate(v.plate);const skipReg=!reg&&id&&f.dataset.original===norm(v.plate);if(!v.customer)return formError('M\u00fc\u015fteri ad\u0131 zorunludur.');if(state.visits.some(x=>x.id!==id&&x.date===v.date&&norm(x.plate)===norm(v.plate))&&!window.confirm('Bu plaka i\u00e7in ayn\u0131 g\u00fcnde ba\u015fka bir geli\u015f kayd\u0131 var. Ayr\u0131 bir geli\u015f olarak kaydetmek istiyor musunuz?'))return;let regNote='';if(!skipReg){if(!reg)v.plate=plateText(v.plate);const ch=registryChange(reg,v);if(ch){if(!await writeRegistry(ch))return;regNote=ch.insert?'Ara\u00e7 geli\u015fi kaydedildi ve plaka kay\u0131tlar\u0131na eklendi.':'Ara\u00e7 geli\u015fi kaydedildi; plaka kayd\u0131ndaki bo\u015f bilgiler tamamland\u0131.';}}const prev=id?state.visits.find(x=>x.id===id):null;v.id=id||uid();v.createdAt=prev?.createdAt||new Date().toISOString();if(await mutate(s=>{if(id)s.visits=s.visits.map(x=>x.id===id?v:x);else s.visits.push(v);})){const w=weekInfo(v.date);if(w.year!==ui.year||w.week!==ui.week){ui.year=w.year;ui.week=w.week;ui.day=v.date;}else if(ui.day!=='all')ui.day=v.date;ui.collapsed.delete(v.date);closeModal();render();toast(regNote||'Ara\u00e7 geli\u015fi kaydedildi.');ruhsatAfterSave();}return;}
 });
-window.PCS_TEST={norm,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,ruhsatRank,ruhsatWeights,ruhsatPickWeights,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
+window.PCS_TEST={norm,plateCountry,fmtCompactPlate,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,ruhsatRank,ruhsatWeights,ruhsatPickWeights,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','app-design','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','msg-read','msg-apply','msg-all','msg-form','msg-skip','msg-dismiss','msg-reread','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok','ruhsat-reread']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','app-design','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','msg-read','msg-apply','msg-all','msg-form','msg-addnew','msg-skip','msg-dismiss','msg-reread','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok','ruhsat-reread']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -420,7 +420,7 @@ function settingsViewClassic(){const a=appearance;const lbl=(o,k,d)=>{const v=o[
  const font=`<div class="app-grid">${appSel('font','Yazı tipi',APP_FONTS)}${appSel('weight','Yazı kalınlığı',APP_WEIGHTS,v=>v)}${appSel('size','Yazı boyutu',APP_SIZES,v=>v[0],'Tüm sayfayı büyütür veya küçültür.')}${appSel('spacing','Harf aralığı',APP_SPACING)}${appSel('plateFont','Plaka yazı tipi',APP_PLATE_FONTS)}${appSel('plateSize','Plaka yazı boyutu',APP_PLATE)}</div><small class="app-hint">Yazılar her zaman BÜYÜK HARF gösterilir.</small>`;
  const board=`<h3 class="set-sub">Pano</h3><div class="app-grid">${appSel('boardView','Açılış görünümü',APP_BOARDVIEW,v=>v,'Panodaki Tablo / Kartlar düğmesiyle her cihaz kendi tercihini de seçebilir.')}${appSel('rowStyle','Satır renklendirme',APP_ROWSTYLE,v=>v)}${appSel('density','Satır yüksekliği',APP_DENSITY)}${appSel('tint','Renkli satırlarda ton',APP_TINT,v=>v[0],'Sadece "Renkli" satır renklendirmede kullanılır.')}${appSel('bg','Sayfa arka planı',APP_BG)}</div>
  <h3 class="set-sub">Müşteri başlıkları</h3><div class="app-grid">${appSel('headStyle','Başlık stili',APP_HEADSTYLE,v=>v)}${appSel('headAlign','Başlık hizası',APP_HALIGN,v=>v)}${appSel('headStrength','Renkli şeritte ton',APP_HSTR,v=>v[0],'Sadece "Renkli şerit" başlık stilinde kullanılır.')}</div>
- <h3 class="set-sub">Durum düğmeleri ve plaka</h3><div class="app-grid">${appSel('chipStyle','İşaretli düğme stili',APP_CHIPSTYLE,v=>v)}${appSel('statusIcons','Düğmelerde simge',APP_ONOFF,v=>v)}${appSel('plateBand','Plakada ülke şeridi',APP_ONOFF,v=>v,'Ülke plakanın yazılışından tanınır (TR, BG, RO, GR, HU, AL, UA, MD).')}${appSel('liveNotify','Canlı değişiklik bildirimi',APP_ONOFF,v=>v,'Başka biri bir aracı değiştirdiğinde sağ altta kısa bildirim çıkar ve satır parlar.')}</div>${appPreview()}`;
+ <h3 class="set-sub">Durum düğmeleri ve plaka</h3><div class="app-grid">${appSel('chipStyle','İşaretli düğme stili',APP_CHIPSTYLE,v=>v)}${appSel('statusIcons','Düğmelerde simge',APP_ONOFF,v=>v)}${appSel('plateBand','Plakada ülke şeridi',APP_ONOFF,v=>v,'Ülke plakanın yazılışından tanınır (TR, BG, RO, GR, HU, CZ, AL, UA, MD).')}${appSel('liveNotify','Canlı değişiklik bildirimi',APP_ONOFF,v=>v,'Başka biri bir aracı değiştirdiğinde sağ altta kısa bildirim çıkar ve satır parlar.')}</div>${appPreview()}`;
  const colors=`<div class="app-colors">${APP_COLOR_LABELS.map(([k,l])=>`<div class="app-color-item"><input type="color" class="app-set" data-k="color-${k}" value="${esc(a.colors[k])}" aria-label="${l}"><div class="app-color-text"><span>${l}</span><input type="text" class="app-set app-hex" data-k="color-${k}" value="${esc(a.colors[k])}" maxlength="7" spellcheck="false" aria-label="${l} kodu"></div><span class="chip-prev ${k}">${['onsite','t1','done'].includes(k)?stIcon(k)+(k==='onsite'?'TESİSTE':k==='t1'?'T1':'BİTTİ'):'Örnek'}</span></div>`).join('')}</div><small class="app-hint">Renk kodunu (örneğin #0f766e) yazı kutusuna yapıştırabilirsiniz. Müşteri renkleri "Müşteri renkleri ve sıralama" bölümündedir.</small>${appPreview()}`;
  return `<div class="set-list">
  ${setPanel('theme','settings','Tasarım ve hazır temalar',`${(a.design||'kule')==='klasik'?'Klasik':'Kontrol Kulesi'} tasarım · Kurumsal, Canlı, Sade veya Yüksek kontrast`,theme)}
@@ -476,14 +476,14 @@ function regNum(s){const k=kgText(s);return /^\d[\d.,]* KG$/.test(k)?k.slice(0,-
 function kgField(val,full){return `<div class="field${full?' full':''}"><label for="f-registration">Ruhsat (kilo) <span class="optional">(isteğe bağlı)</span></label><div class="input-suffix"><input id="f-registration" name="registration" type="text" inputmode="decimal" value="${esc(regNum(val))}" maxlength="150" placeholder="Örn. 15400" autocomplete="off"><span aria-hidden="true">KG</span></div><small>Sadece sayıyı yazın; kaydederken sonuna KG eklenir.</small></div>`;}
 document.addEventListener('input',e=>{if(e.target.id==='f-plate'||e.target.id==='f-carrier'){const p=document.getElementById('plate-preview'),v=document.getElementById('f-plate')?.value.trim()||'';if(p)p.innerHTML=v?plateHTML(v.toLocaleUpperCase('tr-TR'),'',document.getElementById('f-carrier')?.value):'';}});
 /* plaka ülkesi, simgeler, kart görünümü */
-var PLATE_COUNTRY={TR:['Türkiye',0],BG:['Bulgaristan',1],RO:['Romanya',1],GR:['Yunanistan',1],HU:['Macaristan',1],AL:['Arnavutluk',0],UA:['Ukrayna',0],MD:['Moldova',0]};
+var PLATE_COUNTRY={TR:['Türkiye',0],BG:['Bulgaristan',1],RO:['Romanya',1],GR:['Yunanistan',1],HU:['Macaristan',1],AL:['Arnavutluk',0],UA:['Ukrayna',0],MD:['Moldova',0],CZ:['Çekya',1]};
 var BG_RE=/^(A|B|BH|BP|BT|E|EB|EH|K|KH|M|H|OB|P|PA|PB|PK|PP|C|CA|CB|CC|CH|CM|CO|CT|T|TX|X|Y)\d{4}[A-Z]{1,2}$/;
 var RO_RE=/^(B\d{2,3}|(AB|AR|AG|BC|BH|BN|BT|BV|BR|BZ|CS|CL|CJ|CT|CV|DB|DJ|GL|GR|GJ|HR|HD|IL|IS|IF|MM|MH|MS|NT|OT|PH|SM|SJ|SB|SV|TR|TM|TL|VS|VL|VN)\d{2,3})[A-Z]{3}$/;
 /* Macaristan: 2022'den beri 4 harf + 3 rakam (AA BC-123). Eski Macar plakası (ABC-123) Moldova plakasıyla aynı biçimde;
    çiftin öbür plakası Macarsa ya da nakliyeci Macar firmasıysa (Kft., Zrt., "Hungary") Macar sayılır. */
 var HU_CARRIER=/\b(KFT|ZRT|NYRT)\b|HUNGAR|MAGYAR/i;
 function plateCountry(p,hu){const c=latinPlate(p||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[\s.\-]/g,'');
- if(/^\d{2}[A-Z]{1,3}\d{2,5}$/.test(c))return 'TR';if(BG_RE.test(c))return 'BG';if(RO_RE.test(c))return 'RO';if(/^[A-Z]{3}\d{4}$/.test(c))return 'GR';if(/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(c))return 'AL';if(/^[A-Z]{2}\d{4}[A-Z]{2}$/.test(c))return 'UA';if(/^[A-Z]{4}\d{3}$/.test(c))return 'HU';if(/^[A-Z]{3}\d{3}$/.test(c))return hu?'HU':'MD';return '';}
+ if(/^\d{2}[A-Z]{1,3}\d{2,5}$/.test(c))return 'TR';if(BG_RE.test(c))return 'BG';/* Çekya: 1 rakam + bölge harfi + 1 harf/rakam + 4 rakam (3BT 6494, 1A2 3456) */if(/^[1-9][ABCEHJKLMPSTUZ][A-Z0-9]\d{4}$/.test(c))return 'CZ';if(RO_RE.test(c))return 'RO';if(/^[A-Z]{3}\d{4}$/.test(c))return 'GR';if(/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(c))return 'AL';if(/^[A-Z]{2}\d{4}[A-Z]{2}$/.test(c))return 'UA';if(/^[A-Z]{4}\d{3}$/.test(c))return 'HU';if(/^[A-Z]{3}\d{3}$/.test(c))return hu?'HU':'MD';return '';}
 /* [çekici ülkesi, dorse ülkesi, çekici, dorse] */
 function plateCountries(p,carrier){const [tr,dr]=splitPlate(p);const hu=HU_CARRIER.test(carrier||'')||plateCountry(tr)==='HU'||plateCountry(dr)==='HU';return [tr?plateCountry(tr,hu):'',dr?plateCountry(dr,hu):'',tr,dr];}
 function splitPlate(p){const s=String(p||'').trim();let parts=s.split(/\s*[–—\/]\s*|\s+-\s*|\s*-\s+/).filter(Boolean);if(parts.length===1)parts=s.split(/(?<=[A-ZÇĞİÖŞÜ])-(?=[A-ZÇĞİÖŞÜ])/i).filter(Boolean);return parts.slice(0,2).map(x=>x.trim().replace(/\s+/g,' '));}
@@ -958,7 +958,7 @@ function kRows(id){const a=appearance,dev=false,sh=true,on=k=>a[k]!=='off';
   {t:'seg',k:'headStrength',l:'Renkli şeritte ton',h:'Yalnızca “Renkli şerit” başlıkta kullanılır',o:Object.entries(APP_HSTR).map(([k,x])=>[k,x[0]]),v:a.headStrength,sh}]:[]),
   {t:'seg',k:'chipStyle',l:'İşaretli düğme stili',h:'TESİSTE / T1 / BİTTİ düğmeleri işaretliyken',o:[['soft','Yumuşak'],['solid','Dolu renk']],v:a.chipStyle,sh},
   {t:'sw',k:'statusIcons',l:'Düğmelerde simge',h:'Durum düğmelerinde küçük simgeler',v:on('statusIcons'),sh},
-  {t:'sw',k:'plateBand',l:'Plakada ülke şeridi',h:'Ülke plakanın yazılışından tanınır (TR, BG, RO, GR, HU, AL, UA, MD)',v:on('plateBand'),sh},
+  {t:'sw',k:'plateBand',l:'Plakada ülke şeridi',h:'Ülke plakanın yazılışından tanınır (TR, BG, RO, GR, HU, CZ, AL, UA, MD)',v:on('plateBand'),sh},
   {t:'html',html:appPreview()}];
  if(id==='font')return [
   {t:'sel',k:'font',l:'Yazı tipi',h:'Varsayılan: Kontrol Kulesi’nde Inter, Klasik’te Roboto',o:APP_FONTS,v:a.font,sh},
@@ -1251,7 +1251,7 @@ function ruhsatPickWeights(texts){const per=texts.map(ruhsatWeights),n=new Map()
  if(pairs.length)return pairs[0][0];
  const all=[...n.keys()],sure=all.filter(v=>n.get(v)>1);return all.length<=2?all:sure.length===2?sure:[];}
 const compactPlate=v=>latinPlate(v||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I').replace(/[^A-Z0-9]/g,'');
-function fmtCompactPlate(c){c=compactPlate(c);let m;if((m=c.match(/^(\d{2})([A-Z]{1,3})(\d{2,5})$/))||(m=c.match(/^([A-Z]{1,3})(\d{2,4})([A-Z]{1,3})$/)))return m.slice(1).join(' ');if((m=c.match(/^([A-Z]{3,4})(\d{3,4})$/)))return m.slice(1).join(' ');return c;}
+function fmtCompactPlate(c){c=compactPlate(c);let m;if((m=c.match(/^(\d{2})([A-Z]{1,3})(\d{2,5})$/))||(m=c.match(/^([A-Z]{1,3})(\d{2,4})([A-Z]{1,3})$/)))return m.slice(1).join(' ');if((m=c.match(/^([A-Z]{3,4})(\d{3,4})$/))||(m=c.match(/^([1-9][ABCEHJKLMPSTUZ][A-Z0-9])(\d{4})$/)))return m.slice(1).join(' ');return c;}
 /* Küçük / bulanık fotoğrafta rakam harf sanılabilir (CM2817EK → "CM2B17EK"). Rakam grubunun ortasına düşen
    ve rakama benzeyen harfler rakama çevrilir; sonuç geçerli bir plaka değilse düzeltme yapılmaz. */
 const DIGIT_LIKE={O:'0',Q:'0',D:'0',I:'1',L:'1',Z:'2',S:'5',G:'6',B:'8'};
@@ -1620,13 +1620,25 @@ setInterval(()=>{if(!document.hidden)waTick();},WA_POLL_MS);
    kurallarla tanınır (tek harf düzeltme, kayıttaki dorse önerisi); düzeltilmiş ya da tahmin edilmiş plaka toplu işleme
    girmez, tek tek onaylanır. İptal (silme) hiçbir zaman toplu yapılmaz. */
 const MSG_TABLE='incoming_messages',WM_STALE_MS=180000;
-const wmsg={ready:null,loading:false,loadedAt:0,channel:null,timer:null,rows:[],local:[],seq:0,dates:{},reading:false,returnKey:'',text:''};
+const wmsg={ready:null,loading:false,loadedAt:0,channel:null,timer:null,rows:[],local:[],seq:0,dates:{},force:{},reading:false,returnKey:'',text:''};
 const wmAll=()=>[...wmsg.rows,...wmsg.local];
 /* mesaj satırını kimliğinden bulur; sohbet balonundan gelen satırlar (chat) listede ve rozette görünmez */
 const wmRow=id=>wmAll().find(r=>r.id===id)||chat.rows.find(r=>r.id===id);
 const wmDone=r=>!!r.ai?.items?.length&&r.ai.items.every((_,i)=>r.applied?.[i]);
 const wmOpen=()=>wmAll().filter(r=>r.status==='bekliyor'&&!wmDone(r));
 const wmPending=()=>role==='editor'&&!VIEW_TOKEN?wmOpen().length:0;
+/* Plaka kayıtlarında olmayan araçların müşterisi: önce mesajın imzası (kayıtlı bir müşteriyle eşleşirse), sonra gönderen
+   numara (Ayarlar > WhatsApp numaraları), sonra mesajdaki kayıtlı araçların ortak müşterisi. Çıkarım olduğu için bu araçlar
+   kendiliğinden eklenmez; kartta tek tıkla onaylanır. Sonuç, kayıtlar değişmedikçe saklanır. */
+function wmMsgCustomer(row){if(row._mcFor===state.registry)return row._mc;
+ const names=[...new Set(state.registry.map(r=>r.customer).filter(Boolean))],up=v=>String(v||'').toLocaleUpperCase('tr-TR').replace(/\s+/g,' ').trim();
+ let out=null;const sig=up(row.ai?.customer);
+ if(sig.length>=4){const hit=names.filter(n=>up(n).includes(sig)||sig.includes(up(n)));if(hit.length===1)out={name:hit[0],src:'imza'};}
+ if(!out){const w=waCustomer(row);if(w)out={name:w,src:'numara'};}
+ if(!out){const by=new Map(state.registry.map(r=>[norm(r.plate),r.customer]));const found=new Set();
+  for(const it of row.ai?.items||[]){const c=by.get(compactPlate(it.tractor)+compactPlate(it.trailer));if(c)found.add(c);}
+  if(found.size===1)out={name:[...found][0],src:'liste'};}
+ row._mcFor=state.registry;row._mc=out;return out;}
 /* Bir mesaj satırındaki i. aracın bugünkü durumu: plaka kayıtlarıyla eşleşme, panoda ne var, ne yapılabilir. */
 function wmItem(row,i){const it=row.ai.items[i],t=compactPlate(it.tractor),d=compactPlate(it.trailer),cands=[t,d].filter(Boolean),kinds={};
  if(t)kinds[t]='tractor';if(d)kinds[d]='trailer';
@@ -1635,12 +1647,22 @@ function wmItem(row,i){const it=row.ai.items[i],t=compactPlate(it.tractor),d=com
  const t0=res.tractor||t,cars=state.visits.filter(v=>norm(v.plate)===norm(plate)||(t0&&norm(splitPlate(v.plate)[0]||'')===t0));
  const onDate=cars.find(v=>v.date===date)||null,open=cars.filter(v=>!v.done&&v.date>=addDays(TODAY,-3)).sort((a,b)=>a.date.localeCompare(b.date));
  const pick=l=>l.find(v=>v.date>=TODAY)||l[l.length-1]||null,from=open.filter(v=>v.date!==date);
- let mode;if(it.action==='cancel')mode=(given&&onDate)||open.length?'cancel':'none';else if(it.action==='move'&&!onDate&&from.length)mode='move';else mode=onDate?'mevcut':'add';
- const target=mode==='cancel'?((given&&onDate)||pick(open)):mode==='move'?pick(from):null;
- const customer=res.reg?.customer||res.tractorReg?.customer||res.trailerReg?.customer||'';
+ /* "Aracı yarına al" gibi cümleleri Gemini bazen "gelecek" sayar. Araç panoda zaten açıksa (o gün kaydı yok) ve açık kayıt
+    hedef güne en çok 7 gün uzaktaysa yeni geliş açmak yerine mevcut kayıt taşınır; ayrı geliş isteyen "Yeni geliş olarak ekle"ye basar. */
+ const forced=!!wmsg.force[row.id+'.'+i],pool=it.action==='move'?from:from.filter(v=>Math.abs(dateObj(v.date)-dateObj(date))<=7*DAY);
+ let mode;if(it.action==='cancel')mode=(given&&onDate)||open.length?'cancel':'none';else if(!forced&&!onDate&&pool.length)mode='move';else mode=onDate?'mevcut':'add';
+ const implied=mode==='move'&&it.action!=='move';
+ const target=mode==='cancel'?((given&&onDate)||pick(open)):mode==='move'?pick(pool):null;
+ const inf=res.reg||res.tractorReg||res.trailerReg?null:wmMsgCustomer(row);
+ const customer=res.reg?.customer||res.tractorReg?.customer||res.trailerReg?.customer||inf?.name||'';
+ /* Listedeki firmalar: tek firma → Beyanname sütununa firma adı, birden fazlaysa "PARSİYEL"; ücret ve firma listesi nota yazılır */
+ const parties=Array.isArray(it.parties)?it.parties.filter(Boolean):[],fee=String(it.fee||'').trim();
+ const decl=parties.length===1?parties[0]:parties.length>1?'PARSİYEL':'',noteText=[fee,parties.length>1?parties.map((n,k)=>`${k+1}.${n}`).join(' · '):'',it.note||''].filter(Boolean).join(' · ').slice(0,600);
  const ready=!res.fuzzy&&!res.guess&&((mode==='move'&&!!target)||(mode==='add'&&!!res.reg?.customer));
- return {i,it,res,plate,date,noDate:!given,sun,onDate,target,mode,customer,ready,moveMiss:it.action==='move'&&mode==='add'};}
-function wmVisit(x){const r=x.res.reg;return {id:uid(),plate:r?r.plate:x.plate,customer:r?.customer||'',declaration:r?.declaration||'',carrier:r?.carrier||'',registration:kgText(r?.registration||''),date:x.date,time:x.it.time||'',note:x.it.note||'',onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};}
+ /* kayıtlı olmayan ama müşterisi çıkarılabilen yeni araç: onayla tek tıkla plaka kaydıyla birlikte eklenir */
+ const newOk=mode==='add'&&!res.reg&&!res.fuzzy&&!res.guess&&!!customer&&!!res.tractor&&!!plateCountry(res.tractor)&&(!res.trailer||!!plateCountry(res.trailer));
+ return {i,it,res,plate,date,noDate:!given,sun,onDate,target,mode,implied,customer,custSrc:inf?.src||'',decl,noteText,parties,fee,ready,newOk,go:ready||newOk,moveMiss:it.action==='move'&&mode==='add'};}
+function wmVisit(x){const r=x.res.reg;return {id:uid(),plate:r?r.plate:x.plate,customer:x.customer||'',declaration:x.decl||r?.declaration||'',carrier:r?.carrier||'',registration:kgText(r?.registration||''),date:x.date,time:x.it.time||'',note:x.noteText||'',onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};}
 /* Aracın sonucunu mesaj satırına yazar; hepsi bitince satır kapanır. Pano değişikliği zaten yapıldığı için veritabanı
    yazılamasa da kayıt bu ekranda işlenmiş sayılır (aynı araç ikinci kez eklenmesin). */
 async function wmMark(row,i,res){row.applied={...(row.applied||{}),[i]:res};const done=wmDone(row),patch={applied:row.applied};
@@ -1651,54 +1673,59 @@ async function wmMark(row,i,res){row.applied={...(row.applied||{}),[i]:res};cons
  return true;}
 /* Tek aracı uygular (pano değişir). Başarılıysa sonuç, olmadıysa false döner. */
 async function wmApply(row,i){if(!canEdit()||row.applied?.[i])return false;const x=wmItem(row,i);let ok=false,res={};
- if(x.mode==='add'){if(!x.res.reg?.customer)return false;const v=wmVisit(x);ok=await mutate(s=>{s.visits.push(v);});if(ok){justChangedMap.set(v.id,Date.now());res={r:'eklendi',visit_id:v.id,plate:v.plate,date:x.date};}}
+ if(x.mode==='add'){if(!x.go)return false;
+  /* kayıtsız yeni araç: geliş formundaki gibi önce plaka kaydı açılır (müşteri, kayıttaki gibi); sonra geliş eklenir */
+  if(!x.res.reg&&!(await writeRegistry(registryChange(null,{plate:x.plate,customer:x.customer,declaration:'',carrier:'',registration:''}))))return false;
+  const v=wmVisit(x);ok=await mutate(s=>{s.visits.push(v);});if(ok){justChangedMap.set(v.id,Date.now());res={r:'eklendi',visit_id:v.id,plate:v.plate,date:x.date,newReg:!x.res.reg};}}
  else if(x.mode==='move'&&x.target){const id=x.target.id;ok=await mutate(s=>{const v=s.visits.find(y=>y.id===id);if(v)v.date=x.date;});if(ok){justChangedMap.set(id,Date.now());res={r:'tasindi',visit_id:id,plate:x.target.plate,date:x.date};}}
  else if(x.mode==='cancel'&&x.target){const id=x.target.id;ok=await mutate(s=>{s.visits=s.visits.filter(y=>y.id!==id);});if(ok)res={r:'silindi',plate:x.target.plate,date:x.target.date};}
  else{ok=true;res={r:'mevcut'};}
  if(!ok)return false;await wmMark(row,i,res);return res;}
-async function wmApplyAll(row){if(!canEdit())return;const xs=row.ai.items.map((_,i)=>wmItem(row,i)).filter(x=>!row.applied?.[x.i]&&x.ready);if(!xs.length)return;
- const lines=xs.map(x=>x.mode==='move'?`• ${x.plate}: ${fmt(x.target.date)} → ${fmt(x.date)} gününe taşınsın`:`• ${x.plate} · ${x.customer} · ${fmt(x.date)} gününe eklensin`);
+async function wmApplyAll(row){if(!canEdit())return;const xs=row.ai.items.map((_,i)=>wmItem(row,i)).filter(x=>!row.applied?.[x.i]&&x.go);if(!xs.length)return;
+ const lines=xs.map(x=>x.mode==='move'?`• ${x.plate}: ${fmt(x.target.date)} → ${fmt(x.date)} gününe taşınsın`:`• ${x.plate} · ${x.customer} · ${fmt(x.date)} gününe eklensin${x.res.reg?'':' (yeni plaka kaydıyla)'}`);
  if(!window.confirm(`Şu ${xs.length} işlem yapılsın mı?\n\n${lines.join('\n')}`))return;
  let n=0;for(const x of xs){if(!(await wmApply(row,x.i)))break;n++;}
  wmRefresh();toast(n===xs.length?`${n} araç işlendi.`:`${n} araç işlendi; ${xs.length-n} araç işlenemedi, tekrar deneyin.`,n!==xs.length);}
 function wmForm(row,i){const x=wmItem(row,i);wmsg.returnKey=row.id+'|'+i;pendingVisit=null;
- openVisitForm(null,x.date,{plate:x.plate,customer:x.customer||waCustomer(row)||'',registration:'',note:x.it.note||'',time:x.it.time||''});}
+ openVisitForm(null,x.date,{plate:x.plate,customer:x.customer||waCustomer(row)||'',declaration:x.decl||'',registration:'',note:x.noteText||'',time:x.it.time||''});}
 /* Formdan kaydedilince: o araç için yeni bir geliş gerçekten açıldıysa madde "eklendi" olur ve pencere geri gelir. */
 function wmAfterSave(){const k=wmsg.returnKey;if(!k)return;wmsg.returnKey='';const [rid,i]=k.split('|'),row=wmRow(rid);if(!row)return;
  const x=wmItem(row,+i),t=compactPlate(x.res.tractor||x.it.tractor);
  if(!state.visits.some(v=>norm(splitPlate(v.plate)[0]||'')===t&&Date.now()-Date.parse(v.createdAt||0)<300000))return;
  wmMark(row,+i,{r:'eklendi',plate:x.plate,date:x.date}).then(()=>{if(wmOpen().length)setTimeout(()=>{if(!document.getElementById('modal').open)openRuhsat();},300);});}
 const WM_ACT={add:'Gelecek',move:'Tarih değişti',cancel:'İptal'};
-function wmResultText(d){return d.r==='eklendi'?`✓ Panoya eklendi${d.date?' · '+fmt(d.date,{weekday:'long',day:'numeric',month:'long'}):''}`:d.r==='tasindi'?`✓ ${fmt(d.date,{weekday:'long',day:'numeric',month:'long'})} gününe taşındı`:d.r==='silindi'?'✓ Panodan silindi':d.r==='atlandi'?'Atlandı':'✓ Yapılacak bir şey yoktu';}
+function wmResultText(d){return d.r==='eklendi'?`✓ Panoya eklendi${d.newReg?' ve plaka kayıtlarına işlendi':''}${d.date?' · '+fmt(d.date,{weekday:'long',day:'numeric',month:'long'}):''}`:d.r==='tasindi'?`✓ ${fmt(d.date,{weekday:'long',day:'numeric',month:'long'})} gününe taşındı`:d.r==='silindi'?'✓ Panodan silindi':d.r==='atlandi'?'Atlandı':'✓ Yapılacak bir şey yoktu';}
 function wmItemHTML(row,i){const x=wmItem(row,i),it=x.it,done=row.applied?.[i],rid=esc(row.id),dayName=d=>fmt(d,{weekday:'long',day:'numeric',month:'long'});
  const badge=`<span class="msg-act ${esc(it.action)}">${WM_ACT[it.action]||'Gelecek'}</span>`,fields=`data-row="${rid}" data-i="${i}"`;
  if(done)return `<div class="msg-item is-done"><div class="msg-plate">${plateHTML(x.plate||'—','sm')}</div><div class="msg-what">${badge}<div class="rs-status eklendi">${esc(wmResultText(done))}</div></div></div>`;
  let info='';const ok=t=>`<div class="rs-match ok">${icon('check')}<span>${t}</span></div>`,warn=t=>`<div class="rs-match warn">${icon('info')}<span>${t}</span></div>`,nw=t=>`<div class="rs-match new">${icon('info')}<span>${t}</span></div>`;
  if(x.mode==='move')info+=ok(`Panoda şu an <b>${esc(dayName(x.target.date))}</b> gününde (${esc(x.target.customer||'Müşterisiz')}); <b>${esc(dayName(x.date))}</b> gününe taşınır.`);
+ if(x.mode==='move'&&x.implied)info+=`<div class="rs-note warn">Mesajda “taşı / ertele” yazmıyor ama araç panoda açık olduğu için yeni geliş açmak yerine mevcut kayıt taşınır. Ayrı bir geliş istiyorsanız <b>Yeni geliş olarak ekle</b>'ye basın.</div>`;
  else if(x.mode==='cancel')info+=warn(`Panodaki <b>${esc(dayName(x.target.date))}</b> geliş (${esc(x.target.customer||'Müşterisiz')}) <b>silinir</b>. Geri alınabilir (Ctrl+Z).`);
  else if(x.mode==='none')info+=`<div class="rs-match bad">${icon('info')}<span>Panoda bu araç için açık kayıt yok; yapılacak bir şey yok.</span></div>`;
  else if(x.mode==='mevcut')info+=ok(`Bu araç <b>${esc(dayName(x.date))}</b> gününde zaten panoda; tekrar eklenmez.`);
  else if(x.res.reg)info+=ok(`Kayıtlı araç: <b>${esc(x.res.reg.customer||'Müşterisiz')}</b>${x.res.reg.carrier?' · '+esc(x.res.reg.carrier):''}`);
  else if(x.res.tractorReg)info+=warn(`Çekici kayıtlı (<b>${esc(x.res.tractorReg.customer)}</b>) ama bu dorseyle kaydı yok. Formda kontrol edin.`);
  else if(x.res.trailerReg)info+=warn(`Dorse kayıtlı (<b>${esc(x.res.trailerReg.customer)}</b>) ama bu çekiciyle kaydı yok. Formda kontrol edin.`);
+ else if(x.newOk)info+=nw(`Yeni araç: plaka kayıtlarında yok. Müşteri <b>${esc(x.customer)}</b> olarak alındı (${x.custSrc==='imza'?'mesajın imzasından':x.custSrc==='numara'?'gönderen numaradan':'listedeki diğer kayıtlı araçlardan'}); onaylarsanız plaka kaydıyla birlikte eklenir. Yanlışsa <b>Formda aç</b>.`);
  else info+=nw(`Yeni araç: plaka kayıtlarında yok. Müşteriyi formda seçin.${waCustomer(row)?` Gönderen numara <b>${esc(waCustomer(row))}</b> müşterisine kayıtlı; formda müşteri olarak gelir.`:''}`);
  if(x.moveMiss)info+=warn('Mesajda tarih değişikliği yazıyor ama panoda bu araç için açık kayıt yok; yeni geliş olarak eklenir.');
  if(x.res.guess)info+=`<div class="rs-note warn">Mesajda yalnız çekici yazıyor; çekicinin kayıttaki dorsesi (<b>${esc(fmtCompactPlate(x.res.trailer))}</b>) yazıldı. Kontrol edin.</div>`;
  else if(x.res.fuzzy)info+=`<div class="rs-note warn">Plaka kayıtlardaki en yakın plakayla eşleştirildi. Lütfen kontrol edin.</div>`;
- if(x.noDate&&x.mode!=='none'&&x.mode!=='cancel')info+=`<div class="rs-note warn">Mesajda tarih yok; ${esc(dayName(x.date))} (${row.chat?'bugün':'mesajın geldiği gün'}) yazıldı. Gerekirse tarihi değiştirin.</div>`;
+ if(x.noDate&&x.mode!=='none'&&x.mode!=='cancel')info+=`<div class="rs-note warn">Mesajda tarih yok; ${esc(dayName(x.date))} (${row.dayChosen?'seçtiğiniz gün':row.chat?'bugün':'mesajın geldiği gün'}) yazıldı. Gerekirse tarihi değiştirin.</div>`;
  if(x.sun)info+=`<div class="rs-note warn">Pazar günü kayıt alınmaz; Pazartesi gününe alındı.</div>`;
- if(it.time||it.note)info+=`<div class="rs-note">${it.time?`Saat: <b>${esc(it.time)}</b>`:''}${it.time&&it.note?' · ':''}${it.note?`Not: ${esc(it.note)}`:''}</div>`;
+ if(x.mode==='add'||x.mode==='move'){const bits=[it.time?`Saat: <b>${esc(it.time)}</b>`:'',x.decl?`Beyanname: <b>${esc(x.decl)}</b>`:'',x.fee?`Ücret: <b>${esc(x.fee)}</b>`:'',x.parties.length>1?`Firmalar: ${x.parties.map(n=>esc(n)).join(', ')}`:'',it.note?`Not: ${esc(it.note)}`:''].filter(Boolean);if(bits.length)info+=`<div class="rs-note">${bits.join(' · ')}</div>`;}
  const keep=x.mode==='mevcut'||x.mode==='none',main=x.mode==='move'?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('check')}Tarihi değiştir</button>`
   :x.mode==='cancel'?`<button type="button" class="btn danger small" data-action="msg-apply" ${fields}>${icon('trash')}Panodan sil</button>`
   :keep?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('check')}Tamam, kapat</button>`
-  :x.res.reg?.customer?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('plus')}Panoya ekle</button>`:'';
- const acts=`<div class="rs-acts">${main}${x.mode==='add'?`<button type="button" class="btn small" data-action="msg-form" ${fields}>${icon('doc')}Formda aç</button>`:''}${keep?'':`<button type="button" class="btn text small" data-action="msg-skip" ${fields}>${icon('close')}Atla</button>`}</div>`;
+  :x.go?`<button type="button" class="btn primary small" data-action="msg-apply" ${fields}>${icon('plus')}${x.res.reg?'Panoya ekle':'Plaka kaydıyla ekle'}</button>`:'';
+ const acts=`<div class="rs-acts">${main}${x.mode==='add'?`<button type="button" class="btn small" data-action="msg-form" ${fields}>${icon('doc')}Formda aç</button>`:''}${x.implied?`<button type="button" class="btn small" data-action="msg-addnew" ${fields} title="Panodaki kaydı taşımaz; yeni bir geliş açar">${icon('plus')}Yeni geliş olarak ekle</button>`:''}${keep?'':`<button type="button" class="btn text small" data-action="msg-skip" ${fields}>${icon('close')}Atla</button>`}</div>`;
  const dateBox=x.mode==='cancel'||keep&&x.mode==='none'?'':`<label class="msg-date">Tarih<input type="date" data-msgdate="${rid}.${i}" value="${esc(x.date)}"></label>`;
  return `<div class="msg-item"><div class="msg-plate">${plateHTML(x.plate||'—','sm')}${badge}</div><div class="msg-what">${info}${acts}</div>${dateBox}</div>`;}
 function wmCardHTML(row){const items=row.ai?.items||[],rid=esc(row.id),cust=waCustomer(row),who=[row.sender_name,row.from_number?'+'+row.from_number:''].filter(Boolean).join(' · ');
  const head=`<div class="rs-src">${icon('wa')}<span>${row.local?'Yapıştırılan mesaj':'WhatsApp'}${who?' · '+esc(who):''}${cust?' · <b>'+esc(cust)+'</b>':''} · ${esc(tsText(row.created_at))}</span></div>`;
  const text=`<details class="msg-text"><summary>“${esc(String(row.body||'').replace(/\s+/g,' ').slice(0,110))}${String(row.body||'').length>110?'…':''}”</summary><pre>${esc(row.body||'')}</pre></details>`;
- let body='';const bulk=items.filter((_,i)=>!row.applied?.[i]&&wmItem(row,i).ready).length;
+ let body='';const bulk=items.filter((_,i)=>!row.applied?.[i]&&wmItem(row,i).go).length;
  if(row.status==='okunuyor'){const stale=Date.now()-Date.parse(row.created_at||0)>WM_STALE_MS;body=`<div class="rs-status uzakta">${stale?'Sunucu mesajı okuyamadı gibi görünüyor':'Sunucuda yapay zekâyla okunuyor…'}</div>${stale?`<div class="rs-acts"><button type="button" class="btn small" data-action="msg-reread" data-row="${rid}">${icon('refresh')}Yeniden oku</button></div>`:''}`;}
  else if(row.status==='hata')body=`<div class="rs-match bad">${icon('info')}<span>${esc(row.note||'Yapay zekâ mesajı okuyamadı')}. Biraz sonra <b>Yeniden oku</b>'ya basın.</span></div><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-reread" data-row="${rid}">${icon('refresh')}Yeniden oku</button></div>`;
  else{body=items.map((_,i)=>wmItemHTML(row,i)).join('');if(row.ai?.problem)body+=`<div class="rs-note">Yapay zekâ: ${esc(row.ai.problem)}</div>`;}
@@ -1755,7 +1782,7 @@ async function wmLoad(){if(VIEW_TOKEN||!account||role!=='editor'||wmsg.ready===f
 /* ayrı anlık bildirim kanalı: tablo yoksa ana kanal bozulmasın diye yalnızca tablo varken açılır */
 function wmStart(){if(wmsg.channel||typeof client.channel!=='function')return;
  try{wmsg.channel=client.channel('pcs-mesaj').on('postgres_changes',{event:'*',schema:'public',table:MSG_TABLE},()=>{clearTimeout(wmsg.timer);wmsg.timer=setTimeout(wmLoad,400);});wmsg.channel.subscribe();}catch(_){wmsg.channel=null;}}
-function wmStop(){clearTimeout(wmsg.timer);if(wmsg.channel){try{client.removeChannel(wmsg.channel);}catch(_){}wmsg.channel=null;}Object.assign(wmsg,{ready:null,loadedAt:0,rows:[],local:[],dates:{},returnKey:''});}
+function wmStop(){clearTimeout(wmsg.timer);if(wmsg.channel){try{client.removeChannel(wmsg.channel);}catch(_){}wmsg.channel=null;}Object.assign(wmsg,{ready:null,loadedAt:0,rows:[],local:[],dates:{},force:{},returnKey:''});}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="msg-"]');if(!b||b.disabled)return;const a=b.dataset.action;
  if(a==='msg-read')return wmReadPaste(b);
  const row=wmRow(b.dataset.row);if(!row)return;const i=+b.dataset.i;
@@ -1763,6 +1790,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='msg-dismiss')return wmDismiss(row);
  if(a==='msg-reread')return wmReread(row);
  if(a==='msg-form')return wmForm(row,i);
+ if(a==='msg-addnew'){wmsg.force[row.id+'.'+i]=true;return wmRefresh();}
  if(a==='msg-skip'){await wmMark(row,i,{r:'atlandi'});return wmRefresh();}
  if(a==='msg-apply'){const x=wmItem(row,i);
   if(x.mode==='cancel'&&!window.confirm(`${x.plate} için panodaki ${fmt(x.target.date)} gelişi silinsin mi?`))return;
@@ -1776,22 +1804,30 @@ document.addEventListener('change',e=>{const k=e.target.dataset?.msgdate;if(!k||
    plakası kayıtlarda olmayan ya da kayıtlara benzetilerek bulunan araç, müşterisi bilinmeyen araç. Yapılanlar sohbette
    yazar; son işlem Ctrl+Z ile geri alınır. Mesaj okuma ve araç işleme kuralları WhatsApp mesajlarıyla aynıdır (wm*). */
 const chat={open:false,msgs:[],rows:[],seq:0,busy:false,built:false};
+/* sohbette tarih sorulurken sunulan günler: bugün ve sonraki iş günü (Pazar atlanır) */
+const chatDay=n=>{const d=weekday(TODAY)===0?addDays(TODAY,1):TODAY;return n?nextWorkday(d):d;};
 const chatShown=()=>!!account&&role==='editor'&&!VIEW_TOKEN&&!GUARD_ACCT&&!inGuard()&&ui.page!=='saha';
 const CHAT_EX=['Yarın 34 ABC 123 / PB 5678 CD ve CB 1234 AB gelecek','CB 1234 AB cuma gününe ertelendi','B 123 XYZ iptal'];
 function chatBuild(){if(chat.built)return;chat.built=true;const d=document.createElement('div');d.id='chat-root';
  d.innerHTML=`<button type="button" id="chat-fab" class="chat-fab" data-action="chat-toggle" aria-label="Sohbet: yazarak araç ekle" aria-expanded="false">${icon('chat','ic-chat')}${icon('close','ic-x')}<b class="chat-dot" hidden></b></button>
-<section id="chat-panel" class="chat-panel" role="dialog" aria-label="Pano asistanı" hidden><header class="chat-head"><span class="chat-ava" aria-hidden="true">AI</span><div><b>Pano asistanı</b><small>Yazın, Gemini anlasın ve panoya işlesin</small></div><button type="button" class="icon-btn" data-action="chat-toggle" aria-label="Sohbeti kapat">${icon('close')}</button></header><div id="chat-pend"></div><div id="chat-log" class="chat-log" aria-live="polite"></div><form id="chat-form" class="chat-form" autocomplete="off"><textarea id="chat-input" rows="1" maxlength="2000" placeholder="Örn: yarın 34 ABC 123 gelecek" aria-label="Mesajınız"></textarea><button type="submit" class="chat-send" aria-label="Gönder">${icon('send')}</button></form></section>`;
+<section id="chat-panel" class="chat-panel" role="dialog" aria-label="Pano asistanı" hidden><header class="chat-head"><span class="chat-ava" aria-hidden="true">AI</span><div><b>Pano asistanı</b><small>Yazın, Gemini anlasın ve panoya işlesin</small></div><button type="button" class="icon-btn" data-action="chat-toggle" aria-label="Sohbeti kapat">${icon('close')}</button></header><div id="chat-pend"></div><div id="chat-log" class="chat-log" aria-live="polite"></div><form id="chat-form" class="chat-form" autocomplete="off"><textarea id="chat-input" rows="1" maxlength="6000" placeholder="Örn: yarın 34 ABC 123 gelecek" aria-label="Mesajınız"></textarea><button type="submit" class="chat-send" aria-label="Gönder">${icon('send')}</button></form></section>`;
  document.body.appendChild(d);}
 function chatSummary(row){const n=row.ai.items.length,done=Object.values(row.applied||{}).filter(a=>a.r==='eklendi'||a.r==='tasindi'||a.r==='silindi').length,wait=row.ai.items.filter((_,i)=>!row.applied?.[i]).length;
  return `${n} araç anladım${done?`; ${done} tanesini panoya işledim`:''}${wait?`. ${wait} tanesi için onayınız gerekiyor:`:'. Hepsi tamam ✓'}`;}
 function chatMsgHTML(m){if(m.who==='me')return `<div class="chat-msg me"><div class="chat-bub">${esc(m.text)}</div></div>`;
  let body;if(m.typing)body=`<div class="chat-typing" aria-label="Okunuyor"><i></i><i></i><i></i></div>${m.phase?`<small>${esc(m.phase)}</small>`:''}`;
- else if(m.rowId){const row=chat.rows.find(r=>r.id===m.rowId);body=row?`<p>${esc(chatSummary(row))}</p>${row.ai.items.map((_,i)=>wmItemHTML(row,i)).join('')}${row.ai.problem?`<div class="rs-note">${esc(row.ai.problem)}</div>`:''}`:'';}
+ else if(m.rowId){const row=chat.rows.find(r=>r.id===m.rowId);
+  const ask=row?.ask?`<p><b>Mesajda tarih yok.</b> Bu ${row.ai.items.length} aracı hangi güne yazayım?</p><div class="chat-chips chat-days"><button type="button" class="chat-chip" data-action="chat-day" data-row="${esc(row.id)}" data-d="${chatDay(0)}">Bugün · ${esc(fmt(chatDay(0)))}</button><button type="button" class="chat-chip" data-action="chat-day" data-row="${esc(row.id)}" data-d="${chatDay(1)}">Yarın · ${esc(fmt(chatDay(1)))}</button></div>`:'';
+  const pend=row&&!row.ask?row.ai.items.filter((_,i)=>!row.applied?.[i]&&wmItem(row,i).go).length:0;
+  body=row?`<p>${esc(chatSummary(row))}</p>${ask}${row.ai.items.map((_,i)=>wmItemHTML(row,i)).join('')}${pend>1?`<div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-all" data-row="${esc(row.id)}">${icon('check')}Hepsini uygula (${pend})</button></div>`:''}${row.ai.problem?`<div class="rs-note">${esc(row.ai.problem)}</div>`:''}`:'';}
  else body=`<p>${esc(m.text)}</p>`;
  return `<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub${m.error?' err':''}">${body}</div></div>`;}
 function chatRender(){const log=document.getElementById('chat-log');if(!log)return;
  const hello=`<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub"><p>Merhaba! Gelecek, ertelenen ya da iptal edilen araçları yazın; ben okuyup panoya işleyeyim. Silme ve emin olamadıklarımı size sorarım.</p><div class="chat-chips">${CHAT_EX.map(t=>`<button type="button" class="chat-chip" data-action="chat-ex" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div></div>`;
  const stick=chat.busy||log.scrollHeight-log.scrollTop-log.clientHeight<80;log.innerHTML=hello+chat.msgs.map(chatMsgHTML).join('');if(stick)log.scrollTop=log.scrollHeight;
+ /* gün sorusu cevabın en üstündedir; uzun listede kaybolmasın diye cevabın başına kaydırılır */
+ const lastM=chat.msgs[chat.msgs.length-1],qa=lastM?.rowId&&chat.rows.find(r=>r.id===lastM.rowId)?.ask?log.querySelector('.chat-msg.ai:last-child'):null;
+ if(qa)log.scrollTop+=qa.getBoundingClientRect().top-log.getBoundingClientRect().top-8;
  const n=wmPending(),pend=document.getElementById('chat-pend');if(pend)pend.innerHTML=n?`<button type="button" class="chat-pend" data-action="ruhsat-open">${icon('wa')}<span>WhatsApp'tan gelen <b>${n}</b> mesaj onayınızı bekliyor</span><em>Aç →</em></button>`:'';
  const dot=document.querySelector('#chat-fab .chat-dot');if(dot){dot.hidden=!n||chat.open;dot.textContent=n||'';}onlineUI();}
 function chatApply(){const p=document.getElementById('chat-panel'),f=document.getElementById('chat-fab');if(p)p.hidden=!chat.open;if(f){f.setAttribute('aria-expanded',String(chat.open));f.classList.toggle('open',chat.open);}}
@@ -1801,6 +1837,8 @@ function chatSync(){const show=chatShown();if(show)chatBuild();const r=document.
  if(!show&&chat.open){chat.open=false;chatApply();}else if(show&&chat.open)chatRender();else if(show)chatDot();}
 function chatDot(){const n=wmPending(),dot=document.querySelector('#chat-fab .chat-dot');if(dot){dot.hidden=!n||chat.open;dot.textContent=n||'';}}
 function chatGrow(){const i=document.getElementById('chat-input');if(!i)return;i.style.height='auto';i.style.height=Math.min(120,i.scrollHeight)+'px';}
+/* hazır ekleme ve taşımalar kendiliğinden işlenir; panoda zaten olanlar kapatılır. Silme ve emin olunamayanlar bekler. */
+async function chatAuto(row){for(let i=0;i<row.ai.items.length;i++){const x=wmItem(row,i);if(row.applied?.[i]||!(x.ready||x.mode==='mevcut'||x.mode==='none'))continue;if(!(await wmApply(row,i)))break;chatRender();}}
 async function chatSend(text){text=String(text||'').trim();const inp=document.getElementById('chat-input');if(text.length<4||chat.busy)return;
  if(!canEdit()){chat.msgs.push({who:'ai',error:true,text:navigator.onLine===false?'İnternet bağlantısı yok; şu an değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (yetkiniz yok ya da bir kayıt işlemi sürüyor). Biraz sonra tekrar deneyin.'});chatRender();return;}
  chat.busy=true;if(inp){inp.value='';chatGrow();}
@@ -1810,15 +1848,17 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
   if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
   else if(r.err){out({who:'ai',error:true,text:'Okuyamadım: '+r.err+'. Biraz sonra tekrar yazın.'});if(inp&&!inp.value){inp.value=text;chatGrow();}}
   else{const d=r.data;
-   if(!d.items.length)out({who:'ai',text:'Mesajda araç plakası bulamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Plakayı ve günü yazarak deneyin.'});
+   if(!d.items.length)out({who:'ai',text:'Mesajda araç plakası bulamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Şimdilik yalnızca gelecek, ertelenen ya da iptal edilen araçları işleyebiliyorum (plakayı ve günü yazın). Panodaki bir kaydı düzeltmek için o satıra tıklayıp “Kaydı düzenle”yi kullanın.'});
    else{const row={id:'chat-'+(++chat.seq),local:true,chat:true,day:weekday(TODAY)===0?addDays(TODAY,1):TODAY,from_number:'',sender_name:'',body:text,status:'bekliyor',applied:{},created_at:new Date().toISOString(),ai:{items:d.items,customer:d.customer||'',problem:d.problem||'',model:d.model||''}};
-    chat.rows.push(row);out({who:'ai',rowId:row.id});chatRender();
-    /* hazır ekleme ve taşımalar kendiliğinden işlenir; panoda zaten olanlar kapatılır. Silme ve emin olunamayanlar bekler. */
-    for(let i=0;i<d.items.length;i++){const x=wmItem(row,i);if(!(x.ready||x.mode==='mevcut'||x.mode==='none'))continue;if(!(await wmApply(row,i)))break;chatRender();}}}}
+    chat.rows.push(row);
+    /* iki ya da daha fazla araçta hiç tarih yazmıyorsa yanlış güne toplu kayıt açmamak için önce gün sorulur */
+    row.ask=d.items.filter(v=>v.action!=='cancel'&&!v.date).length>=2;
+    out({who:'ai',rowId:row.id});chatRender();if(!row.ask)await chatAuto(row);}}}
  catch(e){out({who:'ai',error:true,text:'Bir sorun oldu: '+(e?.message||e)});}
  finally{chat.busy=false;chatRender();}}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="chat-"]');if(!b)return;const a=b.dataset.action;
  if(a==='chat-toggle')return chatToggle();
+ if(a==='chat-day'){const row=chat.rows.find(r=>r.id===b.dataset.row);if(!row||!row.ask||chat.busy||!canEdit())return;chat.busy=true;row.day=b.dataset.d;row.dayChosen=true;row.ask=false;chatRender();chatAuto(row).finally(()=>{chat.busy=false;chatRender();});return;}
  if(a==='chat-ex'){const i=document.getElementById('chat-input');if(i){i.value=b.dataset.t;chatGrow();i.focus();}}});
 document.addEventListener('submit',e=>{if(e.target.id!=='chat-form')return;e.preventDefault();chatSend(document.getElementById('chat-input')?.value);});
 document.addEventListener('keydown',e=>{if(e.target.id==='chat-input'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();chatSend(e.target.value);return;}
