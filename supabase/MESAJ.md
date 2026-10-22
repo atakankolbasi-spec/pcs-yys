@@ -40,6 +40,27 @@ Bunları yazan siz olduğunuz için ayrıca onay sorulmaz. **Şunlar yine de sor
 - **Plakası kayıtlarda olmayan** ya da kayıtlara benzetilerek bulunan araç: **Formda aç** denir.
 - Müşterisi bilinmeyen araç.
 
+**Müşterinin gönderdiği firmalı listeyi de yapıştırabilirsiniz.** Örneğin:
+
+> PB 7831 KT - PB 7569 EB (90 EURO)
+> 1.GALATA PETROL OTOMOTİV
+> 2.PLASTEK PLASTİK
+>
+> CT 04 LLA - CT 05 LLA (90 EURO)
+> 1.TALIA
+
+Her çekici-dorse çifti bir araç sayılır; altındaki firmalar o aracın yükünün sahipleridir:
+- **Beyanname** sütunu: tek firma varsa firmanın adı (örn. `TALIA`), birden fazlaysa `PARSİYEL` yazılır.
+- **Not**: ücret ve (birden fazlaysa) firmaların listesi nota yazılır (örn. `90 EURO · 1.GALATA PETROL OTOMOTİV · 2.PLASTEK PLASTİK`).
+- **Müşteri / nakliyeci / ruhsat kilosu**: plaka kayıtlıysa kayıttan gelir.
+- **Plakası kayıtlı olmayan araç:** müşteri mesajın imzasından, gönderen numaradan ya da listedeki kayıtlı araçların
+  ortak müşterisinden alınır. Yine de kendiliğinden eklenmez; **Plaka kaydıyla ekle** ya da **Hepsini uygula** ile
+  onaylarsınız, plaka kaydı da birlikte açılır. Müşteri yanlışsa **Formda aç**.
+- **Listede tarih yoksa** (ikiden fazla araçta) yanlış güne toplu kayıt açmamak için önce sorar: **Bugün** mi **Yarın** mı.
+
+**"Aracı yarına al" gibi cümleler:** Araç panoda zaten açıksa (o gün kaydı yoksa) yeni geliş açılmaz, **mevcut kayıt**
+yeni güne taşınır. Ayrı bir geliş istiyorsanız kartta **Yeni geliş olarak ekle**.
+
 Yapılan her şey sohbette araç araç yazar. Sohbet sayfayı yenileyince temizlenir; veritabanına yazılmaz.
 Müşteriden WhatsApp'la gelen mesajlar bekliyorsa balonda kırmızı bir sayı görünür ve panelin üstünde
 "WhatsApp'tan gelen N mesaj onayınızı bekliyor" bağlantısı çıkar (müşteri mesajları yine sizin onayınızla işlenir).

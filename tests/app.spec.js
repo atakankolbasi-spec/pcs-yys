@@ -689,6 +689,25 @@ test('Macar plakası tanınır: yeni biçim her zaman, eski biçim Macar nakliye
   expect(problems).toEqual([]);
 });
 
+test('Çek plakası tanınır: CZ şeridi ve AB yıldızları, çift plakada dorse de Çek', async ({ page }) => {
+  const data = sampleData();
+  const add = (id, plate) => data.visits.push({ ...data.visits[5], id, plate, carrier: 'ANKA EUROPE LOGISTICS S.R.O', customer: 'ANKA LOJİSTİK', visit_time: '12:00' });
+  add('v8', '3 BT 6494');
+  add('v9', '1A2 3456 - 2B1 9999');
+  const problems = await openApp(page, { data });
+  const band = t => page.locator('.lp', { hasText: t }).first();
+  await expect(band('3 BT 6494').locator('.lp-band b')).toHaveText('CZ');
+  await expect(band('3 BT 6494')).toHaveAttribute('title', /Çekya/);
+  await expect(band('3 BT 6494').locator('.lp-band svg')).toHaveCount(1); // AB şeridi (yıldızlar)
+  await expect(band('1A2 3456').locator('.lp-band b')).toHaveText('CZ');
+  await expect(band('1A2 3456').locator('.lp-cc2')).toHaveCount(0);     // dorse de Çek
+  // diğer ülkelerin biçimleri etkilenmez
+  const cc = await page.evaluate(() => ['34 ABC 123', '3BT6494', 'B 123 XYZ', 'CB 1234 AB', 'AG 08 PLS', 'PB 1234 AB'].map(p => window.PCS_TEST.plateCountry(p)));
+  expect(cc).toEqual(['TR', 'CZ', 'RO', 'BG', 'RO', 'BG']);
+  expect(await page.evaluate(() => window.PCS_TEST.fmtCompactPlate('3BT6494'))).toBe('3BT 6494');
+  expect(problems).toEqual([]);
+});
+
 test('son hareketler: işlemi kimin yaptığı görünür', async ({ page }) => {
   const data = sampleData();
   data.visits.find(v => v.id === 'v7').updated_at = '2026-09-23T06:55:00Z';
@@ -1469,15 +1488,16 @@ test('WhatsApp mesajı: elle yapıştırılan mesaj yapay zekâyla okunur, onayl
   // tarih yazmayan madde: mesajın geldiği gün (bugün) yazılır; araç o gün zaten panodaysa tekrar eklenmez
   await expect(card.locator('.msg-item').nth(1)).toContainText('Mesajda tarih yok; 23 Eylül Çarşamba');
   await expect(card.locator('.msg-item').nth(1)).toContainText('zaten panoda');
-  // gün seçilebilir; seçilen güne göre durum yeniden hesaplanır ve o gün eklenir
+  // gün seçilebilir; seçilen güne göre durum yeniden hesaplanır: araç panoda 23'ünde açık, o gün kaydı yok → yeni geliş değil, mevcut kayıt taşınır
   await card.locator('.msg-item').nth(1).locator('input[type="date"]').fill('2026-09-26');
-  await expect(card.locator('.msg-item').nth(1)).toContainText('Kayıtlı araç: TORNADO');
+  await expect(card.locator('.msg-item').nth(1)).toContainText('26 Eylül Cumartesi gününe taşınır');
   page.once('dialog', d => d.accept());
   await expect(card.locator('[data-action="msg-all"]')).toHaveText('Hepsini uygula (2)');
   await card.locator('[data-action="msg-all"]').click();
   await expect(page.locator('#toast')).toContainText('2 araç işlendi');
   const ins = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
-  expect(ins.map(v => [v.plate, v.visit_date])).toEqual([['06 KL 4567', '2026-09-24'], ['CB 1234 AB', '2026-09-26']]);
+  expect(ins.map(v => [v.plate, v.visit_date])).toEqual([['06 KL 4567', '2026-09-24']]);   // CB 1234 AB için yeni kayıt açılmadı
+  expect((await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'))).visit_date).toBe('2026-09-26'); // mevcut kayıt taşındı
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'incoming_messages' && c.op !== 'select').length)).toBe(0);
   await expect(card).toHaveCount(0);
   // mesajda araç yoksa kart açılmaz
@@ -1487,8 +1507,8 @@ test('WhatsApp mesajı: elle yapıştırılan mesaj yapay zekâyla okunur, onayl
 
 test('WhatsApp mesajı: okunamayan mesaj "Yeniden oku" ile okunur; tablo kurulu değilse yalnızca yapıştırma kutusu çalışır', async ({ page, browser }) => {
   const data = sampleData();
-  data.incoming_messages = [msgRow('m2', [], { status: 'hata', ai: null, note: 'Yapay zekâ mesajı okuyamadı', body: 'Perşembe CB 1234 AB gelecek' })];
-  const aiText = { items: [mi('add', 'CB1234AB', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test' };
+  data.incoming_messages = [msgRow('m2', [], { status: 'hata', ai: null, note: 'Yapay zekâ mesajı okuyamadı', body: 'Perşembe 06 KL 4567 gelecek' })];
+  const aiText = { items: [mi('add', '06KL4567', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test' };
   const problems = await openApp(page, { data, aiText });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.locator('.heading [data-action="ruhsat-open"]').click();
@@ -1496,10 +1516,10 @@ test('WhatsApp mesajı: okunamayan mesaj "Yeniden oku" ile okunur; tablo kurulu 
   await expect(card).toContainText('Yapay zekâ mesajı okuyamadı');
   await card.locator('[data-action="msg-reread"]').click();
   await expect(card.locator('.msg-item')).toHaveCount(1);
-  await expect(card.locator('.msg-item')).toContainText('Kayıtlı araç: TORNADO');
+  await expect(card.locator('.msg-item')).toContainText('Kayıtlı araç: ABC NAKLİYAT');
   const row = await page.evaluate(() => window.__db.incoming_messages[0]);
   expect(row.status).toBe('bekliyor');
-  expect(row.ai.items[0].tractor).toBe('CB1234AB');
+  expect(row.ai.items[0].tractor).toBe('06KL4567');
   // mesajı kapatma: satır "yoksayıldı" olur, pano değişmez
   await card.locator('[data-action="msg-dismiss"]').click();
   await expect(card).toHaveCount(0);
@@ -1604,6 +1624,7 @@ test('sohbet balonu: hata ve boş cevap sohbette yazar, yazılan metin geri geli
   await page.locator('#chat-input').fill('merhaba nasılsınız 123');
   await page.locator('#chat-input').press('Enter');
   await expect(panel).toContainText('Mesajda araç plakası bulamadım (Mesajda plaka yok)');
+  await expect(panel).toContainText('Kaydı düzenle');
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
   // bağlantı: WhatsApp mesajlarının onay penceresini açar
   await panel.locator('.chat-pend').click();
@@ -1619,6 +1640,89 @@ test('sohbet balonu: hata ve boş cevap sohbette yazar, yazılan metin geri geli
   await expect(viewer.locator('#app')).toContainText('34 ABC 123');
   await expect(viewer.locator('#chat-fab')).toHaveCount(0);
   await viewer.close();
+});
+
+test('sohbet: panoda açık araç "yarına al" denince yeni geliş açılmaz, mevcut kayıt taşınır; WhatsApp kartında "Yeni geliş olarak ekle" seçilebilir', async ({ page }) => {
+  // Gemini "Aracı yarına al"ı "gelecek" (add) sayar; CB 1234 AB bugün (23 Eylül) panoda açık (v6)
+  const data = sampleData();
+  data.incoming_messages = [msgRow('m7', [mi('add', 'CB1234AB', '', '2026-09-24')])];
+  const aiText = { items: [mi('add', 'CB1234AB', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { data, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).map(c => c.op));
+  await page.locator('#chat-fab').click();
+  await page.locator('#chat-input').fill('CB 1234 AB yarına al');
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#chat-panel')).toContainText('24 Eylül Perşembe gününe taşındı');
+  expect(await writes()).toEqual(['update']);                                  // yeni kayıt açılmadı
+  expect((await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'))).visit_date).toBe('2026-09-24');
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.plate === 'CB 1234 AB' && v.visit_date >= '2026-09-23').length)).toBe(1);
+  await page.locator('#chat-fab').click();
+  // WhatsApp kartı (aynı araç, bu kez 23'ünde açık değil: v6 taşındı) — kartta taşıma gösterilir, ayrı geliş seçilebilir
+  await page.evaluate(() => { const v = window.__db.visits.find(x => x.id === 'v6'); v.visit_date = '2026-09-23'; v.updated_at = new Date().toISOString(); window.__rtEmit('visits'); });
+  await page.clock.runFor(1500);
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const item = page.locator('#msg-m7 .msg-item');
+  await expect(item).toContainText('yeni geliş açmak yerine mevcut kayıt taşınır');
+  await expect(item.locator('[data-action="msg-apply"]')).toHaveText('Tarihi değiştir');
+  await item.locator('[data-action="msg-addnew"]').click();
+  await expect(item.locator('[data-action="msg-apply"]')).toHaveText('Panoya ekle');
+  await expect(item).not.toContainText('yeni geliş açmak yerine');
+  await item.locator('[data-action="msg-apply"]').click();
+  await expect.poll(async () => (await writes()).join()).toBe('update,insert'); // bu kez ayrı geliş açıldı
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: müşterinin firmalı araç listesi yapıştırılır; tarih sorulur, beyanname/not firmalardan çıkar, kayıtsız araç plaka kaydıyla eklenir', async ({ page }) => {
+  test.setTimeout(90000);
+  const data = sampleData();
+  data.registry.push({ id: 'r9', plate: 'PB 7831 KT - PB 7569 EB', customer: 'ETL LOJ - ERVİN MUTLU', declaration: '', carrier: 'RE TRANS PRIM EOOD', registration: '15830 KG', updated_at: '2026-09-01T08:00:00Z' });
+  const parties = (...n) => n;
+  const aiText = { customer: '', problem: '', model: 'gemini-test', items: [
+    mi('add', 'PB7831KT', 'PB7569EB', '', { fee: '90 EURO', parties: parties('GALATA PETROL OTOMOTİV', 'PLASTEK PLASTİK', 'FURKAN SARIM-FORMPLAS', 'MARS TR DIŞ TİC.') }),
+    mi('add', 'CT04LLA', 'CT05LLA', '', { fee: '90 EURO', parties: parties('TALIA') }),
+    mi('add', 'CT40BWT', 'CT41BWT', '', { fee: '90 EURO', parties: parties('UPLASS') }),
+    mi('add', 'CT6913PB', 'CT2803EH', '', { fee: '90 EURO', parties: parties('UĞURLAR PLS.', 'DEMİR PLASTİK') })
+  ] };
+  const problems = await openApp(page, { data, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const writes = () => page.evaluate(() => window.__calls.filter(c => ['visits', 'registry'].includes(c.table) && ['insert', 'update', 'delete'].includes(c.op)).map(c => c.table + ':' + c.op));
+  await page.locator('#chat-fab').click();
+  const list = 'PB 7831 KT - PB 7569 EB (90 EURO)\n1.GALATA PETROL OTOMOTİV\n2.PLASTEK PLASTİK\n\nCT 04 LLA - CT 05 LLA (90 EURO)\n1.TALIA';
+  await page.locator('#chat-input').fill(list);
+  await page.locator('#chat-input').press('Enter');
+  const panel = page.locator('#chat-panel');
+  // tarih yok: toplu kayıt açmadan önce gün sorulur
+  await expect(panel).toContainText('Mesajda tarih yok. Bu 4 aracı hangi güne yazayım?');
+  expect(await writes()).toEqual([]);
+  await panel.locator('[data-action="chat-day"]', { hasText: 'Yarın' }).click();
+  // kayıtlı araç kendiliğinden eklenir: tek firma değil, 4 firma → PARSİYEL; ücret ve firmalar nota yazılır
+  await expect.poll(writes).toEqual(['visits:insert']);
+  const v1 = await page.evaluate(() => window.__db.visits.find(v => v.plate === 'PB 7831 KT - PB 7569 EB'));
+  expect(v1).toMatchObject({ customer: 'ETL LOJ - ERVİN MUTLU', declaration: 'PARSİYEL', carrier: 'RE TRANS PRIM EOOD', registration: '15830 KG', visit_date: '2026-09-24' });
+  expect(v1.note).toBe('90 EURO · 1.GALATA PETROL OTOMOTİV · 2.PLASTEK PLASTİK · 3.FURKAN SARIM-FORMPLAS · 4.MARS TR DIŞ TİC.');
+  // kayıtsız araçlar: müşteri listedeki kayıtlı araçtan çıkarılır, kendiliğinden eklenmez; onaylanınca plaka kaydıyla eklenir
+  await expect(panel).toContainText('listedeki diğer kayıtlı araçlardan');
+  await expect(panel).toContainText('ETL LOJ - ERVİN MUTLU olarak alındı');
+  await expect(panel.locator('[data-action="msg-apply"]', { hasText: 'Plaka kaydıyla ekle' })).toHaveCount(3);
+  const all = panel.locator('[data-action="msg-all"]');
+  await expect(all).toHaveText('Hepsini uygula (3)');
+  let asked = '';
+  page.once('dialog', d => { asked = d.message(); d.accept(); });
+  await all.click();
+  await expect.poll(async () => (await writes()).length).toBe(7); // 1 + 3 × (plaka kaydı + geliş)
+  expect(asked).toContain('CT 04 LLA - CT 05 LLA · ETL LOJ - ERVİN MUTLU');
+  expect(asked).toContain('(yeni plaka kaydıyla)');
+  const reg = await page.evaluate(() => window.__db.registry.filter(r => r.plate.startsWith('CT ')).map(r => [r.plate, r.customer]));
+  expect(reg.sort()).toEqual([['CT 04 LLA - CT 05 LLA', 'ETL LOJ - ERVİN MUTLU'], ['CT 40 BWT - CT 41 BWT', 'ETL LOJ - ERVİN MUTLU'], ['CT 6913 PB - CT 2803 EH', 'ETL LOJ - ERVİN MUTLU']]);
+  const vis = await page.evaluate(() => window.__db.visits.filter(v => v.plate.startsWith('CT ')).map(v => [v.plate, v.declaration, v.note, v.visit_date]));
+  expect(vis.sort()).toEqual([
+    ['CT 04 LLA - CT 05 LLA', 'TALIA', '90 EURO', '2026-09-24'],             // tek firma: firma adı beyannameye
+    ['CT 40 BWT - CT 41 BWT', 'UPLASS', '90 EURO', '2026-09-24'],
+    ['CT 6913 PB - CT 2803 EH', 'PARSİYEL', '90 EURO · 1.UĞURLAR PLS. · 2.DEMİR PLASTİK', '2026-09-24']
+  ]);
+  await expect(panel).toContainText('plaka kayıtlarına işlendi');
+  expect(problems).toEqual([]);
 });
 
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {

@@ -91,7 +91,14 @@ Return one item per vehicle (or per tractor + trailer pair) mentioned:
   "Thursday": the next such day, today counts if it is that weekday), "23.10", "23 Ekim", "23/10/2026" using today's date.
   A date that applies to the whole message applies to every vehicle that has no date of its own. "" if no date is given.
 - time: "HH:MM" (24 h) if an arrival time is given, else "".
-- note: a very short Turkish remark worth keeping (driver name or phone, cargo, declaration number), else "".
+- parties: the companies listed under this vehicle (cargo owners / consignees), usually a numbered list directly below the
+  plates ("1.GALATA PETROL OTOMOTIV", "2.PLASTEK PLASTIK"...). Names only, without the number, as written, at most 15. [] if none.
+- fee: a price or fee written next to the vehicle, e.g. "(90 EURO)" gives "90 EURO", else "".
+- note: a very short Turkish remark worth keeping (driver name or phone, cargo, declaration number), else "". Do not repeat
+  the parties or the fee here.
+Long lists repeat one pattern: a line with a plate pair ("PB 7831 KT - PB 7569 EB (90 EURO)"), then the numbered companies of
+that vehicle, then a blank line, then the next vehicle. Each such block is ONE item (tractor and trailer are the two plates
+on the line). The companies are NOT vehicles and their numbers are not dates.
 Also return "customer": the company name if the sender signs or names one, else "".
 If the message mentions no vehicle plate (greeting, question, thanks...), return an empty "items" list and explain in "problem"
 (Turkish, one short sentence). Never invent or complete a plate: if a character is unclear, leave that vehicle out and say so in "problem".`;
@@ -109,7 +116,9 @@ const TEXT_SCHEMA = {
           trailer: { type: 'STRING' },
           date: { type: 'STRING' },
           time: { type: 'STRING' },
-          note: { type: 'STRING' }
+          note: { type: 'STRING' },
+          parties: { type: 'ARRAY', items: { type: 'STRING' } },
+          fee: { type: 'STRING' }
         },
         required: ['action', 'tractor']
       }
@@ -211,7 +220,10 @@ const cleanText = today => (parsed, model) => {
       tractor: plateOf(v?.tractor), trailer: plateOf(v?.trailer),
       date: d && Date.parse(d + 'T12:00:00Z') >= lo && Date.parse(d + 'T12:00:00Z') <= hi ? d : '',
       time: /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : '',
-      note: String(v?.note || '').replace(/\s+/g, ' ').trim().slice(0, 120)
+      note: String(v?.note || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+      // araçtaki yük sahibi firmalar ("1.GALATA PETROL" → "GALATA PETROL") ve yazılmışsa ücret ("90 EURO")
+      parties: (Array.isArray(v?.parties) ? v.parties : []).map(x => String(x || '').replace(/^\s*\d+\s*[.)\-]\s*/, '').replace(/\s+/g, ' ').trim().slice(0, 60)).filter(Boolean).slice(0, 15),
+      fee: String(v?.fee || '').replace(/\s+/g, ' ').trim().slice(0, 30)
     };
   }).filter(v => v.tractor.length >= 4);
   return { items, customer: String(parsed?.customer || '').replace(/\s+/g, ' ').trim().slice(0, 120), problem: String(parsed?.problem || '').slice(0, 300), model };
