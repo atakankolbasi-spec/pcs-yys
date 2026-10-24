@@ -61,6 +61,29 @@ Her çekici-dorse çifti bir araç sayılır; altındaki firmalar o aracın yük
 **"Aracı yarına al" gibi cümleler:** Araç panoda zaten açıksa (o gün kaydı yoksa) yeni geliş açılmaz, **mevcut kayıt**
 yeni güne taşınır. Ayrı bir geliş istiyorsanız kartta **Yeni geliş olarak ekle**.
 
+### Sohbetle kayıt düzeltme ve soru sorma
+
+Aynı pencereden panodaki kayıtları düzeltebilir ve pano hakkında soru sorabilirsiniz:
+
+- **Düzeltme:** "24. sıradaki aracın müşterisini ETL LOJ yap", "CB 1234 AB tesiste", "34 ABC 123 T1 yazıldı, not acil",
+  "bu aracın nakliyecisi KAAN LOJ. olsun" (önce panoda araca tıklayın), "CB 1234 AB'nin saatini 14:00 yap".
+  Düzenlenebilen alanlar: müşteri, beyanname, nakliyeci, not (değiştir ya da ekle), plaka, ruhsat kilosu, saat, gün,
+  tesiste / T1 yazıldı / işlemler bitti. Sıra numarası panodaki `#` sütunudur (açık günün, ya da gün seçili değilse
+  bugünün sırası); başka günü cümlede söylemeniz yeter.
+  - Tek araç değişiyorsa hemen yapılır; sohbette "eski → yeni" olarak yazar. Bir araçta birkaç alan varsa tek
+    kayıt işleminde yapılır. Zaten öyle olan ya da bulunamayan araç ayrı satırda açıkça yazılır.
+  - **Müşteri adıyla birden fazla araç** değişecekse ("BULTRANS araçlarının beyannamesini PARSİYEL yap") önce kaç
+    aracın değişeceği yazılır, **Uygula** ya da **Vazgeç** dersiniz.
+  - Panodaki gibi, son değişiklik 10 saniye içinde **Geri al** / Ctrl+Z ile geri alınır (birkaç araç birden
+    değiştiyse yalnızca sonuncusu; bu yüzden toplu değişiklikte önce onay sorulur).
+- **Soru:** "Bugün kaç araç tesiste?", "Gelecek araçları listele", "Bugünün özeti", "ETL LOJ'un bu haftaki araçları",
+  "CB 1234 AB son kayıtları". Cevap panodaki kayıtlardan sayılır (pano bilgisi Google'a gönderilmez, yalnızca sizin
+  yazdığınız cümle gönderilir). Listedeki bir araca tıklarsanız panoda o güne gidip aracı seçer. Sorular hiçbir şeyi değiştirmez.
+
+Müşteriden WhatsApp'la gelen mesajlarda bu düzeltme ve soru özelliği **kapalıdır**: müşteri mesajı yalnızca araç
+ekleme / taşıma / iptal olarak okunur ve sizin onayınızdan geçer. Düzeltme ve soru yalnızca sizin sohbet
+penceresine yazdıklarınızda çalışır.
+
 Yapılan her şey sohbette araç araç yazar. Sohbet sayfayı yenileyince temizlenir; veritabanına yazılmaz.
 Müşteriden WhatsApp'la gelen mesajlar bekliyorsa balonda kırmızı bir sayı görünür ve panelin üstünde
 "WhatsApp'tan gelen N mesaj onayınızı bekliyor" bağlantısı çıkar (müşteri mesajları yine sizin onayınızla işlenir).

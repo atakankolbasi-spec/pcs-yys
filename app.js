@@ -1736,9 +1736,9 @@ function wmListHTML(){const rows=wmAll().filter(r=>r.status!=='yoksayildi'&&!wmD
 function wmBoxHTML(){return ai.state==='none'?'':`<details class="msg-paste"><summary>${icon('doc')}<b>Mesajdan araç ekle</b> · müşterinin yazdığı listeyi yapıştırın</summary><textarea id="msg-text" rows="5" maxlength="6000" placeholder="Örn: Yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD, CB 1234 AB. Perşembedeki 06 KL 4567 iptal.">${esc(wmsg.text)}</textarea><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-read">${icon('refresh')}Yapay zekâyla oku</button></div></details>`;}
 function wmRefresh(){const l=document.getElementById('msg-list');if(l)l.innerHTML=wmListHTML();waBadge();onlineUI();if(chat.open)chatRender();}
 /* Mesaj metnini Gemini'ye okutur (ruhsat-oku, mesaj modu). Sonuç: {data} · {none:true} kurulu değil · {err:'neden'} */
-async function wmAi(text,onPhase=()=>{}){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='';
+async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='';
  for(let i=1;i<=3;i++){let st=0,body=null;
-  try{const {data,error}=await client.functions.invoke('ruhsat-oku',{body:JSON.stringify({text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:150000});
+  try{const {data,error}=await client.functions.invoke('ruhsat-oku',{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:150000});
    if(!error&&Array.isArray(data?.items)){ai.state='on';return {data};}
    if(error){st=error.context?.status||0;if(typeof error.context?.json==='function')body=await error.context.json().catch(()=>null);}}
   catch(_){st=0;}
@@ -1807,10 +1807,10 @@ const chat={open:false,msgs:[],rows:[],seq:0,busy:false,built:false};
 /* sohbette tarih sorulurken sunulan günler: bugün ve sonraki iş günü (Pazar atlanır) */
 const chatDay=n=>{const d=weekday(TODAY)===0?addDays(TODAY,1):TODAY;return n?nextWorkday(d):d;};
 const chatShown=()=>!!account&&role==='editor'&&!VIEW_TOKEN&&!GUARD_ACCT&&!inGuard()&&ui.page!=='saha';
-const CHAT_EX=['Yarın 34 ABC 123 / PB 5678 CD ve CB 1234 AB gelecek','CB 1234 AB cuma gününe ertelendi','B 123 XYZ iptal'];
+const CHAT_EX=['Yarın 34 ABC 123 / PB 5678 CD ve CB 1234 AB gelecek','CB 1234 AB cuma gününe ertelendi','24. sıradaki aracın müşterisini ETL LOJ yap','Bugün kaç araç tesiste?'];
 function chatBuild(){if(chat.built)return;chat.built=true;const d=document.createElement('div');d.id='chat-root';
  d.innerHTML=`<button type="button" id="chat-fab" class="chat-fab" data-action="chat-toggle" aria-label="Sohbet: yazarak araç ekle" aria-expanded="false">${icon('chat','ic-chat')}${icon('close','ic-x')}<b class="chat-dot" hidden></b></button>
-<section id="chat-panel" class="chat-panel" role="dialog" aria-label="Pano asistanı" hidden><header class="chat-head"><span class="chat-ava" aria-hidden="true">AI</span><div><b>Pano asistanı</b><small>Yazın, Gemini anlasın ve panoya işlesin</small></div><button type="button" class="icon-btn" data-action="chat-toggle" aria-label="Sohbeti kapat">${icon('close')}</button></header><div id="chat-pend"></div><div id="chat-log" class="chat-log" aria-live="polite"></div><form id="chat-form" class="chat-form" autocomplete="off"><textarea id="chat-input" rows="1" maxlength="6000" placeholder="Örn: yarın 34 ABC 123 gelecek" aria-label="Mesajınız"></textarea><button type="submit" class="chat-send" aria-label="Gönder">${icon('send')}</button></form></section>`;
+<section id="chat-panel" class="chat-panel" role="dialog" aria-label="Pano asistanı" hidden><header class="chat-head"><span class="chat-ava" aria-hidden="true">AI</span><div><b>Pano asistanı</b><small>Yazın; ekler, düzeltir, sorularınızı yanıtlar</small></div><button type="button" class="icon-btn" data-action="chat-toggle" aria-label="Sohbeti kapat">${icon('close')}</button></header><div id="chat-pend"></div><div id="chat-log" class="chat-log" aria-live="polite"></div><form id="chat-form" class="chat-form" autocomplete="off"><textarea id="chat-input" rows="1" maxlength="6000" placeholder="Örn: yarın 34 ABC 123 gelecek" aria-label="Mesajınız"></textarea><button type="submit" class="chat-send" aria-label="Gönder">${icon('send')}</button></form></section>`;
  document.body.appendChild(d);}
 function chatSummary(row){const n=row.ai.items.length,done=Object.values(row.applied||{}).filter(a=>a.r==='eklendi'||a.r==='tasindi'||a.r==='silindi').length,wait=row.ai.items.filter((_,i)=>!row.applied?.[i]).length;
  return `${n} araç anladım${done?`; ${done} tanesini panoya işledim`:''}${wait?`. ${wait} tanesi için onayınız gerekiyor:`:'. Hepsi tamam ✓'}`;}
@@ -1820,10 +1820,11 @@ function chatMsgHTML(m){if(m.who==='me')return `<div class="chat-msg me"><div cl
   const ask=row?.ask?`<p><b>Mesajda tarih yok.</b> Bu ${row.ai.items.length} aracı hangi güne yazayım?</p><div class="chat-chips chat-days"><button type="button" class="chat-chip" data-action="chat-day" data-row="${esc(row.id)}" data-d="${chatDay(0)}">Bugün · ${esc(fmt(chatDay(0)))}</button><button type="button" class="chat-chip" data-action="chat-day" data-row="${esc(row.id)}" data-d="${chatDay(1)}">Yarın · ${esc(fmt(chatDay(1)))}</button></div>`:'';
   const pend=row&&!row.ask?row.ai.items.filter((_,i)=>!row.applied?.[i]&&wmItem(row,i).go).length:0;
   body=row?`<p>${esc(chatSummary(row))}</p>${ask}${row.ai.items.map((_,i)=>wmItemHTML(row,i)).join('')}${pend>1?`<div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-all" data-row="${esc(row.id)}">${icon('check')}Hepsini uygula (${pend})</button></div>`:''}${row.ai.problem?`<div class="rs-note">${esc(row.ai.problem)}</div>`:''}`:'';}
+ else if(m.html)body=m.html+(m.plan&&!m.plan.done?`<div class="rs-acts"><button type="button" class="btn primary small" data-action="chat-plan" data-k="${m.id}">${icon('check')}Uygula (${m.plan.jobs.length} araç)</button><button type="button" class="btn text small" data-action="chat-plan-no" data-k="${m.id}">Vazgeç</button></div>`:'');
  else body=`<p>${esc(m.text)}</p>`;
  return `<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub${m.error?' err':''}">${body}</div></div>`;}
 function chatRender(){const log=document.getElementById('chat-log');if(!log)return;
- const hello=`<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub"><p>Merhaba! Gelecek, ertelenen ya da iptal edilen araçları yazın; ben okuyup panoya işleyeyim. Silme ve emin olamadıklarımı size sorarım.</p><div class="chat-chips">${CHAT_EX.map(t=>`<button type="button" class="chat-chip" data-action="chat-ex" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div></div>`;
+ const hello=`<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub"><p>Merhaba! Gelecek, ertelenen ya da iptal edilen araçları yazın; kayıtları düzeltin (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”) ya da soru sorun (“bugün kaç araç tesiste?”). Ben okuyup panoya işleyeyim. Silme, toplu değişiklik ve emin olamadıklarımı size sorarım.</p><div class="chat-chips">${CHAT_EX.map(t=>`<button type="button" class="chat-chip" data-action="chat-ex" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div></div>`;
  const stick=chat.busy||log.scrollHeight-log.scrollTop-log.clientHeight<80;log.innerHTML=hello+chat.msgs.map(chatMsgHTML).join('');if(stick)log.scrollTop=log.scrollHeight;
  /* gün sorusu cevabın en üstündedir; uzun listede kaybolmasın diye cevabın başına kaydırılır */
  const lastM=chat.msgs[chat.msgs.length-1],qa=lastM?.rowId&&chat.rows.find(r=>r.id===lastM.rowId)?.ask?log.querySelector('.chat-msg.ai:last-child'):null;
@@ -1839,26 +1840,86 @@ function chatDot(){const n=wmPending(),dot=document.querySelector('#chat-fab .ch
 function chatGrow(){const i=document.getElementById('chat-input');if(!i)return;i.style.height='auto';i.style.height=Math.min(120,i.scrollHeight)+'px';}
 /* hazır ekleme ve taşımalar kendiliğinden işlenir; panoda zaten olanlar kapatılır. Silme ve emin olunamayanlar bekler. */
 async function chatAuto(row){for(let i=0;i<row.ai.items.length;i++){const x=wmItem(row,i);if(row.applied?.[i]||!(x.ready||x.mode==='mevcut'||x.mode==='none'))continue;if(!(await wmApply(row,i)))break;chatRender();}}
+/* ---- sohbetle sorgu: Gemini yalnızca ne sorulduğunu çıkarır; sayım ve liste burada, pano verisinden hesaplanır
+   (pano kayıtları Google'a gönderilmez) ---- */
+const CQ_ST={onsite:'tesiste',waiting:'gelecek',t1:'T1 yazıldı',done:'tamamlanan',open:'bitmemiş'};
+const cqHit=(v,st)=>st==='onsite'?(v.onsite&&!v.done):st==='waiting'?(!v.onsite&&!v.done):st==='t1'?!!v.t1:st==='done'?!!v.done:st==='open'?!v.done:true;
+const cqState=v=>v.done?'Bitti':v.onsite&&v.t1?'Tesiste · T1':v.onsite?'Tesiste':v.t1?'T1 yazıldı':'Gelecek';
+const cqCust=(v,c)=>!c||norm(v.customer||'').includes(norm(c));
+function chatQuery(q){const day=q.date||chatDay(0),scope=q.plate?'Son kayıtlar':q.week?`${ui.week}. hafta`:fmt(day,{day:'numeric',month:'long'});
+ const base=(q.plate?state.visits.filter(v=>compactPlate(v.plate).includes(q.plate)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8):q.week?weekVisits():state.visits.filter(v=>v.date===day)).filter(v=>cqCust(v,q.customer));
+ const rows=base.filter(v=>cqHit(v,q.status)),what=[q.customer,q.status?CQ_ST[q.status]:'',q.plate?fmtCompactPlate(q.plate):''].filter(Boolean).join(' · '),head=`<b>${esc(scope)}${what?' · '+esc(what):''}</b>`;
+ if(q.kind==='summary'){const n=f=>base.filter(f).length;
+  return `<p>${head}</p><div class="chat-sum"><span><b>${base.length}</b>Toplam</span><span><b>${n(v=>cqHit(v,'onsite'))}</b>Tesiste</span><span><b>${n(v=>cqHit(v,'waiting'))}</b>Gelecek</span><span><b>${n(v=>v.t1&&!v.done)}</b>T1 yazıldı</span><span><b>${n(v=>v.done)}</b>Biten</span></div>`;}
+ const list=q.kind==='list'&&rows.length?rows.slice(0,12).map(v=>`<button type="button" class="chat-row" data-action="chat-go" data-id="${esc(v.id)}">${plateHTML(v.plate,'sm',v.carrier)}<span>${esc(v.customer||'Müşterisiz')}${q.week||q.plate?' · '+esc(fmt(v.date,{day:'numeric',month:'short'})):''}</span><i>${esc(cqState(v))}</i></button>`).join('')+(rows.length>12?`<small>… ve ${rows.length-12} araç daha</small>`:''):'';
+ return `<p>${head}: <b>${rows.length}</b> araç</p>${list}`;}
+/* ---- sohbetle düzeltme: kaydı bul, değişiklikleri araç başına tek işlemde uygula ---- */
+const FE_TR={customer:'Müşteri',declaration:'Beyanname',carrier:'Nakliyeci',note:'Not',note_add:'Not',plate:'Plaka',registration:'Ruhsat',time:'Saat',date:'Tarih',onsite:'Tesiste',t1:'T1 yazıldı',done:'İşlemler bitti'};
+const ceKey=f=>f==='note_add'?'note':f==='date'?'date':f;
+function ceCustomer(name){const names=[...new Set([...state.registry,...state.visits].map(r=>r.customer).filter(Boolean))],n=norm(name),exact=names.find(x=>norm(x)===n);if(exact)return exact;
+ const hit=n.length>=4?names.filter(x=>norm(x).includes(n)||n.includes(norm(x))):[];return hit.length===1?hit[0]:String(name).toLocaleUpperCase('tr-TR');}
+function ceValue(cur,f,val){switch(f){case 'customer':return ceCustomer(val);case 'plate':return plateText(val);case 'registration':return kgText(val);
+  case 'note_add':return cur.note?`${cur.note} · ${val}`:val;case 'date':return weekday(val)===0?addDays(val,1):val;case 'onsite':case 't1':case 'done':return val==='true';default:return val;}}
+const ceShow=(f,x)=>f==='onsite'||f==='t1'||f==='done'?(x?'evet':'hayır'):f==='date'?fmt(x):(x===''||x==null?'boş':String(x));
+function ceTargets(e){const day=e.date||(ui.day!=='all'?ui.day:defaultDate());
+ if(e.selected){const v=state.visits.find(x=>x.id===(panelId||ui.selected));return v?{rows:[v]}:{err:'Seçili araç yok; panoda bir araca tıklayın.'};}
+ if(e.position){const rows=sortRows(state.visits.filter(v=>v.date===day)),v=rows[e.position-1];return v?{rows:[v]}:{err:`${fmt(day)} gününde ${e.position}. sırada araç yok (o gün ${rows.length} araç var).`};}
+ if(e.plate){const p=e.plate,all=state.visits.filter(v=>{const [a,b]=splitPlate(v.plate).map(compactPlate);return a===p||b===p||compactPlate(v.plate)===p;});
+  let c=e.date?all.filter(v=>v.date===e.date):all.filter(v=>!v.done&&v.date>=addDays(TODAY,-3));
+  if(!c.length&&!e.date)c=all.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,1);
+  if(!c.length)return {err:`${fmtCompactPlate(p)} panoda bulunamadı.`};
+  if(c.length>1)c=[c.find(v=>v.date===day)||c.slice().sort((a,b)=>Math.abs(dateObj(a.date)-dateObj(TODAY))-Math.abs(dateObj(b.date)-dateObj(TODAY)))[0]];
+  return {rows:[c[0]]};}
+ if(e.customer){const rows=state.visits.filter(v=>v.date===day&&cqCust(v,e.customer));return rows.length?{rows,bulk:rows.length>1}:{err:`${fmt(day)} gününde “${e.customer}” müşterisinin aracı yok.`};}
+ return {err:'Hangi araç olduğunu anlayamadım.'};}
+function cePlan(edits){const jobs=new Map(),lines=[];let bulk=false;
+ for(const e of edits){const t=ceTargets(e);if(t.err){lines.push({bad:true,text:t.err});continue;}if(t.bulk)bulk=true;
+  for(const v of t.rows){const j=jobs.get(v.id)||{id:v.id,ch:[]};j.ch.push([e.field,e.value]);jobs.set(v.id,j);}}
+ return {jobs:[...jobs.values()],lines,bulk};}
+async function ceRun(plan){const out=[...plan.lines];
+ for(const j of plan.jobs){const v=state.visits.find(x=>x.id===j.id);if(!v){out.push({bad:true,text:'Kayıt bu arada silinmiş.'});continue;}
+  const cur={...v},diff=[];for(const [f,val] of j.ch){const k=ceKey(f),nv=ceValue(cur,f,val);if(nv===''||nv==null||nv===cur[k])continue;diff.push([f,cur[k],nv]);cur[k]=nv;}
+  if(!diff.length){out.push({text:`${v.plate}: zaten böyle, değişiklik yok.`});continue;}
+  const ok=await mutate(s=>{const x=s.visits.find(y=>y.id===j.id);if(x)for(const [f,,nv] of diff)x[ceKey(f)]=nv;});
+  if(ok)justChangedMap.set(j.id,Date.now());
+  out.push(ok?{ok:true,text:`${v.plate} · ${diff.map(([f,o,n])=>`${FE_TR[f]}: ${ceShow(f,o)} → ${ceShow(f,n)}`).join('; ')}`}:{bad:true,text:`${v.plate}: kaydedilemedi.`});}
+ return out;}
+const ceHTML=out=>`<p>${out.every(x=>x.bad)?'Yapamadım:':out.some(x=>x.bad)?'Kısmen yaptım:':'Düzelttim:'}</p>${out.map(x=>`<div class="rs-note${x.bad?' warn':''}">${x.bad?'⚠':'✓'} ${esc(x.text)}</div>`).join('')}`;
+function cePlanHTML(plan){const names=plan.jobs.slice(0,8).map(j=>{const v=state.visits.find(x=>x.id===j.id);return v?`${esc(v.plate)} · ${esc(v.customer||'Müşterisiz')}`:'';}).filter(Boolean);
+ const what=[...new Set(plan.jobs.flatMap(j=>j.ch.map(([f,val])=>`${FE_TR[f]}: ${f==='onsite'||f==='t1'||f==='done'?(val==='true'?'evet':'hayır'):val}`)))].join('; ');
+ return `<p><b>${plan.jobs.length} araç</b> değişecek (${esc(what)}):</p>${names.map(n=>`<div class="rs-note">${n}</div>`).join('')}${plan.jobs.length>8?`<div class="rs-note">… ve ${plan.jobs.length-8} araç daha</div>`:''}${plan.lines.map(x=>`<div class="rs-note warn">⚠ ${esc(x.text)}</div>`).join('')}`;}
 async function chatSend(text){text=String(text||'').trim();const inp=document.getElementById('chat-input');if(text.length<4||chat.busy)return;
  if(!canEdit()){chat.msgs.push({who:'ai',error:true,text:navigator.onLine===false?'İnternet bağlantısı yok; şu an değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (yetkiniz yok ya da bir kayıt işlemi sürüyor). Biraz sonra tekrar deneyin.'});chatRender();return;}
  chat.busy=true;if(inp){inp.value='';chatGrow();}
  chat.msgs.push({who:'me',text});const typing={who:'ai',typing:true,phase:''};chat.msgs.push(typing);chatRender();
  const out=m=>{const k=chat.msgs.indexOf(typing);if(k>=0)chat.msgs.splice(k,1);chat.msgs.push(m);};
- try{const r=await wmAi(text,t=>{typing.phase=t;chatRender();});
+ try{const r=await wmAi(text,t=>{typing.phase=t;chatRender();},true);
   if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
   else if(r.err){out({who:'ai',error:true,text:'Okuyamadım: '+r.err+'. Biraz sonra tekrar yazın.'});if(inp&&!inp.value){inp.value=text;chatGrow();}}
-  else{const d=r.data;
-   if(!d.items.length)out({who:'ai',text:'Mesajda araç plakası bulamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Şimdilik yalnızca gelecek, ertelenen ya da iptal edilen araçları işleyebiliyorum (plakayı ve günü yazın). Panodaki bir kaydı düzeltmek için o satıra tıklayıp “Kaydı düzenle”yi kullanın.'});
-   else{const row={id:'chat-'+(++chat.seq),local:true,chat:true,day:weekday(TODAY)===0?addDays(TODAY,1):TODAY,from_number:'',sender_name:'',body:text,status:'bekliyor',applied:{},created_at:new Date().toISOString(),ai:{items:d.items,customer:d.customer||'',problem:d.problem||'',model:d.model||''}};
+  else{const d=r.data,items=d.items||[],edits=d.edits||[],queries=d.queries||[];
+   /* 1) sorular: yalnızca okur */
+   for(const q of queries)out({who:'ai',html:chatQuery(q)});
+   /* 2) düzeltmeler: tek araçsa hemen uygulanır; müşteri adıyla birden fazla araç değişecekse önce onay sorulur */
+   if(edits.length){const plan=cePlan(edits);
+    if(plan.bulk&&plan.jobs.length>1)out({who:'ai',id:++chat.seq,plan,html:cePlanHTML(plan)});
+    else{chatRender();out({who:'ai',html:ceHTML(await ceRun(plan))});}}
+   /* 3) araç bildirimleri */
+   if(items.length){const row={id:'chat-'+(++chat.seq),local:true,chat:true,day:weekday(TODAY)===0?addDays(TODAY,1):TODAY,from_number:'',sender_name:'',body:text,status:'bekliyor',applied:{},created_at:new Date().toISOString(),ai:{items,customer:d.customer||'',problem:d.problem||'',model:d.model||''}};
     chat.rows.push(row);
     /* iki ya da daha fazla araçta hiç tarih yazmıyorsa yanlış güne toplu kayıt açmamak için önce gün sorulur */
-    row.ask=d.items.filter(v=>v.action!=='cancel'&&!v.date).length>=2;
-    out({who:'ai',rowId:row.id});chatRender();if(!row.ask)await chatAuto(row);}}}
+    row.ask=items.filter(v=>v.action!=='cancel'&&!v.date).length>=2;
+    out({who:'ai',rowId:row.id});chatRender();if(!row.ask)await chatAuto(row);}
+   if(!items.length&&!edits.length&&!queries.length)out({who:'ai',text:'Bunu anlayamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Şunları yazabilirsiniz: gelecek / ertelenen / iptal edilen araçlar (plaka ve gün), kayıt düzeltme (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”), soru (“bugün kaç araç tesiste?”).'});}}
  catch(e){out({who:'ai',error:true,text:'Bir sorun oldu: '+(e?.message||e)});}
  finally{chat.busy=false;chatRender();}}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="chat-"]');if(!b)return;const a=b.dataset.action;
  if(a==='chat-toggle')return chatToggle();
  if(a==='chat-day'){const row=chat.rows.find(r=>r.id===b.dataset.row);if(!row||!row.ask||chat.busy||!canEdit())return;chat.busy=true;row.day=b.dataset.d;row.dayChosen=true;row.ask=false;chatRender();chatAuto(row).finally(()=>{chat.busy=false;chatRender();});return;}
+ if(a==='chat-go')return kGoVisit(b.dataset.id);
+ if(a==='chat-plan'||a==='chat-plan-no'){const m=chat.msgs.find(x=>x.id===+b.dataset.k);if(!m||!m.plan||m.plan.done||chat.busy)return;
+  if(a==='chat-plan-no'){m.plan.done=true;m.html='<p>Vazgeçtim, bir şey değiştirmedim.</p>';chatRender();return;}
+  if(!canEdit())return;chat.busy=true;m.plan.done=true;m.html='<p>Uygulanıyor…</p>';chatRender();
+  ceRun(m.plan).then(o=>{m.html=ceHTML(o);}).finally(()=>{chat.busy=false;chatRender();});return;}
  if(a==='chat-ex'){const i=document.getElementById('chat-input');if(i){i.value=b.dataset.t;chatGrow();i.focus();}}});
 document.addEventListener('submit',e=>{if(e.target.id!=='chat-form')return;e.preventDefault();chatSend(document.getElementById('chat-input')?.value);});
 document.addEventListener('keydown',e=>{if(e.target.id==='chat-input'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();chatSend(e.target.value);return;}

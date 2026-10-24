@@ -5,6 +5,10 @@
 // 2) Mesaj (Content-Type: application/json, gövde {"text": "...", "today": "2026-10-22"}): bir müşterinin WhatsApp ya da
 //    e-posta mesajından gelecek / ertelenen / iptal edilen araçları (plaka, tarih, saat) çıkarır. Mesaj yalnızca VERİ
 //    sayılır; içindeki talimatlara uyulmaz. Sonuç hiçbir şeyi kendiliğinden değiştirmez, site onay ister.
+// 3) Sohbet (gövde {"text", "today", "chat": true}): yalnızca sitedeki sohbet balonu kullanır (ofis personeli yazar).
+//    Araç bildirimlerine ek olarak panodaki kayıtları düzeltme ("24. sıradaki aracın müşterisini X yap", "CB 1234 AB
+//    tesiste") ve soru ("bugün kaç araç tesiste?") isteklerini de çıkarır. Müşteri WhatsApp mesajları bu modu KULLANMAZ
+//    (whatsapp-webhook "chat" göndermez); yani bir müşteri yazısı panodaki kayıtları düzeltemez ya da sorgulatamaz.
 //
 // Google meşgulse ya da ücretsiz kullanımın dakikalık sınırı dolmuşsa fonksiyon pes etmez: aynı modeli kısa bir
 // beklemeyle bir kez daha dener, olmazsa sırayla yedek modellere geçer (her modelin ayrı sınırı vardır). Hepsi
@@ -102,6 +106,65 @@ on the line). The companies are NOT vehicles and their numbers are not dates.
 Also return "customer": the company name if the sender signs or names one, else "".
 If the message mentions no vehicle plate (greeting, question, thanks...), return an empty "items" list and explain in "problem"
 (Turkish, one short sentence). Never invent or complete a plate: if a character is unclear, leave that vehicle out and say so in "problem".`;
+
+const EDIT_FIELDS = ['customer', 'declaration', 'carrier', 'note', 'note_add', 'plate', 'registration', 'time', 'date', 'onsite', 't1', 'done'];
+const CHAT_PROMPT = (today, weekday) => `${TEXT_PROMPT(today, weekday)}
+
+THIS MESSAGE COMES FROM THE WAREHOUSE OFFICE STAFF (not from a customer), typed into the board's chat box. Besides announcing
+vehicles it may ask to CHANGE an existing board record or ask a QUESTION about the board. Return those in "edits" and "queries"
+(empty arrays if none); one message may contain several instructions. A plate that appears only in an edit or a question is NOT an
+announcement: do not put it in "items".
+
+edits: one entry per single field change.
+- Which vehicle: "plate" = the tractor plate (Latin capitals and digits only) if a plate is given; OR "position" = the row number
+  the user says ("24. sıradaki", "24 numaralı satır", "row 24"), a positive integer; OR "selected": true when they say "bu araç",
+  "seçili araç", "this one" without a plate or number; OR "customer" = a company name to change ALL of that company's vehicles of
+  the day ("BULTRANS'ın hepsi bitti"). "date" = the day of that record as YYYY-MM-DD if they name one, else "".
+- "field" and "value":
+  customer, declaration, carrier, note, plate: the new text exactly as written (plate: Latin capitals, tractor and trailer
+  separated by " - ").  note_add: text to ADD to the existing note.  registration: the registration weight, digits only ("15400").
+  time: arrival time HH:MM.  date: the new arrival date YYYY-MM-DD (use this to move a vehicle named by row number or "this
+  vehicle"; if it is named by plate, use an "items" entry with action "move" instead).
+  onsite / t1 / done: "true" or "false". onsite = "tesiste" (the vehicle is inside the facility), t1 = "T1 yazıldı",
+  done = "işlemler bitti / tamamlandı / bitti".
+Examples: "24. sıradaki aracın müşterisini ETL LOJ yap" -> [{position:24, field:"customer", value:"ETL LOJ"}];
+"CB 1234 AB tesiste" -> [{plate:"CB1234AB", field:"onsite", value:"true"}]; "bu aracı bitti yap" -> [{selected:true, field:"done",
+value:"true"}]; "BULTRANS'ın hepsi T1 yazıldı" -> [{customer:"BULTRANS", field:"t1", value:"true"}].
+
+queries: one entry per question. kind = "summary" (overall counts), "count" (how many) or "list" (which vehicles; also questions
+about one plate such as "34 ABC 123 ne durumda"). status = "onsite" (tesiste), "waiting" (gelecek / bekleyen: not arrived yet),
+"t1", "done" (tamamlanan / biten), "open" (not finished) or "" for all. Optional customer, plate (tractor, Latin capitals and
+digits), date (YYYY-MM-DD, default today) and week (true when they ask about the whole week).
+Examples: "bugün kaç araç tesiste?" -> [{kind:"count", status:"onsite"}]; "BULTRANS'ın bekleyen araçları" ->
+[{kind:"list", status:"waiting", customer:"BULTRANS"}]; "günün özeti" -> [{kind:"summary"}].`;
+
+const chatSchema = () => {
+  const s = JSON.parse(JSON.stringify(TEXT_SCHEMA));
+  s.properties.edits = {
+    type: 'ARRAY',
+    items: {
+      type: 'OBJECT',
+      properties: {
+        plate: { type: 'STRING' }, position: { type: 'INTEGER' }, selected: { type: 'BOOLEAN' },
+        customer: { type: 'STRING' }, date: { type: 'STRING' },
+        field: { type: 'STRING', enum: EDIT_FIELDS }, value: { type: 'STRING' }
+      },
+      required: ['field', 'value']
+    }
+  };
+  s.properties.queries = {
+    type: 'ARRAY',
+    items: {
+      type: 'OBJECT',
+      properties: {
+        kind: { type: 'STRING', enum: ['summary', 'count', 'list'] }, status: { type: 'STRING' },
+        customer: { type: 'STRING' }, plate: { type: 'STRING' }, date: { type: 'STRING' }, week: { type: 'BOOLEAN' }
+      },
+      required: ['kind']
+    }
+  };
+  return s;
+};
 
 const TEXT_SCHEMA = {
   type: 'OBJECT',
@@ -229,6 +292,32 @@ const cleanText = today => (parsed, model) => {
   return { items, customer: String(parsed?.customer || '').replace(/\s+/g, ' ').trim().slice(0, 120), problem: String(parsed?.problem || '').slice(0, 300), model };
 };
 
+// Sohbet modu: araç bildirimlerine ek olarak düzeltme ve soru istekleri. Geçersiz alanlar atılır; hiçbir değer panoya
+// doğrudan gitmez, site her birini yeniden doğrular.
+const cleanChat = today => (parsed, model) => {
+  const base = cleanText(today)(parsed, model);
+  const lo = Date.parse(today + 'T12:00:00Z') - 400 * 86400000, hi = Date.parse(today + 'T12:00:00Z') + 400 * 86400000;
+  const inWindow = d => d && Date.parse(d + 'T12:00:00Z') >= lo && Date.parse(d + 'T12:00:00Z') <= hi ? d : '';
+  const text = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const edits = (Array.isArray(parsed?.edits) ? parsed.edits : []).slice(0, 40).map(e => {
+    const field = EDIT_FIELDS.includes(e?.field) ? e.field : '';
+    let value = text(e?.value, field === 'note' || field === 'note_add' ? 1000 : 150);
+    if (field === 'onsite' || field === 't1' || field === 'done') value = /^(true|evet|1)$/i.test(value) ? 'true' : /^(false|hay[ıi]r|0)$/i.test(value) ? 'false' : '';
+    else if (field === 'registration') { value = value.replace(/\D/g, ''); if (value.length < 3 || value.length > 6) value = ''; }
+    else if (field === 'time') value = /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : '';
+    else if (field === 'date') value = inWindow(isoDay(value));
+    else if (field === 'plate') { value = value.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').trim(); if (plateOf(value).length < 4) value = ''; }
+    const position = Number.isInteger(e?.position) && e.position >= 1 && e.position <= 500 ? e.position : 0;
+    return { plate: plateOf(e?.plate), position, selected: e?.selected === true, customer: text(e?.customer, 150), date: isoDay(text(e?.date, 10)), field, value };
+  }).filter(e => e.field && e.value && (e.plate || e.position || e.selected || e.customer));
+  const queries = (Array.isArray(parsed?.queries) ? parsed.queries : []).slice(0, 5).map(q => ({
+    kind: ['summary', 'count', 'list'].includes(q?.kind) ? q.kind : '',
+    status: ['onsite', 'waiting', 't1', 'done', 'open'].includes(q?.status) ? q.status : '',
+    customer: text(q?.customer, 150), plate: plateOf(q?.plate), date: isoDay(text(q?.date, 10)), week: q?.week === true
+  })).filter(q => q.kind);
+  return { ...base, edits, queries };
+};
+
 // Gemini'ye sorar: istenen model olmazsa sırayla yedek modelleri dener (ayrıntı dosyanın başındaki açıklamada).
 async function ask(parts, schema, clean) {
   const start = Date.now(), left = () => BUDGET_MS - (Date.now() - start);
@@ -284,6 +373,8 @@ export async function handle(req) {
     if (!text || text.length > MAX_TEXT) return json(400, { error: `Mesaj boş ya da ${MAX_TEXT} karakterden uzun`, fatal: true });
     const today = isoDay(String(body?.today || '')) || istanbulToday();
     const weekday = WEEKDAYS[new Date(today + 'T12:00:00Z').getUTCDay()];
+    // Sohbet modu yalnızca siteden ({chat: true}) gelir; müşteri mesajları (whatsapp-webhook) bu bayrağı göndermez.
+    if (body?.chat === true) return ask([{ text: `${CHAT_PROMPT(today, weekday)}\n\n<<<MESSAGE\n${text}\nMESSAGE>>>` }], chatSchema(), cleanChat(today));
     return ask([{ text: `${TEXT_PROMPT(today, weekday)}\n\n<<<MESSAGE\n${text}\nMESSAGE>>>` }], TEXT_SCHEMA, cleanText(today));
   }
 

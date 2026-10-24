@@ -209,6 +209,58 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     expect(props.fee).toEqual({ type: 'STRING' });
   });
 
+  test('sohbet modu: düzeltme ve soru istekleri çıkarılır, değerler sadeleştirilir; müşteri modu bunları hiç döndürmez', async () => {
+    let sent;
+    const gem = { items: [], customer: '', problem: '',
+      edits: [
+        { plate: '', position: 24, selected: false, customer: '', date: '', field: 'customer', value: ' ETL  LOJ ' },
+        { plate: 'cb-1234 ab', position: 0, selected: false, customer: '', date: '2026-10-23', field: 'onsite', value: 'Evet' },
+        { plate: '', position: 0, selected: true, customer: '', date: '', field: 'registration', value: '15.400 kg' },
+        { plate: '', position: 0, selected: false, customer: 'BULTRANS', date: '', field: 'done', value: 'true' },
+        { plate: '', position: 3, selected: false, customer: '', date: '', field: 'time', value: '25:99' },                  // geçersiz saat: atılır
+        { plate: '', position: 3, selected: false, customer: '', date: '', field: 'date', value: '1999-01-01' },           // çok eski tarih: atılır
+        { plate: '', position: 3, selected: false, customer: '', date: '', field: 'plate', value: 'ab' },                  // çok kısa plaka: atılır
+        { plate: '', position: 0, selected: false, customer: '', date: '', field: 'carrier', value: 'KAAN' },              // hangi araç belli değil: atılır
+        { plate: 'X1', position: 0, selected: false, customer: '', date: '', field: 'sil', value: 'x' },                   // bilinmeyen alan: atılır
+        { plate: '', position: 5, selected: false, customer: '', date: '', field: 'note_add', value: ' ek   not ' },
+        { plate: '', position: 7, selected: false, customer: '', date: '', field: 'date', value: '2026-10-25' }
+      ],
+      queries: [
+        { kind: 'count', status: 'onsite', customer: ' BULTRANS ', plate: '', date: '', week: false },
+        { kind: 'list', status: 'bilinmeyen', customer: '', plate: '34 abc 123', date: '2026-10-22', week: true },
+        { kind: 'hesapla', status: '', customer: '', plate: '', date: '', week: false }                                    // bilinmeyen tür: atılır
+      ] };
+    const { post } = await setup({ gemini: (url, body) => { sent = body; return answer(gem); } });
+    const chat = await (await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: '24. sıradaki aracın müşterisini ETL LOJ yap', today: '2026-10-22', chat: true }))).json();
+    expect(chat.edits).toEqual([
+      { plate: '', position: 24, selected: false, customer: '', date: '', field: 'customer', value: 'ETL LOJ' },
+      { plate: 'CB1234AB', position: 0, selected: false, customer: '', date: '2026-10-23', field: 'onsite', value: 'true' },
+      { plate: '', position: 0, selected: true, customer: '', date: '', field: 'registration', value: '15400' },
+      { plate: '', position: 0, selected: false, customer: 'BULTRANS', date: '', field: 'done', value: 'true' },
+      { plate: '', position: 5, selected: false, customer: '', date: '', field: 'note_add', value: 'ek not' },
+      { plate: '', position: 7, selected: false, customer: '', date: '', field: 'date', value: '2026-10-25' }
+    ]);
+    expect(chat.queries).toEqual([
+      { kind: 'count', status: 'onsite', customer: 'BULTRANS', plate: '', date: '', week: false },
+      { kind: 'list', status: '', customer: '', plate: '34ABC123', date: '2026-10-22', week: true }
+    ]);
+    // sohbet istemi personelden geldiğini, araç yoksa plakanın bildirim sayılmayacağını ve alan adlarını anlatır
+    const prompt = sent.contents[0].parts[0].text;
+    expect(prompt).toContain('WAREHOUSE OFFICE STAFF');
+    expect(prompt).toContain('is NOT an\nannouncement');
+    expect(prompt).toContain('note_add');
+    const props = sent.generationConfig.responseSchema.properties;
+    expect(props.edits.items.properties.field.enum).toContain('onsite');
+    expect(props.queries.items.properties.kind.enum).toEqual(['summary', 'count', 'list']);
+    // müşteri modu (chat bayrağı yok): Gemini düzeltme döndürse bile cevapta yoktur ve istem sohbet kurallarını içermez
+    const customer = await setup({ gemini: (url, body) => { sent = body; return answer({ ...gem, items: [{ action: 'add', tractor: 'CB1234AB', trailer: '', date: '', time: '', note: '' }] }); } });
+    const plain = await (await customer.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'Yarın CB 1234 AB gelecek', today: '2026-10-22' }))).json();
+    expect(Object.keys(plain).sort()).toEqual(['customer', 'items', 'model', 'problem']);
+    expect(plain.items.length).toBe(1);
+    expect(sent.contents[0].parts[0].text).not.toContain('WAREHOUSE OFFICE STAFF');
+    expect(sent.generationConfig.responseSchema.properties.edits).toBeUndefined();
+  });
+
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {
     let sent;
     const { post } = await setup({ gemini: (url, body) => { sent = body; return answer({ items: [], problem: 'Mesajda plaka yok.' }); } });
