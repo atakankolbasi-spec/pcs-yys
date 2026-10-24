@@ -234,7 +234,7 @@ test('ayarlar sayfası: bölümler, tema, vurgu rengi, köşe, animasyon, karş�
   const problems = await openApp(page);
   await page.locator('.nav-item[data-page="settings"]').click();
   // sol listede bölümler; ilk açılan Görünüm
-  await expect(page.locator('.k-stab')).toHaveCount(11);
+  await expect(page.locator('.k-stab')).toHaveCount(12);
   await expect(page.locator('.k-stab.on')).toContainText('Görünüm');
   const html = () => page.evaluate(() => ({ theme: document.documentElement.dataset.theme || 'light', radius: document.documentElement.dataset.radius, nomotion: document.documentElement.classList.contains('k-nomotion'), accent: document.documentElement.style.getPropertyValue('--c-accent') }));
   // bu cihaz ayarları hemen geçerli, kaydet çubuğu çıkmaz
@@ -1935,6 +1935,77 @@ test('"Ruhsattan ekle"ye atılan liste fotoğrafı ruhsat sayılmaz: liste mesaj
   await page.locator('#ruhsat-file').setInputFiles([{ name: 'liste.png', mimeType: 'image/png', buffer: PNG1 }]);
   await expect(page.locator('.msg-card', { hasText: 'Yapıştırılan liste (resim)' })).toBeVisible();
   await expect(page.locator('.rs-item')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('uzun bekleyen araç: tesise girip işlemi bitmeyen ve eşiği aşan araç tabloda ve kartta kırmızı görünür, bildirimde listelenir; eşik Ayarlar > Uyarılar\'dan değişir', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  const mk = (id, plate, customer, extra) => ({ id, plate, customer, declaration: '', carrier: '', registration: '', visit_date: '2026-09-23', visit_time: '08:00', note: '', onsite: false, t1: false, done: false,
+    created_at: '2026-09-21T05:00:00Z', updated_at: '2026-09-21T06:00:00Z', onsite_at: null, done_at: null, sort_order: null, ...extra });
+  // şimdi 23 Eylül 10:00 (İstanbul) = 07:00Z
+  data.visits.push(
+    mk('v8', 'CB 1234 AB', 'TORNADO', { onsite: true, t1: true, onsite_at: '2026-09-21T06:00:00Z' }),   // girişinden beri 49 saat
+    mk('v9', 'B 123 XYZ', 'LİN LOJ', { onsite: true, onsite_at: '2026-09-21T03:00:00Z' }),             // 52 saat
+    mk('v10', '06 KL 4567', 'ABC NAKLİYAT', { onsite: true, onsite_at: '2026-09-22T05:00:00Z' }),      // 26 saat: 48'in altında
+    mk('v11', 'X 4455 KB', 'BULTRANS', { created_at: '2026-09-15T05:00:00Z' })                         // günlerdir "gelecek" ama tesiste değil: uyarılmaz
+  );
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const row = id => page.locator(`tr[data-row-id="${id}"]`);
+  await expect(row('v8')).toHaveClass(/row-long/);
+  await expect(row('v8').locator('.wait-badge')).toHaveText('2 gün 1 sa');
+  await expect(row('v9')).toHaveClass(/row-long/);
+  await expect(row('v9').locator('.wait-badge')).toHaveText('2 gün 4 sa');
+  await expect(row('v10')).not.toHaveClass(/row-long/);                                     // 26 saat < 48
+  await expect(row('v11')).not.toHaveClass(/row-long/);                                     // tesiste değil
+  await expect(row('v5')).not.toHaveClass(/row-long/);                                      // bugün girdi
+  await expect(page.locator('.wait-badge')).toHaveCount(2);
+  const red = await row('v9').locator('td').nth(2).evaluate(e => getComputedStyle(e).backgroundColor);
+  expect(red).toBe('rgb(255, 240, 240)');
+  // kartlar görünümü
+  await page.locator('[data-action="view-mode"][data-v="cards"]').click();
+  await expect(page.locator('.vcard.long')).toHaveCount(2);
+  await expect(page.locator('.vcard.long[data-card-id="v9"] .wait-badge')).toHaveText('2 gün 4 sa');
+  await page.locator('[data-action="view-mode"][data-v="table"]').click();
+  // bildirim zili
+  await page.locator('.notif-btn').click();
+  await expect(page.locator('.notif-panel')).toContainText('Uzun bekleyen');
+  await expect(page.locator('.notif-panel')).toContainText('2 araç 2 gün süreyi aştı: tesise girdi, işlemleri bitmedi.');
+  await page.keyboard.press('Escape');
+  // Ayarlar > Uyarılar: eşik 24 saate inince 26 saatlik araç da kırmızı olur
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-stab="alerts"]').click();
+  await expect(page.locator('[data-sk="waitHours"] .on')).toHaveText('48 saat');
+  await page.locator('[data-sk="waitHours"] [data-v="24"]').click();
+  await expect(page.locator('#save-bar')).toHaveClass(/show/);
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(row('v10')).toHaveClass(/row-long/);
+  await expect(row('v10').locator('.wait-badge')).toHaveText('26 sa');
+  // kaydedilince herkes için geçerli (günlük rapor da bu değeri okur)
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-stab="alerts"]').click();
+  await page.locator('[data-action="app-save"]').click();
+  await expect(page.locator('#toast')).toContainText('Görünüm ayarları kaydedildi');
+  expect((await page.evaluate(() => window.__db.app_settings.find(r => r.key === 'appearance').value)).waitHours).toBe('24');
+  // kapalı: hiçbir uyarı yok
+  await page.locator('[data-sk="waitHours"] [data-v="0"]').click();
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(page.locator('.wait-badge')).toHaveCount(0);
+  await expect(page.locator('tr.row-long')).toHaveCount(0);
+  await page.locator('.notif-btn').click();
+  await expect(page.locator('.notif-panel')).not.toContainText('Uzun bekleyen');
+  // işlemleri biten araç uyarıdan çıkar
+  await page.keyboard.press('Escape');
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-stab="alerts"]').click();
+  await page.locator('[data-sk="waitHours"] [data-v="48"]').click();
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(row('v8')).toHaveClass(/row-long/);
+  await row('v8').locator('label[for="chk-v8-done"]').click();
+  await expect(row('v8')).not.toHaveClass(/row-long/);
+  await expect(row('v9')).toHaveClass(/row-long/);
   expect(problems).toEqual([]);
 });
 

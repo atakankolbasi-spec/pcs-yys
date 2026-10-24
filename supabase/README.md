@@ -186,6 +186,11 @@ Kurulum (bir kez):
 5. Denemek için GitHub → **Actions → Günlük rapor maili → Run workflow** (tarih boşsa bugün). Sonuç sitede
    "Son çalışma" satırında görünür.
 
+**Uzun bekleyen araçlar:** tesise girip işlemleri bitmeden belirlenen süreyi (Ayarlar → **Uyarılar**, varsayılan 48 saat)
+aşan araçlar panoda kırmızı görünür, bildirim zilinde ve bu raporda "Uzun bekleyen araçlar" bölümünde listelenir
+(0 = kapalı). Rapordaki bölüm için `gunluk-rapor-kurulumu.sql` dosyasının son halini bir kez daha çalıştırın
+(zararsızdır); çalıştırılmazsa rapor eskisi gibi gider, yalnızca bu bölüm çıkmaz.
+
 Gizli değerler girilmeden görev hiçbir şey göndermeden biter. Gönderim başarısız olursa görev kırmızı olur,
 GitHub e-posta gönderir ve sebep Ayarlar'da "Son çalışma" satırında yazar. Rapor anahtarını bilen günlerin araç
 listesini okuyabilir; yanlış ellere geçerse Ayarlar'dan "Yeni anahtar" deyip GitHub'daki değeri güncelleyin.
