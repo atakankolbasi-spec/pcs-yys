@@ -7,7 +7,9 @@
 //   3. incoming_ruhsat tablosuna bir satır ekler ve fotoğrafa ✅ ile tepki verir.
 //   4. Google Gemini kuruluysa (GEMINI_API_KEY, supabase/GEMINI.md) fotoğrafı hemen, arka planda ruhsat-oku
 //      fonksiyonuna okutur; okunan plaka ve ağırlıkları satıra yazar. Panonun açık olmasını beklemez.
-//      Fotoğrafta hiç plaka okunamadıysa gönderene ⚠️ ile tepki verip ruhsatı yeniden çekmesini ister.
+//      Fotoğrafta ruhsat çıkmadıysa ama araç listesi varsa (müşterinin gönderdiği liste ekran görüntüsü) liste
+//      yazı mesajı gibi okunur ve onay bekleyen mesaj olarak kaydedilir (incoming_messages). Ne ruhsat ne liste
+//      okunabildiyse gönderene ⚠️ ile tepki verip ruhsatı yeniden çekmesini ister.
 //      Gemini o an okuyamazsa (sınır dolu, Google yoğun) fotoğrafı panonun açık olduğu bilgisayara bırakır;
 //      o bilgisayar bekleyip yeniden dener. Gemini kurulu değilse fotoğrafı hep o bilgisayar okur.
 //      Okunan fotoğraf "Ruhsattan ekle" penceresinde onay bekler; hiçbir araç sorulmadan panoya eklenmez.
@@ -136,19 +138,19 @@ async function saveImage(msg, media, contact, phoneId) {
   }), 'Kayıt eklenemedi');
 
   await send(phoneId, { to: msg.from, type: 'reaction', reaction: { message_id: id, emoji: '✅' } });
-  if (readHere) later(readOnServer({ id, bytes, mime, to: msg.from, phoneId }));
+  if (readHere) later(readOnServer({ id, bytes, mime, to: msg.from, phoneId, meta: { from: String(msg.from || '').replace(/\D/g, ''), name: String(contact?.profile?.name || '').slice(0, 200), caption: String(media.caption || '').slice(0, 500), at: sentAt.toISOString() } }));
 }
 
 // ruhsat-oku fonksiyonuna (Gemini) bir fotoğraf ya da mesaj okutur. ruhsat-oku yedek modelleri kendisi dener; burada
 // yalnızca hepsinin sınırı doluysa ya da Google yoğunsa biraz beklenip yeniden sorulur. valid(cevap) cevabın beklenen
 // biçimde olup olmadığını söyler. Okunamazsa null.
-async function readWith(body, contentType, valid) {
+async function readWith(body, contentType, valid, extraHeaders = {}) {
   const key = env('SUPABASE_SERVICE_ROLE_KEY'), start = Date.now(), left = () => READ_BUDGET_MS - (Date.now() - start);
   for (let i = 0; i < 3 && left() > 20000; i++) {
     let res;
     try {
       res = await fetch(env('SUPABASE_URL') + '/functions/v1/ruhsat-oku', {
-        method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': contentType }, body,
+        method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': contentType, ...extraHeaders }, body,
         signal: AbortSignal.timeout(left())
       });
     } catch (e) {
@@ -166,11 +168,13 @@ async function readWith(body, contentType, valid) {
   return null;
 }
 const readPhoto = (bytes, mime) => readWith(bytes, mime, b => Array.isArray(b?.vehicles));
+// Ruhsat çıkmayan fotoğraf: müşterinin gönderdiği araç listesinin ekran görüntüsü olabilir (ruhsat-oku "liste" modu).
+const readListPhoto = (bytes, mime, today) => readWith(bytes, mime, b => Array.isArray(b?.items), { 'x-pcs-mode': 'liste', 'x-pcs-today': today });
 const readMessage = text => readWith(JSON.stringify({ text }), 'application/json', b => Array.isArray(b?.items));
 
 // Arka planda okuma: sonucu satıra yazar. Okunamazsa satırı açık ekranlara bırakır ("yeni").
 // Satır bu arada bir ekran tarafından üstlenildiyse (claimed_by dolu) dokunulmaz.
-async function readOnServer({ id, bytes, mime, to, phoneId }) {
+async function readOnServer({ id, bytes, mime, to, phoneId, meta = {} }) {
   const where = `/rest/v1/${TABLE}?wa_message_id=eq.${encodeURIComponent(id)}&status=eq.okunuyor&claimed_by=is.null`;
   const update = body => supabase(where, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
   const r = await readPhoto(bytes, mime);
@@ -182,6 +186,8 @@ async function readOnServer({ id, bytes, mime, to, phoneId }) {
   let weights = [tractor?.empty_weight_kg, trailer?.empty_weight_kg].filter(Boolean);
   if (weights.length < 2) { const all = r.vehicles.map(v => v?.empty_weight_kg).filter(Boolean); if (all.length <= 2) weights = all; }
   const problem = String(r.problem || '').trim();
+  // Ruhsat çıkmadı: araç listesi fotoğrafı olabilir. Liste okunursa fotoğraf satırı kapanır, liste onay bekleyen mesaj olur.
+  if (!plated.length && await readAsList({ id, bytes, mime, meta, close: update })) return;
   const body = {
     status: 'bekliyor', claimed_at: null, tractor: tractor?.plate || '', trailer: trailer?.plate || '', weights, fuzzy: false,
     note: plated.length ? '' : 'Yapay zekâ ruhsatı okuyamadı' + (problem ? ' · ' + problem.slice(0, 200) : ''),
@@ -196,6 +202,31 @@ async function readOnServer({ id, bytes, mime, to, phoneId }) {
     await send(phoneId, { to, type: 'reaction', reaction: { message_id: id, emoji: '⚠️' } });
     await send(phoneId, { to, type: 'text', context: { message_id: id }, text: { body: RETAKE(problem) } });
   }
+}
+
+// Fotoğrafı araç listesi olarak okutur. Liste çıktıysa onay bekleyen mesaj olarak kaydedilir ve fotoğraf satırı kapatılır
+// (close); true döner. Liste yoksa, okunamadıysa ya da mesaj tablosu kurulu değilse false döner (çağıran ruhsat akışını sürdürür).
+async function readAsList({ id, bytes, mime, meta, close }) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
+  const r = await readListPhoto(bytes, mime, today);
+  if (!r?.items?.length) return false;
+  const res = await supabase(`/rest/v1/${MSG_TABLE}?on_conflict=wa_message_id`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify({
+      wa_message_id: id, from_number: meta.from || '', sender_name: meta.name || '',
+      body: (meta.caption ? meta.caption + '\n' : '') + '(Fotoğraftaki liste)', status: 'bekliyor', created_at: meta.at,
+      ai: { items: r.items, customer: String(r.customer || ''), problem: String(r.problem || '').trim(), model: String(r.model || ''), image: true }
+    })
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    if (/PGRST205|42P01|does not exist|schema cache/i.test(detail)) console.error('incoming_messages tablosu yok (supabase/mesaj-kurulumu.sql çalıştırılmamış).');
+    else console.error('Liste mesajı kaydedilemedi:', res.status, detail.slice(0, 300));
+    return false;
+  }
+  await must(await close({ status: 'yoksayildi', claimed_at: null, note: 'Araç listesi olarak okundu' }), 'Fotoğraf satırı kapatılamadı');
+  return true;
 }
 
 // Yazı mesajını kaydeder ve arka planda okutur. Kaydedildiyse (ya da bu mesaj zaten kayıtlıysa) true; tablo kurulu

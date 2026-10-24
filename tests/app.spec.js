@@ -1834,6 +1834,110 @@ test('sohbet: sorular panodan cevaplanır (sayı, liste, özet); listedeki araca
   expect(problems).toEqual([]);
 });
 
+const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+const NO_CARD = { vehicles: [], problem: 'Fotoğrafta ruhsat görünmüyor.' };   // ruhsat okuması: fotoğrafta ruhsat yok
+
+test('sohbete liste fotoğrafı: önce ruhsat mı diye bakılır, değilse liste okunur; fotoğraftan okunanlar kendiliğinden işlenmez, tek tek onaylanır', async ({ page }) => {
+  test.setTimeout(90000);
+  const aiText = { items: [mi('add', '06KL4567', '', '2026-09-24', { fee: '90 EURO', parties: ['GALATA PETROL'] }), mi('add', 'XX9999YY', '', '2026-09-24')], customer: 'ETL LOJ', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { ai: NO_CARD, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length);
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  await expect(panel).toContainText('ekran görüntüsünü de');
+  await expect(panel.locator('[data-action="chat-attach"]')).toBeVisible();
+  await page.locator('#chat-file').setInputFiles({ name: 'liste.png', mimeType: 'image/png', buffer: PNG1 });
+  await expect(panel.locator('.chat-msg.me .chat-img')).toBeVisible();
+  await expect(panel).toContainText('Fotoğraftan 2 araç okudum. Fotoğraftan okuduğum için hiçbirini kendiliğinden işlemedim');
+  expect(await writes()).toBe(0);                                                       // kayıtlı araç bile kendiliğinden eklenmedi
+  // iki istek: önce ruhsat okuması (başlıksız), sonra liste okuması (bugün başlıkta)
+  const calls = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => ({ type: c.type, list: c.list })));
+  expect(calls).toEqual([{ type: 'image/png' }, { type: 'image/png', list: { today: '2026-09-23' } }]);
+  // onaylayınca eklenir: ücret ve firma nota, tek firma beyannameye
+  const item = panel.locator('.msg-item').first();
+  await item.locator('[data-action="msg-apply"]').click();
+  await expect.poll(writes).toBe(1);
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.plate === '06 KL 4567' && v.visit_date === '2026-09-24'))).toMatchObject({ customer: 'ABC NAKLİYAT', declaration: 'GALATA PETROL', note: '90 EURO' });
+  expect(await page.evaluate(() => window.__db.incoming_messages.length)).toBe(0);      // sohbet veritabanına yazılmaz
+  expect(problems).toEqual([]);
+});
+
+test('sohbete ruhsat fotoğrafı: liste aranmaz, "Ruhsattan ekle" penceresinde açılır ve aynı fotoğraf ikinci kez okutulmaz; ruhsat da liste de değilse nedeni yazılır', async ({ page }) => {
+  test.setTimeout(90000);
+  const ruhsat = { vehicles: [{ plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8150, country: 'BG' }, { plate: 'PB5678CD', kind: 'trailer', empty_weight_kg: 6700, country: 'BG' }], problem: '' };
+  const problems = await openApp(page, { ai: ruhsat, aiText: { items: [], customer: '', problem: 'Mesaj yok.', model: 'x' } });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  await page.locator('#chat-file').setInputFiles({ name: 'ruhsat.png', mimeType: 'image/png', buffer: PNG1 });
+  await expect(panel).toContainText('Bu bir ruhsat fotoğrafı. “Ruhsattan ekle” penceresinde açtım');
+  await expect(page.locator('#ruhsat-box')).toBeVisible();
+  await expect(page.locator('.rs-item .rs-status').first()).toHaveText('Okundu · yapay zekâ');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);   // ikinci okuma yok
+  await page.keyboard.press('Escape');
+  // ne ruhsat ne liste
+  await page.evaluate(() => { window.__PCS_STUB.ai = { vehicles: [], problem: 'Fotoğraf bulanık.' }; });
+  await page.locator('#chat-file').setInputFiles({ name: 'bos.png', mimeType: 'image/png', buffer: PNG1 });
+  await expect(panel).toContainText('Fotoğrafta ruhsat ya da araç listesi bulamadım (Mesaj yok)');
+  expect(await page.evaluate(() => window.__calls.filter(c => ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('sohbet kutusuna yapıştırılan resim sohbete gider (Ruhsattan ekle açılmaz); büyük dosya ve eski sunucu fonksiyonu anlaşılır hata verir', async ({ page }) => {
+  test.setTimeout(90000);
+  const aiText = { items: [mi('add', '06KL4567', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { ai: NO_CARD, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  await page.locator('#chat-input').focus();
+  await page.evaluate(() => {
+    const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'ekran.png', { type: 'image/png' }));
+    document.getElementById('chat-input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator('#chat-panel')).toContainText('Fotoğraftan 1 araç okudum');
+  await expect(page.locator('#ruhsat-box')).toHaveCount(0);
+  // yazı yapıştırmak sohbeti bozmaz
+  await page.locator('#chat-input').fill('merhaba');
+  // 10 MB'tan büyük dosya sunucuya gönderilmez
+  const before = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
+  await page.locator('#chat-file').setInputFiles({ name: 'dev.png', mimeType: 'image/png', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
+  await expect(page.locator('#chat-panel')).toContainText('Fotoğraf çok büyük (en fazla 10 MB)');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(before);
+  // liste modunu bilmeyen eski sürüm fotoğrafı ruhsat gibi okur ("vehicles" döner): güncelleme istenir, tekrar tekrar denenmez
+  await page.evaluate(() => { window.__PCS_STUB.aiText = { vehicles: [], problem: '' }; });
+  await page.locator('#chat-file').setInputFiles({ name: 'liste2.png', mimeType: 'image/png', buffer: PNG1 });
+  await expect(page.locator('#chat-panel')).toContainText('ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku' && c.list).length)).toBe(2);   // 1. liste + 1. deneme (üç değil)
+  expect(problems).toEqual([]);
+});
+
+test('"Ruhsattan ekle"ye atılan liste fotoğrafı ruhsat sayılmaz: liste mesaj kartı olur; WhatsApp fotoğrafı bu bilgisayarda liste çıkarsa satır kapanır', async ({ page }) => {
+  test.setTimeout(90000);
+  const data = sampleData();
+  data.incoming_ruhsat = [waRow('w7', { caption: 'yarınki liste' })];
+  data.incoming_messages = [msgRow('m6', [mi('add', '06KL4567', '', '2026-09-24')], { ai: { items: [mi('add', '06KL4567', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test', image: true }, body: '(Fotoğraftaki liste)' })];
+  const files = { '2026-09-22/w7.png': PNG1.toString('base64') };
+  const aiText = { items: [mi('add', 'CB1234AB', '', '2026-09-24'), mi('add', 'B123XYZ', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test' };
+  const problems = await openApp(page, { data, files, ai: NO_CARD, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  // WhatsApp fotoğrafı bu ekranda okunur (sunucu okumamış): ruhsat çıkmaz, liste çıkar → satır kapanır, liste mesaj olarak onaya düşer
+  await expect.poll(async () => (await page.evaluate(() => window.__db.incoming_ruhsat.find(r => r.id === 'w7'))).status, { timeout: 30000 }).toBe('yoksayildi');
+  expect((await page.evaluate(() => window.__db.incoming_ruhsat.find(r => r.id === 'w7'))).note).toBe('Araç listesi olarak okundu');
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  const cards = page.locator('.msg-card');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.filter({ hasText: 'WhatsApp · fotoğraftaki liste' })).toHaveCount(2);        // sunucudan gelen satır ve bu ekranda okunan
+  await expect(page.locator('.rs-item')).toHaveCount(0);                                            // ruhsat kartı yok
+  await expect(page.locator('.msg-thumb img')).toHaveCount(1);                                      // bu ekranda okunanın küçük resmi
+  expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
+  // elle atılan liste fotoğrafı: yapıştırılan liste kartı
+  await page.locator('#ruhsat-file').setInputFiles([{ name: 'liste.png', mimeType: 'image/png', buffer: PNG1 }]);
+  await expect(page.locator('.msg-card', { hasText: 'Yapıştırılan liste (resim)' })).toBeVisible();
+  await expect(page.locator('.rs-item')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');

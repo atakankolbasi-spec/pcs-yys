@@ -9,6 +9,8 @@
      verilir ve ruhsatı yeniden çekip göndermesi istenir (Türkçe ve İngilizce).
    - Gemini o an okuyamazsa (kullanım sınırı dolu, Google yoğun) ya da kurulu değilse, panonun açık olduğu
      bir düzenleyici bilgisayarı okur.
+   - Fotoğraf ruhsat değil de müşterinin gönderdiği **araç listesinin ekran görüntüsü / fotoğrafı** çıkarsa liste
+     yazı mesajı gibi okunur ve "WhatsApp mesajları"nda onaya düşer (`supabase/MESAJ.md`); ⚠️ gitmez.
 3. **Hiçbir araç sorulmadan panoya eklenmez.** Okunan fotoğraflar "Ruhsattan ekle" düğmesinde rozetle
    görünür ve onay bekler:
    - **Çekici + dorse plaka kayıtlarında müşterisiyle varsa** kartta **Panoya ekle** çıkar. Birden fazlaysa

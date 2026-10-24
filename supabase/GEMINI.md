@@ -28,6 +28,10 @@ bilgisayarında okur.
 aynı fonksiyonla (`ruhsat-oku`, mesaj modu) okunur: plaka, tarih, saat ve gelecek / ertelendi / iptal. Kurulum ve
 kullanım: `supabase/MESAJ.md`.
 
+**Liste fotoğrafları da okunur:** Fotoğrafta ruhsat çıkmazsa ama müşterinin gönderdiği bir araç listesi varsa (ekran
+görüntüsü ya da liste fotoğrafı) liste mesaj gibi okunur; kurulum ve kullanım: `supabase/MESAJ.md`. Fotoğraftan
+okunan listedeki araçlar hiçbir zaman kendiliğinden eklenmez.
+
 Hangi yolla okunursa okunsun, hiçbir araç siz onaylamadan panoya eklenmez: kartta **Panoya ekle** ya da
 pencerenin üstündeki **Hepsini panoya ekle** ile eklersiniz.
 

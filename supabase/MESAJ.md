@@ -1,4 +1,4 @@
-# Mesajdan araç ekleme (Gemini): WhatsApp, sohbet balonu ve yapıştırma
+# Mesajdan araç ekleme (Gemini): WhatsApp, sohbet balonu, yapıştırma ve liste fotoğrafı
 
 Müşteri şirketin WhatsApp numarasına şöyle bir yazı gönderir:
 
@@ -60,6 +60,28 @@ Her çekici-dorse çifti bir araç sayılır; altındaki firmalar o aracın yük
 
 **"Aracı yarına al" gibi cümleler:** Araç panoda zaten açıksa (o gün kaydı yoksa) yeni geliş açılmaz, **mevcut kayıt**
 yeni güne taşınır. Ayrı bir geliş istiyorsanız kartta **Yeni geliş olarak ekle**.
+
+### Liste fotoğrafı ve ekran görüntüsü
+
+Müşteri listeyi yazı yerine **fotoğraf ya da ekran görüntüsü** olarak da gönderebilir. Yapay zekâ önce fotoğrafın
+bir **ruhsat** mı yoksa bir **araç listesi** mi olduğuna bakar:
+- **Ruhsatsa** her zamanki gibi "Ruhsattan ekle" yolundan geçer (hiçbir şey değişmez).
+- **Liste ise** içindeki yazı mesaj gibi okunur (plakalar, tarih, firmalar, ücret) ve aynı onay kartı çıkar.
+  **Fotoğraftan okunan hiçbir araç kendiliğinden panoya işlenmez**; bu yüzden sohbette bile tek tek ya da **Hepsini
+  uygula** ile onaylarsınız. Yazılı mesaja göre daha çok yanlış okuma olabileceği için plakaları kontrol edin.
+
+Nereden gönderilirse:
+- **WhatsApp:** müşteri fotoğrafı numaranıza gönderir. Ruhsat çıkmazsa sunucu aynı fotoğrafı liste olarak okur ve
+  "WhatsApp mesajları"nda "fotoğraftaki liste" kartı olarak onaya düşer; gönderene ✅ gider. Ne ruhsat ne liste
+  okunabilirse eskisi gibi ⚠️ ile "ruhsatı yeniden çekin" denir. (`whatsapp-webhook` ve `ruhsat-oku` fonksiyonlarının
+  güncel olması gerekir; ek SQL gerekmez.)
+- **Sohbet balonu:** yazı kutusunun solundaki **📎** düğmesiyle fotoğraf seçin, ya da ekran görüntüsünü kutuya
+  **Ctrl+V** ile yapıştırın / pencereye sürükleyin (en fazla 10 MB). Fotoğraf ruhsat çıkarsa "Ruhsattan ekle" penceresi açılır.
+- **Ruhsattan ekle penceresi:** buraya atılan fotoğraf ruhsat değil liste çıkarsa kart kapanır, liste "WhatsApp
+  mesajları" bölümüne mesaj kartı olarak gelir (kartta fotoğrafın küçük resmi vardır; büyütmek için tıklayın).
+
+Ruhsat fotoğrafı olmayan her fotoğraf için yapay zekâya iki istek gider (önce ruhsat, sonra liste); Gemini'nin ücretsiz
+kullanım sınırı bu yüzden biraz daha hızlı dolabilir.
 
 ### Sohbetle kayıt düzeltme ve soru sorma
 
