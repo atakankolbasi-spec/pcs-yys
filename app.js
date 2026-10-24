@@ -16,7 +16,7 @@ chart:'<path d="M4 4v16h17M8 16v-5m5 5V7m5 9v-8"/>',
 shield:'<path d="M12 3l8 3v6c0 5-8 9-8 9S4 17 4 12V6z"/><path d="M8 12l3 3 5-6"/>',
 calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>',
 chevron:'<path d="M9 5l7 7-7 7"/>',left:'<path d="M15 5l-7 7 7 7"/>',down:'<path d="M6 9l6 6 6-6"/>',
-plus:'<path d="M12 5v14M5 12h14"/>',download:'<path d="M12 3v12m-5-5l5 5 5-5M4 16v5h16v-5"/>',upload:'<path d="M12 16V4m-5 5l5-5 5 5M4 16v5h16v-5"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',download:'<path d="M12 3v12m-5-5l5 5 5-5M4 16v5h16v-5"/>',upload:'<path d="M12 16V4m-5 5l5-5 5 5M4 16v5h16v-5"/>',clip:'<path d="M20 11l-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7"/>',
 check:'<path d="M5 12l4 4L19 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',doc:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h6"/>',
 search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16l5 5"/>',st_onsite:'<path d="M3 21V9.5L12 4l9 5.5V21"/><path d="M3 21h18"/><path d="M8 21v-6.5h8V21"/><path d="M8 17.5h8"/><path d="M10 10h4"/>',st_t1:'<path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21H11"/><path d="M13 3v5h5v3"/><path d="M8 12h6M8 16h3"/><path d="M19.2 13.8a1.6 1.6 0 0 1 2.3 2.3L16 21.6 13 22l.4-3z"/>',st_done:'<path d="M12 2.8 19.5 5.6v6c0 4.9-3.3 8.3-7.5 9.6-4.2-1.3-7.5-4.7-7.5-9.6v-6z"/><path d="m8.6 12.1 2.4 2.4 4.6-4.9"/>',wa:'<path d="M20.5 11.6a8.6 8.6 0 0 1-12.7 7.6L3.5 20.5l1.4-4.1a8.6 8.6 0 1 1 15.6-4.8z"/><path d="M9.2 8.4c.1 3.3 3 6.2 6.4 6.4l1-1.3-1.9-1.1-.9.8a4.1 4.1 0 0 1-2.4-2.4l.8-.9-1.1-1.9z"/>',edit:'<path d="M14 5l5 5M4 20l4-1L20 7a2.1 2.1 0 00-3-3L5 16z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
 info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',close:'<path d="M6 6l12 12M6 18L18 6"/>',database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
@@ -1377,11 +1377,11 @@ async function ruhsatFromClipboard(){if(!navigator.clipboard?.read){toast('Bu ta
  try{const files=[];for(const item of await navigator.clipboard.read()){const t=item.types.find(x=>x.startsWith('image/'));if(t)files.push(new File([await item.getType(t)],'pano.'+(t.split('/')[1]||'png'),{type:t}));}
   if(files.length)ruhsatAdd(files);else toast('Panoda resim yok. WhatsApp\'ta fotoğrafı açıp sağ tıklayın → "Resmi kopyala", sonra tekrar deneyin.',true);}
  catch(_){toast('Panoya erişilemedi (tarayıcı izin vermedi). Ctrl+V ile yapıştırın ya da fotoğrafı kaydedip "Fotoğraf seç" ile ekleyin.',true);}}
-function ruhsatAdd(files){if(!ruhsatAllowed()||!files.length)return;const m=document.getElementById('modal');
- if(!document.getElementById('ruhsat-box')){if(m.open){toast('Önce açık pencereyi kapatın, sonra fotoğrafı yapıştırın.',true);return;}openRuhsat();}
+function ruhsatAdd(files,pre=null){if(!ruhsatAllowed()||!files.length)return false;const m=document.getElementById('modal');
+ if(!document.getElementById('ruhsat-box')){if(m.open){toast('Önce açık pencereyi kapatın, sonra fotoğrafı yapıştırın.',true);return false;}openRuhsat();}
  for(const f of files.slice(0,10)){if(f.size>20*1024*1024){toast('Fotoğraf çok büyük (en fazla 20 MB).',true);continue;}
-  ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,ai:false,aiNote:'',aiFail:false,ocr:false,error:''});}
- ruhsatRefresh();ruhsatRun();}
+  ruhsat.items.push({id:'rs'+(++ruhsat.seq),file:f,url:URL.createObjectURL(f),pre,status:'sirada',progress:0,phase:'',weights:[],sum:null,tractor:'',trailer:'',reg:null,tractorReg:null,trailerReg:null,fuzzy:false,guess:false,ai:false,aiNote:'',aiFail:false,ocr:false,error:''});}
+ ruhsatRefresh();ruhsatRun();return true;}
 async function ruhsatRun(){if(ruhsat.running)return;ruhsat.running=true;try{let it;while((it=ruhsat.items.find(x=>x.status==='sirada'&&(!x.wa||ruhsatAllowed()))))await (it.wa?waProcess(it):ruhsatProcess(it));}finally{ruhsat.running=false;}}
 /* Fotoğraf birkaç farklı biçimde okunur ve sonuçlar birleştirilir; her biçim başka fotoğraflarda iyi sonuç verir:
    keskinleştirilmiş, hiç dokunulmamış ve keskinleştirmesiz gri. Yön seçimi okumanın kendi güven puanına göre değil,
@@ -1441,11 +1441,15 @@ async function ruhsatProcess(it){const ocr=it.forceOcr||ai.state==='none';it.for
  const texts=[];let last=0,done=0,total=3;
  const status=()=>{const el=document.querySelector(`#${it.id} .rs-status`);if(el)el.textContent=ruhsatStatusText(it);};
  ocrOnProgress=m=>{const p=m.status==='recognizing text'?Math.round((done+m.progress)/total*100):Math.round(m.progress*100);if(Date.now()-last<250&&p<100)return;last=Date.now();it.progress=p;status();};
- try{const r=ocr?{none:true}:await ruhsatAi(it.file,t=>{it.phase=t;status();});
+ try{const r=ocr?{none:true}:it.pre?{data:it.pre}:await ruhsatAi(it.file,t=>{it.phase=t;status();});it.pre=null;
   if(r.data){it.aiRaw=r.data;const got=ruhsatFromAi(r.data);
    if(got){Object.assign(it,got,{rot:0});it.status='tamam';}
-   /* Gemini cevap verdi ama fotoğrafta okunur bir ruhsat bulamadı: nedenini yazar */
-   else Object.assign(it,{status:'hata',ai:true,aiNote:'',error:'Yapay zekâ ruhsatı okuyamadı'+(r.data.problem?' · '+String(r.data.problem).slice(0,160):'')});}
+   else{
+    /* Fotoğrafta ruhsat yok: müşterinin gönderdiği araç listesinin ekran görüntüsü olabilir. Liste okunursa kart kapanır, liste "mesaj" olarak onaya düşer. */
+    let l=null;if(it.file){it.phase='Araç listesi olup olmadığına bakılıyor';status();l=await wmAi(it.file,t=>{it.phase=t;status();});}
+    if(l?.data?.items?.length)ruhsatToList(it,l.data);
+    /* Gemini cevap verdi ama fotoğrafta okunur bir ruhsat bulamadı: nedenini yazar */
+    else Object.assign(it,{status:'hata',ai:true,aiNote:'',error:'Yapay zekâ ruhsatı okuyamadı'+(r.data.problem?' · '+String(r.data.problem).slice(0,160):'')});}}
   /* Gemini birkaç kez denendi, olmadı: bu bilgisayarda okumaya geçilmez, karar kişiye kalır */
   else if(r.err)Object.assign(it,{status:'hata',aiFail:true,error:`${AI_FAIL} (${r.err})`});
   else{it.ai=false;it.ocr=true;it.phase=ocrWorkerP?'Bu bilgisayarda okunuyor':OCR_PREP;status();
@@ -1464,6 +1468,11 @@ async function ruhsatProcess(it){const ocr=it.forceOcr||ai.state==='none';it.for
  catch(e){it.status='hata';it.error=e?.message||String(e);}
  finally{ocrOnProgress=null;}
  ruhsatUpdateCard(it);}
+/* Ruhsat yerine araç listesi çıkan fotoğraf: liste, yapıştırılan mesaj gibi "WhatsApp mesajları" bölümünde onay bekler. */
+function ruhsatToList(it,d){const w=it.wa;
+ wmsg.local.push({id:'lokal-'+(++wmsg.seq),local:true,from_number:w?.from_number||'',sender_name:w?.sender_name||'',body:(w?.caption?w.caption+'\n':'')+'(Fotoğraftaki liste)',status:'bekliyor',applied:{},created_at:w?.created_at||new Date().toISOString(),thumb:it.url||'',ai:{items:d.items,customer:d.customer||'',problem:d.problem||'',model:d.model||'',image:true}});
+ it.status='liste';it.listRead=true;if(!w)ruhsat.items=ruhsat.items.filter(x=>x!==it);
+ wmRefresh();ruhsatRefresh();toast(`Fotoğraf ruhsat değil, araç listesi olarak okundu (${d.items.length} araç). "WhatsApp mesajları" bölümünden kontrol edip onaylayın.`);}
 /* Plaka kaydındaki bilgilerle panoya eklenecek geliş. WhatsApp fotoğrafında saat, fotoğrafın geldiği saattir. */
 function ruhsatVisit(it){const r=it.reg;return {id:uid(),plate:r.plate,customer:r.customer||'',declaration:r.declaration||'',carrier:r.carrier||'',registration:kgText(r.registration||(it.sum?String(it.sum):'')),date:ruhsatDate(it),time:it.wa?tsTime(it.wa.created_at):timeNow(),note:'',onsite:false,t1:false,done:false,createdAt:new Date().toISOString()};}
 async function ruhsatQuickAdd(it){const r=it.reg;if(!r||!r.customer||!canEdit())return;const d=ruhsatDate(it);
@@ -1503,14 +1512,18 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="r
 document.addEventListener('input',e=>{const t=e.target;if(!t.dataset?.rs)return;const it=ruhsat.items.find(x=>x.id===t.dataset.rs);if(!it)return;
  it[t.dataset.k]=compactPlate(t.value);it.fuzzy=false;Object.assign(it,ruhsatLookup(it.tractor,it.trailer));const box=document.querySelector(`#${it.id} .rs-info`);if(box)box.innerHTML=ruhsatInfo(it);onlineUI();});
 document.addEventListener('change',e=>{if(e.target.id!=='ruhsat-file')return;const f=ruhsatFiles(e.target.files);e.target.value='';ruhsatAdd(f);});
-document.addEventListener('paste',e=>{if(!ruhsatAllowed())return;const f=transferImages(e.clipboardData);
+document.addEventListener('paste',e=>{
+ /* sohbet kutusuna yapıştırılan resim sohbete gider ("Ruhsattan ekle" penceresi açılmaz) */
+ if(e.target?.id==='chat-input'){const f=transferImages(e.clipboardData);if(f.length){e.preventDefault();chatImages(f);}return;}
+ if(!ruhsatAllowed())return;const f=transferImages(e.clipboardData);
  if(!f.length){if(e.target.closest?.('#ruhsat-paste')){e.preventDefault();toast('Yapıştırılan şey resim değil. WhatsApp\'ta fotoğrafı açıp sağ tıklayın → "Resmi kopyala" (masaüstü uygulamasında "Kopyala"). Olmazsa fotoğrafı kaydedip "Fotoğraf seç" ile ekleyin.',true);}return;}
  e.preventDefault();ruhsatAdd(f);});
 /* yapıştırma kutusu yalnızca yapıştırmayı karşılar; yazı yazılmaz */
 document.addEventListener('beforeinput',e=>{if(e.target.id==='ruhsat-paste')e.preventDefault();});
 document.addEventListener('dragover',e=>{if(dragId||!ruhsatAllowed()||![...(e.dataTransfer?.types||[])].includes('Files'))return;e.preventDefault();e.dataTransfer.dropEffect='copy';document.documentElement.classList.add('rs-dragging');});
 document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.documentElement.classList.remove('rs-dragging');});
-document.addEventListener('drop',e=>{document.documentElement.classList.remove('rs-dragging');if(dragId||!ruhsatAllowed())return;const f=transferImages(e.dataTransfer);if(!f.length)return;e.preventDefault();ruhsatAdd(f);});
+document.addEventListener('drop',e=>{document.documentElement.classList.remove('rs-dragging');if(dragId||!ruhsatAllowed())return;const f=transferImages(e.dataTransfer);if(!f.length)return;e.preventDefault();
+ if(e.target.closest?.('#chat-panel'))chatImages(f);else ruhsatAdd(f);});
 
 /* WhatsApp'tan otomatik aktarma (kurulum: supabase/WHATSAPP.md).
    Sunucu fonksiyonu WhatsApp numarasına gelen fotoğrafı "ruhsat-gelen" deposuna koyar ve incoming_ruhsat
@@ -1600,7 +1613,10 @@ async function waProcess(it){const row=it.wa;it.status='okunuyor';it.phase='What
    "Ruhsattan ekle" penceresinde onay bekler (tek tek "Panoya ekle" ya da "Hepsini panoya ekle").
    Tek istisna: araç o gün zaten panodaysa ve ruhsat kilosu aynıysa (ya da okunamadıysa) yapılacak bir şey yoktur;
    fotoğraf "mevcut" diye kapanır, ekranda bir kez yazar. */
-async function waDecide(it){const read={tractor:it.tractor,trailer:it.trailer,weights:it.weights};
+async function waDecide(it){
+ /* fotoğraf ruhsat değil araç listesi çıktı: satır kapanır, liste mesaj olarak onaya düştü */
+ if(it.listRead){await waMark(it,'yoksayildi',{note:'Araç listesi olarak okundu'});ruhsat.items=ruhsat.items.filter(x=>x!==it);ruhsatRefresh();waBadge();return;}
+ const read={tractor:it.tractor,trailer:it.trailer,weights:it.weights};
  if(waSettle(it,read))return;
  if(await waMark(it,'bekliyor',{...read,fuzzy:!!it.fuzzy,note:it.status==='hata'?String(it.error||'').slice(0,300):'',...(wa.aiCol?{ai:it.aiRaw||null}:{})})&&!document.getElementById('ruhsat-box'))
   toast(`WhatsApp'tan gelen ${waPending()} ruhsat onayınızı bekliyor. "Ruhsattan ekle"ye bakın.`);}
@@ -1723,7 +1739,8 @@ function wmItemHTML(row,i){const x=wmItem(row,i),it=x.it,done=row.applied?.[i],r
  const dateBox=x.mode==='cancel'||keep&&x.mode==='none'?'':`<label class="msg-date">Tarih<input type="date" data-msgdate="${rid}.${i}" value="${esc(x.date)}"></label>`;
  return `<div class="msg-item"><div class="msg-plate">${plateHTML(x.plate||'—','sm')}${badge}</div><div class="msg-what">${info}${acts}</div>${dateBox}</div>`;}
 function wmCardHTML(row){const items=row.ai?.items||[],rid=esc(row.id),cust=waCustomer(row),who=[row.sender_name,row.from_number?'+'+row.from_number:''].filter(Boolean).join(' · ');
- const head=`<div class="rs-src">${icon('wa')}<span>${row.local?'Yapıştırılan mesaj':'WhatsApp'}${who?' · '+esc(who):''}${cust?' · <b>'+esc(cust)+'</b>':''} · ${esc(tsText(row.created_at))}</span></div>`;
+ const kind=row.ai?.image?(row.local&&!who?'Yapıştırılan liste (resim)':'WhatsApp · fotoğraftaki liste'):row.local?'Yapıştırılan mesaj':'WhatsApp';
+ const head=`<div class="rs-src">${icon('wa')}<span>${kind}${who?' · '+esc(who):''}${cust?' · <b>'+esc(cust)+'</b>':''} · ${esc(tsText(row.created_at))}</span></div>${row.thumb?`<a class="msg-thumb" href="${esc(row.thumb)}" target="_blank" rel="noopener" title="Fotoğrafı büyük aç"><img src="${esc(row.thumb)}" alt="Gönderilen liste"></a>`:''}`;
  const text=`<details class="msg-text"><summary>“${esc(String(row.body||'').replace(/\s+/g,' ').slice(0,110))}${String(row.body||'').length>110?'…':''}”</summary><pre>${esc(row.body||'')}</pre></details>`;
  let body='';const bulk=items.filter((_,i)=>!row.applied?.[i]&&wmItem(row,i).go).length;
  if(row.status==='okunuyor'){const stale=Date.now()-Date.parse(row.created_at||0)>WM_STALE_MS;body=`<div class="rs-status uzakta">${stale?'Sunucu mesajı okuyamadı gibi görünüyor':'Sunucuda yapay zekâyla okunuyor…'}</div>${stale?`<div class="rs-acts"><button type="button" class="btn small" data-action="msg-reread" data-row="${rid}">${icon('refresh')}Yeniden oku</button></div>`:''}`;}
@@ -1737,9 +1754,13 @@ function wmBoxHTML(){return ai.state==='none'?'':`<details class="msg-paste"><su
 function wmRefresh(){const l=document.getElementById('msg-list');if(l)l.innerHTML=wmListHTML();waBadge();onlineUI();if(chat.open)chatRender();}
 /* Mesaj metnini Gemini'ye okutur (ruhsat-oku, mesaj modu). Sonuç: {data} · {none:true} kurulu değil · {err:'neden'} */
 async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='';
+ /* text bir dosyaysa (liste ekran görüntüsü) fotoğraf "liste" modunda okunur: ruhsat-oku içindeki yazı mesaj gibi okunur */
+ const img=text&&typeof text==='object'?text:null;
  for(let i=1;i<=3;i++){let st=0,body=null;
-  try{const {data,error}=await client.functions.invoke('ruhsat-oku',{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:150000});
+  try{const {data,error}=await client.functions.invoke('ruhsat-oku',img?{body:img,headers:{'Content-Type':img.type||'image/jpeg','x-pcs-mode':'liste','x-pcs-today':TODAY},timeout:150000}:{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:150000});
    if(!error&&Array.isArray(data?.items)){ai.state='on';return {data};}
+   /* liste modunu bilmeyen eski sürüm fotoğrafı ruhsat gibi okur ve "vehicles" döndürür */
+   if(!error&&img&&Array.isArray(data?.vehicles))return {err:'ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)'};
    if(error){st=error.context?.status||0;if(typeof error.context?.json==='function')body=await error.context.json().catch(()=>null);}}
   catch(_){st=0;}
   last=body?.reason||AI_REASON[st]||(st?'sunucu hatası '+st:AI_REASON[0]);
@@ -1810,11 +1831,12 @@ const chatShown=()=>!!account&&role==='editor'&&!VIEW_TOKEN&&!GUARD_ACCT&&!inGua
 const CHAT_EX=['Yarın 34 ABC 123 / PB 5678 CD ve CB 1234 AB gelecek','CB 1234 AB cuma gününe ertelendi','24. sıradaki aracın müşterisini ETL LOJ yap','Bugün kaç araç tesiste?'];
 function chatBuild(){if(chat.built)return;chat.built=true;const d=document.createElement('div');d.id='chat-root';
  d.innerHTML=`<button type="button" id="chat-fab" class="chat-fab" data-action="chat-toggle" aria-label="Sohbet: yazarak araç ekle" aria-expanded="false">${icon('chat','ic-chat')}${icon('close','ic-x')}<b class="chat-dot" hidden></b></button>
-<section id="chat-panel" class="chat-panel" role="dialog" aria-label="Pano asistanı" hidden><header class="chat-head"><span class="chat-ava" aria-hidden="true">AI</span><div><b>Pano asistanı</b><small>Yazın; ekler, düzeltir, sorularınızı yanıtlar</small></div><button type="button" class="icon-btn" data-action="chat-toggle" aria-label="Sohbeti kapat">${icon('close')}</button></header><div id="chat-pend"></div><div id="chat-log" class="chat-log" aria-live="polite"></div><form id="chat-form" class="chat-form" autocomplete="off"><textarea id="chat-input" rows="1" maxlength="6000" placeholder="Örn: yarın 34 ABC 123 gelecek" aria-label="Mesajınız"></textarea><button type="submit" class="chat-send" aria-label="Gönder">${icon('send')}</button></form></section>`;
+<section id="chat-panel" class="chat-panel" role="dialog" aria-label="Pano asistanı" hidden><header class="chat-head"><span class="chat-ava" aria-hidden="true">AI</span><div><b>Pano asistanı</b><small>Yazın; ekler, düzeltir, sorularınızı yanıtlar</small></div><button type="button" class="icon-btn" data-action="chat-toggle" aria-label="Sohbeti kapat">${icon('close')}</button></header><div id="chat-pend"></div><div id="chat-log" class="chat-log" aria-live="polite"></div><form id="chat-form" class="chat-form" autocomplete="off"><button type="button" class="chat-attach" data-action="chat-attach" aria-label="Liste fotoğrafı ya da ekran görüntüsü ekle" title="Müşterinin gönderdiği listenin fotoğrafını ekleyin (ya da kutuya yapıştırın)">${icon('clip')}</button><input type="file" id="chat-file" accept="image/*" multiple hidden><textarea id="chat-input" rows="1" maxlength="6000" placeholder="Örn: yarın 34 ABC 123 gelecek" aria-label="Mesajınız"></textarea><button type="submit" class="chat-send" aria-label="Gönder">${icon('send')}</button></form></section>`;
  document.body.appendChild(d);}
-function chatSummary(row){const n=row.ai.items.length,done=Object.values(row.applied||{}).filter(a=>a.r==='eklendi'||a.r==='tasindi'||a.r==='silindi').length,wait=row.ai.items.filter((_,i)=>!row.applied?.[i]).length;
+function chatSummary(row){if(row.ai.image)return `Fotoğraftan ${row.ai.items.length} araç okudum. Fotoğraftan okuduğum için hiçbirini kendiliğinden işlemedim; kontrol edip onaylayın:`;
+ const n=row.ai.items.length,done=Object.values(row.applied||{}).filter(a=>a.r==='eklendi'||a.r==='tasindi'||a.r==='silindi').length,wait=row.ai.items.filter((_,i)=>!row.applied?.[i]).length;
  return `${n} araç anladım${done?`; ${done} tanesini panoya işledim`:''}${wait?`. ${wait} tanesi için onayınız gerekiyor:`:'. Hepsi tamam ✓'}`;}
-function chatMsgHTML(m){if(m.who==='me')return `<div class="chat-msg me"><div class="chat-bub">${esc(m.text)}</div></div>`;
+function chatMsgHTML(m){if(m.who==='me')return `<div class="chat-msg me"><div class="chat-bub">${m.img?`<img class="chat-img" src="${esc(m.img)}" alt="Gönderilen fotoğraf">`:esc(m.text)}</div></div>`;
  let body;if(m.typing)body=`<div class="chat-typing" aria-label="Okunuyor"><i></i><i></i><i></i></div>${m.phase?`<small>${esc(m.phase)}</small>`:''}`;
  else if(m.rowId){const row=chat.rows.find(r=>r.id===m.rowId);
   const ask=row?.ask?`<p><b>Mesajda tarih yok.</b> Bu ${row.ai.items.length} aracı hangi güne yazayım?</p><div class="chat-chips chat-days"><button type="button" class="chat-chip" data-action="chat-day" data-row="${esc(row.id)}" data-d="${chatDay(0)}">Bugün · ${esc(fmt(chatDay(0)))}</button><button type="button" class="chat-chip" data-action="chat-day" data-row="${esc(row.id)}" data-d="${chatDay(1)}">Yarın · ${esc(fmt(chatDay(1)))}</button></div>`:'';
@@ -1824,7 +1846,7 @@ function chatMsgHTML(m){if(m.who==='me')return `<div class="chat-msg me"><div cl
  else body=`<p>${esc(m.text)}</p>`;
  return `<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub${m.error?' err':''}">${body}</div></div>`;}
 function chatRender(){const log=document.getElementById('chat-log');if(!log)return;
- const hello=`<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub"><p>Merhaba! Gelecek, ertelenen ya da iptal edilen araçları yazın; kayıtları düzeltin (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”) ya da soru sorun (“bugün kaç araç tesiste?”). Ben okuyup panoya işleyeyim. Silme, toplu değişiklik ve emin olamadıklarımı size sorarım.</p><div class="chat-chips">${CHAT_EX.map(t=>`<button type="button" class="chat-chip" data-action="chat-ex" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div></div>`;
+ const hello=`<div class="chat-msg ai"><span class="chat-ava sm" aria-hidden="true">AI</span><div class="chat-bub"><p>Merhaba! Gelecek, ertelenen ya da iptal edilen araçları yazın; kayıtları düzeltin (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”) ya da soru sorun (“bugün kaç araç tesiste?”). Müşterinin gönderdiği listenin ekran görüntüsünü de (📎 ile ya da kutuya yapıştırarak) okurum. Yazdıklarınızı panoya işlerim; silme, toplu değişiklik ve emin olamadıklarımı size sorarım.</p><div class="chat-chips">${CHAT_EX.map(t=>`<button type="button" class="chat-chip" data-action="chat-ex" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div></div>`;
  const stick=chat.busy||log.scrollHeight-log.scrollTop-log.clientHeight<80;log.innerHTML=hello+chat.msgs.map(chatMsgHTML).join('');if(stick)log.scrollTop=log.scrollHeight;
  /* gün sorusu cevabın en üstündedir; uzun listede kaybolmasın diye cevabın başına kaydırılır */
  const lastM=chat.msgs[chat.msgs.length-1],qa=lastM?.rowId&&chat.rows.find(r=>r.id===lastM.rowId)?.ask?log.querySelector('.chat-msg.ai:last-child'):null;
@@ -1839,7 +1861,8 @@ function chatSync(){const show=chatShown();if(show)chatBuild();const r=document.
 function chatDot(){const n=wmPending(),dot=document.querySelector('#chat-fab .chat-dot');if(dot){dot.hidden=!n||chat.open;dot.textContent=n||'';}}
 function chatGrow(){const i=document.getElementById('chat-input');if(!i)return;i.style.height='auto';i.style.height=Math.min(120,i.scrollHeight)+'px';}
 /* hazır ekleme ve taşımalar kendiliğinden işlenir; panoda zaten olanlar kapatılır. Silme ve emin olunamayanlar bekler. */
-async function chatAuto(row){for(let i=0;i<row.ai.items.length;i++){const x=wmItem(row,i);if(row.applied?.[i]||!(x.ready||x.mode==='mevcut'||x.mode==='none'))continue;if(!(await wmApply(row,i)))break;chatRender();}}
+async function chatAuto(row){if(row.ai?.image)return; /* fotoğraftan okunanlar kendiliğinden işlenmez */
+ for(let i=0;i<row.ai.items.length;i++){const x=wmItem(row,i);if(row.applied?.[i]||!(x.ready||x.mode==='mevcut'||x.mode==='none'))continue;if(!(await wmApply(row,i)))break;chatRender();}}
 /* ---- sohbetle sorgu: Gemini yalnızca ne sorulduğunu çıkarır; sayım ve liste burada, pano verisinden hesaplanır
    (pano kayıtları Google'a gönderilmez) ---- */
 const CQ_ST={onsite:'tesiste',waiting:'gelecek',t1:'T1 yazıldı',done:'tamamlanan',open:'bitmemiş'};
@@ -1888,6 +1911,29 @@ const ceHTML=out=>`<p>${out.every(x=>x.bad)?'Yapamadım:':out.some(x=>x.bad)?'K�
 function cePlanHTML(plan){const names=plan.jobs.slice(0,8).map(j=>{const v=state.visits.find(x=>x.id===j.id);return v?`${esc(v.plate)} · ${esc(v.customer||'Müşterisiz')}`:'';}).filter(Boolean);
  const what=[...new Set(plan.jobs.flatMap(j=>j.ch.map(([f,val])=>`${FE_TR[f]}: ${f==='onsite'||f==='t1'||f==='done'?(val==='true'?'evet':'hayır'):val}`)))].join('; ');
  return `<p><b>${plan.jobs.length} araç</b> değişecek (${esc(what)}):</p>${names.map(n=>`<div class="rs-note">${n}</div>`).join('')}${plan.jobs.length>8?`<div class="rs-note">… ve ${plan.jobs.length-8} araç daha</div>`:''}${plan.lines.map(x=>`<div class="rs-note warn">⚠ ${esc(x.text)}</div>`).join('')}`;}
+/* Sohbete fotoğraf: önce ruhsat mı diye bakılır (ruhsatsa "Ruhsattan ekle" penceresinde açılır), değilse müşterinin gönderdiği
+   araç listesi olarak okunur. Fotoğraftan okunanlar hiçbir zaman kendiliğinden işlenmez; kullanıcı onaylar. */
+async function chatSendImage(file){const inp=document.getElementById('chat-input');if(chat.busy)return;
+ if(!canEdit()){chat.msgs.push({who:'ai',error:true,text:navigator.onLine===false?'İnternet bağlantısı yok; şu an değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (yetkiniz yok ya da bir kayıt işlemi sürüyor). Biraz sonra tekrar deneyin.'});chatRender();return;}
+ if(file.size>10*1024*1024){chat.msgs.push({who:'ai',error:true,text:'Fotoğraf çok büyük (en fazla 10 MB). Ekran görüntüsü almayı deneyin.'});chatRender();return;}
+ chat.busy=true;const url=URL.createObjectURL(file);
+ chat.msgs.push({who:'me',img:url,text:'Fotoğraf'});const typing={who:'ai',typing:true,phase:'Fotoğraf okunuyor'};chat.msgs.push(typing);chatRender();
+ const out=m=>{const k=chat.msgs.indexOf(typing);if(k>=0)chat.msgs.splice(k,1);chat.msgs.push(m);};
+ try{const r=await ruhsatAi(file,t=>{typing.phase=t;chatRender();});
+  if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
+  else if(r.err)out({who:'ai',error:true,text:'Okuyamadım: '+r.err+'. Biraz sonra tekrar deneyin.'});
+  else if(ruhsatFromAi(r.data)){
+   if(ruhsatAdd([file],r.data))out({who:'ai',text:'Bu bir ruhsat fotoğrafı. “Ruhsattan ekle” penceresinde açtım; orada kontrol edip ekleyin.'});
+   else out({who:'ai',error:true,text:'Bu bir ruhsat fotoğrafı ama “Ruhsattan ekle” penceresi şu an açılamadı. Açık pencereyi kapatıp fotoğrafı tekrar ekleyin.'});}
+  else{typing.phase='Araç listesi olup olmadığına bakılıyor';chatRender();
+   const l=await wmAi(file,t=>{typing.phase=t;chatRender();});
+   if(l.err)out({who:'ai',error:true,text:'Okuyamadım: '+l.err+'. Biraz sonra tekrar deneyin.'});
+   else if(!l.data?.items?.length)out({who:'ai',error:true,text:'Fotoğrafta ruhsat ya da araç listesi bulamadım'+(l.data?.problem||r.data.problem?' ('+String(l.data?.problem||r.data.problem).replace(/[.\s]+$/,'')+')':'')+'. Fotoğraf net değilse listeyi yazıp gönderebilirsiniz.'});
+   else{const d=l.data,row={id:'chat-'+(++chat.seq),local:true,chat:true,day:weekday(TODAY)===0?addDays(TODAY,1):TODAY,from_number:'',sender_name:'',body:'(Fotoğraftaki liste)',status:'bekliyor',applied:{},created_at:new Date().toISOString(),thumb:url,ai:{items:d.items,customer:d.customer||'',problem:d.problem||'',model:d.model||'',image:true}};
+    chat.rows.push(row);row.ask=d.items.filter(v=>v.action!=='cancel'&&!v.date).length>=2;out({who:'ai',rowId:row.id});}}}
+ catch(e){out({who:'ai',error:true,text:'Bir sorun oldu: '+(e?.message||e)});}
+ finally{chat.busy=false;chatRender();}}
+async function chatImages(files){for(const f of files.slice(0,3))await chatSendImage(f);}
 async function chatSend(text){text=String(text||'').trim();const inp=document.getElementById('chat-input');if(text.length<4||chat.busy)return;
  if(!canEdit()){chat.msgs.push({who:'ai',error:true,text:navigator.onLine===false?'İnternet bağlantısı yok; şu an değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (yetkiniz yok ya da bir kayıt işlemi sürüyor). Biraz sonra tekrar deneyin.'});chatRender();return;}
  chat.busy=true;if(inp){inp.value='';chatGrow();}
@@ -1916,11 +1962,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="c
  if(a==='chat-toggle')return chatToggle();
  if(a==='chat-day'){const row=chat.rows.find(r=>r.id===b.dataset.row);if(!row||!row.ask||chat.busy||!canEdit())return;chat.busy=true;row.day=b.dataset.d;row.dayChosen=true;row.ask=false;chatRender();chatAuto(row).finally(()=>{chat.busy=false;chatRender();});return;}
  if(a==='chat-go')return kGoVisit(b.dataset.id);
+ if(a==='chat-attach')return document.getElementById('chat-file')?.click();
  if(a==='chat-plan'||a==='chat-plan-no'){const m=chat.msgs.find(x=>x.id===+b.dataset.k);if(!m||!m.plan||m.plan.done||chat.busy)return;
   if(a==='chat-plan-no'){m.plan.done=true;m.html='<p>Vazgeçtim, bir şey değiştirmedim.</p>';chatRender();return;}
   if(!canEdit())return;chat.busy=true;m.plan.done=true;m.html='<p>Uygulanıyor…</p>';chatRender();
   ceRun(m.plan).then(o=>{m.html=ceHTML(o);}).finally(()=>{chat.busy=false;chatRender();});return;}
  if(a==='chat-ex'){const i=document.getElementById('chat-input');if(i){i.value=b.dataset.t;chatGrow();i.focus();}}});
+document.addEventListener('change',e=>{if(e.target.id!=='chat-file')return;const f=ruhsatFiles(e.target.files);e.target.value='';if(f.length)chatImages(f);});
 document.addEventListener('submit',e=>{if(e.target.id!=='chat-form')return;e.preventDefault();chatSend(document.getElementById('chat-input')?.value);});
 document.addEventListener('keydown',e=>{if(e.target.id==='chat-input'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();chatSend(e.target.value);return;}
  if(e.key==='Escape'&&chat.open&&e.target.closest?.('#chat-root')&&!document.getElementById('modal')?.open)chatToggle();});

@@ -121,12 +121,15 @@
     // verilmezse fonksiyon kurulmamış gibi 404 döner (site bu bilgisayarda okur).
     functions: {
       async invoke(name, opts = {}) {
-        // mesaj modu: gövde JSON yazıdır ({ text, today }); cevabı cfg.aiText verir. Fotoğraf modunda cfg.ai kullanılır.
-        const isText = !!(opts.headers && opts.headers['Content-Type'] === 'application/json');
-        calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size, text: isText ? JSON.parse(opts.body) : undefined });
+        // mesaj modu: gövde JSON yazıdır ({ text, today }) ya da liste fotoğrafıdır (x-pcs-mode: liste); cevabı cfg.aiText verir. Ruhsat fotoğrafında cfg.ai kullanılır.
+        const isJson = !!(opts.headers && opts.headers['Content-Type'] === 'application/json');
+        // liste fotoğrafı: resim gövdesi + "x-pcs-mode: liste" başlığı; cevabı yine cfg.aiText verir (mesaj biçiminde)
+        const isList = !!(opts.headers && opts.headers['x-pcs-mode'] === 'liste');
+        const isText = isJson || isList;
+        calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size, text: isJson ? JSON.parse(opts.body) : undefined, list: isList ? { today: opts.headers['x-pcs-today'] } : undefined });
         if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
         // dizi verilirse sırayla kullanılır (ör. önce 429, sonra cevap); son eleman tekrar eder
-        const src = isText ? cfg.aiText : name !== 'ruhsat-oku' ? null : cfg.ai;
+        const src = isList ? (cfg.aiText || { items: [], customer: '', problem: '', model: 'gemini-test' }) : isText ? cfg.aiText : name !== 'ruhsat-oku' ? null : cfg.ai;
         const r = Array.isArray(src) ? (src.length > 1 ? src.shift() : src[0]) : src;
         const err = (status, body) => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(body ? JSON.stringify(body) : null, { status }) } });
         if (!r) return err(404);

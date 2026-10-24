@@ -185,6 +185,58 @@ test.describe('WhatsApp sunucu fonksiyonu', () => {
     expect(quiet.log.some(l => l.url.endsWith('/PHONE1/messages'))).toBe(false);
   });
 
+  test('ruhsat çıkmayan fotoğraf araç listesi olarak okunur: onay bekleyen mesaj olur, fotoğraf satırı kapanır, ⚠️ gitmez', async () => {
+    const items = [{ action: 'add', tractor: 'PB7831KT', trailer: 'PB7569EB', date: '', time: '', note: '', parties: ['GALATA PETROL'], fee: '90 EURO' }];
+    const noCard = { body: { vehicles: [], problem: 'Fotoğrafta ruhsat yok.', model: 'm' } };
+    const list = { body: { items, customer: 'ETL LOJ', problem: '', model: 'gemini-test' } };
+    const { mod, log, rows, patches, msgRows, post } = await setup({ env: { GEMINI_API_KEY: 'g' }, read: [noCard, list] });
+    expect((await post(notify(image('wamid.L', { image: { id: 'MEDIA1', mime_type: 'image/jpeg', caption: 'yarın gelecekler' } })))).status).toBe(200);
+    await mod.idle();
+    // önce ruhsat okunur, ruhsat çıkmayınca aynı fotoğraf "liste" modunda okunur (Türkiye saatiyle bugün başlıkta)
+    const reads = log.filter(l => l.url.endsWith('/functions/v1/ruhsat-oku'));
+    expect(reads.length).toBe(2);
+    expect(reads[0].headers['x-pcs-mode']).toBeUndefined();
+    expect(reads[1].headers['x-pcs-mode']).toBe('liste');
+    expect(reads[1].headers['x-pcs-today']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect([...reads[1].body]).toEqual([0xff, 0xd8, 0xff, 1, 2, 3]);
+    // liste onay bekleyen mesaj olarak kaydedilir; gönderen ve açıklama korunur
+    expect(msgRows.length).toBe(1);
+    expect(msgRows[0]).toMatchObject({ wa_message_id: 'wamid.L', from_number: '905321112233', sender_name: 'Ali Şoför', status: 'bekliyor', body: 'yarın gelecekler\n(Fotoğraftaki liste)' });
+    expect(msgRows[0].ai).toEqual({ items, customer: 'ETL LOJ', problem: '', model: 'gemini-test', image: true });
+    expect(msgRows[0].created_at).toBe(rows[0].created_at);
+    // fotoğraf satırı ruhsat olarak onaya düşmez: kapanır
+    expect(patches).toEqual([{
+      url: ENV.SUPABASE_URL + '/rest/v1/incoming_ruhsat?wa_message_id=eq.wamid.L&status=eq.okunuyor&claimed_by=is.null',
+      body: { status: 'yoksayildi', claimed_at: null, note: 'Araç listesi olarak okundu' }
+    }]);
+    // gönderene yalnızca ✅ gider
+    expect(log.filter(l => l.url.endsWith('/PHONE1/messages')).map(l => JSON.parse(l.body).type)).toEqual(['reaction']);
+  });
+
+  test('ruhsat da liste de çıkmazsa ya da mesaj tablosu yoksa eski yol: satır ruhsat olarak kalır, ⚠️ gider', async () => {
+    const noCard = { body: { vehicles: [], problem: 'Fotoğraf çok bulanık.', model: 'm' } };
+    const a = await setup({ env: { GEMINI_API_KEY: 'g' }, read: [noCard, { body: { items: [], customer: '', problem: 'Liste yok.', model: 'm' } }] });
+    await a.post(notify(image('wamid.M')));
+    await a.mod.idle();
+    expect(a.msgRows.length).toBe(0);
+    expect(a.patches.length).toBe(1);
+    expect(a.patches[0].body).toMatchObject({ status: 'bekliyor', note: 'Yapay zekâ ruhsatı okuyamadı · Fotoğraf çok bulanık.' });
+    expect(a.log.filter(l => l.url.endsWith('/PHONE1/messages')).map(l => { const m = JSON.parse(l.body); return m.type === 'reaction' ? m.reaction.emoji : 'yazı'; })).toEqual(['✅', '⚠️', 'yazı']);
+    // liste çıktı ama mesaj tablosu kurulu değil: fotoğraf satırı ruhsat olarak kalır
+    const items = [{ action: 'add', tractor: 'PB7831KT', trailer: '', date: '', time: '', note: '', parties: [], fee: '' }];
+    const b = await setup({ env: { GEMINI_API_KEY: 'g' }, noMsgTable: true, read: [noCard, { body: { items, customer: '', problem: '', model: 'm' } }] });
+    await b.post(notify(image('wamid.N')));
+    await b.mod.idle();
+    expect(b.patches.length).toBe(1);
+    expect(b.patches[0].body.status).toBe('bekliyor');
+    expect(b.errors.join('\n')).toContain('mesaj-kurulumu.sql');
+    // ruhsat okunduysa liste modu hiç denenmez (Gemini çağrısı artmaz)
+    const c = await setup({ env: { GEMINI_API_KEY: 'g' }, read: [{ body: { vehicles: [{ plate: 'PB1234AB', kind: 'tractor', empty_weight_kg: 8000 }], problem: '', model: 'm' } }] });
+    await c.post(notify(image('wamid.O')));
+    await c.mod.idle();
+    expect(c.log.filter(l => l.url.endsWith('/functions/v1/ruhsat-oku')).length).toBe(1);
+  });
+
   test('Gemini sınırı doluysa söylediği süre beklenip yeniden sorulur; yine olmazsa fotoğraf açık ekranlara bırakılır', async () => {
     const ok = { body: { vehicles: [{ plate: '34ABC123', kind: 'tractor', empty_weight_kg: 8000 }], problem: '' } };
     const a = await setup({ env: { GEMINI_API_KEY: 'g' }, read: [{ status: 429, body: { error: 'Gemini 429', retry_after: 1 } }, ok] });
