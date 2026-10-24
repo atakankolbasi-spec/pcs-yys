@@ -2257,6 +2257,20 @@ html[data-theme="dark"] .rep-setup a{color:#8fb3ff}
 .chat-send{flex:none;width:42px;height:42px;padding:0;border-radius:50%;border:0;display:grid;place-items:center;background:#128c7e;color:#fff;cursor:pointer}
 .chat-send:hover{background:#0f7a6e}
 .chat-send svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* sohbetle sorgu: sayılar ve araç satırları */
+.chat-sum{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.chat-sum span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:10px;background:#f0f2f5;font-size:10px;font-weight:700;color:#54656f;text-align:center}
+.chat-sum b{font-size:18px;color:#111b21}
+.chat-row{display:flex;align-items:center;gap:8px;width:100%;margin-top:6px;padding:6px 8px;border:1px solid #0000001a;border-radius:10px;background:#fff;color:inherit;font:inherit;font-size:12px;text-align:left;cursor:pointer;flex-wrap:wrap}
+.chat-row:hover{border-color:var(--c-accent,#3453d1)}
+.chat-row>:first-child{flex:none}
+.chat-row>span{flex:1;min-width:90px;color:#54656f}
+.chat-row i{font-style:normal;padding:2px 8px;border-radius:99px;background:#eef1fd;color:#3453d1;font-size:10.5px;font-weight:800}
+html[data-theme="dark"] .chat-sum span{background:#0b141a;color:#aebac1}
+html[data-theme="dark"] .chat-sum b{color:#e9edef}
+html[data-theme="dark"] .chat-row{background:#111b21;border-color:#ffffff1f}
+html[data-theme="dark"] .chat-row>span{color:#aebac1}
+html[data-theme="dark"] .chat-row i{background:#1c2a4a;color:#9db4ff}
 /* sohbetteki araç kartları: dar balona sığacak şekilde tek sütun */
 .chat-bub .msg-item{grid-template-columns:1fr;gap:8px;margin-top:8px;padding:10px 0 2px;border-top:1px dashed #0000002e}
 .chat-bub p+.msg-item{border-top:0;padding-top:4px}

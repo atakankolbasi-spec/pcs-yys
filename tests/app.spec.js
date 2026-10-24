@@ -1578,7 +1578,7 @@ test('sohbet balonu: yazılan cümle okunur, hazır ekleme ve taşıma kendiliğ
   await expect(panel).toContainText('5 araç anladım; 2 tanesini panoya işledim. 2 tanesi için onayınız gerekiyor');
   // gönderilen metin Gemini'ye bugünün tarihiyle gider
   const sent = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.text));
-  expect(sent).toEqual([{ text: 'Yarın 06 KL 4567 saat 09:30 gelecek\nCB 1234 AB cumaya ertelendi, XX 9999 YY gelecek, B 123 XYZ iptal', today: '2026-09-23' }]);
+  expect(sent).toEqual([{ text: 'Yarın 06 KL 4567 saat 09:30 gelecek\nCB 1234 AB cumaya ertelendi, XX 9999 YY gelecek, B 123 XYZ iptal', today: '2026-09-23', chat: true }]);
   // kendiliğinden yapılanlar: ekleme + taşıma. Silme ve yeni araç yapılmadı.
   const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).map(c => ({ op: c.op, rows: c.rows })));
   const w = await writes();
@@ -1623,8 +1623,8 @@ test('sohbet balonu: hata ve boş cevap sohbette yazar, yazılan metin geri geli
   // araç yok
   await page.locator('#chat-input').fill('merhaba nasılsınız 123');
   await page.locator('#chat-input').press('Enter');
-  await expect(panel).toContainText('Mesajda araç plakası bulamadım (Mesajda plaka yok)');
-  await expect(panel).toContainText('Kaydı düzenle');
+  await expect(panel).toContainText('Bunu anlayamadım (Mesajda plaka yok)');
+  await expect(panel).toContainText('kayıt düzeltme');
   expect(await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
   // bağlantı: WhatsApp mesajlarının onay penceresini açar
   await panel.locator('.chat-pend').click();
@@ -1722,6 +1722,115 @@ test('sohbet: müşterinin firmalı araç listesi yapıştırılır; tarih sorul
     ['CT 6913 PB - CT 2803 EH', 'PARSİYEL', '90 EURO · 1.UĞURLAR PLS. · 2.DEMİR PLASTİK', '2026-09-24']
   ]);
   await expect(panel).toContainText('plaka kayıtlarına işlendi');
+  expect(problems).toEqual([]);
+});
+
+const ed = (field, value, target) => ({ plate: '', position: 0, selected: false, customer: '', date: '', field, value, ...target });
+const chatAi = (extra, page) => ({ items: [], customer: '', problem: '', model: 'gemini-test', edits: [], queries: [], ...extra });
+
+test('sohbet: kayıt düzeltme sıra / plaka / seçili araçla yapılır; araç başına tek kayıt işlemi, değişmeyen ve bulunamayan satır açıkça yazılır', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const aiText = chatAi({ edits: [
+    ed('customer', 'etl loj', { position: 3 }),                  // sıra: bugünün 3. aracı
+    ed('t1', 'true', { plate: '34ABC123' }),                      // plaka: iki alan, tek işlem
+    ed('note_add', 'acil', { plate: '34ABC123' }),
+    ed('onsite', 'true', { plate: 'B123XYZ' }),                   // zaten tesiste: değişiklik yok
+    ed('time', '12:00', { position: 9 })                          // 9. sıra yok
+  ] });
+  const problems = await openApp(page, { aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).map(c => ({ op: c.op, rows: c.rows })));
+  await page.locator('#chat-fab').click();
+  await page.locator('#chat-input').fill('3. sıradaki aracın müşterisini ETL LOJ yap, 34 ABC 123 T1 yazıldı, not acil');
+  await page.locator('#chat-input').press('Enter');
+  const panel = page.locator('#chat-panel');
+  await expect(panel).toContainText('Kısmen yaptım:');
+  await expect(panel).toContainText('CB 1234 AB · Müşteri: TORNADO → ETL LOJ');     // 3. sıra; büyük harfe çevrildi
+  await expect(panel).toContainText('34 ABC 123 · T1 yazıldı: hayır → evet; Not: boş → acil');
+  await expect(panel).toContainText('B 123 XYZ: zaten böyle, değişiklik yok.');
+  await expect(panel).toContainText('23 Eylül gününde 9. sırada araç yok (o gün 3 araç var).');
+  // araç başına tek yazma: 2 güncelleme (sıra 3 + 34 ABC 123); T1 ve not aynı işlemde
+  const w = await writes();
+  expect(w.map(x => x.op)).toEqual(['update', 'update']);
+  const v5 = await page.evaluate(() => window.__db.visits.find(v => v.id === 'v5'));
+  expect(v5).toMatchObject({ t1: true, note: 'acil' });
+  expect((await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6'))).customer).toBe('ETL LOJ');
+  // sohbet sorusu veritabanına yazılmaz, pano açıkken kayıt panoda da güncellenir
+  expect(await page.evaluate(() => window.__db.incoming_messages.length)).toBe(0);
+  await expect(page.locator('#app')).toContainText('ETL LOJ');
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: seçili aracı düzeltme; müşteri adıyla birden fazla araç değişiyorsa önce onay sorulur ve Vazgeç hiçbir şey yazmaz', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  const v6 = data.visits.find(v => v.id === 'v6');
+  v6.customer = 'BULTRANS';                                        // bugün BULTRANS: v5 ve v6
+  const aiText = [
+    chatAi({ edits: [ed('declaration', 'PARSİYEL', { customer: 'BULTRANS' })] }),
+    chatAi({ edits: [ed('declaration', 'PARSİYEL', { customer: 'BULTRANS' })] }),
+    chatAi({ edits: [ed('carrier', 'YENİ LOJ', { selected: true })] })
+  ];
+  const problems = await openApp(page, { data, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length);
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  await say('BULTRANS araçlarının beyannamesini PARSİYEL yap');
+  await expect(panel).toContainText('2 araç değişecek (Beyanname: PARSİYEL)');
+  await expect(panel.locator('[data-action="chat-plan"]')).toHaveText(/Uygula \(2 araç\)/);
+  expect(await writes()).toBe(0);                                      // onaydan önce hiçbir şey yazılmaz
+  await panel.locator('[data-action="chat-plan-no"]').click();
+  await expect(panel).toContainText('Vazgeçtim, bir şey değiştirmedim.');
+  expect(await writes()).toBe(0);
+  // aynı istek, bu kez onay
+  await say('BULTRANS araçlarının beyannamesini PARSİYEL yap');
+  await expect(panel.locator('[data-action="chat-plan"]')).toHaveCount(1);
+  await panel.locator('[data-action="chat-plan"]').click();
+  await expect(panel).toContainText('Düzelttim:');
+  expect(await writes()).toBe(2);
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.declaration === 'PARSİYEL').map(v => v.id).sort())).toEqual(['v5', 'v6']);
+  // seçili araç: panoda bir satıra tıklanır, "bu araç" denir
+  await page.locator('#app tbody tr', { hasText: '34 ABC 123' }).first().click();
+  await say('bu aracın nakliyecisi YENİ LOJ olsun');
+  await expect(panel).toContainText('34 ABC 123 · Nakliyeci: KAAN LOJ. → YENİ LOJ');
+  expect(await writes()).toBe(3);
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: sorular panodan cevaplanır (sayı, liste, özet); listedeki araca tıklayınca panoda açılır; hiçbir şey yazılmaz', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const q = (kind, extra = {}) => ({ kind, status: '', customer: '', plate: '', date: '', week: false, ...extra });
+  const aiText = [
+    chatAi({ queries: [q('count', { status: 'onsite' })] }),
+    chatAi({ queries: [q('summary')] }),
+    chatAi({ queries: [q('list', { status: 'waiting' })] }),
+    chatAi({ queries: [q('list', { plate: 'CB1234AB' })] })
+  ];
+  const problems = await openApp(page, { aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  await say('Bugün kaç araç tesiste?');
+  await expect(panel).toContainText('23 Eylül · tesiste: 2 araç');
+  await say('Bugünün özeti');
+  const sum = panel.locator('.chat-sum').last();
+  expect(await sum.locator('b').allTextContents()).toEqual(['3', '2', '1', '1', '0']);   // toplam, tesiste, gelecek, T1, tamamlanan
+  await say('Gelecek araçları listele');
+  const row = panel.locator('.chat-row').last();
+  await expect(row).toContainText('CB 1234 AB');
+  await expect(row).toContainText('Gelecek');
+  await say('CB 1234 AB son kayıtları');
+  await expect(panel).toContainText('Son kayıtlar · CB 1234 AB: 2 araç');
+  await panel.locator('.chat-row', { hasText: '21 Eyl' }).click();
+  await expect(page.locator('[data-row-id="v2"]')).toHaveClass(/is-selected/);   // 21 Eylül gününe gidip satırı seçer
+  await expect(page.locator('.day-tab.active')).toContainText('21 Eyl');
+  expect(await page.evaluate(() => window.__calls.filter(c => ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
   expect(problems).toEqual([]);
 });
 
