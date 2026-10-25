@@ -351,6 +351,7 @@ async function syncData(opts={}){
  else{const every=!opts.poll||!!opts.changed,cur=realState;
   [registry,visits]=await Promise.all([every||!same('registry')?fetchChanged('registry',cur.registry,fp.registry):cur.registry,every||!same('visits')?fetchChanged('visits',cur.visits,fp.visits):cur.visits]);if(stamp!==generation)return;}
  state=realState={...emptyState(),registry,visits,updatedAt:new Date().toISOString()};storageError='';lastSync=timeNow();syncPrint=fp;
+ if(!feeProbed&&visits.length){feeProbed=true;feeCol=Object.prototype.hasOwnProperty.call(visits[0],'fee_amount');}   /* ücret sütunu var mı: gelen satırlardan anlaşılır; satır yoksa feeProbe sorar */
  if(getSettings)try{const {data:sRows,error:sErr}=await client.from('app_settings').select('*');if(!sErr&&Array.isArray(sRows)){lastSettings=Object.fromEntries(sRows.map(s=>[s.key,s.value]));applySettings(lastSettings);}else if(sErr)console.warn('Ayarlar okunamadı (ayar-okuma-duzeltmesi.sql çalıştırılmalı):',sErr.message);}catch(e){}}
  if(prevVisits)try{liveDiff(prevVisits,state.visits);}catch(_){}
  if(!VIEW_TOKEN)saveCache();

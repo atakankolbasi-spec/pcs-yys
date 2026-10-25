@@ -2103,7 +2103,8 @@ test('ücret alanı: araç formunda tutar ve para birimi girilir, kaydedilir, ge
   expect(w[0]).not.toContain('fee_currency');
   await page2.locator('.nav-item[data-page="reports"]').click();
   await expect(page2.locator('#cust-report .rs-note.warn')).toContainText('ucret-kurulumu.sql');
-  expect(problems2.filter(p => !/42703|400/.test(p))).toEqual([]);
+  expect(problems2).toEqual([]);                                                                       // sütun kayıtlı satırlardan anlaşılır: 400 veren yoklama isteği yok
+  expect(await page2.evaluate(() => window.__calls.filter(c => c.table === 'visits' && /fee_amount/.test(c.cols || '')).length)).toBe(0);
   await page2.close();
 });
 
