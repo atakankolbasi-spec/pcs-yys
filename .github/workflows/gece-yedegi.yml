@@ -1,0 +1,40 @@
+name: Gece yedeği
+
+# Her gece 02:30'da (İstanbul) bütün plaka kayıtlarını, gelişleri ve ayarları e-postayla yedek olarak gönderir:
+# tam yedek (JSON) + iki CSV (Excel'de açılır). Alıcılar ve açık/kapalı durumu sitede Ayarlar > Rapor ve yedek bölümündedir.
+# Günlük rapor maili ile aynı GitHub gizli değerlerini kullanır (PCS_RAPOR_ANAHTARI, GMAIL_ADRES, GMAIL_UYGULAMA_SIFRESI);
+# eksikse görev hiçbir şey göndermeden biter. Kurulum: supabase/README.md bölüm 12.
+# Elle denemek için: Actions > Gece yedeği > Run workflow.
+
+on:
+  schedule:
+    - cron: '30 23 * * *'   # her gün 23:30 UTC = ertesi gün 02:30 (İstanbul)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gece-yedegi
+  cancel-in-progress: false
+
+jobs:
+  yedekle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scripts/gunluk-rapor/package-lock.json
+      - name: Bağımlılıklar
+        run: npm ci --no-audit --no-fund
+        working-directory: scripts/gunluk-rapor
+      - name: Yedeği gönder
+        run: node scripts/gunluk-rapor/yedek.mjs
+        env:
+          PCS_RAPOR_ANAHTARI: ${{ secrets.PCS_RAPOR_ANAHTARI }}
+          GMAIL_ADRES: ${{ secrets.GMAIL_ADRES }}
+          GMAIL_UYGULAMA_SIFRESI: ${{ secrets.GMAIL_UYGULAMA_SIFRESI }}

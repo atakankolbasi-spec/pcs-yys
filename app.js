@@ -266,7 +266,7 @@ document.addEventListener('submit',async e=>{
 window.PCS_TEST={parseFee,parseAmount,feeOf,norm,plateCountry,fmtCompactPlate,weekInfo,monday,addDays,validDate,weekday,stats,validateData,ruhsatPlates,ruhsatKinds,ruhsatResolve,ruhsatRank,ruhsatWeights,ruhsatPickWeights,getState:()=>structuredClone(state),getUI:()=>({...ui,collapsed:[...ui.collapsed]}),today:TODAY};
 const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co','sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
 let account=null, role='viewer', busy=false, loading=false, resync=false, generation=0, formVersion=null, lastSync='';
-const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','app-design','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','msg-read','msg-apply','msg-all','msg-form','msg-addnew','msg-skip','msg-dismiss','msg-reread','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok','ruhsat-reread']);
+const writeActions=new Set(['move-up','move-down','clear-order','bulk-onsite','bulk-t1','bulk-done','bulk-clear','prio-up','prio-down','prio-del','prio-add','prio-save','add-visit','edit-visit','delete-visit','add-reg','edit-reg','delete-reg','register-current','app-save','app-reset','app-preset','app-design','link-show','link-rotate','glink-show','glink-rotate','gvlink-show','gvlink-rotate','gacc-add','gacc-on','gacc-off','gacc-del','rep-save','rep-rotate','bkp-save','carry-next','bulk-next','wa-contacts-save','import-reg','import-confirm','ruhsat-open','msg-read','msg-apply','msg-all','msg-form','msg-addnew','msg-skip','msg-dismiss','msg-reread','ruhsat-add','ruhsat-form','ruhsat-clear','ruhsat-clip','ruhsat-dismiss','ruhsat-kg','ruhsat-kg-ok','ruhsat-reread']);
 const disabledActions=new Set(['toggle-demo']);
 const canEdit=()=>!!account&&role==='editor'&&!busy&&navigator.onLine!==false;
 function authScreen(message=''){
@@ -972,7 +972,7 @@ function kSections(){const ed=role==='editor'&&!VIEW_TOKEN;return [
  {id:'colors',ic:'🖍️',t:'Renkler',d:'Durum, ana ve vurgu renkleri · hazır temalar',html:()=>kColorsHTML()},
  {id:'customers',ic:'🏢',t:'Müşteriler',d:'Müşteri renkleri ve pano sırası',html:()=>priorityEditor()},
  !VIEW_TOKEN&&{id:'whatsapp',ic:'💬',t:'WhatsApp',d:'Müşteri numaraları ve mesaj şablonu',html:()=>contactsEditor()},
- ed&&{id:'report',ic:'📧',t:'Günlük rapor',d:'Her iş günü 23:59’da e-postayla özet',html:()=>`<div data-panel="report">${reportEditor()}</div>`},
+ ed&&{id:'report',ic:'📧',t:'Rapor ve yedek',d:'Günlük rapor maili ve gece yedeği (e-posta)',html:()=>`<div data-panel="report">${reportEditor()}</div><div data-panel="backup">${backupEditor()}</div>`},
  ed&&{id:'link',ic:'🔗',t:'Görüntüleme linki',d:'Giriş gerektirmeyen izleme linki',html:()=>`<div data-panel="link">${linkEditor()}</div>`},
  ed&&{id:'guard',ic:'🛡️',t:'Güvenlik',d:'Kapı görevlisi hesapları ve linkleri',html:()=>`<div data-panel="guardacct"><div class="card-header"><div><h2>Güvenlik hesapları</h2><p>Görevli kendi e-posta ve şifresiyle girer; yalnızca güvenlik ekranını görür.</p></div></div>${guardAccountsEditor()}</div><div data-panel="guard">${guardLinkEditor()}</div><div data-panel="guardview">${guardViewLinkEditor()}</div>`},
  {id:'keys',ic:'⌨️',t:'Kısayollar',d:'Klavye ile hızlı çalış',html:()=>kKeysHTML()},
@@ -2254,7 +2254,7 @@ function reportEditor(){if(role!=='editor'||VIEW_TOKEN)return '';if(repCfg.state
  <label class="rep-label" for="rep-to">Alıcılar <small>(her satıra bir e-posta, en fazla 20)</small></label>
  <textarea id="rep-to" rows="4" spellcheck="false" autocomplete="off" placeholder="ornek@firma.com">${esc((d.recipients||[]).join('\n'))}</textarea>
  <div class="actions" style="margin-top:10px">${button('rep-save','Kaydet','check','primary')}</div>${last}
- <h3 class="set-sub">Rapor anahtarı</h3><p class="help-note" style="margin:0 0 8px">GitHub’a <b>PCS_RAPOR_ANAHTARI</b> adıyla girilir. Anahtarı bilen, günlerin araç listesini okuyabilir; yanlış ellere geçerse “Yeni anahtar” deyip GitHub’daki değeri de güncelleyin.</p>
+ <h3 class="set-sub">Rapor anahtarı</h3><p class="help-note" style="margin:0 0 8px">GitHub’a <b>PCS_RAPOR_ANAHTARI</b> adıyla girilir. Anahtarı bilen, günlerin araç listesini (gece yedeği kuruluysa bütün kayıtları) okuyabilir; yanlış ellere geçerse “Yeni anahtar” deyip GitHub’daki değeri de güncelleyin.</p>
  <div class="link-row"><input id="rep-token" type="password" readonly value="${esc(d.token||'')}" aria-label="Rapor anahtarı">${button('rep-show','Göster','search')}${button('rep-copy','Kopyala','doc')}</div>
  <div class="actions" style="margin-top:10px">${button('rep-rotate','Yeni anahtar','refresh','danger')}</div>${setup}`;}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="rep-"]');if(!b||b.disabled)return;const a=b.dataset.action;
@@ -2273,6 +2273,43 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
   busy=true;onlineUI();
   try{const {error}=await client.rpc('rotate_report_token');if(error)throw error;toast('Yeni anahtar oluşturuldu; GitHub’daki değeri güncelleyin.');}
   catch(err){toast(friendly(err),true);}finally{busy=false;}await loadReportCfg();}});
+
+/* Ayarlar: gece yedeği (e-posta; yalnızca düzenleyici). Gönderimi GitHub'daki "Gece yedeği" görevi yapar
+   (.github/workflows/gece-yedegi.yml): her gece bütün kayıtlar JSON + CSV olarak alıcılara gider. Günlük raporla aynı rapor anahtarı
+   ve Gmail değerleri kullanılır; burada yalnızca alıcılar ve açık/kapalı durumu yönetilir. */
+const bkCfg={state:'idle',data:null};
+async function loadBackupCfg(){bkCfg.state='loading';
+ try{const {data,error}=await client.rpc('get_backup_settings');if(error)throw error;bkCfg.data=data||{};bkCfg.state='ready';}
+ catch(e){bkCfg.data=null;bkCfg.state=e?.code==='PGRST202'?'missing':'error';}
+ if(ui.page==='settings')render();}
+function backupEditor(){if(role!=='editor'||VIEW_TOKEN)return '';if(bkCfg.state==='idle')setTimeout(loadBackupCfg,0);const d=bkCfg.data||{};
+ const link=(u,t)=>`<a href="${u}" target="_blank" rel="noopener">${t}</a>`;
+ const head='<h3 class="set-sub" style="margin-top:26px">Gece yedeği (e-posta)</h3>';
+ const setup=`<details class="rep-setup"${bkCfg.state==='missing'||!d.last_at?' open':''}><summary>Kurulum (bir kez)</summary><ol class="gacc-steps">
+  <li>Günlük rapor kurulu olmalı (yukarıdaki adımlar): yedek aynı gönderen Gmail ve GitHub değerlerini kullanır, yeni bir gizli değer girmeniz gerekmez.</li>
+  <li>Supabase → SQL Editor’de <b>gece-yedegi-kurulumu.sql</b> dosyasının tamamını çalıştırın (iki satır “tamam”).</li>
+  <li>Aşağıda alıcıları yazıp yedeği açın, <b>Kaydet</b>’e basın.</li>
+  <li>Denemek için ${link(REPO_URL+'/actions/workflows/gece-yedegi.yml','Actions → Gece yedeği')} → <b>Run workflow</b>. Sonuç burada “Son yedek” olarak görünür.</li></ol></details>`;
+ if(bkCfg.state==='missing')return `${head}<div class="notice">${icon('info')}<div>Önce Supabase’de <b>gece-yedegi-kurulumu.sql</b> dosyasını çalıştırın (günlük rapor kurulumu önceden yapılmış olmalı).</div></div>${setup}`;
+ if(bkCfg.state==='error')return `${head}<p class="help-note">Yedek ayarları alınamadı. ${button('bkp-reload','Tekrar dene','refresh','small')}</p>`;
+ if(bkCfg.state!=='ready')return `${head}<p class="help-note">Yükleniyor…</p>`;
+ const last=d.last_at?`<p class="rep-last ${d.last_ok?'ok':'bad'}">${icon(d.last_ok?'check':'info')}<span>Son yedek: ${esc(tsText(d.last_at))} · ${esc(d.last_note||'')}</span></p>`:'<p class="help-note" style="margin-top:10px">Henüz yedek gönderilmedi. Kurulumu tamamlayıp GitHub’dan bir kez deneyin.</p>';
+ return `${head}<p class="help-note" style="margin:0 0 12px">Her gece <b>02:30</b>’da bütün plaka kayıtları, gelişler ve ayarlar aşağıdaki adreslere e-postayla gider: tam yedek (JSON) ve iki CSV (Excel’de açılır). Böylece verinin Supabase’in dışında, e-posta kutunuzda da bir kopyası durur. Dosyalar müşteri bilgisi içerir; yalnızca güvendiğiniz adresleri yazın.</p>
+ <label class="rep-on"><input type="checkbox" id="bkp-enabled" ${d.enabled?'checked':''}> Gece yedeği gönderilsin</label>
+ <label class="rep-label" for="bkp-to">Alıcılar <small>(her satıra bir e-posta, en fazla 5)</small></label>
+ <textarea id="bkp-to" rows="3" spellcheck="false" autocomplete="off" placeholder="ornek@firma.com">${esc((d.recipients||[]).join('\n'))}</textarea>
+ <div class="actions" style="margin-top:10px">${button('bkp-save','Kaydet','check','primary')}</div>${last}${setup}`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action^="bkp-"]');if(!b||b.disabled)return;const a=b.dataset.action;
+ if(a==='bkp-reload'){bkCfg.state='idle';return render();}
+ if(!canEdit())return;
+ if(a==='bkp-save'){const list=(document.getElementById('bkp-to')?.value||'').split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean),enabled=!!document.getElementById('bkp-enabled')?.checked;
+  const bad=list.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));if(bad){toast(`Geçersiz e-posta: ${bad}`,true);return;}
+  if(list.length>5){toast('Yedek en fazla 5 adrese gönderilebilir.',true);return;}
+  if(enabled&&!list.length){toast('Yedek açıkken en az bir alıcı yazın.',true);return;}
+  busy=true;onlineUI();
+  try{const {data,error}=await client.rpc('save_backup_settings',{p_enabled:enabled,p_recipients:list});if(error)throw error;bkCfg.data=data||bkCfg.data;toast(enabled?`Kaydedildi: gece yedeği ${list.length} alıcıya gidecek.`:'Kaydedildi: gece yedeği kapalı.');}
+  catch(err){toast(err?.code==='PGRST202'?'Önce gece-yedegi-kurulumu.sql dosyasını Supabase’de çalıştırın.':err?.code==='22023'?err.message:friendly(err),true);}
+  finally{busy=false;}render();}});
 
 /* çevrimdışı açılış için uygulama dosyalarını önbelleğe alan service worker */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}));

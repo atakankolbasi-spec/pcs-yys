@@ -9,7 +9,8 @@
  *     guardViewToken: 'gv1',                   // güvenlik ekranı izleme linki (yalnızca görüntüleme)
  *     guardAccount: { name: 'Tepecik', active: true },  // giriş yapan kullanıcı güvenlik hesabı
  *     guardAccounts: [{ email, name, active, has_user, last_sign_in_at }],  // Ayarlar > Güvenlik hesapları
- *     report: { enabled, recipients, token, last_run_at, last_ok, last_note } }  // Ayarlar > Otomatik günlük rapor
+ *     report: { enabled, recipients, token, last_run_at, last_ok, last_note },  // Ayarlar > Otomatik günlük rapor
+ *     backup: { enabled, recipients, last_at, last_ok, last_note } }              // Ayarlar > Gece yedeği (missing: ['backup'] = kurulmamış)
  * Yapılan her çağrı window.__calls dizisine yazılır. */
 (() => {
   const cfg = window.__PCS_STUB || {};
@@ -180,6 +181,18 @@
         if (name === 'save_report_settings') {
           const list = [...new Set((params.p_recipients || []).map(x => String(x).trim().toLowerCase()).filter(Boolean))].sort();
           if (list.some(x => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))) return guardErr('22023', 'Geçersiz e-posta adresi var; her satıra bir adres yazın');
+          Object.assign(r, { enabled: !!params.p_enabled, recipients: list });
+        }
+        return { data: clone(r), error: null };
+      }
+      // Gece yedeği ayarları (supabase/gece-yedegi-kurulumu.sql'in sade karşılığı)
+      if (name === 'get_backup_settings' || name === 'save_backup_settings') {
+        if ((cfg.missing || []).includes('backup')) return guardErr('PGRST202', 'Could not find the function');
+        const r = (cfg.backup = cfg.backup || { enabled: false, recipients: [], last_at: null, last_ok: null, last_note: null });
+        if (name === 'save_backup_settings') {
+          const list = [...new Set((params.p_recipients || []).map(x => String(x).trim().toLowerCase()).filter(Boolean))].sort();
+          if (list.some(x => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))) return guardErr('22023', 'Geçersiz e-posta adresi var; her satıra bir adres yazın');
+          if (list.length > 5) return guardErr('22023', 'Yedek en fazla 5 adrese gönderilebilir');
           Object.assign(r, { enabled: !!params.p_enabled, recipients: list });
         }
         return { data: clone(r), error: null };

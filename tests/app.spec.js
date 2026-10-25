@@ -2528,6 +2528,48 @@ test('ayarlar: otomatik günlük rapor alıcıları kaydedilir, anahtar gösteri
   expect(problems).toEqual([]);
 });
 
+test('ayarlar: gece yedeği alıcıları kaydedilir; geçersiz adres, boş liste ve 5\'ten fazla adres reddedilir; kurulmamışsa SQL istenir', async ({ page, browser }) => {
+  test.setTimeout(90000);
+  const problems = await openApp(page, { report: { enabled: false, recipients: [], token: 'rapor1' }, backup: { enabled: false, recipients: [], last_at: '2026-09-23T23:30:20Z', last_ok: true, last_note: '24.09.2026: 1 alıcıya gönderildi · 120 plaka, 1.540 geliş.' } });
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-stab="report"]').click();
+  await expect(page.locator('.k-stab.on')).toContainText('Rapor ve yedek');
+  const panel = page.locator('[data-panel="backup"]');
+  await expect(panel).toContainText('Gece yedeği (e-posta)');
+  await expect(panel).toContainText('02:30');
+  await expect(panel.locator('.rep-last.ok')).toContainText('120 plaka, 1.540 geliş');
+  // alıcısız açılamaz; geçersiz adres ve 6 adres reddedilir
+  await page.locator('#bkp-enabled').check();
+  await page.locator('[data-action="bkp-save"]').click();
+  await expect(page.locator('#toast')).toContainText('en az bir alıcı');
+  await page.locator('#bkp-to').fill('ofis@ornek.com\nyanlis');
+  await page.locator('[data-action="bkp-save"]').click();
+  await expect(page.locator('#toast')).toContainText('Geçersiz e-posta: yanlis');
+  await page.locator('#bkp-to').fill('a@ornek.com b@ornek.com c@ornek.com d@ornek.com e@ornek.com f@ornek.com');
+  await page.locator('[data-action="bkp-save"]').click();
+  await expect(page.locator('#toast')).toContainText('en fazla 5 adrese');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.rpc === 'save_backup_settings').length)).toBe(0);   // hiçbiri sunucuya gitmedi
+  // kaydet
+  await page.locator('#bkp-to').fill('Sahip@Ornek.com, ofis@ornek.com\n\n');
+  await page.locator('[data-action="bkp-save"]').click();
+  await expect(page.locator('#toast')).toContainText('2 alıcıya gidecek');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.rpc === 'save_backup_settings').at(-1).params)).toEqual({ p_enabled: true, p_recipients: ['sahip@ornek.com', 'ofis@ornek.com'] });
+  await expect(page.locator('#bkp-to')).toHaveValue('ofis@ornek.com\nsahip@ornek.com');
+  // kapatınca alıcı gerekmez
+  await page.locator('#bkp-enabled').uncheck();
+  await page.locator('[data-action="bkp-save"]').click();
+  await expect(page.locator('#toast')).toContainText('gece yedeği kapalı');
+  expect(problems).toEqual([]);
+  // kurulmamış: SQL istenir, günlük rapor ayarı etkilenmez
+  const page2 = await browser.newPage();
+  await openApp(page2, { missing: ['backup'], report: { enabled: false, recipients: [], token: 'rapor1' } });
+  await page2.locator('.nav-item[data-page="settings"]').click();
+  await page2.locator('[data-stab="report"]').click();
+  await expect(page2.locator('[data-panel="backup"]')).toContainText('gece-yedegi-kurulumu.sql');
+  await expect(page2.locator('[data-panel="report"] #rep-token')).toHaveCount(1);
+  await page2.close();
+});
+
 test('ayarlar: günlük rapor kurulmamışsa SQL dosyası istenir; görüntüleyiciye bölüm görünmez', async ({ page, browser }) => {
   const problems = await openApp(page, { missing: ['report'] });
   await page.locator('.nav-item[data-page="settings"]').click();
