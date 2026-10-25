@@ -159,8 +159,8 @@ silip aynı e-postayla yeniden açmak yeterlidir; listedeki kayıt durur.
 - **Kontrol:** Ayda bir Supabase → **Organization → Usage** sayfasına bakın; bir çubuk %70'i geçerse
   geliştiriciye haber verin.
 - **Yedek:** Ücretsiz planda Supabase indirilebilir yedek tutmaz; sitenin gece aldığı yedekler de aynı
-  veritabanındadır. Haftada bir sitede **Veri ve yedek** sayfasından yedeği indirip bilgisayara ya da
-  Drive'a koyun.
+  veritabanındadır. Verinin dışarıda da kopyası olması için **gece yedeği e-postasını** kurun (bölüm 12);
+  ayrıca haftada bir sitede **Veri ve yedek** sayfasından yedeği indirip bilgisayara ya da Drive'a koyun.
 - **SQL dosyaları:** GitHub'da düzenlemeyin (kalem simgesi). Dosyanın tamamını "kopyala" simgesiyle alıp
   SQL Editor'deki eski içeriğin yerine yapıştırın; kontrol satırlarının hepsi "tamam" demeli.
 
@@ -193,8 +193,34 @@ aşan araçlar panoda kırmızı görünür, bildirim zilinde ve bu raporda "Uzu
 
 Gizli değerler girilmeden görev hiçbir şey göndermeden biter. Gönderim başarısız olursa görev kırmızı olur,
 GitHub e-posta gönderir ve sebep Ayarlar'da "Son çalışma" satırında yazar. Rapor anahtarını bilen günlerin araç
-listesini okuyabilir; yanlış ellere geçerse Ayarlar'dan "Yeni anahtar" deyip GitHub'daki değeri güncelleyin.
+listesini (gece yedeği kuruluysa bütün kayıtları) okuyabilir; yanlış ellere geçerse Ayarlar'dan "Yeni anahtar" deyip GitHub'daki değeri güncelleyin.
 Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI` değerini de güncelleyin.
+
+## 12. Gece yedeği (e-posta)
+
+Her gece **02:30**'da (İstanbul) bütün plaka kayıtları, gelişler ve ayarlar e-postayla gider: tam yedek (`PCS_YEDEK_<tarih>.json`)
+ve iki CSV (`PCS_PLAKA_KAYITLARI_<tarih>.csv`, `PCS_GELISLER_<tarih>.csv`; Excel'de açılır). Böylece verinin Supabase'in
+dışında, e-posta kutunuzda da bir kopyası durur (Supabase'in ücretsiz planı indirilebilir yedek tutmaz). Gönderimi GitHub'daki
+"Gece yedeği" görevi yapar (`.github/workflows/gece-yedegi.yml`, betik `scripts/gunluk-rapor/yedek.mjs`).
+
+Kurulum (bir kez):
+
+1. Günlük rapor kurulu olmalı (bölüm 10): yedek aynı gönderen Gmail ve GitHub gizli değerlerini (`GMAIL_ADRES`,
+   `GMAIL_UYGULAMA_SIFRESI`, `PCS_RAPOR_ANAHTARI`) kullanır; yeni bir şey girmeniz gerekmez.
+2. `gece-yedegi-kurulumu.sql` dosyasının **tamamını** SQL Editor'de çalıştırın (iki satır "tamam").
+3. Sitede **Ayarlar → Rapor ve yedek → Gece yedeği** bölümünde alıcıları yazın (en fazla 5; her satıra bir e-posta),
+   "Gece yedeği gönderilsin"i işaretleyip **Kaydet**'e basın.
+4. Denemek için GitHub → **Actions → Gece yedeği → Run workflow**. Sonuç sitede "Son yedek" satırında görünür.
+
+Bilmeniz gerekenler:
+- Yedek dosyaları müşteri ve araç bilgisi içerir; yalnızca güvendiğiniz adreslere gönderin, e-postayı başkalarına iletmeyin.
+- Rapor anahtarını bilen, günlük raporun yanında yedekteki **bütün** kayıtları da okuyabilir. Anahtarı kimseyle paylaşmayın;
+  yanlış ellere geçerse Ayarlar'dan "Yeni anahtar" deyip GitHub'daki `PCS_RAPOR_ANAHTARI` değerini de güncelleyin.
+- Dosyalar toplamı 20 MB'ı aşarsa yalnızca JSON gönderilir; JSON tek başına 20 MB'ı aşarsa yedek gönderilmez, görev
+  kırmızı olur ve sebep "Son yedek" satırında yazar (o durumda Veri ve yedek sayfasından elle indirin).
+- Veritabanı boş görünüyorsa yedek gönderilmez (boş bir yedek yanıltıcı olur); görev kırmızı olup GitHub e-posta gönderir.
+- JSON, veritabanı satırlarının olduğu gibi dökümüdür (`data.registry`, `data.visits`, `data.app_settings`). Veritabanı
+  bozulursa bu dosyadan yeniden yüklenir.
 
 ## 11. Araç ücreti ve aylık müşteri raporu
 
@@ -214,6 +240,7 @@ site eskisi gibi çalışır: Ücret kutuları çıkmaz, ücret notta kalır ve 
 | `anlik-guncelleme-kurulumu.sql` | Tabloları Realtime yayınına ekler (anlık güncelleme) |
 | `guvenlik-kurulumu.sql` | Güvenlik linki, güvenlik hesapları (GİRİŞ / ÇIKIŞ ekranı) ve ayrı çıkış saati |
 | `gunluk-rapor-kurulumu.sql` | Otomatik günlük rapor maili: alıcılar, rapor anahtarı, günün verisi |
+| `gece-yedegi-kurulumu.sql` | Gece yedeği e-postası: alıcılar, sayfa sayfa okuma, son yedek durumu (önce gunluk-rapor-kurulumu.sql) |
 | `ucret-kurulumu.sql` | Araç ücreti için ayrı alan (tutar + para birimi); Raporlar > Aylık müşteri raporu bunu toplar |
 | `plaka-harf-duzeltmesi.sql` | Eski kayıtlardaki Kiril / Yunan harfli plakaları Latin harfe çevirir (isteğe bağlı) |
 | `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |

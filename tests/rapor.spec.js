@@ -89,3 +89,76 @@ test('günlük rapor maili: GitHub gizli değerleri girilmemişse görev sessizc
   expect(r.status).toBe(0);
   expect(r.stdout).toContain('henüz kurulmadı');
 });
+
+// ---- gece yedeği (scripts/gunluk-rapor/yedek.mjs): gerçek gönderim yerine "kuru" modda dosyaya yazar ----
+const YEDEK = path.join(__dirname, '..', 'scripts', 'gunluk-rapor', 'yedek.mjs');
+function runBackup(data, extraEnv = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yedek-'));
+  fs.writeFileSync(path.join(dir, 'veri.json'), JSON.stringify(data));
+  const out = path.join(dir, 'cikti');
+  const r = spawnSync(process.execPath, [YEDEK], { encoding: 'utf8', env: { ...process.env, YEDEK_VERI: path.join(dir, 'veri.json'), YEDEK_KURU: out, ...extraEnv } });
+  return { code: r.status, log: r.stdout + r.stderr, out };
+}
+const bkData = () => ({
+  enabled: true, recipients: ['ofis@ornek.com'],
+  registry: [
+    { id: 'r1', plate: '34 ABC 123', customer: 'BULTRANS', declaration: '26341200EX0001', carrier: 'KAAN LOJ.', registration: '15400 KG', updated_at: '2026-09-01T08:00:00Z' },
+    { id: 'r2', plate: 'CB 1234 AB', customer: 'TORNADO; "EXPRESS"', declaration: '', carrier: '', registration: '' }
+  ],
+  visits: [
+    visit('a1', '34 ABC 123', 'BULTRANS', { visit_date: '2026-09-28', note: 'acil, "özel"', onsite: true, t1: true, done: true, onsite_at: '2026-09-28T05:12:00Z', done_at: '2026-09-28T09:40:00Z', exit_at: '2026-09-28T10:05:00Z', fee_amount: 90, fee_currency: 'EUR' }),
+    visit('a2', 'CB 1234 AB', 'TORNADO', { visit_date: '2026-09-30', note: '=1+1', fee_amount: null, fee_currency: '' }),
+    visit('a3', 'X 1', 'LİN', { visit_date: '2026-09-29', note: '-acil' })
+  ],
+  app_settings: [{ key: 'appearance', value: { waitHours: '48' } }]
+});
+
+test('gece yedeği: tam yedek (JSON) ve iki CSV hazırlanır; müşteri, ücret ve saatler yerinde, formül sayılabilecek yazılar korunur', () => {
+  const r = runBackup(bkData());
+  expect(r.code).toBe(0);
+  expect(r.log).toContain('1 alıcılık yedek');
+  const mail = JSON.parse(fs.readFileSync(path.join(r.out, 'mail.json'), 'utf8'));
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
+  expect(mail.to).toEqual(['ofis@ornek.com']);
+  expect(mail.subject).toBe(`PCS TRANSİT · Gece yedeği · ${day.split('-').reverse().join('.')} · 2 plaka, 3 geliş`);
+  expect(mail.attachments).toEqual([`PCS_YEDEK_${day}.json`, `PCS_PLAKA_KAYITLARI_${day}.csv`, `PCS_GELISLER_${day}.csv`]);
+  expect(mail.text).toContain('Geliş kaydı: 3 (28.09.2026 – 30.09.2026)');
+  const json = JSON.parse(fs.readFileSync(path.join(r.out, mail.attachments[0]), 'utf8'));
+  expect(json).toMatchObject({ app: 'PCS TRANSIT YYS', schemaVersion: 1, kind: 'gece-yedegi' });
+  expect(json.data.registry.length).toBe(2);
+  expect(json.data.visits.length).toBe(3);
+  expect(json.data.visits[0]).toMatchObject({ id: 'a1', fee_amount: 90, exit_at: '2026-09-28T10:05:00Z' });      // veritabanı satırları olduğu gibi
+  expect(json.data.app_settings).toEqual([{ key: 'appearance', value: { waitHours: '48' } }]);
+  const reg = fs.readFileSync(path.join(r.out, mail.attachments[1]), 'utf8');
+  expect(reg.charCodeAt(0)).toBe(0xFEFF);                                                                       // Excel için BOM
+  expect(reg.split('\r\n')).toEqual(['﻿PLAKA;MÜŞTERİ;BEYANNAME;NAKLİYECİ;RUHSAT', '34 ABC 123;BULTRANS;26341200EX0001;KAAN LOJ.;15400 KG', 'CB 1234 AB;"TORNADO; ""EXPRESS""";;;', '']);
+  const vis = fs.readFileSync(path.join(r.out, mail.attachments[2]), 'utf8').split('\r\n');
+  expect(vis[0]).toContain('GELİŞ TARİHİ;SAAT;PLAKA;MÜŞTERİ');
+  expect(vis[1]).toBe('2026-09-28;09:00;34 ABC 123;BULTRANS;;;;"acil, ""özel""";EVET;EVET;EVET;2026-09-28 08:12;2026-09-28 12:40;2026-09-28 13:05;90;EUR');
+  expect(vis[2]).toContain(";'-acil;");                                                                         // "-acil" formül sayılmasın
+  expect(vis[3]).toContain(";'=1+1;");
+  expect(vis.length).toBe(5);
+});
+
+test('gece yedeği: kapalıysa, alıcı yoksa, veritabanı boşsa ya da çok büyükse gönderilmez; gizli değerler yoksa sessizce biter', () => {
+  let r = runBackup({ ...bkData(), enabled: false });
+  expect(r.code).toBe(0);
+  expect(r.log).toContain('kapalı');
+  expect(fs.existsSync(path.join(r.out, 'mail.json'))).toBe(false);
+  r = runBackup({ ...bkData(), recipients: [] });
+  expect(r.code).toBe(0);
+  expect(r.log).toContain('Alıcı yok');
+  r = runBackup({ ...bkData(), registry: [], visits: [] });
+  expect(r.code).toBe(0);
+  expect(r.log).toContain('Veritabanı boş görünüyor');
+  expect(fs.existsSync(path.join(r.out, 'mail.json'))).toBe(false);
+  // 20 MB'ı aşan yedek e-postaya sığmaz
+  const big = bkData();
+  big.visits = Array.from({ length: 30000 }, (_, i) => visit('b' + i, 'PL ' + i, 'MÜŞTERİ', { note: 'x'.repeat(900) }));
+  r = runBackup(big);
+  expect(r.log).toContain('e-postaya sığmayacak kadar büyük');
+  expect(fs.existsSync(path.join(r.out, 'mail.json'))).toBe(false);
+  const quiet = spawnSync(process.execPath, [YEDEK], { encoding: 'utf8', env: { PATH: process.env.PATH } });
+  expect(quiet.status).toBe(0);
+  expect(quiet.stdout).toContain('henüz kurulmadı');
+});
