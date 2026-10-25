@@ -4,6 +4,8 @@
 -- (özet + günlük Excel) gönderir. Alıcılar ve açık/kapalı durumu sitede Ayarlar > Otomatik günlük
 -- rapor bölümünden yönetilir (yalnızca düzenleyici).
 --
+-- Raporda ayrıca "Uzun bekleyen araçlar" bölümü çıkar (eşik: Ayarlar > Uyarılar).
+--
 -- Görev veritabanına "rapor anahtarı" ile bağlanır: anahtar Ayarlar'da görünür ve GitHub'a gizli değer
 -- olarak girilir. Anahtarı bilen, bir günün araç listesini (müşteri, plaka, beyanname, nakliyeci, saatler)
 -- okuyabilir; başka hiçbir şey yapamaz. Anahtar yanlış ellere geçerse Ayarlar'dan yenilenir.
@@ -81,6 +83,18 @@ begin
   return jsonb_build_object(
     'date', p_date, 'enabled', c.enabled, 'recipients', to_jsonb(c.recipients),
     'customer_priority', coalesce((select s.value from public.app_settings s where s.key = 'customer_priority'), '[]'::jsonb),
+    -- Uzun bekleyen uyarısının eşiği (saat; Ayarlar > Uyarılar). 0 = kapalı. Ayar hiç kaydedilmemişse 48.
+    'wait_hours', coalesce((select case when s.value->>'waitHours' ~ '^[0-9]{1,4}$' then (s.value->>'waitHours')::int end
+                            from public.app_settings s where s.key = 'appearance'), 48),
+    -- Tesise girmiş ama işlemi bitmemiş araçlar (uzun bekleyenleri bulmak için; en fazla 300)
+    'open_visits', coalesce((
+      select jsonb_agg(q.j order by q.d, q.p) from (
+        select v.visit_date as d, v.plate as p,
+               jsonb_build_object('plate', v.plate, 'customer', v.customer, 'declaration', v.declaration, 'visit_date', v.visit_date,
+                                  'visit_time', v.visit_time, 'onsite', v.onsite, 't1', v.t1, 'onsite_at', v.onsite_at) as j
+        from public.visits v where not v.done and v.onsite and v.visit_date <= p_date order by v.visit_date, v.plate limit 300
+      ) q
+    ), '[]'::jsonb),
     'visits', coalesce((
       select jsonb_agg(jsonb_build_object(
                'id', v.id, 'plate', v.plate, 'customer', v.customer, 'declaration', v.declaration, 'carrier', v.carrier,

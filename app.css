@@ -2302,3 +2302,18 @@ html[data-theme="dark"] .chat-attach:hover{background:#ffffff14;color:#53bdeb}
 html[data-theme="dark"] .chat-form textarea{background:#2a3942;border-color:#2a3942;color:#e9edef}
 html[data-theme="dark"] .chat-bub .msg-item{border-top-color:#ffffff24}
 html[data-theme="dark"] .chat-dot{border-color:#111b21}
+
+/* uzun bekleyen araç: işlemi bitmeden eşiği aşan satır / kart kırmızı (eşik Ayarlar > Uyarılar) */
+.operations tbody tr.row-long:not(.is-selected) td,.operations tbody tr.row-long:not(.is-selected) td.actions-cell{background:#fff0f0}
+.operations tbody tr.row-long td:first-child{box-shadow:inset 4px 0 0 #dc2626}
+.operations tbody tr.row-long:not(.is-selected):hover td{background:#ffe6e6}
+.vcard.long{border-color:#f0a3a3;box-shadow:inset 4px 0 0 #dc2626,var(--shadow)}
+.vcard.long:not(.is-selected){background:#fff7f7}
+.wait-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:2px 7px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:10.5px;font-weight:800;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
+.wait-badge svg{width:11px;height:11px}
+html[data-theme="dark"] .operations tbody tr.row-long:not(.is-selected) td,html[data-theme="dark"] .operations tbody tr.row-long:not(.is-selected) td.actions-cell{background:#2c1a1e}
+html[data-theme="dark"] .operations tbody tr.row-long:not(.is-selected):hover td{background:#35202a}
+html[data-theme="dark"] .vcard.long{border-color:#7f2a2a}
+html[data-theme="dark"] .vcard.long:not(.is-selected){background:#2a1a1e}
+html[data-theme="dark"] .wait-badge{background:#450a0a;color:#fca5a5}
+.operations td.plate .wait-badge{display:flex;width:max-content;margin:4px 0 0}

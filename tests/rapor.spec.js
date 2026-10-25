@@ -40,6 +40,36 @@ test('günlük rapor maili: özet, giriş-çıkış saatleri ve günlük Excel e
   expect(xml.indexOf('LİN LOJİSTİK')).toBeLessThan(xml.indexOf('BULTRANS')); // müşteri önceliği Excel'de de geçerli
 });
 
+test('günlük rapor maili: eşiği aşan bekleyen araçlar "Uzun bekleyen araçlar" bölümünde en uzundan başlayarak listelenir; eşik kapalıysa ya da veri yoksa bölüm çıkmaz', () => {
+  const open = [
+    { plate: 'CB 1291 TA', customer: 'TORNADO EXPRESS', declaration: '', visit_date: '2026-09-28', visit_time: '09:00:00', onsite: true, t1: false, onsite_at: '2026-09-28T00:00:00Z' },   // girişten beri ≈ 69 saat (2 gün 20 sa)
+    { plate: '34 ABC 123', customer: 'BULTRANS', declaration: '26341200EX0001', visit_date: '2026-09-27', visit_time: '08:00:00', onsite: true, t1: true, onsite_at: '2026-09-27T05:00:00Z' },   // girişten beri ≈ 88 saat
+    { plate: 'X 111 YY', customer: 'LİN LOJ', declaration: '', visit_date: '2026-09-30', visit_time: '10:00:00', onsite: true, t1: false, onsite_at: '2026-09-30T07:00:00Z' },                    // bugün girdi: eşiğin altında
+    { plate: 'Y 222 ZZ', customer: 'LİN LOJ', declaration: '', visit_date: '2026-09-25', visit_time: '10:00:00', onsite: false, t1: false, onsite_at: null }                                    // hiç gelmedi: uyarıya girmez (her gün bugüne aktarılır)
+  ];
+  let r = run({ ...base(), wait_hours: 48, open_visits: open });
+  expect(r.code).toBe(0);
+  const html = fs.readFileSync(path.join(r.out, 'rapor.html'), 'utf8');
+  expect(html).toContain('UZUN BEKLEYEN ARAÇLAR · 2 gün ve üstü · 2 araç');
+  expect(html.indexOf('34 ABC 123')).toBeGreaterThan(html.indexOf('UZUN BEKLEYEN'));
+  expect(html.indexOf('34 ABC 123')).toBeLessThan(html.indexOf('CB 1291 TA', html.indexOf('UZUN BEKLEYEN')));   // en uzun (88 sa) üstte
+  for (const t of ['3 gün 15 sa', '2 gün 20 sa', 'Tesiste · T1', '27.09 08:00']) expect(html).toContain(t);
+  expect(html).not.toContain('X 111 YY');
+  expect(html).not.toContain('Y 222 ZZ');
+  const mail = JSON.parse(fs.readFileSync(path.join(r.out, 'mail.json'), 'utf8'));
+  expect(mail.text).toContain('UZUN BEKLEYEN ARAÇLAR (2 gün ve üstü, 2 araç):\n34 ABC 123 · BULTRANS · tesiste · T1 · 3 gün 15 sa\nCB 1291 TA · TORNADO EXPRESS · tesiste · 2 gün 20 sa');
+  // 12 saat eşiği: bugün girenler de (≈ 17 sa) listelenir
+  r = run({ ...base(), wait_hours: 12, open_visits: open });
+  expect(fs.readFileSync(path.join(r.out, 'rapor.html'), 'utf8')).toContain('UZUN BEKLEYEN ARAÇLAR · 12 sa ve üstü · 3 araç');
+  // kapalı (0), hiç ayarlanmamış ya da eski veritabanı fonksiyonu (open_visits yok): bölüm çıkmaz, rapor yine gider
+  for (const extra of [{ wait_hours: 0, open_visits: open }, { open_visits: open }, { wait_hours: 48 }]) {
+    r = run({ ...base(), ...extra });
+    expect(r.code).toBe(0);
+    expect(fs.readFileSync(path.join(r.out, 'rapor.html'), 'utf8')).not.toContain('UZUN BEKLEYEN');
+    expect(JSON.parse(fs.readFileSync(path.join(r.out, 'mail.json'), 'utf8')).text).not.toContain('UZUN BEKLEYEN');
+  }
+});
+
 test('günlük rapor maili: kapalıysa, alıcı yoksa ya da araç yoksa gönderilmez', () => {
   let r = run({ ...base(), enabled: false });
   expect(r.code).toBe(0);

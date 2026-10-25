@@ -47,6 +47,8 @@ const hm = iso => new Intl.DateTimeFormat('tr-TR', { timeZone: TZ, hour: '2-digi
 /* raporun gününden farklı bir günse tarih de yazılır */
 const when = iso => { if (!iso) return '—'; const d = istDate(Date.parse(iso)); return (d === DATE ? '' : fmtDate(d).slice(0, 5) + ' ') + hm(iso); };
 const stay = m => m == null ? '—' : m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${pad(m % 60)} dk`;
+/* uzun bekleme: saat → "2 gün 5 sa" / "30 sa" */
+const waitTxt = h => h >= 48 ? `${Math.floor(h / 24)} gün${Math.floor(h % 24) ? ` ${Math.floor(h % 24)} sa` : ''}` : `${Math.floor(h)} sa`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* ---- günlük Excel: sitedeki xlsx.js ile aynı dosya ---- */
@@ -58,8 +60,19 @@ async function excel(visits, priority) {
   return { name: out.name, content: Buffer.from(await out.blob.arrayBuffer()) };
 }
 
+/* Uzun bekleyenler: tesise girmiş, işlemi bitmemiş araçlar; süre girişten (kayıtlı değilse geliş gününün başından) beri, raporun
+   günü bitişine (23:59) kadar sayılır (site ile aynı kural). Eşik Ayarlar > Uyarılar'daki saat; 0 ya da veri yoksa bölüm çıkmaz. */
+function longWaiting(open, limit) {
+  if (!(limit > 0) || !Array.isArray(open)) return [];
+  const ref = Math.min(Date.now(), Date.parse(`${DATE}T23:59:59+03:00`));
+  return open.filter(v => v.onsite).map(v => {
+    const start = v.onsite_at ? Date.parse(v.onsite_at) : Date.parse(`${v.visit_date}T00:00:00+03:00`);
+    return { ...v, hours: (ref - start) / 3600e3 };
+  }).filter(v => Number.isFinite(v.hours) && v.hours >= limit).sort((a, b) => b.hours - a.hours);
+}
+
 /* ---- mail içeriği ---- */
-function report(visits) {
+function report(visits, long = [], limit = 0) {
   const outAt = v => v.exit_at || v.done_at || null;
   const stayMin = v => { const o = outAt(v); if (!v.onsite_at || !o) return null; const m = Math.round((new Date(o) - new Date(v.onsite_at)) / 60000); return m >= 0 ? m : null; };
   const n = { total: visits.length, onsite: visits.filter(v => v.onsite || v.onsite_at).length, t1: visits.filter(v => v.t1).length, done: visits.filter(v => v.done).length, out: visits.filter(v => v.exit_at).length };
@@ -83,6 +96,10 @@ function report(visits) {
 <tr><td style="padding:18px 22px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="6"><tr>${kpi('Toplam araç', n.total, '#1f4fb8')}${kpi('Tesise giren', n.onsite, '#d97706')}${kpi('T1 yazılan', n.t1, '#2f5fd0')}${kpi('İşlemi biten', n.done, '#15803d')}${kpi('Çıkış yapan', n.out, '#0f766e')}${kpi('Bekleyen', n.pending, '#b91c1c')}</tr></table>
 <p style="font-size:13px;color:#3e4c63;margin:10px 4px 18px">Ortalama kalma süresi: <b>${stay(avg)}</b>${stays.length ? ` (${stays.length} araç)` : ''}</p>
+${long.length ? `<div style="font-size:13px;font-weight:800;color:#b91c1c;margin:0 4px 8px">UZUN BEKLEYEN ARAÇLAR · ${esc(waitTxt(limit))} ve üstü · ${long.length} araç</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:22px;border:1px solid #fecaca"><tr><th style="${th};background:#991b1b">Plaka</th><th style="${th};background:#991b1b">Müşteri</th><th style="${th};background:#991b1b">Beyanname</th><th style="${th};background:#991b1b;text-align:center">Durum</th><th style="${th};background:#991b1b;text-align:center">Tesis giriş</th><th style="${th};background:#991b1b;text-align:center">Bekleme</th></tr>
+${long.slice(0, 40).map(v => `<tr style="background:#fef2f2"><td style="${td};font-weight:700;white-space:nowrap">${esc(v.plate)}</td><td style="${td}">${esc(v.customer || '—')}</td><td style="${td}">${esc(v.declaration || '—')}</td><td style="${num}">${v.t1 ? 'Tesiste · T1' : 'Tesiste'}</td><td style="${num}">${v.onsite_at ? when(v.onsite_at) : fmtDate(String(v.visit_date))}</td><td style="${num};font-weight:800;color:#b91c1c">${esc(waitTxt(v.hours))}</td></tr>`).join('')}</table>
+${long.length > 40 ? `<p style="font-size:12px;color:#6b7a90;margin:-14px 4px 18px">… ve ${long.length - 40} araç daha (panoda Bekleyenler sayfasına bakın).</p>` : ''}` : ''}
 <div style="font-size:13px;font-weight:800;color:#16233a;margin:0 4px 8px">MÜŞTERİ BAZINDA</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:22px"><tr><th style="${th}">Müşteri</th><th style="${th};text-align:center">Araç</th><th style="${th};text-align:center">Tesiste</th><th style="${th};text-align:center">T1</th><th style="${th};text-align:center">Bitti</th><th style="${th};text-align:center">Çıktı</th></tr>
 ${custs.map(([k, g]) => `<tr><td style="${td};font-weight:700">${esc(k)}</td><td style="${num}">${g.n}</td><td style="${num}">${g.o}</td><td style="${num}">${g.t}</td><td style="${num}">${g.d}</td><td style="${num}">${g.x}</td></tr>`).join('')}</table>
@@ -93,6 +110,7 @@ ${list.some(v => !v.exit_at && v.done_at) ? '<p style="font-size:12px;color:#6b7
 <p style="font-size:12px;color:#6b7a90;margin:22px 4px 0">Ekte günün Excel raporu var. Bu mail PCS TRANSİT YYS tarafından otomatik gönderildi; almak istemiyorsanız ofise haber verin.</p>
 </td></tr></table></td></tr></table></body></html>`;
   const text = `${subject}\n\nToplam araç: ${n.total} · Tesise giren: ${n.onsite} · T1: ${n.t1} · İşlemi biten: ${n.done} · Çıkış yapan: ${n.out} · Bekleyen: ${n.pending}\nOrtalama kalma: ${stay(avg)}\n\n` +
+    (long.length ? `UZUN BEKLEYEN ARAÇLAR (${waitTxt(limit)} ve üstü, ${long.length} araç):\n` + long.slice(0, 40).map(v => `${v.plate} · ${v.customer || '—'} · ${v.t1 ? 'tesiste · T1' : 'tesiste'} · ${waitTxt(v.hours)}`).join('\n') + '\n\n' : '') +
     custs.map(([k, g]) => `${k}: ${g.n} araç (tesiste ${g.o}, T1 ${g.t}, bitti ${g.d}, çıktı ${g.x})`).join('\n') + '\n\nAyrıntılar ekteki Excel dosyasında.';
   return { subject, html, text };
 }
@@ -112,7 +130,8 @@ async function main() {
   if (!to.length) return log(false, 'Alıcı yok; Ayarlar > Otomatik günlük rapor bölümünden ekleyin.');
   const visits = (data.visits || []).map(v => ({ ...v, date: v.visit_date, time: String(v.visit_time || '').slice(0, 5), createdAt: v.created_at, customer: v.customer || '', declaration: v.declaration || '', carrier: v.carrier || '', registration: v.registration || '', note: v.note || '', plate: v.plate || '' }));
   if (!visits.length) return log(true, `${fmtDate(DATE)}: araç kaydı yok; rapor gönderilmedi.`);
-  const mail = report(visits);
+  const limit = Number(data.wait_hours ?? 0), long = longWaiting(data.open_visits, limit);
+  const mail = report(visits, long, limit);
   const xlsx = await excel(visits, Array.isArray(data.customer_priority) ? data.customer_priority : []);
   if (env.RAPOR_KURU) {
     fs.mkdirSync(env.RAPOR_KURU, { recursive: true });
