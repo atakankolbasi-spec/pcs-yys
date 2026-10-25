@@ -196,6 +196,16 @@ GitHub e-posta gönderir ve sebep Ayarlar'da "Son çalışma" satırında yazar.
 listesini okuyabilir; yanlış ellere geçerse Ayarlar'dan "Yeni anahtar" deyip GitHub'daki değeri güncelleyin.
 Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI` değerini de güncelleyin.
 
+## 11. Araç ücreti ve aylık müşteri raporu
+
+Her geliş için ayrı bir **Ücret** (tutar + para birimi: EUR, USD, TRY, GBP) alanı vardır. Sitede **Raporlar → Aylık müşteri
+raporu**, seçilen ayda her müşterinin araç sayısını ve ücret toplamını (para birimi ayrı) gösterir; **Excel'e aktar**
+müşteri özeti ve araç detayını indirir. Müşterinin gönderdiği listedeki ücret (`90 EURO`) de bu alana yazılır.
+
+Kurulum (bir kez): `ucret-kurulumu.sql` dosyasının **tamamını** SQL Editor'de çalıştırın (iki satır "tamam"). Çalıştırılmazsa
+site eskisi gibi çalışır: Ücret kutuları çıkmaz, ücret notta kalır ve rapor yalnızca notun başındaki tutarları
+(`90 EURO · ...`) sayar. Eski kayıtlara dokunulmaz; notun başındaki tutar rapora zaten sayılır.
+
 ## Bu klasördeki dosyalar
 
 | Dosya | Ne işe yarar |
@@ -204,6 +214,7 @@ Gmail uygulama şifresini değiştirirseniz GitHub'daki `GMAIL_UYGULAMA_SIFRESI`
 | `anlik-guncelleme-kurulumu.sql` | Tabloları Realtime yayınına ekler (anlık güncelleme) |
 | `guvenlik-kurulumu.sql` | Güvenlik linki, güvenlik hesapları (GİRİŞ / ÇIKIŞ ekranı) ve ayrı çıkış saati |
 | `gunluk-rapor-kurulumu.sql` | Otomatik günlük rapor maili: alıcılar, rapor anahtarı, günün verisi |
+| `ucret-kurulumu.sql` | Araç ücreti için ayrı alan (tutar + para birimi); Raporlar > Aylık müşteri raporu bunu toplar |
 | `plaka-harf-duzeltmesi.sql` | Eski kayıtlardaki Kiril / Yunan harfli plakaları Latin harfe çevirir (isteğe bağlı) |
 | `whatsapp-kurulumu.sql` | WhatsApp'tan gelen ruhsatlar için tablo, fotoğraf deposu ve yetki kuralları |
 | `mesaj-kurulumu.sql` | WhatsApp'tan gelen müşteri mesajlarından araç ekleme için tablo ve yetki kuralları. Kullanım: `MESAJ.md` |

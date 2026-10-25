@@ -94,7 +94,34 @@ function panoWorkbook(data){
   'xl/styles.xml':styles,'xl/worksheets/sheet1.xml':sheet};
  const name=month?`PCS_${month.replace('-','_')}_AY.xlsx`:data.selectedDate?`PCS_${data.selectedDate}_GUN.xlsx`:`PCS_${data.year}_${String(data.week).padStart(2,'0')}_HAFTA.xlsx`;
  return {blob:zipStore(files),name};
-}function makeWorkbook(data,mode){if(mode!=='registry'&&mode!=='template')return panoWorkbook(data);const regOnly=mode==='registry'||mode==='template',base=regOnly?PCS_TEMPLATES.registry:PCS_TEMPLATES.operations,files={...base.files},s=base.styles;const prefix=data.demo&&mode!=='template'?'ORNEK_':'';let name;
+}/* Aylık müşteri raporu: müşteri başına araç sayısı ve ücret toplamları (para birimi ayrı sütun), altında araç detayı.
+   Kayıt şablonunun tek sayfası kullanılır; para biçimi (1.250,00) için iki hücre stili eklenir. */
+function customersWorkbook(data){
+ const base=PCS_TEMPLATES.registry,files={...base.files},s={...base.styles,money:13,moneyTotal:14};
+ const xf=(font,fill)=>`<xf numFmtId="4" fontId="${font}" fillId="${fill}" borderId="1" applyNumberFormat="1" applyAlignment="1" pivotButton="0" quotePrefix="0" xfId="0"><alignment horizontal="right" vertical="center"/></xf>`;
+ files['xl/styles.xml']=files['xl/styles.xml'].replace('<cellXfs count="13">','<cellXfs count="15">').replace('</cellXfs>',xf(4,0)+xf(9,3)+'</cellXfs>');
+ const curs=data.curs||[],list=data.list||[],n=list.length,lastSum=4+n,tr=lastSum+1,details=data.details||[];
+ const lastCol=col(Math.max(7,4+curs.length)-1);
+ let rows=row(1,[`${data.demo?'ÖRNEK VERİ | ':''}PCS TRANSİT YYS | AYLIK MÜŞTERİ RAPORU`],s.title,35)
+  +row(2,[`${data.monthLabel} | Her müşterinin aydaki araç sayısı ve ücret toplamı (para birimleri ayrı). Ücret, araç kaydındaki Ücret alanından; yoksa notun başındaki tutardan alınır.`],s.subtitle,27)
+  +row(4,['MÜŞTERİ','ARAÇ SAYISI','ÜCRETLİ ARAÇ','ÜCRETSİZ ARAÇ',...curs.map(c=>`TOPLAM ÜCRET (${c})`)],s.header,32);
+ list.forEach((g,i)=>{rows+=row(i+5,[g.name||'MÜŞTERİSİZ',g.count,g.paid,g.count-g.paid,...curs.map(c=>g.tot[c]||null)],[s.text,s.integer,s.integer,s.integer,...curs.map(()=>s.money)],26);});
+ let t=cell('A'+tr,'TOPLAM',s.total);
+ for(const [c,v] of [['B',data.all.count],['C',data.all.paid],['D',data.all.count-data.all.paid]])t+=cell(c+tr,v,s.total,n?`SUM(${c}5:${c}${lastSum})`:null);
+ curs.forEach((c,i)=>{const L=col(4+i);t+=cell(L+tr,data.all.tot[c]||0,s.moneyTotal,n?`SUM(${L}5:${L}${lastSum})`:null);});
+ rows+=`<row r="${tr}" ht="28" customHeight="1">${t}</row>`;
+ const dr=tr+3;
+ rows+=row(dr,['ARAÇ DETAYI','','','','','',''],s.header,28)+row(dr+1,['MÜŞTERİ','GELİŞ TARİHİ','PLAKA','BEYANNAME','ÜCRET','PARA BİRİMİ','NOT'],s.header,28);
+ details.forEach((d,i)=>{rows+=row(dr+2+i,[d.customer||'MÜŞTERİSİZ',serial(d.date),d.plate,d.declaration,d.amount==null?null:d.amount,d.cur||'',d.note],[s.text,s.date,s.input,s.text,s.money,s.text,s.muted],26);});
+ let sheet=replaceSheet(files['xl/worksheets/sheet1.xml'],rows,lastCol,dr+1+details.length);
+ const widths=[34,16,26,28,22,16,44];while(widths.length<4+curs.length)widths.push(22);
+ sheet=sheet.replace(/<cols>[\s\S]*?<\/cols>/,`<cols>${widths.map((w,i)=>`<col width="${w}" customWidth="1" min="${i+1}" max="${i+1}"/>`).join('')}</cols>`)
+  .replace(/<mergeCells[\s\S]*?<\/mergeCells>/,`<mergeCells count="2"><mergeCell ref="A2:${lastCol}2"/><mergeCell ref="A1:${lastCol}1"/></mergeCells>`);
+ files['xl/worksheets/sheet1.xml']=sheet;
+ files['xl/workbook.xml']=files['xl/workbook.xml'].replace(/PLAKA KAYITLARI/g,'MÜŞTERİ RAPORU');
+ return {blob:zipStore(files),name:`${data.demo?'ORNEK_':''}PCS_${data.month}_MUSTERI_RAPORU.xlsx`};
+}
+function makeWorkbook(data,mode){if(mode==='customers')return customersWorkbook(data);if(mode!=='registry'&&mode!=='template')return panoWorkbook(data);const regOnly=mode==='registry'||mode==='template',base=regOnly?PCS_TEMPLATES.registry:PCS_TEMPLATES.operations,files={...base.files},s=base.styles;const prefix=data.demo&&mode!=='template'?'ORNEK_':'';let name;
  if(regOnly){files['xl/worksheets/sheet1.xml']=registrySheet(files['xl/worksheets/sheet1.xml'],s,data.state.registry,mode==='template',data.demo&&mode!=='template');name=mode==='template'?'PCS_PLAKA_KAYIT_SABLONU.xlsx':prefix+'PCS_PLAKA_KAYITLARI.xlsx';}
  else{const ds=Array.from({length:6},(_,i)=>add(data.monday,i));const all=data.state.visits.filter(x=>ds.includes(x.date)&&(!data.selectedDate||x.date===data.selectedDate));const range=`${data.year} | ${data.week}. Hafta | ${fmt(ds[0])} - ${fmt(ds[5])}`;const note=(data.selectedDate?`${fmt(data.selectedDate)} | G\u00fcnl\u00fck rapor. `:range+' | ')+'Durumlar EVET/HAYIR olarak aktar\u0131l\u0131r. Plaka tek alan: G s\u00fctunu.';
  files['xl/worksheets/sheet1.xml']=summarySheet(files['xl/worksheets/sheet1.xml'],s,data,all);

@@ -4,6 +4,7 @@
  *     files: { 'depo/yolu.png': base64 },   // storage.download için dosyalar
  *     aiText: { items: [...], customer, problem },  // ruhsat-oku mesaj modu cevabı (ya da { status, body } hata)
  *     missing: ['incoming_ruhsat'],         // "tablo yok" hatası veren tablolar (kurulum yapılmamış gibi)
+ *     noFee: true,                          // visits.fee_amount / fee_currency sütunları yokmuş gibi (ucret-kurulumu.sql çalıştırılmamış)
  *     guardToken: 'g1', today: '2026-09-23',  // güvenlik linki anahtarı ve güvenlik ekranının "bugün"ü
  *     guardViewToken: 'gv1',                   // güvenlik ekranı izleme linki (yalnızca görüntüleme)
  *     guardAccount: { name: 'Tepecik', active: true },  // giriş yapan kullanıcı güvenlik hesabı
@@ -56,6 +57,11 @@
       if (window.__hangReads && st.op === 'select') return new Promise(() => {}); // yalnızca okuma (yenileme) takılır, yazma çalışır
       if (cfg.offline) return netError();
       if ((cfg.missing || []).includes(table)) return { data: null, count: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` } };
+      // ücret sütunları (supabase/ucret-kurulumu.sql) yokmuş gibi: okuma 42703, yazma PGRST204 verir
+      if (table === 'visits' && cfg.noFee) {
+        if (st.op === 'select' && /fee_amount/.test(st.cols)) return { data: null, count: null, error: { code: '42703', message: 'column visits.fee_amount does not exist' } };
+        if ((st.rows || [st.patch]).some(r => r && ('fee_amount' in r || 'fee_currency' in r))) return { data: null, error: { code: 'PGRST204', message: "Could not find the 'fee_amount' column of 'visits' in the schema cache" } };
+      }
       const t = db[table] || (db[table] = []);
       if (st.op === 'insert') {
         const plate = r => String(r.plate || '').replace(/\s/g, '').toUpperCase();
