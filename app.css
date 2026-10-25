@@ -2317,3 +2317,9 @@ html[data-theme="dark"] .vcard.long{border-color:#7f2a2a}
 html[data-theme="dark"] .vcard.long:not(.is-selected){background:#2a1a1e}
 html[data-theme="dark"] .wait-badge{background:#450a0a;color:#fca5a5}
 .operations td.plate .wait-badge{display:flex;width:max-content;margin:4px 0 0}
+/* aylık müşteri raporu (Raporlar sayfası): tablo biçimi report-table'dan gelir */
+.custrep{margin-top:16px}
+.custrep .card-header{flex-wrap:wrap}
+.custrep .card-header .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cust-table td.fee{white-space:nowrap;font-weight:700}
+.custrep .help-note{margin-top:10px}

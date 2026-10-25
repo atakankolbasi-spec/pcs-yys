@@ -51,7 +51,10 @@ Bunları yazan siz olduğunuz için ayrıca onay sorulmaz. **Şunlar yine de sor
 
 Her çekici-dorse çifti bir araç sayılır; altındaki firmalar o aracın yükünün sahipleridir:
 - **Beyanname** sütunu: tek firma varsa firmanın adı (örn. `TALIA`), birden fazlaysa `PARSİYEL` yazılır.
-- **Not**: ücret ve (birden fazlaysa) firmaların listesi nota yazılır (örn. `90 EURO · 1.GALATA PETROL OTOMOTİV · 2.PLASTEK PLASTİK`).
+- **Ücret**: araç kaydındaki ayrı **Ücret** alanına tutar ve para birimi olarak yazılır (`90 EURO` → 90 EUR; aylık müşteri
+  raporu bunu toplar). Bunun için `supabase/ucret-kurulumu.sql` bir kez çalıştırılmış olmalı; çalıştırılmadıysa ücret eskisi
+  gibi notun başına yazılır.
+- **Not**: (birden fazla firma varsa) firmaların listesi nota yazılır (örn. `1.GALATA PETROL OTOMOTİV · 2.PLASTEK PLASTİK`).
 - **Müşteri / nakliyeci / ruhsat kilosu**: plaka kayıtlıysa kayıttan gelir.
 - **Plakası kayıtlı olmayan araç:** müşteri mesajın imzasından, gönderen numaradan ya da listedeki kayıtlı araçların
   ortak müşterisinden alınır. Yine de kendiliğinden eklenmez; **Plaka kaydıyla ekle** ya da **Hepsini uygula** ile

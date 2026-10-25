@@ -1696,11 +1696,12 @@ test('sohbet: müşterinin firmalı araç listesi yapıştırılır; tarih sorul
   await expect(panel).toContainText('Mesajda tarih yok. Bu 4 aracı hangi güne yazayım?');
   expect(await writes()).toEqual([]);
   await panel.locator('[data-action="chat-day"]', { hasText: 'Yarın' }).click();
-  // kayıtlı araç kendiliğinden eklenir: tek firma değil, 4 firma → PARSİYEL; ücret ve firmalar nota yazılır
+  // kayıtlı araç kendiliğinden eklenir: tek firma değil, 4 firma → PARSİYEL; firmalar nota, ücret ayrı alana yazılır
   await expect.poll(writes).toEqual(['visits:insert']);
   const v1 = await page.evaluate(() => window.__db.visits.find(v => v.plate === 'PB 7831 KT - PB 7569 EB'));
   expect(v1).toMatchObject({ customer: 'ETL LOJ - ERVİN MUTLU', declaration: 'PARSİYEL', carrier: 'RE TRANS PRIM EOOD', registration: '15830 KG', visit_date: '2026-09-24' });
-  expect(v1.note).toBe('90 EURO · 1.GALATA PETROL OTOMOTİV · 2.PLASTEK PLASTİK · 3.FURKAN SARIM-FORMPLAS · 4.MARS TR DIŞ TİC.');
+  expect(v1.note).toBe('1.GALATA PETROL OTOMOTİV · 2.PLASTEK PLASTİK · 3.FURKAN SARIM-FORMPLAS · 4.MARS TR DIŞ TİC.');
+  expect([v1.fee_amount, v1.fee_currency]).toEqual([90, 'EUR']);                    // ücret notta değil, ayrı alanda
   // kayıtsız araçlar: müşteri listedeki kayıtlı araçtan çıkarılır, kendiliğinden eklenmez; onaylanınca plaka kaydıyla eklenir
   await expect(panel).toContainText('listedeki diğer kayıtlı araçlardan');
   await expect(panel).toContainText('ETL LOJ - ERVİN MUTLU olarak alındı');
@@ -1715,11 +1716,11 @@ test('sohbet: müşterinin firmalı araç listesi yapıştırılır; tarih sorul
   expect(asked).toContain('(yeni plaka kaydıyla)');
   const reg = await page.evaluate(() => window.__db.registry.filter(r => r.plate.startsWith('CT ')).map(r => [r.plate, r.customer]));
   expect(reg.sort()).toEqual([['CT 04 LLA - CT 05 LLA', 'ETL LOJ - ERVİN MUTLU'], ['CT 40 BWT - CT 41 BWT', 'ETL LOJ - ERVİN MUTLU'], ['CT 6913 PB - CT 2803 EH', 'ETL LOJ - ERVİN MUTLU']]);
-  const vis = await page.evaluate(() => window.__db.visits.filter(v => v.plate.startsWith('CT ')).map(v => [v.plate, v.declaration, v.note, v.visit_date]));
+  const vis = await page.evaluate(() => window.__db.visits.filter(v => v.plate.startsWith('CT ')).map(v => [v.plate, v.declaration, v.note, v.visit_date, v.fee_amount + ' ' + v.fee_currency]));
   expect(vis.sort()).toEqual([
-    ['CT 04 LLA - CT 05 LLA', 'TALIA', '90 EURO', '2026-09-24'],             // tek firma: firma adı beyannameye
-    ['CT 40 BWT - CT 41 BWT', 'UPLASS', '90 EURO', '2026-09-24'],
-    ['CT 6913 PB - CT 2803 EH', 'PARSİYEL', '90 EURO · 1.UĞURLAR PLS. · 2.DEMİR PLASTİK', '2026-09-24']
+    ['CT 04 LLA - CT 05 LLA', 'TALIA', '', '2026-09-24', '90 EUR'],             // tek firma: firma adı beyannameye
+    ['CT 40 BWT - CT 41 BWT', 'UPLASS', '', '2026-09-24', '90 EUR'],
+    ['CT 6913 PB - CT 2803 EH', 'PARSİYEL', '1.UĞURLAR PLS. · 2.DEMİR PLASTİK', '2026-09-24', '90 EUR']
   ]);
   await expect(panel).toContainText('plaka kayıtlarına işlendi');
   expect(problems).toEqual([]);
@@ -1854,11 +1855,11 @@ test('sohbete liste fotoğrafı: önce ruhsat mı diye bakılır, değilse liste
   // iki istek: önce ruhsat okuması (başlıksız), sonra liste okuması (bugün başlıkta)
   const calls = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => ({ type: c.type, list: c.list })));
   expect(calls).toEqual([{ type: 'image/png' }, { type: 'image/png', list: { today: '2026-09-23' } }]);
-  // onaylayınca eklenir: ücret ve firma nota, tek firma beyannameye
+  // onaylayınca eklenir: ücret ayrı alana, tek firma beyannameye
   const item = panel.locator('.msg-item').first();
   await item.locator('[data-action="msg-apply"]').click();
   await expect.poll(writes).toBe(1);
-  expect(await page.evaluate(() => window.__db.visits.find(v => v.plate === '06 KL 4567' && v.visit_date === '2026-09-24'))).toMatchObject({ customer: 'ABC NAKLİYAT', declaration: 'GALATA PETROL', note: '90 EURO' });
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.plate === '06 KL 4567' && v.visit_date === '2026-09-24'))).toMatchObject({ customer: 'ABC NAKLİYAT', declaration: 'GALATA PETROL', note: '', fee_amount: 90, fee_currency: 'EUR' });
   expect(await page.evaluate(() => window.__db.incoming_messages.length)).toBe(0);      // sohbet veritabanına yazılmaz
   expect(problems).toEqual([]);
 });
@@ -2007,6 +2008,130 @@ test('uzun bekleyen araç: tesise girip işlemi bitmeyen ve eşiği aşan araç 
   await expect(row('v8')).not.toHaveClass(/row-long/);
   await expect(row('v9')).toHaveClass(/row-long/);
   expect(problems).toEqual([]);
+});
+
+test('aylık müşteri raporu: müşteri başına araç sayısı ve ücret toplamı (para birimi ayrı; eski notlardaki tutar da sayılır), ay seçilir, Excel\'e aktarılır', async ({ page }) => {
+  test.setTimeout(90000);
+  const data = sampleData();
+  const fee = (id, amount, cur, extra = {}) => { Object.assign(data.visits.find(v => v.id === id), { fee_amount: amount, fee_currency: cur, ...extra }); };
+  fee('v1', 90, 'EUR'); fee('v2', 120.5, 'EUR'); fee('v5', 90, 'EUR'); fee('v6', 80, 'TRY'); fee('v7', 250, 'EUR');
+  data.visits.find(v => v.id === 'v3').note = '100 USD · 1.GALATA PETROL';       // eski kayıt: ücret notun başında
+  // v4 (ABC NAKLİYAT) ücretsiz; Ağustos'ta tek araç
+  data.visits.push({ id: 'v90', plate: '35 AGU 35', customer: 'ESKİ MÜŞTERİ', declaration: '', carrier: '', registration: '', visit_date: '2026-08-12', visit_time: '09:00', note: '', onsite: false, t1: false, done: true,
+    created_at: '2026-08-12T05:00:00Z', updated_at: '2026-08-12T06:00:00Z', onsite_at: null, done_at: null, sort_order: null, fee_amount: 45, fee_currency: 'USD' });
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.nav-item[data-page="reports"]').click();
+  const card = page.locator('#cust-report');
+  await expect(card).toBeVisible();
+  await expect(card.locator('#cr-month option:checked')).toHaveText(/Eylül 2026 · 7 araç/);
+  const rows = () => card.locator('tbody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.textContent.trim())));
+  expect(await rows()).toEqual([
+    ['BULTRANS', '2', '2', '0', '180 EUR'],
+    ['LİN LOJ', '2', '2', '0', '250 EUR · 100 USD'],           // v3'ün 100 USD'si notun başından okundu
+    ['TORNADO', '2', '2', '0', '120,5 EUR · 80 TRY'],
+    ['ABC NAKLİYAT', '1', '0', '1', '—']
+  ]);
+  expect(await card.locator('tfoot td').allTextContents()).toEqual(['TOPLAM', '7', '6', '1', '550,5 EUR · 100 USD · 80 TRY']);
+  await expect(card).toContainText('1 araçta ücret yazılmamış');
+  await expect(card).toContainText('1 araçta ücret, notun başındaki tutardan okundu');
+  await expect(card.locator('.rs-note.warn')).toHaveCount(0);                                 // ücret alanı kurulu: uyarı yok
+  // müşteri adına tıklayınca profil açılır
+  await card.locator('[data-action="customer-profile"]', { hasText: 'BULTRANS' }).click();
+  await expect(page.locator('#modal')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // ay seçimi
+  await card.locator('#cr-month').selectOption('2026-08');
+  expect(await rows()).toEqual([['ESKİ MÜŞTERİ', '1', '1', '0', '45 USD']]);
+  expect(await card.locator('tfoot td').allTextContents()).toEqual(['TOPLAM', '1', '1', '0', '45 USD']);
+  await expect(card).not.toContainText('ücret yazılmamış');
+  await card.locator('#cr-month').selectOption('2026-09');
+  // Excel: özet + araç detayı; para birimi ayrı sütun, toplamlar formül
+  const [download] = await Promise.all([page.waitForEvent('download'), card.locator('[data-action="export-customers"]').click()]);
+  expect(download.suggestedFilename()).toBe('PCS_2026-09_MUSTERI_RAPORU.xlsx');
+  const buf = fs.readFileSync(await download.path());
+  expect(buf.subarray(0, 2).toString()).toBe('PK');
+  const xml = buf.toString('utf8');
+  for (const t of ['MÜŞTERİ RAPORU', 'AYLIK MÜŞTERİ RAPORU', 'Eylül 2026', 'TOPLAM ÜCRET (EUR)', 'TOPLAM ÜCRET (USD)', 'TOPLAM ÜCRET (TRY)', 'ARAÇ DETAYI', 'BULTRANS', 'TORNADO', '34 ABC 123', 'SUM(B5:B8)', 'SUM(E5:E8)', 'GELİŞ TARİHİ'])
+    expect(xml).toContain(t);
+  expect(xml).not.toContain('ESKİ MÜŞTERİ');                                               // başka ayın müşterisi yok
+  expect(xml).toContain('<v>550.5</v>');                                                    // EUR toplamı (önbellekteki değer)
+  expect(xml).toContain('<v>120.5</v>');
+  expect(problems).toEqual([]);
+});
+
+test('ücret alanı: araç formunda tutar ve para birimi girilir, kaydedilir, geri alınır; sayı olmayan ücret reddedilir; sütun yoksa kutular çıkmaz ve hiçbir yazmaya eklenmez', async ({ page }) => {
+  test.setTimeout(90000);
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('.heading [data-action="add-visit"]').first().click();
+  await expect(page.locator('#f-fee_amount')).toBeVisible();
+  await expect(page.locator('#f-fee_currency')).toHaveValue('EUR');
+  await page.locator('#f-plate').fill('06 KL 4567');
+  await page.locator('#f-fee_amount').fill('90x');
+  await page.locator('#visit-form button[type="submit"]').click();
+  await expect(page.locator('#form-error')).toContainText('Ücret yalnızca sayı olmalı');
+  await page.locator('#f-fee_amount').fill('1.250,50');
+  await page.locator('#f-fee_currency').selectOption('USD');
+  await page.locator('#visit-form button[type="submit"]').click();
+  await expect(page.locator('#modal')).toBeHidden();
+  const added = () => page.evaluate(() => window.__db.visits.find(v => v.plate === '06 KL 4567' && v.visit_date === '2026-09-23'));
+  expect(await added()).toMatchObject({ fee_amount: 1250.5, fee_currency: 'USD' });
+  // düzenlerken kayıtlı ücret kutuda görünür; boşaltınca ücret silinir
+  await page.locator('tr[data-row-id]', { hasText: '06 KL 4567' }).first().locator('[data-action="select-visit"]').click();   // dar ekranda doğrudan düzenleme formu açılır
+  await expect(page.locator('#f-fee_amount')).toHaveValue('1250,5');
+  await expect(page.locator('#f-fee_currency')).toHaveValue('USD');
+  await page.locator('#f-fee_amount').fill('');
+  await page.locator('#visit-form button[type="submit"]').click();
+  await expect(page.locator('#modal')).toBeHidden();
+  expect(await added()).toMatchObject({ fee_amount: null, fee_currency: '' });
+  expect(problems).toEqual([]);
+
+  // sütunlar yok (ucret-kurulumu.sql çalıştırılmamış): kutular çıkmaz, yazma istekleri sütunsuz gider, rapor uyarır
+  const page2 = await page.context().newPage();
+  const problems2 = await openApp(page2, { noFee: true });
+  await expect(page2.locator('#app')).toContainText('34 ABC 123');
+  await page2.locator('.heading [data-action="add-visit"]').first().click();
+  await expect(page2.locator('#f-plate')).toBeVisible();
+  await expect(page2.locator('#f-fee_amount')).toHaveCount(0);
+  await page2.locator('#f-plate').fill('06 KL 4567');
+  await page2.locator('#visit-form button[type="submit"]').click();
+  await expect(page2.locator('#modal')).toBeHidden();
+  const w = await page2.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').map(c => Object.keys(c.rows[0])));
+  expect(w.length).toBe(1);
+  expect(w[0]).not.toContain('fee_amount');
+  expect(w[0]).not.toContain('fee_currency');
+  await page2.locator('.nav-item[data-page="reports"]').click();
+  await expect(page2.locator('#cust-report .rs-note.warn')).toContainText('ucret-kurulumu.sql');
+  expect(problems2.filter(p => !/42703|400/.test(p))).toEqual([]);
+  await page2.close();
+});
+
+test('ücret ayrıştırma: "90 EURO", "1.250,50 TL", "$100" okunur; tanınmayan para birimi ya da belirsiz yazı okunmaz', async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const r = await page.evaluate(() => {
+    const { parseFee, parseAmount, feeOf, validateData } = window.PCS_TEST;
+    const bk = fee => validateData({ schemaVersion: 1, registry: [{ id: 'r1', plate: '34 ABC 123', customer: 'X' }], visits: [{ id: 'v1', plate: '34 ABC 123', customer: 'X', date: '2026-09-23', time: '', note: '', onsite: false, t1: false, done: false, ...fee }] }).visits[0];
+    return {
+      backup: [bk({ fee_amount: 90.456, fee_currency: 'USD' }), bk({ fee_amount: -5 }), bk({ fee_amount: 10, fee_currency: 'XYZ' }), bk({})].map(v => [v.fee_amount ?? null, v.fee_currency ?? null]),
+      fees: ['90 EURO', '90 EUR (KDV hariç)', '1.250,50 TL', '$100', '€ 75', '1,250.50 USD', '90,5 euro', '1.GALATA 90 EURO', '15 ARAÇ', '90', '12 RON', '', '99999999 EUR'].map(t => parseFee(t)),
+      amounts: ['90', '90,5', '90.5', '1.250', '1.250,50', '1,250.50', '0', 'abc', '12abc', ''].map(t => parseAmount(t)),
+      of: [
+        feeOf({ fee_amount: 90, fee_currency: 'USD', note: '50 EURO' }),     // alan notun önüne geçer
+        feeOf({ fee_amount: null, note: '90 EURO · 1.GALATA' }),               // eski kayıt: notun başından
+        feeOf({ note: 'acil · 90 EURO' }),                                      // not başında değilse ücret sayılmaz
+        feeOf({ fee_amount: '', note: '' })
+      ]
+    };
+  });
+  expect(r.fees).toEqual([
+    { amount: 90, cur: 'EUR' }, { amount: 90, cur: 'EUR' }, { amount: 1250.5, cur: 'TRY' }, { amount: 100, cur: 'USD' }, { amount: 75, cur: 'EUR' },
+    { amount: 1250.5, cur: 'USD' }, { amount: 90.5, cur: 'EUR' }, { amount: 90, cur: 'EUR' }, null, null, null, null, null
+  ]);
+  expect(r.amounts).toEqual([90, 90.5, 90.5, 1250, 1250.5, 1250.5, 0, NaN, NaN, NaN]);   // okunamayanlar NaN
+  expect(r.backup).toEqual([[90.46, 'USD'], [null, null], [10, 'EUR'], [null, null]]);   // JSON yedeğinden dönerken ücret korunur, bozuk değer atılır
+  expect(r.of).toEqual([{ amount: 90, cur: 'USD', legacy: false }, { amount: 90, cur: 'EUR', legacy: true }, null, null]);
 });
 
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
