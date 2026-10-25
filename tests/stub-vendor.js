@@ -52,6 +52,8 @@
       delete() { st.op = 'delete'; return q; },
       then(resolve, reject) { return Promise.resolve().then(run).then(resolve, reject); }
     };
+    // PostgREST "select *" bütün sütunları döndürür: ücret sütunları varsa boş olsalar da satırda görünür
+    const withFee = r => (table === 'visits' && !cfg.noFee && !('fee_amount' in r) ? { ...r, fee_amount: null, fee_currency: '' } : r);
     function run() {
       calls.push({ table, op: st.op, cols: st.cols, count: st.count, rows: st.rows && clone(st.rows), gte: st.gte, from: st.from });
       if (window.__hang) return new Promise(() => {}); // takılan istek: hiç cevap gelmez
@@ -70,12 +72,12 @@
           return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } };
         const added = st.rows.map(r => ({ ...r, created_at: now(), updated_at: now() }));
         t.push(...added);
-        return { data: clone(added), error: null };
+        return { data: clone(added.map(withFee)), error: null };
       }
       if (st.op === 'update') {
         const hit = rowsNow();
         hit.forEach(r => Object.assign(r, st.patch, { updated_at: now() }));
-        return { data: clone(hit), error: null };
+        return { data: clone(hit.map(withFee)), error: null };
       }
       if (st.op === 'delete') {
         const hit = rowsNow();
@@ -89,7 +91,7 @@
       }
       const total = rows.length;
       rows = rows.slice(st.from, st.to === Infinity ? undefined : st.to + 1);
-      return { data: clone(rows), count: st.count ? total : null, error: null };
+      return { data: clone(rows.map(withFee)), count: st.count ? total : null, error: null };
     }
     return q;
   }

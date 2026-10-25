@@ -23,6 +23,8 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 | `ocr/` | "Ruhsattan ekle" için tarayıcıda çalışan metin okuma programı (Tesseract). Ayrıntı: `ocr/README.md` |
 | `_headers` | Sunucu güvenlik başlıkları. **GitHub Pages'te etkisizdir**; site Cloudflare Pages veya Netlify'a taşınırsa kullanılır. Gömülmeye (iframe) karşı koruma bu yüzden `app.js` başında yapılır. |
 | `supabase/` | Veritabanı tarafı notları, kurulum SQL'leri ve WhatsApp sunucu fonksiyonu. WhatsApp kurulumu: `supabase/WHATSAPP.md`, mesajdan ve sağ alttaki sohbet balonundan araç ekleme (yazı ya da liste fotoğrafı), kayıt düzeltme ve soru sorma (Gemini): `supabase/MESAJ.md` |
+| `scripts/gunluk-rapor/` | GitHub'da zamanlanmış görevlerin betikleri: günlük rapor maili (`gonder.mjs`) ve gece yedeği e-postası (`yedek.mjs`). Kurulum: `supabase/README.md` bölüm 10 ve 12 |
+| `.github/workflows/` | Testler (`test.yml`), günlük rapor, gece yedeği ve Supabase'i canlı tutan görevler |
 | `tests/` | Otomatik tarayıcı testleri (uygulamanın parçası değildir) |
 
 ## Düzenleme yaparken
