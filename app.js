@@ -1816,7 +1816,7 @@ async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!c
  /* text bir dosyaysa (liste ekran görüntüsü) fotoğraf "liste" modunda okunur: ruhsat-oku içindeki yazı mesaj gibi okunur */
  const img=text&&typeof text==='object'?text:null;
  for(let i=1;i<=3;i++){let st=0,body=null;
-  try{const {data,error}=await client.functions.invoke('ruhsat-oku',img?{body:img,headers:{'Content-Type':img.type||'image/jpeg','x-pcs-mode':'liste','x-pcs-today':TODAY},timeout:150000}:{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:150000});
+  try{const {data,error}=await client.functions.invoke('ruhsat-oku',img?{body:img,headers:{'Content-Type':img.type||'image/jpeg','x-pcs-mode':'liste','x-pcs-today':TODAY},timeout:150000}:{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:chatMode?50000:150000});
    if(!error&&Array.isArray(data?.items)){ai.state='on';return {data};}
    /* liste modunu bilmeyen eski sürüm fotoğrafı ruhsat gibi okur ve "vehicles" döndürür */
    if(!error&&img&&Array.isArray(data?.vehicles))return {err:'ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)'};
@@ -1827,7 +1827,9 @@ async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!c
   if(st===400&&/Desteklenmeyen dosya/.test(body?.error||''))last='ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)';
   if(st===404||st===501){ai.state='none';return {none:true};}
   if(st===401&&!refreshed){refreshed=true;try{await client.auth.refreshSession();}catch(_){}i--;continue;}
-  if(body?.fatal||!(st===429||st>=500||st===0)||i===3)break;
+  /* sohbet: cevap bekleyen kişi dakikalarca beklemesin; sunucu en çok ~40 sn dener, zaman aşımında tekrar denenmez, en çok 2 deneme */
+  if(chatMode&&st===0){last='yapay zekâ zamanında cevap vermedi';break;}
+  if(body?.fatal||!(st===429||st>=500||st===0)||i===(chatMode?2:3))break;
   await aiCountdown(Math.min(40,st===429?Math.max(5,+body?.retry_after||15):8)*1000,n=>onPhase(`${n} sn sonra yeniden denenecek`));}
  return {err:last};}
 async function wmReadPaste(b){if(!canEdit()||wmsg.reading)return;const ta=document.getElementById('msg-text'),text=String(ta?.value||'').trim();wmsg.text=text;
@@ -1998,10 +2000,10 @@ async function chatImages(files){for(const f of files.slice(0,3))await chatSendI
    tanınmazsa ya da plaka dışında rakam varsa (tarih, sıra no...) null döner ve cümle Gemini'ye gider. Böylece yanlış anlama
    riski küçüktür: emin olunamayan her şey yapay zekâya bırakılır. Dönen nesne sunucunun cevabıyla aynı biçimdedir. */
 const clAscii=t=>String(t||'').toLocaleLowerCase('tr-TR').replace(/[çğıöşü]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u'}[c])).replace(/[^a-z0-9]+/g,' ').trim();
-const CL_FILL=new Set('bugun bugunun yarin yarinin dun dunun bu hafta haftada haftanin kac arac araci araclar araclari aracin tane adet var mi mu olan olanlar olani hangi hangileri hangisi listele goster listesi ver bana soyle ne nedir nelerdir neler kadar sayisi toplam su an simdi ve ile icin da de durum durumu durumda ozet ozeti gunun gunluk genel hepsi tum tumu son kayitlari kayitlar gecmisi nerede henuz yazilan yazilanlar yazildi yazilmis un in nin nun dan den'.split(' '));
+const CL_FILL=new Set('bugun bugunun yarin yarinin dun dunun bu hafta haftada haftanin kac arac araci araclar araclari aracin tane adet var mi mu olan olanlar olani hangi hangileri hangisi listele goster listesi ver bana soyle ne nedir nelerdir neler kadar sayisi toplam su an simdi ve ile icin da de durum durumu durumda ozet ozeti gunun gunluk genel hepsi tum tumu son kayitlari kayitlar gecmisi nerede henuz yazilan yazilanlar yazildi yazilmis un in nin nun dan den yi yu i u ye ya'.split(' '));
 const CL_STAT={tesiste:'onsite',tesisteki:'onsite',tesistekiler:'onsite',girmis:'onsite',girenler:'onsite',iceride:'onsite',icerideki:'onsite',gelecek:'waiting',gelecekler:'waiting',bekleyen:'waiting',bekleyenler:'waiting',gelmeyen:'waiting',gelmemis:'waiting',gelmedi:'waiting',t1:'t1',biten:'done',bitenler:'done',tamamlanan:'done',tamamlananlar:'done',bitmis:'done',bitmeyen:'open',bitmeyenler:'open',acik:'open'};
 const CL_EDIT={tesiste:'onsite',girdi:'onsite',t1:'t1',bitti:'done',tamamlandi:'done',bitmis:'done'};
-const CL_EDITFILL=new Set('yazildi islemler islemleri islem yap yapin isaretle isaretleyin oldu artik simdi ve aracin araci arac olarak'.split(' '));
+const CL_EDITFILL=new Set('yazildi islemler islemleri islem yap yapin isaretle isaretleyin oldu artik simdi ve aracin araci arac olarak yi yu i u'.split(' '));
 function chatLocal(raw){const text=String(raw||'').trim();if(text.length>90||/\n/.test(text))return null;
  const toks=clAscii(text).split(' ').filter(Boolean);if(!toks.length||toks.length>12)return null;
  /* bilinen plakalar (çekici ve dorse ayrı ayrı): 1-4 ardışık sözcük birleşince bir plaka çıkarsa o sözcükler plaka sayılır */
@@ -2037,6 +2039,17 @@ function chatLocal(raw){const text=String(raw||'').trim();if(text.length>90||/\n
  if(!kind)return null;
  if(kind==='summary'&&status)return null;
  return {...base,queries:[{...q0,kind,status,date,week}]};}
+/* Plaka yazım hatası: "B 150 BW yi T1 yazıldı yap" gibi, bilinen bir plakaya bir harf uzaklıktaki (ya da bir iki harfi eksik)
+   yazılmış plaka varsa ve düzeltilmiş cümle yerelde anlaşılabiliyorsa, yapay zekâyı beklemeden "Şunu mu demek istediniz?" denir. */
+const clNear=(a,b)=>{if(a===b||Math.abs(a.length-b.length)>2)return false;if(b.startsWith(a)||a.startsWith(b))return true;if(a.length===b.length){let d=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i]&&++d>1)return false;return true;}
+ const [x,y]=a.length>b.length?[a,b]:[b,a];if(x.length-y.length!==1)return false;for(let i=0;i<x.length;i++)if(x.slice(0,i)+x.slice(i+1)===y)return true;return false;};
+function chatSuggest(raw){const text=String(raw||'').trim();if(text.length>90||chatLocal(text))return null;
+ const words=text.split(/\s+/),known=new Map();for(const r of [...state.visits,...state.registry])for(const part of splitPlate(r.plate).map(compactPlate))if(part.length>=5&&/\d/.test(part)&&/[A-Z]/.test(part))known.set(part,part);
+ for(let n=3;n>=1;n--)for(let i=0;i+n<=words.length;i++){const c=compactPlate(words.slice(i,i+n).join(''));if(c.length<4||c.length>9||!/\d/.test(c)||!/[A-Z]/.test(c)||known.has(c))continue;
+  const hits=[...known.keys()].filter(k=>clNear(c,k));if(hits.length!==1)continue;
+  const fixed=[...words.slice(0,i),fmtCompactPlate(hits[0]),...words.slice(i+n)].join(' ');
+  if(chatLocal(fixed))return {bad:words.slice(i,i+n).join(' '),fixed};}
+ return null;}
 async function chatSend(text){text=String(text||'').trim();const inp=document.getElementById('chat-input');if(text.length<4||chat.busy)return;
  if(!canEdit()){chat.msgs.push({who:'ai',error:true,text:navigator.onLine===false?'İnternet bağlantısı yok; şu an değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (yetkiniz yok ya da bir kayıt işlemi sürüyor). Biraz sonra tekrar deneyin.'});chatRender();return;}
  chat.busy=true;if(inp){inp.value='';chatGrow();}
@@ -2044,7 +2057,9 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
  const out=m=>{const k=chat.msgs.indexOf(typing);if(k>=0)chat.msgs.splice(k,1);chat.msgs.push(m);};
  /* yapay zekâ cevabını beklerken geçen süre görünür (yeniden deneme geri sayımı yazıyorsa o kalır) */
  const tick=setInterval(()=>{if(typing.auto){const n=Math.round((Date.now()-typing.t0)/1000);typing.phase=n>=3?`Yanıt bekleniyor… ${n} sn`:'';chatRender();}},1000);
- try{const loc=chatLocal(text),r=loc?{data:loc}:await wmAi(text,t=>{typing.auto=false;typing.phase=t;chatRender();},true);
+ try{const loc=chatLocal(text),sug=loc?null:chatSuggest(text);
+  if(sug){out({who:'ai',html:`<p>“${esc(sug.bad)}” plakasını panoda bulamadım. Şunu mu demek istediniz?</p><div class="chat-chips"><button type="button" class="chat-chip" data-action="chat-say" data-t="${esc(sug.fixed)}">${esc(sug.fixed)}</button></div>`});return;}
+  const r=loc?{data:loc}:await wmAi(text,t=>{typing.auto=false;typing.phase=t;chatRender();},true);
   if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
   else if(r.err){out({who:'ai',error:true,text:'Okuyamadım: '+r.err+'. Biraz sonra tekrar yazın.'});if(inp&&!inp.value){inp.value=text;chatGrow();}}
   else{const d=r.data,items=d.items||[],edits=d.edits||[],queries=d.queries||[];
@@ -2072,6 +2087,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="c
   if(a==='chat-plan-no'){m.plan.done=true;m.html='<p>Vazgeçtim, bir şey değiştirmedim.</p>';chatRender();return;}
   if(!canEdit())return;chat.busy=true;m.plan.done=true;m.html='<p>Uygulanıyor…</p>';chatRender();
   ceRun(m.plan).then(o=>{m.html=ceHTML(o);}).finally(()=>{chat.busy=false;chatRender();});return;}
+ if(a==='chat-say'){if(!chat.busy)chatSend(b.dataset.t);return;}
  if(a==='chat-ex'){const i=document.getElementById('chat-input');if(i){i.value=b.dataset.t;chatGrow();i.focus();}}});
 document.addEventListener('change',e=>{if(e.target.id!=='chat-file')return;const f=ruhsatFiles(e.target.files);e.target.value='';if(f.length)chatImages(f);});
 document.addEventListener('submit',e=>{if(e.target.id!=='chat-form')return;e.preventDefault();chatSend(document.getElementById('chat-input')?.value);});

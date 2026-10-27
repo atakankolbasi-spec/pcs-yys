@@ -135,7 +135,7 @@
         // liste fotoğrafı: resim gövdesi + "x-pcs-mode: liste" başlığı; cevabı yine cfg.aiText verir (mesaj biçiminde)
         const isList = !!(opts.headers && opts.headers['x-pcs-mode'] === 'liste');
         const isText = isJson || isList;
-        calls.push({ fn: name, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size, text: isJson ? JSON.parse(opts.body) : undefined, list: isList ? { today: opts.headers['x-pcs-today'] } : undefined });
+        calls.push({ fn: name, timeout: opts.timeout, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size, text: isJson ? JSON.parse(opts.body) : undefined, list: isList ? { today: opts.headers['x-pcs-today'] } : undefined });
         if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
         if (cfg.aiDelay) await new Promise(r => setTimeout(r, cfg.aiDelay));   // yavaş cevap (sahte saatle ilerler)
         // dizi verilirse sırayla kullanılır (ör. önce 429, sonra cevap); son eleman tekrar eder

@@ -84,6 +84,10 @@ const SCHEMA = {
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MAX_TEXT = 6000;
 const FAST_CHARS = 400; // bundan kısa sohbet komutlarında düşünme kapatılır
+// Hızlı yolda bir deneme en fazla bu kadar bekler (Google takılırsa 60 saniye beklemek yerine sıradaki modele geçilir) ve
+// toplam bekleme sınırlıdır; sohbet balonu en kötü durumda yarım dakika içinde cevap ya da hata alır.
+const FAST_TRY_MS = Number(env('GEMINI_FAST_MS')) || 12000;
+const FAST_BUDGET_MS = 40000;
 const TEXT_PROMPT = (today, weekday, image = false) => `${image ? `The input is an IMAGE (a screenshot or photo): a message or a printed / handwritten list that a customer sent. Read all the text in the image first, then treat that text exactly like the message described below. If the image is a vehicle registration certificate (ruhsat) or has no vehicle list or announcement at all, return an empty "items" list and say so in "problem".\n\n` : ''}You are reading ONE message that a trucking / forwarding customer sent by WhatsApp or e-mail to a customs
 warehouse. It usually announces trucks that will arrive (a tractor unit plus its semi-trailer, or a single vehicle) and sometimes
 postpones or cancels them. The message may be Turkish, English, Bulgarian, Romanian, Serbian, Hungarian, etc.
@@ -333,15 +337,17 @@ const cleanChat = today => (parsed, model) => {
 // Gemini'ye sorar: istenen model olmazsa sırayla yedek modelleri dener (ayrıntı dosyanın başındaki açıklamada).
 // fast: kısa sohbet komutu; düşünme kapatılır ve (varsa) GEMINI_CHAT_MODEL ilk denenir.
 async function ask(parts, schema, clean, { fast = false } = {}) {
-  const start = Date.now(), left = () => BUDGET_MS - (Date.now() - start);
-  const models = [...new Set([...(fast && env('GEMINI_CHAT_MODEL') ? [env('GEMINI_CHAT_MODEL')] : []), env('GEMINI_MODEL') || 'gemini-flash-latest', ...FALLBACK_MODELS])];
+  const start = Date.now(), left = () => (fast ? FAST_BUDGET_MS : BUDGET_MS) - (Date.now() - start), minLeft = fast ? 4000 : 15000;
+  // Hızlı yolda önce hızlı ve kararlı model: GEMINI_CHAT_MODEL, yoksa (GEMINI_MODEL elle seçilmediyse) gemini-2.5-flash;
+  // "gemini-flash-latest" gibi takma adlar yeni / yoğun bir modele işaret edip yavaş kalabilir.
+  const models = [...new Set([...(fast ? [env('GEMINI_CHAT_MODEL') || (env('GEMINI_MODEL') ? '' : 'gemini-2.5-flash')].filter(Boolean) : []), env('GEMINI_MODEL') || 'gemini-flash-latest', ...FALLBACK_MODELS])];
   const limits = [];
   let last = null, busy = false;
   for (const model of models) {
     let vi = fast ? thinkVariant.get(model) ?? 0 : THINK_VARIANTS.length - 1; // son eleman: ayarsız
-    for (let again = 0; again < 2 && left() > 15000; again++) {
+    for (let again = 0; again < 2 && left() > minLeft; again++) {
       const t0 = Date.now();
-      const res = await gemini(model, parts, schema, Math.min(60000, left()), THINK_VARIANTS[vi]);
+      const res = await gemini(model, parts, schema, Math.min(fast ? FAST_TRY_MS : 60000, left()), THINK_VARIANTS[vi]);
       if (res.ok) {
         if (fast) thinkVariant.set(model, vi);
         const out = await parse(res, model, clean);
@@ -357,7 +363,7 @@ async function ask(parts, schema, clean, { fast = false } = {}) {
       // model bu düşünme ayarını kabul etmedi: sıradaki yöntemle hemen yeniden dene (deneme hakkı harcanmaz)
       if (res.status === 400 && fast && vi < THINK_VARIANTS.length - 1 && /think|budget/i.test(text)) { vi++; thinkVariant.set(model, vi); again--; continue; }
       if (res.status === 429) { limits.push({ after: retryAfter(res, text), daily: /PerDay/i.test(text) }); break; }
-      if (res.status >= 500) { busy = true; if (!again) { await sleep(1500); continue; } break; }
+      if (res.status >= 500) { busy = true; if (!again && !fast) { await sleep(1500); continue; } break; } // hızlı yolda beklemeden sıradaki modele
       if (res.status === 404) break; // bu adla model yok
       // 400 / 401 / 403: anahtar geçersiz, izin yok ya da içerik kabul edilmedi; beklemekle düzelmez
       const key = /API_KEY|API key/i.test(text) || res.status === 401 || res.status === 403;
