@@ -2797,3 +2797,40 @@ test.describe('service worker', () => {
     expect(await hits()).toBeGreaterThan(before);
   });
 });
+
+test('kart çerçeveleri: renkli geçişli varsayılan, Sade ile düz çizgi, gece modunda da geçerli', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const st = loc => loc.evaluate(el => { const c = getComputedStyle(el); return { bw: c.borderTopWidth, bc: c.borderTopColor, bi: c.backgroundImage }; });
+  const look = () => page.evaluate(() => document.documentElement.dataset.frameLook);
+  expect(await look()).toBe('gecis');
+  const day = page.locator('.day-block').first();
+  let d = await st(day);
+  expect([d.bw, d.bc]).toEqual(['2px', 'rgba(0, 0, 0, 0)']);
+  expect(d.bi).toContain('linear-gradient');
+  // kendi renkli zemini olan kontrol kartı da çerçeveli, zemini korunur
+  const ctl = await st(page.locator('.k-card.k-ctl'));
+  expect(ctl.bc).toBe('rgba(0, 0, 0, 0)');
+  expect(ctl.bi).toContain('radial-gradient');
+  // ayarlar > görünüm: Sade seçilince düz ince çizgi
+  await page.locator('.nav-item[data-page="settings"]').click();
+  const seg = page.locator('[data-sk="frameLook"]');
+  await expect(seg.locator('[data-v="gecis"]')).toHaveAttribute('aria-pressed', 'true');
+  await seg.locator('[data-v="sade"]').click();
+  expect(await look()).toBe('sade');
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  d = await st(page.locator('.day-block').first());
+  expect(d.bw).toBe('1px');
+  expect(d.bi).toBe('none');
+  // geri aç, gece modunda da çerçeve geçişli
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-sk="frameLook"] [data-v="gecis"]').click();
+  await page.locator('[data-sk="theme"] [data-v="dark"]').click();
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  d = await st(page.locator('.day-block').first());
+  expect([d.bw, d.bc]).toEqual(['2px', 'rgba(0, 0, 0, 0)']);
+  expect(d.bi).toContain('linear-gradient');
+  expect(problems).toEqual([]);
+});

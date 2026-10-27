@@ -403,6 +403,51 @@ html.kule[data-theme="dark"] .k-design.on{border-color:var(--c-accent)}
 html.kule[data-theme="dark"] .k-bar i{background:color-mix(in srgb,var(--c-accent) 35%,#16203a)}
 html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
 
+/* ---------- Renkli geçişli çerçeveler ----------
+   Karşılama bandındaki gibi: mavi-turkuaz-mor tonlarından turuncuya geçen ince çerçeve ve hafif parıltı.
+   Ayarlar > Tasarım > "Kart çerçeveleri" = "Sade" seçilirse bu blok devre dışıdır (düz ince çizgi kalır).
+   Yöntem: şeffaf çerçevenin altında, iç dolgu (--k-fill, varsayılan kart rengi) padding-box'a, geçiş (--k-frame) border-box'a çizilir.
+   Müşteri renkli çerçeveleri (.card-group, satırlar), seçili/uzun bekleyen kartlar ve kendi renkli zemini olan kartlar (.k-ctl, .kpi.teal) ayrıca ele alınır. */
+@media screen{
+ html.kule:not([data-frame-look="sade"]){
+  --k-frame:linear-gradient(125deg,#38bdf8 0%,#2dd4bf 22%,#a78bfa 50%,#f472b6 70%,#fb923c 88%,#fbbf24 100%);
+  --k-fw:2px;
+  --k-glow:0 14px 30px -18px #7c6cf5b3,0 8px 22px -16px #f59e0bb3,0 1px 2px #0b15300f
+ }
+ html.kule[data-theme="dark"]:not([data-frame-look="sade"]){--k-glow:0 0 24px -10px #8b7cf6a6,0 0 18px -12px #fb923ca6}
+ /* :is() içindeki en özgül öğe (.vcard:not():not()) hepsine uygulanır; böylece gece modu ve açık ayar panelinin kuralları bunu ezemez */
+ html.kule:not([data-frame-look="sade"]) :is(.period-panel,.day-block,.kpi:not(.teal),.card,.empty-state,.set-panel,.reg-group,.backup-card,.quick-add,.side-panel>section,.side-panel>div,.report-card,.gate-card,.cp-box,.side-card,.k-card:not(.k-ctl),.k-scard,.k-snav,.heading.k-pagehead,.topbar,.vcard:not(.long):not(.is-selected),.cp-kpi,.cp-list,.wa-list,.gacc-row,.app-preview,.rep-setup,.live-item,#modal,.k-qs,.chat-panel){
+  border:var(--k-fw) solid transparent;
+  background-image:linear-gradient(var(--k-fill,var(--k-card)),var(--k-fill,var(--k-card))),var(--k-frame);
+  background-origin:border-box;background-clip:padding-box,border-box;
+  box-shadow:var(--k-glow)
+ }
+ /* küçük iç kutular ve satır kartları: parıltısız, hafif gölge */
+ html.kule:not([data-frame-look="sade"]) :is(.vcard:not(.long):not(.is-selected),.cp-kpi,.cp-list,.wa-list,.gacc-row,.app-preview,.rep-setup){border-width:1.5px;box-shadow:var(--k-sh1)}
+ /* pencereler ve yüzen paneller: parıltı + kendi derin gölgeleri */
+ html.kule:not([data-frame-look="sade"]) :is(#modal,.k-qs,.chat-panel){box-shadow:var(--k-glow),0 30px 90px #0b153059}
+ html.kule:not([data-frame-look="sade"]) .live-item{box-shadow:var(--k-glow),0 12px 32px #16233a26}
+ html.kule:not([data-frame-look="sade"]) .chat-panel{--k-fill:#f0f2f5}
+ html.kule[data-theme="dark"]:not([data-frame-look="sade"]) .chat-panel{--k-fill:#111b21}
+ html.kule:not([data-frame-look="sade"]) .vcard.done{--k-fill:color-mix(in srgb,var(--c-done) 6%,var(--k-card))}
+ html.kule:not([data-frame-look="sade"]) .set-panel[open]{border-color:transparent}
+ /* çerçeve 1 px'ten kalınlaşınca kart içi daralmasın (örn. durum dağılımı yazıları satır kırmasın) */
+ html.kule:not([data-frame-look="sade"]) .k-card{padding:calc(18px - var(--k-fw) + 1px) calc(20px - var(--k-fw) + 1px)}
+ html.kule:not([data-frame-look="sade"]) .topbar{box-shadow:var(--k-glow)}
+ /* kendi renkli zemini olan kartlar: zemin padding-box'ta, geçiş çerçevesi border-box'ta */
+ html.kule:not([data-frame-look="sade"]) .k-card.k-ctl{border:var(--k-fw) solid transparent;box-shadow:var(--k-glow);
+  background-image:radial-gradient(240px 160px at 100% 0%,color-mix(in srgb,var(--c-accent) 55%,transparent),transparent 70%),linear-gradient(150deg,var(--k-brand2),var(--k-brand,#16233a)),var(--k-frame);
+  background-origin:padding-box,padding-box,border-box;background-clip:padding-box,padding-box,border-box}
+ html.kule:not([data-frame-look="sade"]) .kpi.teal{border:var(--k-fw) solid transparent;box-shadow:var(--k-glow);
+  background-image:radial-gradient(220px 140px at 100% 0%,color-mix(in srgb,var(--c-accent) 50%,transparent),transparent 70%),linear-gradient(150deg,var(--k-brand2),var(--k-brand,#16233a)),var(--k-frame);
+  background-origin:padding-box,padding-box,border-box;background-clip:padding-box,padding-box,border-box}
+}
+@media screen and (min-width:701px){
+ html.kule:not([data-frame-look="sade"]) .sidebar{border:var(--k-fw) solid transparent;
+  background-image:linear-gradient(170deg,var(--k-brand2) 0%,var(--k-brand,#16233a) 55%,color-mix(in srgb,var(--k-brand,#16233a) 88%,#000) 100%),var(--k-frame);
+  background-origin:padding-box,border-box;background-clip:padding-box,border-box;box-shadow:var(--k-glow),0 20px 50px #0b153055}
+}
+
 /* ---------- Müşteri başlıkları: ışıltılı koyu şerit + müşterinin renginde çerçeve ----------
    Her müşterinin araçları (başlık + satırlar) müşteri renginde tek çerçevenin içindedir. Renk, Ayarlar'daki müşteri
    öncelik listesinden gelir (--bc). Ayarlar > Yerleşim > "Müşteri başlık görünümü" = "Önceki stil" seçilirse eski
