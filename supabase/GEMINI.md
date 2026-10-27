@@ -86,6 +86,10 @@ sekmesine girin, eski kodu tamamen silip yenisini yapıştırın ve **Deploy**'a
   tarih / sıra numarası gibi rakam varsa cümle Gemini'ye gider; böylece yanlış anlama yerine yapay zekâya sorulur.
 - Gemini'ye giden kısa komutlarda modelin "düşünme" adımı kapatılır (cevap birkaç saniye yerine bir iki saniyede gelir). Model bu
   ayarı kabul etmezse fonksiyon sıradaki yönteme, o da olmazsa ayarsız isteğe geçer. Uzun listeler ve müşteri mesajları düşünerek okunur.
+- Kısa komutlar önce hızlı ve kararlı **gemini-2.5-flash** ile denenir (`GEMINI_MODEL` elle seçildiyse o); bir deneme en fazla
+  12 saniye bekler, takılırsa sıradaki modele geçilir. Sohbet en kötü durumda yaklaşık 40 saniyede cevap ya da hata alır
+  (eskiden Google takılınca iki dakikadan fazla beklenebiliyordu). Sitede de sohbet için bekleme 50 saniye ve en çok iki denemeyle sınırlıdır.
+- Plaka bir harf yanlış yazıldıysa ("CB 1234 A yi T1 yazıldı yap") yapay zekâ beklenmeden "Şunu mu demek istediniz?" önerilir.
 - Beklerken sohbette geçen süre ("Yanıt bekleniyor… 8 sn") görünür.
 - Süreleri görmek için Supabase → Edge Functions → `ruhsat-oku` → **Logs**: her Gemini cevabı için `ruhsat-oku: <model> <süre> ms` satırı yazılır.
   Süre hâlâ 5 saniyenin üzerindeyse `GEMINI_CHAT_MODEL` ayarını deneyin.

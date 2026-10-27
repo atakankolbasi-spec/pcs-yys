@@ -2216,6 +2216,52 @@ test('koyu tema: yazılara kalınlaştırıcı çizgi (text-stroke) eklenmez; ya
   expect(problems).toEqual([]);
 });
 
+test('sohbet: plaka yazım hatası yapay zekâ beklenmeden düzeltme önerilir; "yi" gibi ekler anlaşılır; duyurularda öneri yapılmaz', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page, { aiText: chatAi({ problem: 'Anlaşılmadı.' }) });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  const ai = () => page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
+  await say('CB 1234 A yi T1 yazıldı yap');                                   // son harf eksik
+  await expect(panel).toContainText('“CB 1234 A” plakasını panoda bulamadım. Şunu mu demek istediniz?');
+  await expect(panel.locator('[data-action="chat-say"]')).toHaveText('CB 1234 AB yi T1 yazıldı yap');
+  expect(await ai()).toBe(0);
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').t1)).toBe(false);   // öneri hiçbir şeyi değiştirmez
+  await panel.locator('[data-action="chat-say"]').click();                    // önerilene tıklayınca gönderilir ve yerelde uygulanır
+  await expect(panel).toContainText('CB 1234 AB · T1 yazıldı: hayır → evet');
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').t1)).toBe(true);
+  expect(await ai()).toBe(0);
+  await say('CB 1234 AB yi tesiste yap');                                     // ek ("yi") anlaşılır
+  await expect(panel).toContainText('CB 1234 AB · Tesiste: hayır → evet');
+  expect(await ai()).toBe(0);
+  // plakaya benzeyen ama bir duyuru olan cümlede öneri yapılmaz, yapay zekâya gider
+  await say('yarın CB 1234 A gelecek');
+  await expect.poll(ai).toBe(1);
+  await expect(panel).toContainText('Bunu anlayamadım');
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: yapay zekâ beklemesi sınırlıdır (50 sn, en çok 2 deneme); zaman aşımı yazılan cümleyi geri verir', async ({ page }) => {
+  test.setTimeout(60000);
+  const err504 = { status: 504, body: { error: 'Gemini 504', reason: 'Gemini zamanında cevap vermedi' } };
+  const problems = await openApp(page, { aiText: [err504, err504, err504] });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  await page.locator('#chat-input').fill('yarın 34 ABC 123 gelecek');
+  await page.locator('#chat-input').press('Enter');
+  await expect(panel).toContainText('sn sonra yeniden denenecek');
+  await page.clock.runFor(10000);
+  await expect(panel).toContainText('Okuyamadım: Gemini zamanında cevap vermedi');
+  const calls = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.timeout));
+  expect(calls).toEqual([50000, 50000]);                                       // sohbette 50 sn ve en çok iki deneme (önceden 150 sn ve üç deneme)
+  await expect(page.locator('#chat-input')).toHaveValue('yarın 34 ABC 123 gelecek');
+  expect(problems.filter(p => !/504/.test(p))).toEqual([]);
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');

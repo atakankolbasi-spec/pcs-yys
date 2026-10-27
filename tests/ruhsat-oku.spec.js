@@ -21,7 +21,7 @@ async function setup({ env = {}, role = 'editor', gemini } = {}) {
     log.push({ url, headers, body: init.body });
     const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'Content-Type': 'application/json' } });
     if (url === ENV.SUPABASE_URL + '/rest/v1/rpc/current_app_role') return headers.Authorization === 'Bearer kullanici' ? json(role) : json({ message: 'JWT' }, 401);
-    if (url.startsWith('https://generativelanguage.googleapis.com/')) return gemini(url, JSON.parse(init.body), headers);
+    if (url.startsWith('https://generativelanguage.googleapis.com/')) return gemini(url, JSON.parse(init.body), headers, init.signal);
     return json({ error: 'beklenmeyen istek ' + url }, 500);
   };
   const file = path.join(os.tmpdir(), `ruhsat-oku-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
@@ -329,6 +329,29 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     res = await post2({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'tesiste kaç araç var', today: '2026-10-22', chat: true }));
     expect(res.status).toBe(200);
     expect(seen).toEqual([{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null]);
+  });
+
+  test('sohbet hızlı yolu: Google takılırsa 60 saniye beklenmez, yavaş model zaman aşımıyla bırakılıp sıradaki modelle cevap alınır; sıra gemini-2.5-flash ile başlar', async () => {
+    const tried = [];
+    const hang = signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new DOMException('zaman aşımı', 'TimeoutError'))));
+    const { post } = await setup({ env: { GEMINI_FAST_MS: '60' }, gemini: (url, body, headers, signal) => {
+      const model = /models\/([^:]+):/.exec(url)[1];
+      tried.push(model);
+      if (model === 'gemini-2.5-flash') return hang(signal);                       // ilk model cevap vermiyor
+      return answer({ items: [], customer: '', problem: '', edits: [], queries: [{ kind: 'count', status: 'onsite' }] });
+    } });
+    const t0 = Date.now();
+    const res = await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'tesiste kaç araç var', today: '2026-10-22', chat: true }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).queries).toEqual([{ kind: 'count', status: 'onsite', customer: '', plate: '', date: '', week: false }]);
+    expect(tried).toEqual(['gemini-2.5-flash', 'gemini-flash-latest']);            // takılan modelden hemen sonrakine geçildi (aynı model tekrarlanmadı)
+    expect(Date.now() - t0).toBeLessThan(4000);
+    // elle seçilmiş GEMINI_MODEL varsa hızlı yolda de önce o denenir; müşteri mesajı yolu hiç değişmez
+    const seen = [];
+    const b = await setup({ env: { GEMINI_MODEL: 'gemini-ozel' }, gemini: (url) => { seen.push(/models\/([^:]+):/.exec(url)[1]); return answer({ items: [], customer: '', problem: '' }); } });
+    await b.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'tesiste kaç araç var', today: '2026-10-22', chat: true }));
+    await b.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }));
+    expect(seen).toEqual(['gemini-ozel', 'gemini-ozel']);
   });
 
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {
