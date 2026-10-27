@@ -1578,7 +1578,7 @@ test('sohbet balonu: yazılan cümle okunur, hazır ekleme ve taşıma kendiliğ
   await expect(panel).toContainText('5 araç anladım; 2 tanesini panoya işledim. 2 tanesi için onayınız gerekiyor');
   // gönderilen metin Gemini'ye bugünün tarihiyle gider
   const sent = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.text));
-  expect(sent).toEqual([{ text: 'Yarın 06 KL 4567 saat 09:30 gelecek\nCB 1234 AB cumaya ertelendi, XX 9999 YY gelecek, B 123 XYZ iptal', today: '2026-09-23', chat: true }]);
+  expect(sent).toEqual([{ text: 'Yarın 06 KL 4567 saat 09:30 gelecek\nCB 1234 AB cumaya ertelendi, XX 9999 YY gelecek, B 123 XYZ iptal', today: '2026-09-23', chat: true, context: expect.stringContaining('BOARD DAY 2026-09-23') }]);
   // kendiliğinden yapılanlar: ekleme + taşıma. Silme ve yeni araç yapılmadı.
   const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).map(c => ({ op: c.op, rows: c.rows })));
   const w = await writes();
@@ -2172,16 +2172,18 @@ test('sohbet hızlı yol: sık sorular ve plakalı durum komutları yerelde anı
   await expect(panel).toContainText('T1 yazıldı: hayır → evet');
   await say('CB-1234-AB işlemleri bitti');
   await expect(panel).toContainText('İşlemler bitti: hayır → evet');
-  expect(await writes()).toBe(3);
+  await say('CB 1234 AB tesiste değil');                                           // olumsuz: kutu kapatılır
+  await expect(panel).toContainText('Tesiste: evet → hayır');
+  expect(await writes()).toBe(4);
   expect(await ai()).toBe(0);
   // belirsiz / tanınmayan cümleler yapay zekâya gider (yanlış anlama yerine)
-  for (const t of ['yarın 34 ABC 123 gelecek', 'tesiste olmayan araçlar', 'CB 1234 AB tesiste değil', 'bugün kaç araç ertelendi', 'BULTRANS ve LİN LOJ araçları', 'XX 9999 YY tesiste']) {
+  for (const t of ['yarın 34 ABC 123 gelecek', 'tesiste olmayan araçlar', 'bugün kaç araç ertelendi', 'BULTRANS ve LİN LOJ araçları', 'XX 9999 YY tesiste']) {
     const before = await ai();
     await say(t);
     await expect.poll(ai).toBe(before + 1);
     await expect(panel).toContainText('Bunu anlayamadım');
   }
-  expect(await writes()).toBe(3);                                                   // yapay zekâya giden cümleler hiçbir şeyi değiştirmedi
+  expect(await writes()).toBe(4);                                                   // yapay zekâya giden cümleler hiçbir şeyi değiştirmedi
   expect(problems).toEqual([]);
 });
 
@@ -2833,4 +2835,78 @@ test('kart çerçeveleri: renkli geçişli varsayılan, Sade ile düz çizgi, ge
   expect([d.bw, d.bc]).toEqual(['2px', 'rgba(0, 0, 0, 0)']);
   expect(d.bi).toContain('linear-gradient');
   expect(problems).toEqual([]);
+});
+
+test('sohbet: doğal cümleler yerelde anlaşılır (dorse plakası, "işaretle", olumsuz, birden fazla araç, sıra numarası, soru); yapay zekâ çağrılmaz', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  data.visits.find(v => v.id === 'v6').plate = 'CB 1234 AB - CT 29 BWT';          // çekici + dorse
+  const problems = await openApp(page, { data, aiText: chatAi({}) });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel'), last = panel.locator('.chat-msg.ai').last();
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  const v = id => page.evaluate(i => window.__db.visits.find(x => x.id === i), id);
+  await say('CT 29 BWT dorse plakalı aracı T1 yazıldı işaretle');
+  await expect(last).toContainText('CB 1234 AB - CT 29 BWT · T1 yazıldı: hayır → evet');
+  expect(await v('v6')).toMatchObject({ t1: true, onsite: false });
+  await say('çekici CB 1234 AB tesise girdi lütfen');
+  await expect(last).toContainText('Tesiste: hayır → evet');
+  await say('CT 29 BWT tesiste değil');
+  await expect(last).toContainText('Tesiste: evet → hayır');
+  expect(await v('v6')).toMatchObject({ onsite: false, t1: true });
+  await say('CT 29 BWT T1 yazılmadı');
+  await expect(last).toContainText('T1 yazıldı: evet → hayır');
+  await say('34 ABC 123 ve CT 29 BWT bitti');                                       // iki ayrı araç
+  await expect(panel.locator('.chat-msg.ai').last().locator('.rs-note')).toHaveCount(2);
+  expect(await v('v5')).toMatchObject({ done: true });
+  expect(await v('v6')).toMatchObject({ done: true });
+  await say('2. sıradaki aracı T1 yazıldı yap');                                    // sıra numarası: panodaki 2. satır (34 ABC 123)
+  await expect(last).toContainText('34 ABC 123 · T1 yazıldı: hayır → evet');
+  await say('CT 29 BWT tesiste mi');                                                // soru: aracın durumu gösterilir, yazılmaz
+  await expect(panel.locator('.chat-row').last()).toContainText('TORNADO');
+  await say('raporlara git');                                                       // sayfa gezinme
+  await expect(last).toContainText('Raporlar sayfasını açtım.');
+  await expect(page.locator('.nav-item.active')).toContainText('Raporlar');
+  await say('lütfen ayarları aç');
+  await expect(page.locator('.nav-item.active')).toContainText('Ayarlar');
+  await say('panoya git');
+  await expect(page.locator('.nav-item.active')).toContainText('Pano');
+  const writes = await page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length);
+  expect(writes).toBe(7);                                                          // 7 değişiklik; soru yazmadı
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: yapay zekâ cevap veremezse metinden anlaşılan komut önerilir, teknik ayrıntı gösterilir; yapay zekâya pano özeti gönderilir', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  data.visits.find(v => v.id === 'v6').plate = 'CB 1234 AB - CT 29 BWT';
+  const aiText = { status: 502, body: { fatal: true, reason: 'Gemini bu içeriği kabul etmedi', detail: '{"error":{"code":400,"message":"Invalid JSON payload received. Unknown name enum"}}' } };
+  const problems = await openApp(page, { data, aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  await say('hocam acaba CT 29 BWT dorse plakalı aracı T1 yazıldı olarak işaretler misin');   // bilinmeyen sözcükler: yerelde kesin anlaşılmaz
+  const chip = panel.locator('.chat-chip[data-action="chat-say"]');
+  await expect(chip).toHaveText('CT 29 BWT T1 yazıldı');
+  await expect(panel).toContainText('Yapay zekâya ulaşamadım (Gemini bu içeriği kabul etmedi). Şunu mu demek istediniz?');
+  await panel.locator('.chat-det summary').click();
+  await expect(panel.locator('.chat-det code')).toHaveText('Invalid JSON payload received. Unknown name enum');
+  // gönderilen istekte panonun o günkü özeti var
+  const sent = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.text));
+  expect(sent).toHaveLength(1);
+  expect(sent[0].context).toContain('BOARD DAY 2026-09-23');
+  expect(sent[0].context).toContain('1. B 123 XYZ | LİN LOJ | Tesiste · T1');
+  expect(sent[0].context).toContain('2. 34 ABC 123 | BULTRANS | Tesiste');
+  expect(sent[0].context).toContain('3. CB 1234 AB - CT 29 BWT | TORNADO | Gelecek');
+  expect(sent[0].context).toMatch(/CUSTOMERS: .*BULTRANS/);
+  // öneriye tıklanınca yerelde uygulanır
+  await chip.click();
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('CB 1234 AB - CT 29 BWT · T1 yazıldı: hayır → evet');
+  expect((await page.evaluate(() => window.__db.visits.find(x => x.id === 'v6'))).t1).toBe(true);
+  expect(problems.filter(x => !/50[0-9]|ruhsat-oku/.test(x))).toEqual([]);
 });

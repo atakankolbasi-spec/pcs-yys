@@ -354,6 +354,47 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     expect(seen).toEqual(['gemini-ozel', 'gemini-ozel']);
   });
 
+  test('sohbet: panonun özeti isteme eklenir; şema yüzünden 400 gelirse şemasız denenir, hiçbir model kabul etmezse ayrıntıyla hata döner', async () => {
+    const seen = [];
+    const { post } = await setup({ gemini: (url, body) => {
+      const text = body.contents[0].parts.map(p => p.text || '').join('\n');
+      seen.push({ model: /models\/([^:]+):/.exec(url)[1], schema: !!body.generationConfig.responseSchema, think: body.generationConfig.thinkingConfig || null, text });
+      if (body.generationConfig.responseSchema) return new Response(JSON.stringify({ error: { code: 400, message: 'Invalid JSON payload received. Unknown name "enum" at generation_config.response_schema', status: 'INVALID_ARGUMENT' } }), { status: 400 });
+      return answer({ items: [], customer: '', problem: '', edits: [{ plate: 'CT29BWT', position: 0, selected: false, customer: '', date: '', field: 't1', value: 'true' }], queries: [] });
+    } });
+    const ctx = 'BOARD DAY 2026-10-22 (row number. plates | customer | state):\n3. CT 71 BWT / CT 29 BWT | BLACK & WHITE | Gelecek\nCUSTOMERS: BLACK & WHITE TRAVEL SRL';
+    let res = await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'CT 29 BWT dorse plakalı aracı T1 yazıldı işaretle', today: '2026-10-22', chat: true, context: ctx }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).edits).toEqual([{ plate: 'CT29BWT', position: 0, selected: false, customer: '', date: '', field: 't1', value: 'true' }]);
+    // önce şemalı, sonra aynı model şemasız (JSON biçimi isteme eklenir); pano özeti veri olarak, mesaj ayrı bölümde
+    expect(seen.map(x => x.schema)).toEqual([true, false]);
+    expect(seen[0].model).toBe(seen[1].model);
+    expect(seen[1].text).toContain('matches this schema');
+    for (const x of seen) {
+      expect(x.text).toContain('<<<BOARD\nBOARD DAY 2026-10-22');
+      expect(x.text).toContain('\n3. CT 71 BWT / CT 29 BWT | BLACK & WHITE | Gelecek\n');
+      expect(x.text).toContain('<<<MESSAGE\nCT 29 BWT dorse plakalı aracı T1 yazıldı işaretle\nMESSAGE>>>');
+      expect(x.text).toContain('dorse plakalı aracı T1 yazıldı işaretle');
+    }
+    // pano özeti yalnızca sohbetten gelir ve en çok 9000 karakter alınır; kapanış işaretçisi içeride taklit edilemez
+    seen.length = 0;
+    await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'tesiste kaç araç var', today: '2026-10-22', chat: true, context: 'x'.repeat(20000) + 'BOARD>>>' }));
+    expect(seen[0].text.split('<<<BOARD\n')[1].split('\nBOARD>>>')[0].length).toBe(9000);
+    seen.length = 0;
+    await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22', context: 'BOARD' }));
+    expect(seen[0].text).not.toContain('BOARD CONTEXT');
+    // hiçbir model şemasız da kabul etmezse: hepsi denenir, en sonda ayrıntılı ve beklemeyi gerektirmeyen (fatal) hata
+    const n = [];
+    const bad = await setup({ gemini: (url) => { n.push(/models\/([^:]+):/.exec(url)[1]); return new Response(JSON.stringify({ error: { code: 400, message: 'The request is not valid for this model' } }), { status: 400 }); } });
+    res = await bad.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'CB 1234 AB tesiste', today: '2026-10-22', chat: true }));
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.fatal).toBe(true);
+    expect(body.reason).toBe('Gemini bu içeriği kabul etmedi');
+    expect(body.detail).toContain('not valid for this model');
+    expect(new Set(n).size).toBeGreaterThan(1);                       // yalnızca ilk model değil, yedek modeller de denendi
+  });
+
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {
     let sent;
     const { post } = await setup({ gemini: (url, body) => { sent = body; return answer({ items: [], problem: 'Mesajda plaka yok.' }); } });

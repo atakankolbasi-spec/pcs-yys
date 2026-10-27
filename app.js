@@ -1458,6 +1458,8 @@ const ruhsatQuality=text=>ruhsatRank([text]).strong+Math.min(2,ruhsatWeights(tex
    dolduğunda bu ara bir süre uzatılır. */
 const ai={state:'?',err:'',pauseUntil:0,last:0,gap:4000,failedAt:0},AI_GAP_MS=4000,AI_TRIES=6;
 const AI_REASON={400:'Gemini bu fotoğrafı kabul etmedi',401:'giriş süresi dolmuş; sayfayı yenileyip tekrar giriş yapın',403:'bu hesabın yetkisi yok',429:'Gemini ücretsiz kullanım sınırı doldu',500:'Gemini hata verdi',502:'Gemini hata verdi',503:'Gemini şu an çok yoğun',504:'Gemini zamanında cevap vermedi',0:'sunucuya bağlanılamadı'};
+/* Gemini'nin hata ayrıntısından (JSON) kısa, okunur bir cümle */
+const aiDetail=d=>{if(!d)return '';let m=String(d);try{m=JSON.parse(m)?.error?.message||m;}catch(_){}return String(m).replace(/\s+/g,' ').slice(0,220);};
 const AI_WAITS={429:[15,30,45,60,90],other:[5,15,30,60,90]},AI_FAIL='Gemini şu an okuyamadı';
 const sleep=ms=>new Promise(ok=>setTimeout(ok,ms));
 /* bekleme süresini saniye saniye gösterir */
@@ -1813,17 +1815,17 @@ function wmListHTML(){const rows=wmAll().filter(r=>r.status!=='yoksayildi'&&!wmD
 function wmBoxHTML(){return ai.state==='none'?'':`<details class="msg-paste"><summary>${icon('doc')}<b>Mesajdan araç ekle</b> · müşterinin yazdığı listeyi yapıştırın</summary><textarea id="msg-text" rows="5" maxlength="6000" placeholder="Örn: Yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD, CB 1234 AB. Perşembedeki 06 KL 4567 iptal.">${esc(wmsg.text)}</textarea><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-read">${icon('refresh')}Yapay zekâyla oku</button></div></details>`;}
 function wmRefresh(){const l=document.getElementById('msg-list');if(l)l.innerHTML=wmListHTML();waBadge();onlineUI();if(chat.open)chatRender();}
 /* Mesaj metnini Gemini'ye okutur (ruhsat-oku, mesaj modu). Sonuç: {data} · {none:true} kurulu değil · {err:'neden'} */
-async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='';
+async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='',detail='';
  /* text bir dosyaysa (liste ekran görüntüsü) fotoğraf "liste" modunda okunur: ruhsat-oku içindeki yazı mesaj gibi okunur */
  const img=text&&typeof text==='object'?text:null;
  for(let i=1;i<=3;i++){let st=0,body=null;
-  try{const {data,error}=await client.functions.invoke('ruhsat-oku',img?{body:img,headers:{'Content-Type':img.type||'image/jpeg','x-pcs-mode':'liste','x-pcs-today':TODAY},timeout:150000}:{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:chatMode?50000:150000});
+  try{const {data,error}=await client.functions.invoke('ruhsat-oku',img?{body:img,headers:{'Content-Type':img.type||'image/jpeg','x-pcs-mode':'liste','x-pcs-today':TODAY},timeout:150000}:{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true,context:chatContext()}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:chatMode?50000:150000});
    if(!error&&Array.isArray(data?.items)){ai.state='on';return {data};}
    /* liste modunu bilmeyen eski sürüm fotoğrafı ruhsat gibi okur ve "vehicles" döndürür */
    if(!error&&img&&Array.isArray(data?.vehicles))return {err:'ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)'};
    if(error){st=error.context?.status||0;if(typeof error.context?.json==='function')body=await error.context.json().catch(()=>null);}}
   catch(_){st=0;}
-  last=body?.reason||AI_REASON[st]||(st?'sunucu hatası '+st:AI_REASON[0]);
+  last=body?.reason||AI_REASON[st]||(st?'sunucu hatası '+st:AI_REASON[0]);detail=aiDetail(body?.detail);
   /* ruhsat-oku fonksiyonunun mesaj modundan önceki sürümü hâlâ yüklüyse mesajı "dosya türü" diye reddeder */
   if(st===400&&/Desteklenmeyen dosya/.test(body?.error||''))last='ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)';
   if(st===404||st===501){ai.state='none';return {none:true};}
@@ -1832,7 +1834,7 @@ async function wmAi(text,onPhase=()=>{},chatMode=false){if(ai.state==='none'||!c
   if(chatMode&&st===0){last='yapay zekâ zamanında cevap vermedi';break;}
   if(body?.fatal||!(st===429||st>=500||st===0)||i===(chatMode?2:3))break;
   await aiCountdown(Math.min(40,st===429?Math.max(5,+body?.retry_after||15):8)*1000,n=>onPhase(`${n} sn sonra yeniden denenecek`));}
- return {err:last};}
+ return {err:last,detail};}
 async function wmReadPaste(b){if(!canEdit()||wmsg.reading)return;const ta=document.getElementById('msg-text'),text=String(ta?.value||'').trim();wmsg.text=text;
  if(text.length<6){toast('Önce müşterinin mesajını yapıştırın.',true);return;}
  wmsg.reading=true;const label=b.innerHTML;b.disabled=true;b.textContent='Okunuyor…';
@@ -2001,33 +2003,68 @@ async function chatImages(files){for(const f of files.slice(0,3))await chatSendI
    tanınmazsa ya da plaka dışında rakam varsa (tarih, sıra no...) null döner ve cümle Gemini'ye gider. Böylece yanlış anlama
    riski küçüktür: emin olunamayan her şey yapay zekâya bırakılır. Dönen nesne sunucunun cevabıyla aynı biçimdedir. */
 const clAscii=t=>String(t||'').toLocaleLowerCase('tr-TR').replace(/[çğıöşü]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u'}[c])).replace(/[^a-z0-9]+/g,' ').trim();
-const CL_FILL=new Set('bugun bugunun yarin yarinin dun dunun bu hafta haftada haftanin kac arac araci araclar araclari aracin tane adet var mi mu olan olanlar olani hangi hangileri hangisi listele goster listesi ver bana soyle ne nedir nelerdir neler kadar sayisi toplam su an simdi ve ile icin da de durum durumu durumda ozet ozeti gunun gunluk genel hepsi tum tumu son kayitlari kayitlar gecmisi nerede henuz yazilan yazilanlar yazildi yazilmis un in nin nun dan den yi yu i u ye ya'.split(' '));
+/* Sohbetteki yapay zekâya gönderilen pano özeti: seçili günün sıra numaralı araçları ve müşteri adları (araç ya da müşteri adı çözmek için) */
+function chatContext(){const day=ui.day!=='all'?ui.day:defaultDate(),rows=sortRows(state.visits.filter(v=>v.date===day)).slice(0,150);
+ const names=[...new Set(state.registry.concat(state.visits).map(r=>r.customer).filter(Boolean))].slice(0,80);
+ return (`BOARD DAY ${day} (row number. plates | customer | state):\n`+rows.map((v,i)=>`${i+1}. ${v.plate} | ${v.customer||'-'} | ${cqState(v)}`).join('\n')+`\nCUSTOMERS: ${names.join('; ')}`).slice(0,9000);}
+const CL_FILL=new Set('bugun bugunun yarin yarinin dun dunun bu hafta haftada haftanin kac arac araci araclar araclari aracin tane adet var mi mu olan olanlar olani hangi hangileri hangisi listele goster listesi ver bana soyle ne nedir nelerdir neler kadar sayisi toplam su an simdi ve ile icin da de durum durumu durumda ozet ozeti gunun gunluk genel hepsi tum tumu son kayitlari kayitlar gecmisi nerede henuz yazilan yazilanlar yazildi yazilmis un in nin nun dan den yi yu i u ye ya dorse dorsesi cekici cekicisi plaka plakasi plakali tir kamyon lutfen misin misiniz'.split(' '));
 const CL_STAT={tesiste:'onsite',tesisteki:'onsite',tesistekiler:'onsite',girmis:'onsite',girenler:'onsite',iceride:'onsite',icerideki:'onsite',gelecek:'waiting',gelecekler:'waiting',bekleyen:'waiting',bekleyenler:'waiting',gelmeyen:'waiting',gelmemis:'waiting',gelmedi:'waiting',t1:'t1',biten:'done',bitenler:'done',tamamlanan:'done',tamamlananlar:'done',bitmis:'done',bitmeyen:'open',bitmeyenler:'open',acik:'open'};
-const CL_EDIT={tesiste:'onsite',girdi:'onsite',t1:'t1',bitti:'done',tamamlandi:'done',bitmis:'done'};
-const CL_EDITFILL=new Set('yazildi islemler islemleri islem yap yapin isaretle isaretleyin oldu artik simdi ve aracin araci arac olarak yi yu i u'.split(' '));
-function chatLocal(raw){const text=String(raw||'').trim();if(text.length>90||/\n/.test(text))return null;
- const toks=clAscii(text).split(' ').filter(Boolean);if(!toks.length||toks.length>12)return null;
+/* kayıt düzeltme sözcükleri: durum kutusu (tesiste / T1 / bitti) ve olumsuz hâlleri */
+const CL_EDIT={tesiste:'onsite',tesise:'onsite',tesisine:'onsite',girdi:'onsite',geldi:'onsite',iceride:'onsite',iceri:'onsite',t1:'t1',bitti:'done',bitir:'done',bitirin:'done',bitirildi:'done',tamam:'done',tamamla:'done',tamamlandi:'done',tamamlayin:'done',bitmis:'done'};
+const CL_EDITNEG={gelmedi:'onsite',girmedi:'onsite',bitmedi:'done',yazilmadi:'t1',yazilmamis:'t1',yapilmadi:'t1'};
+const CL_NEG=new Set('degil yok kaldir kaldirin geri'.split(' '));
+const CL_EDITFILL=new Set('yazildi yazdim yazdik yazin yaz yazilsin yazilmis islemler islemleri islem yap yapin yapar yapalim yapiniz olsun oldu olarak isaretle isaretlendi isaretleyin isaretini isareti isaret ve ile aracin araci arac araca artik simdi hemen lutfen misin misiniz rica ederim tamamen yi yu i u ye ya dorse dorsesi dorseli cekici cekicisi tir kamyon plaka plakasi plakali olan bu su sunu bunu onu bir sadece de da al alin'.split(' '));
+const CL_POSAFTER=new Set('sirada siradaki siradakini numarali nolu numaradaki satirdaki satirda'.split(' ')),CL_POSBEFORE=new Set('satir sira no numara'.split(' '));
+const CL_EDITTXT={onsite:'tesiste',t1:'T1 yazıldı',done:'bitti'},CL_EDITTXTNEG={onsite:'tesiste değil',t1:'T1 yazılmadı',done:'bitmedi'};
+/* sayfa gezinme: "raporlara git", "ayarları aç", "panoya git" */
+const CL_NAV={pano:'pano',panoya:'pano',panoyu:'pano',rapor:'reports',raporlar:'reports',raporlara:'reports',raporlari:'reports',rapora:'reports',veri:'data',veriler:'data',verilere:'data',yedek:'data',yedege:'data',ayar:'settings',ayarlar:'settings',ayarlara:'settings',ayarlari:'settings',plakalar:'registry',kayitlar:'registry',kayitlara:'registry',kayitlari:'registry',bekleyenler:'pending',bekleyenlere:'pending'};
+const CL_NAVV=new Set('git gec gidelim ac acin gotur goster'.split(' ')),CL_NAVF=new Set('lutfen bana sayfasi sayfasina sayfayi ekrani ekranina bolumu bolumune ve'.split(' '));
+const CL_NAVT={pano:'Pano',reports:'Raporlar',data:'Veri ve Yedek',settings:'Ayarlar',registry:'Plaka Kayıtları',pending:'Bekleyenler'};
+function clNav(toks){const pages=[...new Set(toks.filter(w=>CL_NAV[w]).map(w=>CL_NAV[w]))];if(pages.length!==1)return '';
+ const verbs=toks.filter(w=>CL_NAVV.has(w));if(!verbs.length||!toks.every(w=>CL_NAV[w]||CL_NAVV.has(w)||CL_NAVF.has(w)))return '';
+ return pages[0]==='pending'&&verbs.every(w=>w==='goster')?'':pages[0];}   // "bekleyenleri göster" bir sorudur
+function chatLocal(raw,loose=false){const text=String(raw||'').trim();if(text.length>(loose?160:90)||/\n/.test(text))return null;
+ const toks=clAscii(text).split(' ').filter(Boolean);if(!toks.length||toks.length>(loose?24:14))return null;
+ const nv=loose?'':clNav(toks);if(nv)return {items:[],customer:'',problem:'',model:'yerel',edits:[],queries:[],nav:nv};
  /* bilinen plakalar (çekici ve dorse ayrı ayrı): 1-4 ardışık sözcük birleşince bir plaka çıkarsa o sözcükler plaka sayılır */
  const known=new Map();for(const r of [...state.visits,...state.registry])for(const part of splitPlate(r.plate).map(compactPlate))if(part.length>=5&&/\d/.test(part)&&/[A-Z]/.test(part))known.set(part.toLowerCase(),part);
  const used=new Array(toks.length).fill(false),plates=[];
  for(let i=0;i<toks.length;i++){if(used[i])continue;for(let n=4;n>=1;n--){if(i+n>toks.length)continue;const c=toks.slice(i,i+n).join('');if(known.has(c)){for(let k=i;k<i+n;k++)used[k]=true;plates.push(known.get(c));break;}}}
+ /* "24. sıradaki araç", "satır 24": sıra numarası */
+ let pos=0;
+ for(let i=0;i<toks.length&&!pos;i++){if(used[i]||!/^\d{1,3}$/.test(toks[i]))continue;
+  if(CL_POSAFTER.has(toks[i+1])&&!used[i+1]){pos=+toks[i];used[i]=used[i+1]=true;}
+  else if(i&&CL_POSBEFORE.has(toks[i-1])&&!used[i-1]){pos=+toks[i];used[i]=used[i-1]=true;}}
  /* müşteri adı: adındaki sözcükler cümlede art arda geçiyorsa (en uzun ad kazanır) */
  let cust='',custN=[],custI=0;const names=[...new Set([...state.registry,...state.visits].map(r=>r.customer).filter(Boolean))];
  for(const nm of names){const nt=clAscii(nm).split(' ').filter(Boolean),len=nt.join('').length;if(len<3||len<=custN.join('').length)continue;
   for(let i=0;i+nt.length<=toks.length;i++)if(nt.every((w,k)=>toks[i+k]===w&&!used[i+k])){cust=nm;custN=nt;custI=i;break;}}
  for(let k=0;k<custN.length;k++)used[custI+k]=true;
  const rest=toks.filter((_,i)=>!used[i]);
- if(rest.some(w=>/\d/.test(w)&&w!=='t1'))return null;   // t1 dışında rakam (tarih, sıra no, bilinmeyen plaka) varsa yapay zekâya
+ if(!loose&&rest.some(w=>/\d/.test(w)&&w!=='t1'))return null;   // t1 dışında rakam (tarih, bilinmeyen plaka) varsa yapay zekâya
+ if(loose&&rest.some(w=>/^\d+$/.test(w)))return null;
  const base={items:[],customer:'',problem:'',model:'yerel',edits:[],queries:[]};
  const q0={kind:'',status:'',customer:cust,plate:'',date:'',week:false};
- if(plates.length){
-  const uniq=[...new Set(plates)];   // birden fazla plaka ancak aynı aracın (çekici + dorse) plakalarıysa kabul edilir
-  if(uniq.length>1&&!state.visits.concat(state.registry).some(r=>{const ps=splitPlate(r.plate).map(compactPlate);return uniq.every(p=>ps.includes(p));}))return null;
+ const fields=[...new Set(rest.map(w=>CL_EDITNEG[w]||CL_EDIT[w]).filter(Boolean))];
+ const sel=fields.length>0&&!plates.length&&!pos&&(rest.includes('secili')||rest.includes('secilen')||(rest.includes('bu')&&!rest.includes('hafta')&&rest.some(w=>w==='arac'||w==='araci'||w==='aracin')));
+ if(plates.length||pos||sel){
   if(cust)return null;
-  const edits=[...new Set(rest.filter(w=>CL_EDIT[w]).map(w=>CL_EDIT[w]))];
-  if(edits.length&&rest.every(w=>CL_EDIT[w]||CL_EDITFILL.has(w))){return {...base,edits:edits.map(f=>({plate:plates[0],position:0,selected:false,customer:'',date:'',field:f,value:'true'}))};}
-  if(rest.length&&rest.every(w=>CL_FILL.has(w)))return {...base,queries:[{...q0,kind:'list',plate:plates[0]}]};
+  /* aynı aracın çekici ve dorse plakası tek hedeftir; farklı araçların plakaları ayrı hedef olur (en çok 8) */
+  const recs=state.visits.concat(state.registry),both=(x,y)=>recs.some(r=>{const ps=splitPlate(r.plate).map(compactPlate);return ps.includes(x)&&ps.includes(y);});
+  const targets=[];for(const p of [...new Set(plates)])if(!targets.some(t=>both(t,p)))targets.push(p);if(targets.length>8||(pos&&targets.length))return null;
+  /* "34 ABC 123 tesiste mi", "... ne durumda": soru; aracın durumu gösterilir */
+  if(!loose&&targets.length===1&&!pos&&!sel&&rest.some(w=>w==='mi'||w==='mu'||w==='ne'||w==='nedir'||w==='nerede'||w==='durum'||w==='durumda')&&rest.every(w=>CL_FILL.has(w)||CL_EDIT[w]||CL_EDITNEG[w]))return {...base,queries:[{...q0,kind:'list',plate:targets[0]}]};
+  const neg=rest.some(w=>CL_NEG.has(w)||CL_EDITNEG[w]);
+  const known2=w=>CL_EDIT[w]||CL_EDITNEG[w]||CL_NEG.has(w)||CL_EDITFILL.has(w)||w==='secili'||w==='secilen';
+  if(fields.length&&(loose||rest.every(known2))){
+   const tg=pos?[{plate:'',position:pos,selected:false}]:sel?[{plate:'',position:0,selected:true}]:targets.map(plate=>({plate,position:0,selected:false}));
+   const who=pos?`${pos}. sıradaki araç`:sel?'seçili araç':targets.map(fmtCompactPlate).join(' ve ');
+   const canon=`${who} ${fields.map(f=>(neg?CL_EDITTXTNEG:CL_EDITTXT)[f]).join(' ')}`;
+   return {...base,canon,edits:tg.flatMap(t=>fields.map(f=>({...t,customer:'',date:'',field:f,value:neg?'false':'true'})))};}
+  if(loose||pos||sel||targets.length!==1)return null;
+  if(rest.length&&rest.every(w=>CL_FILL.has(w)))return {...base,queries:[{...q0,kind:'list',plate:targets[0]}]};
   return null;}
+ if(loose)return null;
  if(!rest.every(w=>CL_FILL.has(w)||CL_STAT[w]))return null;
  const stats=[...new Set(rest.filter(w=>CL_STAT[w]).map(w=>CL_STAT[w]))];if(stats.length>1)return null;
  const has=w=>rest.includes(w),status=stats[0]||'';
@@ -2062,8 +2099,14 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
   if(sug){out({who:'ai',html:`<p>“${esc(sug.bad)}” plakasını panoda bulamadım. Şunu mu demek istediniz?</p><div class="chat-chips"><button type="button" class="chat-chip" data-action="chat-say" data-t="${esc(sug.fixed)}">${esc(sug.fixed)}</button></div>`});return;}
   const r=loc?{data:loc}:await wmAi(text,t=>{typing.auto=false;typing.phase=t;chatRender();},true);
   if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
-  else if(r.err){out({who:'ai',error:true,text:'Okuyamadım: '+r.err+'. Biraz sonra tekrar yazın.'});if(inp&&!inp.value){inp.value=text;chatGrow();}}
+  else if(r.err){
+   /* yapay zekâya ulaşılamadıysa metindeki plaka + durum sözcüğünden yerelde anlaşılan bir cümle önerilir */
+   const lo=chatLocal(text,true),det=r.detail?`<details class="chat-det"><summary>Teknik ayrıntı</summary><code>${esc(r.detail)}</code></details>`:'';
+   if(lo?.canon)out({who:'ai',html:`<p>Yapay zekâya ulaşamadım (${esc(r.err)}). Şunu mu demek istediniz?</p><div class="chat-chips"><button type="button" class="chat-chip" data-action="chat-say" data-t="${esc(lo.canon)}">${esc(lo.canon)}</button></div>${det}`});
+   else out({who:'ai',error:true,html:`<p>Okuyamadım: ${esc(r.err)}. Biraz sonra tekrar yazın.</p>${det}`});
+   if(inp&&!inp.value){inp.value=text;chatGrow();}}
   else{const d=r.data,items=d.items||[],edits=d.edits||[],queries=d.queries||[];
+   if(d.nav){ui.page=d.nav;render();out({who:'ai',text:`${CL_NAVT[d.nav]} sayfasını açtım.`});return;}
    /* 1) sorular: yalnızca okur */
    for(const q of queries)out({who:'ai',html:chatQuery(q)});
    /* 2) düzeltmeler: tek araçsa hemen uygulanır; müşteri adıyla birden fazla araç değişecekse önce onay sorulur */
