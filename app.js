@@ -474,7 +474,7 @@ function settingsViewClassic(){const a=appearance;const lbl=(o,k,d)=>{const v=o[
  ${setPanel('colors','chart','Renkler',`<span class="set-dots">${dots}</span> Durum, ana ve vurgu renkleri`,colors)}
  ${setPanel('customers','registry','Müşteri renkleri ve sıralama',`${custPriorityList.length} öncelikli müşteri · panodaki blok sırası ve renkleri`,priorityEditor())}
  ${setPanel('whatsapp','wa','WhatsApp',`${filled}/${names.length} müşterinin numarası kayıtlı · mesaj şablonu`,contactsEditor())}
- ${setPanel('report','bell','Otomatik günlük rapor','Her iş günü 23:59’da e-postayla · özet ve günlük Excel',reportEditor())}
+ ${setPanel('report','bell','Otomatik günlük rapor','Her iş günü yaklaşık 23:00’te e-postayla · özet ve günlük Excel',reportEditor())}
  ${setPanel('link','search','Görüntüleme linki','Giriş gerektirmeyen, sadece izleme linki',linkEditor())}
  ${setPanel('guardacct','user','Güvenlik hesapları','Görevli kendi e-posta ve şifresiyle girer · yalnızca güvenlik ekranı',guardAccountsEditor())}
  ${setPanel('guard','tablet','Güvenlik linki','Kapıdaki güvenlik için yalnızca GİRİŞ / ÇIKIŞ ekranı',guardLinkEditor())}
@@ -1993,12 +1993,58 @@ async function chatSendImage(file){const inp=document.getElementById('chat-input
  catch(e){out({who:'ai',error:true,text:'Bir sorun oldu: '+(e?.message||e)});}
  finally{chat.busy=false;chatRender();}}
 async function chatImages(files){for(const f of files.slice(0,3))await chatSendImage(f);}
+/* Sık kullanılan kısa soru ve komutlar yerelde, yapay zekâya gitmeden anında cevaplanır ("bugün kaç araç tesiste?",
+   "gelecek araçları listele", "CB 1234 AB tesiste"). Cümledeki HER sözcük bilinen bir sözcük olmalı; biri bile
+   tanınmazsa ya da plaka dışında rakam varsa (tarih, sıra no...) null döner ve cümle Gemini'ye gider. Böylece yanlış anlama
+   riski küçüktür: emin olunamayan her şey yapay zekâya bırakılır. Dönen nesne sunucunun cevabıyla aynı biçimdedir. */
+const clAscii=t=>String(t||'').toLocaleLowerCase('tr-TR').replace(/[çğıöşü]/g,c=>({'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u'}[c])).replace(/[^a-z0-9]+/g,' ').trim();
+const CL_FILL=new Set('bugun bugunun yarin yarinin dun dunun bu hafta haftada haftanin kac arac araci araclar araclari aracin tane adet var mi mu olan olanlar olani hangi hangileri hangisi listele goster listesi ver bana soyle ne nedir nelerdir neler kadar sayisi toplam su an simdi ve ile icin da de durum durumu durumda ozet ozeti gunun gunluk genel hepsi tum tumu son kayitlari kayitlar gecmisi nerede henuz yazilan yazilanlar yazildi yazilmis un in nin nun dan den'.split(' '));
+const CL_STAT={tesiste:'onsite',tesisteki:'onsite',tesistekiler:'onsite',girmis:'onsite',girenler:'onsite',iceride:'onsite',icerideki:'onsite',gelecek:'waiting',gelecekler:'waiting',bekleyen:'waiting',bekleyenler:'waiting',gelmeyen:'waiting',gelmemis:'waiting',gelmedi:'waiting',t1:'t1',biten:'done',bitenler:'done',tamamlanan:'done',tamamlananlar:'done',bitmis:'done',bitmeyen:'open',bitmeyenler:'open',acik:'open'};
+const CL_EDIT={tesiste:'onsite',girdi:'onsite',t1:'t1',bitti:'done',tamamlandi:'done',bitmis:'done'};
+const CL_EDITFILL=new Set('yazildi islemler islemleri islem yap yapin isaretle isaretleyin oldu artik simdi ve aracin araci arac olarak'.split(' '));
+function chatLocal(raw){const text=String(raw||'').trim();if(text.length>90||/\n/.test(text))return null;
+ const toks=clAscii(text).split(' ').filter(Boolean);if(!toks.length||toks.length>12)return null;
+ /* bilinen plakalar (çekici ve dorse ayrı ayrı): 1-4 ardışık sözcük birleşince bir plaka çıkarsa o sözcükler plaka sayılır */
+ const known=new Map();for(const r of [...state.visits,...state.registry])for(const part of splitPlate(r.plate).map(compactPlate))if(part.length>=5&&/\d/.test(part)&&/[A-Z]/.test(part))known.set(part.toLowerCase(),part);
+ const used=new Array(toks.length).fill(false),plates=[];
+ for(let i=0;i<toks.length;i++){if(used[i])continue;for(let n=4;n>=1;n--){if(i+n>toks.length)continue;const c=toks.slice(i,i+n).join('');if(known.has(c)){for(let k=i;k<i+n;k++)used[k]=true;plates.push(known.get(c));break;}}}
+ /* müşteri adı: adındaki sözcükler cümlede art arda geçiyorsa (en uzun ad kazanır) */
+ let cust='',custN=[],custI=0;const names=[...new Set([...state.registry,...state.visits].map(r=>r.customer).filter(Boolean))];
+ for(const nm of names){const nt=clAscii(nm).split(' ').filter(Boolean),len=nt.join('').length;if(len<3||len<=custN.join('').length)continue;
+  for(let i=0;i+nt.length<=toks.length;i++)if(nt.every((w,k)=>toks[i+k]===w&&!used[i+k])){cust=nm;custN=nt;custI=i;break;}}
+ for(let k=0;k<custN.length;k++)used[custI+k]=true;
+ const rest=toks.filter((_,i)=>!used[i]);
+ if(rest.some(w=>/\d/.test(w)&&w!=='t1'))return null;   // t1 dışında rakam (tarih, sıra no, bilinmeyen plaka) varsa yapay zekâya
+ const base={items:[],customer:'',problem:'',model:'yerel',edits:[],queries:[]};
+ const q0={kind:'',status:'',customer:cust,plate:'',date:'',week:false};
+ if(plates.length){
+  const uniq=[...new Set(plates)];   // birden fazla plaka ancak aynı aracın (çekici + dorse) plakalarıysa kabul edilir
+  if(uniq.length>1&&!state.visits.concat(state.registry).some(r=>{const ps=splitPlate(r.plate).map(compactPlate);return uniq.every(p=>ps.includes(p));}))return null;
+  if(cust)return null;
+  const edits=[...new Set(rest.filter(w=>CL_EDIT[w]).map(w=>CL_EDIT[w]))];
+  if(edits.length&&rest.every(w=>CL_EDIT[w]||CL_EDITFILL.has(w))){return {...base,edits:edits.map(f=>({plate:plates[0],position:0,selected:false,customer:'',date:'',field:f,value:'true'}))};}
+  if(rest.length&&rest.every(w=>CL_FILL.has(w)))return {...base,queries:[{...q0,kind:'list',plate:plates[0]}]};
+  return null;}
+ if(!rest.every(w=>CL_FILL.has(w)||CL_STAT[w]))return null;
+ const stats=[...new Set(rest.filter(w=>CL_STAT[w]).map(w=>CL_STAT[w]))];if(stats.length>1)return null;
+ const has=w=>rest.includes(w),status=stats[0]||'';
+ let date='';if(has('yarin'))date=chatDay(1);else if(has('dun')){const d=addDays(TODAY,-1);date=weekday(d)===0?addDays(d,-1):d;}
+ const week=has('hafta')||has('haftada')||has('haftanin');if(week&&date)return null;
+ let kind='';
+ if(has('kac')||has('sayisi')||has('adet')||has('tane'))kind='count';
+ else if(has('ozet')||has('ozeti')||(has('durum')&&!status))kind='summary';
+ else if(status||has('listele')||has('goster')||has('hangi')||has('hangileri')||has('hangisi')||has('listesi'))kind='list';
+ if(!kind)return null;
+ if(kind==='summary'&&status)return null;
+ return {...base,queries:[{...q0,kind,status,date,week}]};}
 async function chatSend(text){text=String(text||'').trim();const inp=document.getElementById('chat-input');if(text.length<4||chat.busy)return;
  if(!canEdit()){chat.msgs.push({who:'ai',error:true,text:navigator.onLine===false?'İnternet bağlantısı yok; şu an değişiklik yapılamaz.':'Şu an değişiklik yapılamıyor (yetkiniz yok ya da bir kayıt işlemi sürüyor). Biraz sonra tekrar deneyin.'});chatRender();return;}
  chat.busy=true;if(inp){inp.value='';chatGrow();}
- chat.msgs.push({who:'me',text});const typing={who:'ai',typing:true,phase:''};chat.msgs.push(typing);chatRender();
+ chat.msgs.push({who:'me',text});const typing={who:'ai',typing:true,phase:'',t0:Date.now(),auto:true};chat.msgs.push(typing);chatRender();
  const out=m=>{const k=chat.msgs.indexOf(typing);if(k>=0)chat.msgs.splice(k,1);chat.msgs.push(m);};
- try{const r=await wmAi(text,t=>{typing.phase=t;chatRender();},true);
+ /* yapay zekâ cevabını beklerken geçen süre görünür (yeniden deneme geri sayımı yazıyorsa o kalır) */
+ const tick=setInterval(()=>{if(typing.auto){const n=Math.round((Date.now()-typing.t0)/1000);typing.phase=n>=3?`Yanıt bekleniyor… ${n} sn`:'';chatRender();}},1000);
+ try{const loc=chatLocal(text),r=loc?{data:loc}:await wmAi(text,t=>{typing.auto=false;typing.phase=t;chatRender();},true);
   if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
   else if(r.err){out({who:'ai',error:true,text:'Okuyamadım: '+r.err+'. Biraz sonra tekrar yazın.'});if(inp&&!inp.value){inp.value=text;chatGrow();}}
   else{const d=r.data,items=d.items||[],edits=d.edits||[],queries=d.queries||[];
@@ -2016,7 +2062,7 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
     out({who:'ai',rowId:row.id});chatRender();if(!row.ask)await chatAuto(row);}
    if(!items.length&&!edits.length&&!queries.length)out({who:'ai',text:'Bunu anlayamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Şunları yazabilirsiniz: gelecek / ertelenen / iptal edilen araçlar (plaka ve gün), kayıt düzeltme (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”), soru (“bugün kaç araç tesiste?”).'});}}
  catch(e){out({who:'ai',error:true,text:'Bir sorun oldu: '+(e?.message||e)});}
- finally{chat.busy=false;chatRender();}}
+ finally{clearInterval(tick);chat.busy=false;chatRender();}}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="chat-"]');if(!b)return;const a=b.dataset.action;
  if(a==='chat-toggle')return chatToggle();
  if(a==='chat-day'){const row=chat.rows.find(r=>r.id===b.dataset.row);if(!row||!row.ask||chat.busy||!canEdit())return;chat.busy=true;row.day=b.dataset.d;row.dayChosen=true;row.ask=false;chatRender();chatAuto(row).finally(()=>{chat.busy=false;chatRender();});return;}
@@ -2250,7 +2296,7 @@ function reportEditor(){if(role!=='editor'||VIEW_TOKEN)return '';if(repCfg.state
  if(repCfg.state==='error')return `<p class="help-note">Ayarlar alınamadı. ${button('rep-reload','Tekrar dene','refresh','small')}</p>`;
  if(repCfg.state!=='ready')return '<p class="help-note">Yükleniyor…</p>';
  const last=d.last_run_at?`<p class="rep-last ${d.last_ok?'ok':'bad'}">${icon(d.last_ok?'check':'info')}<span>Son çalışma: ${esc(tsText(d.last_run_at))} · ${esc(d.last_note||'')}</span></p>`:'<p class="help-note" style="margin-top:10px">Henüz çalışmadı. Kurulumu tamamlayıp GitHub’dan bir kez deneyin.</p>';
- return `<p class="help-note" style="margin:0 0 12px">Her iş günü (Pazartesi–Cumartesi) <b>23:59</b>’da günün raporu aşağıdaki adreslere e-postayla gider: günün özeti, müşteri bazında sayılar, araçların giriş–çıkış saatleri ve ekte günlük Excel. Araç olmayan günlerde gönderilmez.</p>
+ return `<p class="help-note" style="margin:0 0 12px">Her iş günü (Pazartesi–Cumartesi) yaklaşık <b>23:00</b>’te günün raporu aşağıdaki adreslere e-postayla gider: günün özeti, müşteri bazında sayılar, araçların giriş–çıkış saatleri ve ekte günlük Excel. Araç olmayan günlerde gönderilmez.</p>
  <label class="rep-on"><input type="checkbox" id="rep-enabled" ${d.enabled?'checked':''}> Günlük rapor gönderilsin</label>
  <label class="rep-label" for="rep-to">Alıcılar <small>(her satıra bir e-posta, en fazla 20)</small></label>
  <textarea id="rep-to" rows="4" spellcheck="false" autocomplete="off" placeholder="ornek@firma.com">${esc((d.recipients||[]).join('\n'))}</textarea>

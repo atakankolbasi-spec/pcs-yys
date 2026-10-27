@@ -166,10 +166,15 @@ silip aynı e-postayla yeniden açmak yeterlidir; listedeki kayıt durur.
 
 ## 10. Otomatik günlük rapor (e-posta)
 
-Her iş günü (Pazartesi–Cumartesi) 23:59'da günün raporu e-postayla gider: günün özeti, müşteri bazında
+Her iş günü (Pazartesi–Cumartesi) yaklaşık 23:00'te günün raporu e-postayla gider: günün özeti, müşteri bazında
 sayılar, araçların tesis giriş – işlem bitti – tesis çıkış – kalma saatleri ve ekte günlük Excel. Araç olmayan
 günlerde gönderilmez. Gönderimi GitHub'daki "Günlük rapor maili" görevi yapar
 (`.github/workflows/gunluk-rapor.yml`, betik `scripts/gunluk-rapor/gonder.mjs`).
+
+**Gönderim saati:** Görev 22:55'e (İstanbul) kuruludur; mail yaklaşık 23:00'te gelir. GitHub zamanlanmış görevleri tam saatinde
+değil, yoğunluğa göre dakikalar hatta saatler sonra başlatır (Ekim 2026'da 2–3 saat gecikme görüldü; bu yüzden eskiden saat
+23:59'a kuruluyken mail gece 02:00–04:00'te geliyordu). Raporun altında "Rapor hazırlandı" saati yazar, gecikmeyi oradan
+görürsünüz. Gecikme sürerse saat tam tutsun diye görev Supabase'in zamanlayıcısından tetiklenebilir; geliştiriciye haber verin.
 
 Kurulum (bir kez):
 
