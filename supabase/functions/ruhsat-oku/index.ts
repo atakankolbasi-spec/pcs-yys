@@ -153,8 +153,14 @@ queries: one entry per question. kind = "summary" (overall counts), "count" (how
 about one plate such as "34 ABC 123 ne durumda"). status = "onsite" (tesiste), "waiting" (gelecek / bekleyen: not arrived yet),
 "t1", "done" (tamamlanan / biten), "open" (not finished) or "" for all. Optional customer, plate (tractor, Latin capitals and
 digits), date (YYYY-MM-DD, default today) and week (true when they ask about the whole week).
+
 Examples: "bugün kaç araç tesiste?" -> [{kind:"count", status:"onsite"}]; "BULTRANS'ın bekleyen araçları" ->
-[{kind:"list", status:"waiting", customer:"BULTRANS"}]; "günün özeti" -> [{kind:"summary"}].`;
+[{kind:"list", status:"waiting", customer:"BULTRANS"}]; "günün özeti" -> [{kind:"summary"}].
+sorts: the user wants the ORDER of the vehicles on the board changed by status ("sıralamayı düzenle", "biten araçlar en üstte olsun").
+One entry {order, reset}. order = the statuses from the TOP of each customer's group to the bottom, using only "done" (işlemleri biten /
+tamamlanan), "onsite" (tesiste olan), "t1" (T1 işaretli / yazılmış) and "waiting" (gelecek / bekleyen). "1. biten 2. tesiste 3. T1 işaretli"
+-> {order:["done","onsite","t1"], reset:false}. "sıralamayı sıfırla / eski haline getir / otomatik olsun" -> {order:[], reset:true}.
+undo: true when the user asks to take back the last change ("geri al", "yaptığını iptal et", "eski haline getir" about a previous edit); else false.`;
 
 const chatSchema = () => {
   const s = JSON.parse(JSON.stringify(TEXT_SCHEMA));
@@ -181,6 +187,15 @@ const chatSchema = () => {
       required: ['kind']
     }
   };
+  s.properties.sorts = {
+    type: 'ARRAY',
+    items: {
+      type: 'OBJECT',
+      properties: { order: { type: 'ARRAY', items: { type: 'STRING', enum: ['done', 'onsite', 't1', 'waiting'] } }, reset: { type: 'BOOLEAN' } },
+      required: ['order']
+    }
+  };
+  s.properties.undo = { type: 'BOOLEAN' };
   return s;
 };
 
@@ -339,7 +354,11 @@ const cleanChat = today => (parsed, model) => {
     status: ['onsite', 'waiting', 't1', 'done', 'open'].includes(q?.status) ? q.status : '',
     customer: text(q?.customer, 150), plate: plateOf(q?.plate), date: isoDay(text(q?.date, 10)), week: q?.week === true
   })).filter(q => q.kind);
-  return { ...base, edits, queries };
+  const sorts = (Array.isArray(parsed?.sorts) ? parsed.sorts : []).slice(0, 1).map(x => ({
+    order: [...new Set((Array.isArray(x?.order) ? x.order : []).filter(k => ['done', 'onsite', 't1', 'waiting'].includes(k)))],
+    reset: x?.reset === true
+  })).filter(x => x.reset || x.order.length);
+  return { ...base, edits, queries, sorts, undo: parsed?.undo === true };
 };
 
 // Gemini'ye sorar: istenen model olmazsa sırayla yedek modelleri dener (ayrıntı dosyanın başındaki açıklamada).
