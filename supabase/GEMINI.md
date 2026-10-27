@@ -89,6 +89,14 @@ sekmesine girin, eski kodu tamamen silip yenisini yapıştırın ve **Deploy**'a
 - Kısa komutlar önce hızlı ve kararlı **gemini-2.5-flash** ile denenir (`GEMINI_MODEL` elle seçildiyse o); bir deneme en fazla
   12 saniye bekler, takılırsa sıradaki modele geçilir. Sohbet en kötü durumda yaklaşık 40 saniyede cevap ya da hata alır
   (eskiden Google takılınca iki dakikadan fazla beklenebiliyordu). Sitede de sohbet için bekleme 50 saniye ve en çok iki denemeyle sınırlıdır.
+- Yerel anlama doğal cümleleri de kapsar: **"CT 29 BWT dorse plakalı aracı T1 yazıldı işaretle"** (çekici ya da dorse plakası, ikisi de olur),
+  **"CB 1234 AB tesiste değil"** / **"T1 yazılmadı"** (olumsuz), **"34 ABC 123 ve CT 29 BWT bitti"** (birden fazla araç),
+  **"2. sıradaki aracı bitti yap"**, **"bu aracı bitti yap"**, **"CT 29 BWT tesiste mi"**. "lütfen, dorse, plakalı, işaretle, yap" gibi dolgu sözcükler sayılmaz.
+- Gemini'ye giden her sohbet cümlesine panoda seçili günün sıra numaralı araç listesi (plaka | müşteri | durum) ve kayıtlı müşteri adları
+  **veri olarak** eklenir; model "hangi araç / hangi müşteri" sorusunu bununla çözer (talimat olarak okunmaz). Gizlilik sayfasında belirtilmiştir.
+- Gemini isteği (örn. şema ya da model sınırı yüzünden) **400** ile reddederse fonksiyon önce aynı modeli şemasız dener, sonra yedek modelleri;
+  hiçbiri kabul etmezse hata verir. Sohbette hata mesajının altında **"Teknik ayrıntı"** açılır (Gemini'nin yazdığı neden; anahtar içermez).
+  Yapay zekâ cevap veremese bile cümlede bilinen bir plaka ve tesiste / T1 / bitti gibi bir sözcük varsa "Şunu mu demek istediniz?" önerilir.
 - Plaka bir harf yanlış yazıldıysa ("CB 1234 A yi T1 yazıldı yap") yapay zekâ beklenmeden "Şunu mu demek istediniz?" önerilir.
 - Beklerken sohbette geçen süre ("Yanıt bekleniyor… 8 sn") görünür.
 - Süreleri görmek için Supabase → Edge Functions → `ruhsat-oku` → **Logs**: her Gemini cevabı için `ruhsat-oku: <model> <süre> ms` satırı yazılır.
