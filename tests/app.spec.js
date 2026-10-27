@@ -2172,16 +2172,18 @@ test('sohbet hızlı yol: sık sorular ve plakalı durum komutları yerelde anı
   await expect(panel).toContainText('T1 yazıldı: hayır → evet');
   await say('CB-1234-AB işlemleri bitti');
   await expect(panel).toContainText('İşlemler bitti: hayır → evet');
-  expect(await writes()).toBe(3);
+  await say('CB 1234 AB tesiste değil');                                           // olumsuz: kutu kapatılır
+  await expect(panel).toContainText('Tesiste: evet → hayır');
+  expect(await writes()).toBe(4);
   expect(await ai()).toBe(0);
   // belirsiz / tanınmayan cümleler yapay zekâya gider (yanlış anlama yerine)
-  for (const t of ['yarın 34 ABC 123 gelecek', 'tesiste olmayan araçlar', 'CB 1234 AB tesiste değil', 'bugün kaç araç ertelendi', 'BULTRANS ve LİN LOJ araçları', 'XX 9999 YY tesiste']) {
+  for (const t of ['yarın 34 ABC 123 gelecek', 'tesiste olmayan araçlar', 'bugün kaç araç ertelendi', 'BULTRANS ve LİN LOJ araçları', 'XX 9999 YY tesiste']) {
     const before = await ai();
     await say(t);
     await expect.poll(ai).toBe(before + 1);
     await expect(panel).toContainText('Bunu anlayamadım');
   }
-  expect(await writes()).toBe(3);                                                   // yapay zekâya giden cümleler hiçbir şeyi değiştirmedi
+  expect(await writes()).toBe(4);                                                   // yapay zekâya giden cümleler hiçbir şeyi değiştirmedi
   expect(problems).toEqual([]);
 });
 
