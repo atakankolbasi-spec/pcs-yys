@@ -30,8 +30,9 @@ test('günlük rapor maili: özet, giriş-çıkış saatleri ve günlük Excel e
   expect(mail.subject).toBe('PCS TRANSİT · Günlük rapor · 30.09.2026 Çarşamba · 3 araç');
   expect(mail.attachment).toBe('PCS_2026-09-30_GUN.xlsx');
   expect(mail.text).toContain('Toplam araç: 3 · Tesise giren: 2 · T1: 2 · İşlemi biten: 2 · Çıkış yapan: 1 · Bekleyen: 1');
+  expect(mail.text).toMatch(/Rapor hazırlandı: (\d{2}\.\d{2} )?\d{2}:\d{2}\./);                      // hazırlanma saati (GitHub gecikirse fark edilir)
   const html = fs.readFileSync(path.join(r.out, 'rapor.html'), 'utf8');
-  for (const t of ['30.09.2026 Çarşamba', 'PP 7685 BP - PP 2758 EA', '26341200EX000001', '08:12', '13:05', '4 sa 53 dk', '14:22*', 'Güvenlik çıkışı işlenmemiş', 'Ortalama kalma süresi: <b>5 sa 08 dk</b>'])
+  for (const t of ['30.09.2026 Çarşamba', 'PP 7685 BP - PP 2758 EA', '26341200EX000001', '08:12', '13:05', '4 sa 53 dk', '14:22*', 'Güvenlik çıkışı işlenmemiş', 'Ortalama kalma süresi: <b>5 sa 08 dk</b>', 'Rapor hazırlandı:'])
     expect(html).toContain(t);
   const xlsx = fs.readFileSync(path.join(r.out, mail.attachment));
   expect(xlsx.subarray(0, 2).toString()).toBe('PK');

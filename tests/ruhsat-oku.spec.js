@@ -9,12 +9,13 @@ const { pathToFileURL } = require('url');
 const SRC = path.join(__dirname, '..', 'supabase', 'functions', 'ruhsat-oku', 'index.ts');
 const ENV = { SUPABASE_URL: 'https://proje.supabase.co', GEMINI_API_KEY: 'gemini-anahtari' };
 const importFresh = new Function('u', 'return import(u)'); // derleyici dokunmasın diye
-const realConsoleError = console.error;
+const realConsoleError = console.error, realConsoleLog = console.log;
 
 async function setup({ env = {}, role = 'editor', gemini } = {}) {
   globalThis.Deno = { env: { get: k => ({ ...ENV, ...env })[k] } };
   const log = [];
   console.error = () => {};
+  console.log = () => {};
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input), headers = init.headers || {};
     log.push({ url, headers, body: init.body });
@@ -35,7 +36,7 @@ async function setup({ env = {}, role = 'editor', gemini } = {}) {
 const answer = obj => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(obj) }] } }], modelVersion: 'gemini-test' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
 test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
-  test.afterEach(() => { console.error = realConsoleError; });
+  test.afterEach(() => { console.error = realConsoleError; console.log = realConsoleLog; });
 
   test('düzenleyicinin fotoğrafını Gemini’ye okutur, plakayı sadeleştirir, anlamsız ağırlığı atar', async () => {
     let sent;
@@ -291,6 +292,43 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     expect(bad.queries).toBeUndefined();
     // yetki yine denetlenir
     expect((await post({ 'Content-Type': 'image/png', 'x-pcs-mode': 'liste', Authorization: 'Bearer yabanci' })).status).toBe(401);
+  });
+
+  test('sohbet hızlı yolu: kısa komutta Gemini düşünmesi kapatılır; model reddederse sıradaki yönteme geçilir ve hatırlanır; uzun liste, mesaj ve fotoğraf düşünmeyi kapatmaz', async () => {
+    const seen = [];
+    let reject = 0;            // ilk kaç istek düşünme ayarı yüzünden 400 alsın
+    const { post } = await setup({ env: { GEMINI_CHAT_MODEL: 'gemini-hizli' }, gemini: (url, body) => {
+      const think = body.generationConfig.thinkingConfig;
+      seen.push({ model: /models\/([^:]+):/.exec(url)[1], think });
+      if (reject > 0 && think) { reject--; return new Response(JSON.stringify({ error: { message: 'Budget 0 is invalid. This model only works in thinking mode.' } }), { status: 400 }); }
+      return answer({ items: [], customer: '', problem: '', edits: [], queries: [{ kind: 'count', status: 'onsite' }] });
+    } });
+    const chat = text => post({ 'Content-Type': 'application/json' }, JSON.stringify({ text, today: '2026-10-22', chat: true }));
+    // kısa komut: önce GEMINI_CHAT_MODEL, düşünme kapalı
+    let res = await chat('bugün kaç araç tesiste?');
+    expect(res.status).toBe(200);
+    expect(seen).toEqual([{ model: 'gemini-hizli', think: { thinkingBudget: 0 } }]);
+    // model "budget 0" demeyi kabul etmedi: aynı istek sıradaki yöntemle (thinkingLevel) hemen tekrarlanır, çalışan yöntem hatırlanır
+    seen.length = 0; reject = 1;
+    res = await chat('CB 1234 AB tesiste');
+    expect(res.status).toBe(200);
+    expect(seen.map(x => x.think)).toEqual([{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }]);
+    seen.length = 0;
+    await chat('bugün kaç araç var?');
+    expect(seen.map(x => x.think)).toEqual([{ thinkingLevel: 'minimal' }]);                                   // artık doğrudan çalışan yöntem
+    // düşünme kapatılmayanlar: 400 karakterden uzun sohbet yazısı, müşteri mesajı modu ve fotoğraf
+    seen.length = 0; reject = 0;
+    await chat('yarın şu araçlar gelecek: ' + 'PB 7831 KT - PB 7569 EB (90 EURO) 1.GALATA PETROL OTOMOTİV 2.PLASTEK PLASTİK '.repeat(8));
+    await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }));
+    await post({ 'Content-Type': 'image/png' });
+    expect(seen.map(x => x.think)).toEqual([undefined, undefined, undefined]);
+    expect(seen.map(x => x.model)).toEqual(['gemini-flash-latest', 'gemini-flash-latest', 'gemini-flash-latest']);   // GEMINI_CHAT_MODEL yalnızca kısa sohbet komutlarında kullanılır
+    // hiçbir düşünme ayarı kabul edilmezse ayarsız istek gider (hata yerine cevap alınır)
+    seen.length = 0;
+    const { post: post2 } = await setup({ gemini: (url, body) => { seen.push(body.generationConfig.thinkingConfig || null); return body.generationConfig.thinkingConfig ? new Response(JSON.stringify({ error: { message: 'Unknown name "thinking_config"' } }), { status: 400 }) : answer({ items: [], customer: '', problem: '' }); } });
+    res = await post2({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'tesiste kaç araç var', today: '2026-10-22', chat: true }));
+    expect(res.status).toBe(200);
+    expect(seen).toEqual([{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null]);
   });
 
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {

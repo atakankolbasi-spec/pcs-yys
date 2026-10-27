@@ -1,6 +1,6 @@
 -- Otomatik günlük rapor (e-posta): veritabanı kurulumu.
 --
--- Her iş günü 23:59'da GitHub'daki "Günlük rapor maili" görevi günün araçlarını okur ve rapor mailini
+-- Her iş günü yaklaşık 23:00'te GitHub'daki "Günlük rapor maili" görevi günün araçlarını okur ve rapor mailini
 -- (özet + günlük Excel) gönderir. Alıcılar ve açık/kapalı durumu sitede Ayarlar > Otomatik günlük
 -- rapor bölümünden yönetilir (yalnızca düzenleyici).
 --

@@ -88,6 +88,11 @@ kullanım sınırı bu yüzden biraz daha hızlı dolabilir.
 
 ### Sohbetle kayıt düzeltme ve soru sorma
 
+**Hız:** En sık kullanılan kısa cümleler yapay zekâya gitmeden **anında** cevaplanır: "bugün kaç araç tesiste?", "bugünün özeti",
+"gelecek araçları listele", "ETL LOJ bekleyen araçlar", "bu hafta kaç araç var", "CB 1234 AB tesiste / T1 yazıldı / işlemleri bitti",
+"CB 1234 AB ne durumda". Başka her cümle (tarih, sıra numarası, yeni plaka, "değil" gibi olumsuzluk...) Gemini'ye gider; bekleme
+süresi sohbette görünür. Ayrıntı: `supabase/GEMINI.md`.
+
 Aynı pencereden panodaki kayıtları düzeltebilir ve pano hakkında soru sorabilirsiniz:
 
 - **Düzeltme:** "24. sıradaki aracın müşterisini ETL LOJ yap", "CB 1234 AB tesiste", "34 ABC 123 T1 yazıldı, not acil",

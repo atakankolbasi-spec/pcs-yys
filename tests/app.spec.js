@@ -772,7 +772,7 @@ test('koyu temada yazılar okunaklı (yeterli kontrast)', async ({ page }) => {
   // Düzeltmeden önce yazıların ~%13'ü 4.5:1'in altındaydı; şimdi yalnızca renkli düğme üstü birkaç yazı kalıyor.
   expect(r.total).toBeGreaterThan(50);
   expect(r.low / r.total).toBeLessThan(0.05);
-  expect(r.stroke).toBeGreaterThan(0);
+  expect(r.stroke).toBe(0);                                  // yazıya kalınlaştırıcı çizgi eklenmez (bulanık / kalın görünüyordu)
 });
 
 // Sahte ruhsat görüntüsü üretir. Gerçek ruhsat fotoğrafları kişisel veri içerdiği için depoda tutulmaz.
@@ -2135,6 +2135,87 @@ test('ücret ayrıştırma: "90 EURO", "1.250,50 TL", "$100" okunur; tanınmayan
   expect(r.of).toEqual([{ amount: 90, cur: 'USD', legacy: false }, { amount: 90, cur: 'EUR', legacy: true }, null, null]);
 });
 
+test('sohbet hızlı yol: sık sorular ve plakalı durum komutları yerelde anında cevaplanır (Gemini\'ye gitmez); tanınmayan ya da belirsiz cümle Gemini\'ye gider', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const aiText = chatAi({ problem: 'Anlaşılmadı.' });
+  const problems = await openApp(page, { aiText });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  const ai = () => page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
+  const writes = () => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && ['insert', 'update', 'delete'].includes(c.op)).length);
+  // sorular
+  await say('Bugün kaç araç tesiste?');
+  await expect(panel).toContainText('23 Eylül · tesiste: 2 araç');
+  await say('bugünün özeti');
+  await expect(panel.locator('.chat-sum')).toHaveCount(1);
+  expect(await panel.locator('.chat-sum').last().locator('b').allTextContents()).toEqual(['3', '2', '1', '1', '0']);
+  await say('gelecek araçları listele');
+  await expect(panel.locator('.chat-row').last()).toContainText('CB 1234 AB');
+  await say('BULTRANS bekleyen araçlar');
+  await expect(panel).toContainText('23 Eylül · BULTRANS · gelecek: 0 araç');
+  await say('yarın kaç araç var');
+  await expect(panel).toContainText('24 Eylül: 0 araç');
+  await say('bu hafta kaç araç tesiste');
+  await expect(panel).toContainText('39. hafta · tesiste: 2 araç');
+  await say('CB 1234 AB ne durumda');
+  await expect(panel).toContainText('Son kayıtlar · CB 1234 AB: 2 araç');
+  expect(await ai()).toBe(0);                                                       // hiçbiri yapay zekâya gitmedi
+  expect(await writes()).toBe(0);
+  // plakalı durum komutları: tek araç, hemen uygulanır
+  await say('CB 1234 AB tesiste');
+  await expect(panel).toContainText('CB 1234 AB · Tesiste: hayır → evet');
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').onsite)).toBe(true);
+  await say('cb 1234 ab t1 yazıldı');
+  await expect(panel).toContainText('T1 yazıldı: hayır → evet');
+  await say('CB-1234-AB işlemleri bitti');
+  await expect(panel).toContainText('İşlemler bitti: hayır → evet');
+  expect(await writes()).toBe(3);
+  expect(await ai()).toBe(0);
+  // belirsiz / tanınmayan cümleler yapay zekâya gider (yanlış anlama yerine)
+  for (const t of ['yarın 34 ABC 123 gelecek', 'tesiste olmayan araçlar', 'CB 1234 AB tesiste değil', 'bugün kaç araç ertelendi', 'BULTRANS ve LİN LOJ araçları', 'XX 9999 YY tesiste']) {
+    const before = await ai();
+    await say(t);
+    await expect.poll(ai).toBe(before + 1);
+    await expect(panel).toContainText('Bunu anlayamadım');
+  }
+  expect(await writes()).toBe(3);                                                   // yapay zekâya giden cümleler hiçbir şeyi değiştirmedi
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: yapay zekâ cevabı beklenirken geçen süre görünür', async ({ page }) => {
+  test.setTimeout(60000);
+  const problems = await openApp(page, { aiText: chatAi({ problem: 'Anlaşılmadı.' }), aiDelay: 10000 });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  await page.locator('#chat-input').fill('yarın 34 ABC 123 gelecek');
+  await page.locator('#chat-input').press('Enter');
+  const panel = page.locator('#chat-panel');
+  await expect(panel.locator('.chat-typing')).toBeVisible();
+  await page.clock.runFor(2000);
+  await expect(panel).not.toContainText('Yanıt bekleniyor');          // ilk saniyelerde ek yazı yok
+  await page.clock.runFor(4000);
+  await expect(panel).toContainText('Yanıt bekleniyor… 6 sn');
+  await page.clock.runFor(6000);
+  await expect(panel).toContainText('Bunu anlayamadım');
+  await expect(panel.locator('.chat-typing')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('koyu tema: yazılara kalınlaştırıcı çizgi (text-stroke) eklenmez; yazı kalınlığı açık temadaki gibidir', async ({ page }) => {
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const read = () => page.evaluate(() => { const b = getComputedStyle(document.body), t = getComputedStyle(document.querySelector('td.info')); return { stroke: b.webkitTextStrokeWidth, weight: t.fontWeight }; });
+  const light = await read();
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+  const dark = await read();
+  expect(dark.stroke).toBe('0px');
+  expect(dark.weight).toBe(light.weight);
+  expect(problems).toEqual([]);
+});
+
 test('WhatsApp kurulmamışsa (tablo yok) sessizce devre dışı kalır', async ({ page }) => {
   const problems = await openApp(page, { missing: ['incoming_ruhsat'] });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
@@ -2503,7 +2584,7 @@ test('ayarlar: otomatik günlük rapor alıcıları kaydedilir, anahtar gösteri
   await page.locator('[data-stab="report"]').click();
   const panel = page.locator('[data-panel="report"]');
   await expect(panel.locator('.rep-last.ok')).toContainText('2 alıcıya gönderildi');
-  await expect(panel).toContainText('23:59');
+  await expect(panel).toContainText('23:00');
   // geçersiz adres ve boş liste reddedilir
   await page.locator('#rep-enabled').check();
   await page.locator('[data-action="rep-save"]').click();

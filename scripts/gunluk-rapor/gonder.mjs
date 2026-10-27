@@ -1,5 +1,5 @@
 /* PCS TRANSİT YYS · günlük rapor maili.
- * GitHub Actions'ta her iş günü 23:59'da çalışır (.github/workflows/gunluk-rapor.yml):
+ * GitHub Actions'ta her iş günü 22:55'te (İstanbul) çalışır (.github/workflows/gunluk-rapor.yml):
  *   1. Günün araçlarını "rapor anahtarı" ile veritabanından okur (report_day).
  *   2. Sitedeki günlük Excel'in aynısını üretir (xlsx.js) ve mail içine günün özetini yazar.
  *   3. Ayarlar > Otomatik günlük rapor'daki alıcılara Gmail üzerinden gönderir, sonucu yazar (report_log).
@@ -21,7 +21,7 @@ const SB_KEY = (appJs.match(/sb_publishable_[A-Za-z0-9_-]+/) || [])[0];
 const TOKEN = (env.PCS_RAPOR_ANAHTARI || '').trim();
 
 const istDate = ms => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ms)); // YYYY-AA-GG
-/* 23:59 görevi gecikip gece yarısını geçse de rapor o günün olsun: 3 saat geriye bakılır */
+/* görev GitHub'da gecikip gece yarısını geçse de rapor o günün olsun: 3 saat geriye bakılır */
 const DATE = /^\d{4}-\d{2}-\d{2}$/.test(env.RAPOR_TARIHI || '') ? env.RAPOR_TARIHI : istDate(Date.now() - 3 * 3600e3);
 
 async function rpc(name, body) {
@@ -107,11 +107,11 @@ ${custs.map(([k, g]) => `<tr><td style="${td};font-weight:700">${esc(k)}</td><td
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><th style="${th}">Müşteri</th><th style="${th}">Plaka</th><th style="${th}">Beyanname</th><th style="${th};text-align:center">Tesis giriş</th><th style="${th};text-align:center">İşlem bitti</th><th style="${th};text-align:center">Tesis çıkış</th><th style="${th};text-align:center">Kalma</th></tr>
 ${list.map(v => { const est = !v.exit_at && v.done_at; return `<tr><td style="${td}">${esc(v.customer || '—')}</td><td style="${td};font-weight:700;white-space:nowrap">${esc(v.plate)}</td><td style="${td}">${esc(v.declaration || '—')}</td><td style="${num}">${when(v.onsite_at)}</td><td style="${num}">${when(v.done_at)}</td><td style="${num}${est ? ';color:#9c6500;font-style:italic' : ''}">${when(outAt(v))}${est ? '*' : ''}</td><td style="${num}">${stay(stayMin(v))}</td></tr>`; }).join('')}</table>
 ${list.some(v => !v.exit_at && v.done_at) ? '<p style="font-size:12px;color:#6b7a90;margin:8px 4px 0">* Güvenlik çıkışı işlenmemiş; işlemlerin bittiği saat yazıldı.</p>' : ''}
-<p style="font-size:12px;color:#6b7a90;margin:22px 4px 0">Ekte günün Excel raporu var. Bu mail PCS TRANSİT YYS tarafından otomatik gönderildi; almak istemiyorsanız ofise haber verin.</p>
+<p style="font-size:12px;color:#6b7a90;margin:22px 4px 0">Ekte günün Excel raporu var. Rapor hazırlandı: <b>${esc(when(new Date().toISOString()))}</b> (kayıtlar o andaki haliyle). Bu mail PCS TRANSİT YYS tarafından otomatik gönderildi; almak istemiyorsanız ofise haber verin.</p>
 </td></tr></table></td></tr></table></body></html>`;
   const text = `${subject}\n\nToplam araç: ${n.total} · Tesise giren: ${n.onsite} · T1: ${n.t1} · İşlemi biten: ${n.done} · Çıkış yapan: ${n.out} · Bekleyen: ${n.pending}\nOrtalama kalma: ${stay(avg)}\n\n` +
     (long.length ? `UZUN BEKLEYEN ARAÇLAR (${waitTxt(limit)} ve üstü, ${long.length} araç):\n` + long.slice(0, 40).map(v => `${v.plate} · ${v.customer || '—'} · ${v.t1 ? 'tesiste · T1' : 'tesiste'} · ${waitTxt(v.hours)}`).join('\n') + '\n\n' : '') +
-    custs.map(([k, g]) => `${k}: ${g.n} araç (tesiste ${g.o}, T1 ${g.t}, bitti ${g.d}, çıktı ${g.x})`).join('\n') + '\n\nAyrıntılar ekteki Excel dosyasında.';
+    custs.map(([k, g]) => `${k}: ${g.n} araç (tesiste ${g.o}, T1 ${g.t}, bitti ${g.d}, çıktı ${g.x})`).join('\n') + `\n\nAyrıntılar ekteki Excel dosyasında. Rapor hazırlandı: ${when(new Date().toISOString())}.`;
   return { subject, html, text };
 }
 

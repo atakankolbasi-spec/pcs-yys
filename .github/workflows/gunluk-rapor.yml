@@ -1,6 +1,8 @@
 name: Günlük rapor maili
 
-# Her iş günü (Pazartesi–Cumartesi) 23:59'da günün raporunu (özet + günlük Excel) e-postayla gönderir.
+# Her iş günü (Pazartesi–Cumartesi) yaklaşık 23:00'te günün raporunu (özet + günlük Excel) e-postayla gönderir.
+# Not: GitHub zamanlanmış görevleri tam saatinde değil, yoğunluğa göre dakikalar hatta saatler sonra başlatır. Bu yüzden
+# 22:55'e kuruldu (:00'dan kaçınmak da gecikmeyi azaltır). Mailde "Rapor hazırlandı" saati yazar.
 # Alıcılar ve açık/kapalı durumu sitede Ayarlar > Otomatik günlük rapor bölümündedir.
 # Gerekli gizli değerler (Settings > Secrets and variables > Actions): PCS_RAPOR_ANAHTARI, GMAIL_ADRES,
 # GMAIL_UYGULAMA_SIFRESI. Eksikse görev hiçbir şey göndermeden biter. Kurulum: supabase/README.md bölüm 10.
@@ -8,7 +10,7 @@ name: Günlük rapor maili
 
 on:
   schedule:
-    - cron: '59 20 * * 1-6'   # Pazartesi–Cumartesi 23:59 (İstanbul)
+    - cron: '55 19 * * 1-6'   # Pazartesi–Cumartesi 22:55 (İstanbul) = 19:55 UTC
   workflow_dispatch:
     inputs:
       tarih:

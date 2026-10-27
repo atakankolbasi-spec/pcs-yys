@@ -83,6 +83,7 @@ const SCHEMA = {
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MAX_TEXT = 6000;
+const FAST_CHARS = 400; // bundan kısa sohbet komutlarında düşünme kapatılır
 const TEXT_PROMPT = (today, weekday, image = false) => `${image ? `The input is an IMAGE (a screenshot or photo): a message or a printed / handwritten list that a customer sent. Read all the text in the image first, then treat that text exactly like the message described below. If the image is a vehicle registration certificate (ruhsat) or has no vehicle list or announcement at all, return an empty "items" list and say so in "problem".\n\n` : ''}You are reading ONE message that a trucking / forwarding customer sent by WhatsApp or e-mail to a customs
 warehouse. It usually announces trucks that will arrive (a tractor unit plus its semi-trailer, or a single vehicle) and sometimes
 postpones or cancels them. The message may be Turkish, English, Bulgarian, Romanian, Serbian, Hungarian, etc.
@@ -230,14 +231,20 @@ async function caller(req) {
   return res.ok && (await res.json().catch(() => '')) === 'editor' ? 'ok' : 'hayir';
 }
 
-async function gemini(model, parts, schema, ms) {
+// Kısa sohbet komutlarında Gemini'nin "düşünme" adımı kapatılır: cevap birkaç saniye yerine bir iki saniyede gelir.
+// Modele göre ayar adı değişir ("thinkingBudget: 0" ya da "thinkingLevel: minimal"); model reddederse (400) sıradaki
+// yönteme, o da olmazsa düşünme ayarsız isteğe geçilir ve çalışan yöntem bu işlem süresince hatırlanır.
+const THINK_VARIANTS = [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, null];
+const thinkVariant = new Map();
+
+async function gemini(model, parts, schema, ms, think = null) {
   try {
     return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env('GEMINI_API_KEY') },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: schema }
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: schema, ...(think ? { thinkingConfig: think } : {}) }
       }),
       signal: AbortSignal.timeout(ms)
     });
@@ -324,16 +331,21 @@ const cleanChat = today => (parsed, model) => {
 };
 
 // Gemini'ye sorar: istenen model olmazsa sırayla yedek modelleri dener (ayrıntı dosyanın başındaki açıklamada).
-async function ask(parts, schema, clean) {
+// fast: kısa sohbet komutu; düşünme kapatılır ve (varsa) GEMINI_CHAT_MODEL ilk denenir.
+async function ask(parts, schema, clean, { fast = false } = {}) {
   const start = Date.now(), left = () => BUDGET_MS - (Date.now() - start);
-  const models = [...new Set([env('GEMINI_MODEL') || 'gemini-flash-latest', ...FALLBACK_MODELS])];
+  const models = [...new Set([...(fast && env('GEMINI_CHAT_MODEL') ? [env('GEMINI_CHAT_MODEL')] : []), env('GEMINI_MODEL') || 'gemini-flash-latest', ...FALLBACK_MODELS])];
   const limits = [];
   let last = null, busy = false;
   for (const model of models) {
+    let vi = fast ? thinkVariant.get(model) ?? 0 : THINK_VARIANTS.length - 1; // son eleman: ayarsız
     for (let again = 0; again < 2 && left() > 15000; again++) {
-      const res = await gemini(model, parts, schema, Math.min(60000, left()));
+      const t0 = Date.now();
+      const res = await gemini(model, parts, schema, Math.min(60000, left()), THINK_VARIANTS[vi]);
       if (res.ok) {
+        if (fast) thinkVariant.set(model, vi);
         const out = await parse(res, model, clean);
+        console.log(`ruhsat-oku: ${model} ${Date.now() - t0} ms${fast ? ` (hızlı, düşünme: ${JSON.stringify(THINK_VARIANTS[vi])})` : ''}`);
         if (out) return json(200, out);
         last = { status: 502, error: 'Gemini cevabı anlaşılamadı' };
         busy = true;
@@ -342,6 +354,8 @@ async function ask(parts, schema, clean) {
       const text = await res.text().catch(() => '');
       console.error('Gemini hatası', model, res.status, text.slice(0, 400));
       last = { status: res.status, error: `Gemini ${res.status}`, detail: text.slice(0, 400) };
+      // model bu düşünme ayarını kabul etmedi: sıradaki yöntemle hemen yeniden dene (deneme hakkı harcanmaz)
+      if (res.status === 400 && fast && vi < THINK_VARIANTS.length - 1 && /think|budget/i.test(text)) { vi++; thinkVariant.set(model, vi); again--; continue; }
       if (res.status === 429) { limits.push({ after: retryAfter(res, text), daily: /PerDay/i.test(text) }); break; }
       if (res.status >= 500) { busy = true; if (!again) { await sleep(1500); continue; } break; }
       if (res.status === 404) break; // bu adla model yok
@@ -379,7 +393,8 @@ export async function handle(req) {
     const today = isoDay(String(body?.today || '')) || istanbulToday();
     const weekday = WEEKDAYS[new Date(today + 'T12:00:00Z').getUTCDay()];
     // Sohbet modu yalnızca siteden ({chat: true}) gelir; müşteri mesajları (whatsapp-webhook) bu bayrağı göndermez.
-    if (body?.chat === true) return ask([{ text: `${CHAT_PROMPT(today, weekday)}\n\n<<<MESSAGE\n${text}\nMESSAGE>>>` }], chatSchema(), cleanChat(today));
+    // Kısa komutlar ("CB 1234 AB tesiste", "bugün kaç araç tesiste?") hızlı yoldan gider; uzun listeler düşünerek okunur.
+    if (body?.chat === true) return ask([{ text: `${CHAT_PROMPT(today, weekday)}\n\n<<<MESSAGE\n${text}\nMESSAGE>>>` }], chatSchema(), cleanChat(today), { fast: text.length <= FAST_CHARS });
     return ask([{ text: `${TEXT_PROMPT(today, weekday)}\n\n<<<MESSAGE\n${text}\nMESSAGE>>>` }], TEXT_SCHEMA, cleanText(today));
   }
 

@@ -52,6 +52,7 @@ denemeden sonra ücretli kullanıma geçmeniz önerilir. Güncel koşullar: [ai.
 |---|---|
 | `GEMINI_API_KEY` | 1. adımda kopyaladığınız anahtar |
 | `GEMINI_MODEL` | İsteğe bağlı. Boş bırakılırsa `gemini-flash-latest` kullanılır |
+| `GEMINI_CHAT_MODEL` | İsteğe bağlı. Yalnızca sohbet balonuna yazılan **kısa** komutlarda (400 karakterden kısa) ilk denenen model; daha hızlı cevap için `gemini-flash-lite-latest` yazılabilir. Boşsa `GEMINI_MODEL` kullanılır |
 
 ## 3. Sunucu fonksiyonu
 1. **Edge Functions** → **Deploy a new function** → **Via Editor**.
@@ -78,3 +79,14 @@ sekmesine girin, eski kodu tamamen silip yenisini yapıştırın ve **Deploy**'a
   10:00–11:00 arasında sıfırlanır. Sık oluyorsa Google AI Studio'da faturalandırmayı açın (ücretli kullanım
   sınırları çok daha yüksektir).
 - `Gemini 503`: Google o an çok yoğun; site bekleyip yeniden dener.
+
+## Sohbet balonu neden yavaş olabilir, ne yapıldı
+- Sık sorular ve plakalı durum komutları (**"bugün kaç araç tesiste?"**, **"gelecek araçları listele"**, **"CB 1234 AB tesiste"**,
+  **"CB 1234 AB ne durumda"**) sitede yerelde, yapay zekâya gitmeden anında cevaplanır. Cümledeki her sözcük bilinmiyorsa ya da
+  tarih / sıra numarası gibi rakam varsa cümle Gemini'ye gider; böylece yanlış anlama yerine yapay zekâya sorulur.
+- Gemini'ye giden kısa komutlarda modelin "düşünme" adımı kapatılır (cevap birkaç saniye yerine bir iki saniyede gelir). Model bu
+  ayarı kabul etmezse fonksiyon sıradaki yönteme, o da olmazsa ayarsız isteğe geçer. Uzun listeler ve müşteri mesajları düşünerek okunur.
+- Beklerken sohbette geçen süre ("Yanıt bekleniyor… 8 sn") görünür.
+- Süreleri görmek için Supabase → Edge Functions → `ruhsat-oku` → **Logs**: her Gemini cevabı için `ruhsat-oku: <model> <süre> ms` satırı yazılır.
+  Süre hâlâ 5 saniyenin üzerindeyse `GEMINI_CHAT_MODEL` ayarını deneyin.
+
