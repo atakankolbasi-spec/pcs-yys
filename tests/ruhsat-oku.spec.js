@@ -395,6 +395,21 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     expect(new Set(n).size).toBeGreaterThan(1);                       // yalnızca ilk model değil, yedek modeller de denendi
   });
 
+  test('sohbet: sıralama ve geri alma isteği sadeleştirilir (yalnızca bilinen durumlar, tekrarsız, en çok bir sıralama); müşteri modu bunları hiç döndürmez', async () => {
+    const { post } = await setup({ gemini: () => answer({ items: [], customer: '', problem: '', edits: [], queries: [],
+      sorts: [{ order: ['done', 'onsite', 'x', 'onsite', 't1'], reset: false }, { order: [], reset: true }], undo: true }) });
+    const chat = await (await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'sıralamayı biten, tesiste, T1 olarak düzenle ve eskisini geri al', today: '2026-10-22', chat: true }))).json();
+    expect(chat.sorts).toEqual([{ order: ['done', 'onsite', 't1'], reset: false }]);
+    expect(chat.undo).toBe(true);
+    const reset = await setup({ gemini: () => answer({ items: [], sorts: [{ order: [], reset: true }, { order: ['bilinmeyen'], reset: false }] }) });
+    const r = await (await reset.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'sıralamayı sıfırla', today: '2026-10-22', chat: true }))).json();
+    expect(r.sorts).toEqual([{ order: [], reset: true }]);
+    expect(r.undo).toBe(false);
+    const cust = await (await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }))).json();
+    expect(cust.sorts).toBeUndefined();
+    expect(cust.undo).toBeUndefined();
+  });
+
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {
     let sent;
     const { post } = await setup({ gemini: (url, body) => { sent = body; return answer({ items: [], problem: 'Mesajda plaka yok.' }); } });

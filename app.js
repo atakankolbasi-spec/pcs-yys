@@ -128,7 +128,12 @@ I.up='<path d="m6 15 6-6 6 6"/>';
 I.chat='<path d="M21 12a8.5 8.5 0 0 1-12.2 7.6L3.5 21l1.4-4.8A8.5 8.5 0 1 1 21 12Z"/><path d="M8.5 11h7M8.5 14.5h4"/>';
 I.send='<path d="m21.5 2.5-19 8 7.5 3 3 7.5Z"/><path d="m10 13.5 6-6"/>';
 const orderReady=()=>state.visits.length>0&&'sort_order' in state.visits[0];
-function statusTier(v){return v.done?0:(v.onsite&&v.t1)?1:(v.onsite||v.t1)?2:3;}
+/* Durum sıralaması: her müşterinin araçları içinde hangi durumun üstte duracağı. Ayar boşsa eski kural (biten, tesiste+T1, tesiste ya da T1, diğer);
+   "done,onsite,t1" gibi bir liste varsa sırayla biten → tesiste → T1 işaretli → gelecek/diğer (listede olmayanlar sona eklenir). */
+const ST_KEYS=['done','onsite','t1','waiting'],ST_TXT={done:'Biten',onsite:'Tesiste',t1:'T1 işaretli',waiting:'Gelecek / diğer'};
+function statusOrder(v=appearance.statusOrder){const l=String(v||'').split(',').filter((k,i,a)=>ST_KEYS.includes(k)&&a.indexOf(k)===i);return l.length?[...l,...ST_KEYS.filter(k=>!l.includes(k))]:null;}
+function statusTier(v){const o=statusOrder();if(!o)return v.done?0:(v.onsite&&v.t1)?1:(v.onsite||v.t1)?2:3;
+ const has={done:!!v.done,onsite:!!v.onsite&&!v.done,t1:!!v.t1&&!v.done,waiting:true};for(let i=0;i<o.length;i++)if(has[o[i]])return i;return 3;}
 let custPriorityList=[{match:'ETL LOJ - ERVİN',color:'#2dd4bf'},{match:'ETL LOJ - KAAN',color:'#a78bfa'},{match:'LİN LOJ',color:'#f472b6'},{match:'BULTRANS',color:'#818cf8'},{match:'PLASTNAK',color:'#22d3ee'},{match:'TORNADO',color:'#facc15'},{match:'BBL',color:'#fb7185'}];
 function custPriority(name){const c=String(name||'').toLocaleUpperCase('tr-TR');const i=custPriorityList.findIndex(e=>e.match&&c.includes(String(e.match).toLocaleUpperCase('tr-TR')));return i<0?Infinity:i;}
 function custColor(name){const i=custPriority(name);return i>=0&&custPriorityList[i]?custPriorityList[i].color||'#5eead4':'#5eead4';}
@@ -434,7 +439,7 @@ const APP_HEADSTYLE={minimal:'Sade (beyaz başlık, ince renkli çizgi)',band:'R
 const APP_ROWSTYLE={minimal:'Sade (sadece bitenler hafif yeşil)',full:'Renkli (duruma göre tüm satır)'};
 const APP_ONOFF={on:'Açık',off:'Kapalı'};
 const APP_HSTR={hafif:['Hafif','12%'],normal:['Normal','24%'],koyu:['Koyu','45%'],cokkoyu:['Çok koyu','65%']};
-const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',headStyle:'minimal',headLook:'isiltili',frameLook:'gecis',waitHours:'48',rowStyle:'minimal',chipStyle:'soft',liveNotify:'on',boardView:'table',plateBand:'on',statusIcons:'on',design:'kule',radius:'yumusak',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
+const APP_DEFAULT={font:'varsayilan',plateFont:'ayni',weight:'normal',size:'normal',spacing:'normal',plateSize:'normal',density:'normal',tint:'normal',bg:'gri',headAlign:'center',headStrength:'normal',headStyle:'minimal',headLook:'isiltili',frameLook:'gecis',statusOrder:'',waitHours:'48',rowStyle:'minimal',chipStyle:'soft',liveNotify:'on',boardView:'table',plateBand:'on',statusIcons:'on',design:'kule',radius:'yumusak',colors:{onsite:'#f59e0b',t1:'#2f5fd0',done:'#15803d',brand:'#16233a',accent:'#3453d1'}};
 const APP_PRESETS={klasik:['Kurumsal (önerilen)',{}],canli:['Canlı',{headStyle:'band',rowStyle:'full',chipStyle:'solid',weight:'bold',tint:'guclu',headStrength:'koyu',colors:{onsite:'#f97316',t1:'#2563eb',done:'#16a34a',brand:'#1e3a8a',accent:'#2563eb'}}],sade:['Sade',{tint:'hafif',headStrength:'hafif',bg:'beyaz',colors:{onsite:'#d97706',t1:'#3b82f6',done:'#059669',brand:'#334155',accent:'#475569'}}],kontrast:['Yüksek kontrast',{weight:'extra',size:'buyuk',plateSize:'buyuk',tint:'cokguclu',headStrength:'koyu',bg:'beyaz',colors:{onsite:'#b45309',t1:'#1e40af',done:'#166534',brand:'#000000',accent:'#1e40af'}}]};
 const APP_COLOR_LABELS=[['onsite','TESİSTE işaretli'],['t1','T1 işaretli'],['done','BİTTİ işaretli'],['brand','Ana renk (düğmeler, seçili gün)'],['accent','Vurgu rengi (menü, seçili satır)']];
 let appearance=structuredClone(APP_DEFAULT);
@@ -660,7 +665,7 @@ document.addEventListener('change',e=>{const t=e.target;if(t.classList?.contains
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;
  if(['prio-up','prio-down','prio-del','prio-add'].includes(a)){prioDirty=true;return;}
  if(a==='app-design'){const v=b.dataset.v==='klasik'?'klasik':'kule';if(appearance.design===v)return;appearance.design=v;appearanceDirty=true;applyAppearance();render();toast(`${v==='kule'?'Kontrol Kulesi':'Klasik'} görünüm açıldı. Herkes için kalıcı olması için Kaydet’e basın.`);return;}
- if(a==='app-preset'){const p=APP_PRESETS[b.dataset.p];if(!p)return;const d=structuredClone(APP_DEFAULT);appearance={...d,...p[1],design:appearance.design,frameLook:appearance.frameLook,waitHours:appearance.waitHours,colors:{...d.colors,...(p[1].colors||{})}};appearanceDirty=true;applyAppearance();render();toast(`“${p[0]}” teması uygulandı. Kalıcı olması için Kaydet’e basın.`);return;}
+ if(a==='app-preset'){const p=APP_PRESETS[b.dataset.p];if(!p)return;const d=structuredClone(APP_DEFAULT);appearance={...d,...p[1],design:appearance.design,frameLook:appearance.frameLook,statusOrder:appearance.statusOrder,waitHours:appearance.waitHours,colors:{...d.colors,...(p[1].colors||{})}};appearanceDirty=true;applyAppearance();render();toast(`“${p[0]}” teması uygulandı. Kalıcı olması için Kaydet’e basın.`);return;}
  if(a==='app-reset'){appearance=structuredClone(APP_DEFAULT);appearanceDirty=true;applyAppearance();render();toast('Varsayılan görünüm yüklendi. Kalıcı olması için Kaydet’e basın.');return;}
  if(a==='app-save'){if(!canEdit())return;busy=true;onlineUI();try{let {error}=await client.rpc('save_app_setting',{p_key:'appearance',p_value:appearance});if(error&&error.code==='PGRST202'){const r=await client.from('app_settings').update({value:appearance,updated_at:new Date().toISOString()}).eq('key','appearance').select('key');error=r.error;if(!error&&!r.data?.length)error={code:'SETUP'};}if(error)throw error;generation++;appearanceDirty=false;busy=false;render();syncData();toast('Görünüm ayarları kaydedildi.');}catch(err){toast(err.code==='SETUP'||err.code==='42501'?'Görünüm kaydedilemedi: önce ayar-kaydetme-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
  if(a==='link-show'||a==='link-rotate'){if(!canEdit())return;if(a==='link-rotate'&&!window.confirm('Yeni link oluşturulsun mu? Eski link hemen çalışmaz olur; yeni linki tekrar paylaşmanız gerekir.'))return;busy=true;onlineUI();try{const {data,error}=await client.rpc(a==='link-show'?'get_public_link':'rotate_public_link');if(error)throw error;if(!data)throw new Error('Aktif link bulunamadı. “Yeni link oluştur” ile oluşturun.');publicLink=location.origin+location.pathname+'?izle='+encodeURIComponent(data);busy=false;render();if(a==='link-rotate')toast('Yeni link oluşturuldu; eski link artık çalışmıyor.');}catch(err){toast(err.code==='PGRST202'?'Önce gorunum-linki-kurulumu.sql dosyasını Supabase’de çalıştırın.':friendly(err),true);}finally{busy=false;onlineUI();}return;}
@@ -996,6 +1001,7 @@ function kRows(id){const a=appearance,dev=false,sh=true,on=k=>a[k]!=='off';
   {t:'sw',k:'panel',l:'Genel bakış kartları',h:'Panodaki grafik, durum dağılımı, bekleyenler ve bugün kartları',v:kGet(K_PANEL)!=='1',sh:dev},
   {t:'seg',k:'boardView',l:'Pano açılış görünümü',h:'Panodaki Tablo / Kartlar düğmesiyle her cihaz kendi tercihini de seçebilir',o:Object.entries(APP_BOARDVIEW),v:a.boardView,sh},
   {t:'seg',k:'rowStyle',l:'Satır renklendirme',h:'Sade: yalnızca bitenler hafif yeşil · Renkli: duruma göre tüm satır',o:[['minimal','Sade'],['full','Renkli']],v:a.rowStyle,sh},
+  {t:'seg',k:'statusOrder',l:'Durum sıralaması',h:'Her müşterinin araçları bu sırayla dizilir. Başka bir sıra için sohbete yazın: “sıralamayı biten, tesiste, T1 işaretli olarak düzenle”',o:[['','Varsayılan'],['done,onsite,t1','Biten → Tesiste → T1'],...(a.statusOrder&&a.statusOrder!=='done,onsite,t1'&&statusOrder(a.statusOrder)?[[a.statusOrder,'Özel: '+a.statusOrder.split(',').filter(k=>ST_TXT[k]).map(k=>ST_TXT[k]).join(' → ')]]:[])],v:a.statusOrder||'',sh},
   {t:'seg',k:'tint',l:'Renkli satırlarda ton',h:'Yalnızca “Renkli” satır renklendirmede kullanılır',o:Object.entries(APP_TINT).map(([k,x])=>[k,x[0]]),v:a.tint,sh},
   {t:'seg',k:'bg',l:'Sayfa arka planı',h:'Kartların arkasındaki zemin',o:[['gri','Gri'],['beyaz','Beyaz'],['sicak','Krem'],['mavi','Mavi'],['yesil','Yeşil']],v:a.bg,sh},
   {t:'seg',k:'headLook',l:'Müşteri başlık görünümü',h:'Işıltılı koyu: koyu şerit ve müşterinin renginde çerçeve · Önceki stil: Sade / Renkli şerit seçenekleri',o:[['isiltili','Işıltılı koyu'],['eski','Önceki stil']],v:a.headLook,sh},
@@ -1888,7 +1894,7 @@ document.addEventListener('change',e=>{const k=e.target.dataset?.msgdate;if(!k||
    bunu yazan düzenleyicinin kendisidir, o yüzden ayrıca onay istenmez. Yine de şunlar sorulmadan yapılmaz: silme (iptal),
    plakası kayıtlarda olmayan ya da kayıtlara benzetilerek bulunan araç, müşterisi bilinmeyen araç. Yapılanlar sohbette
    yazar; son işlem Ctrl+Z ile geri alınır. Mesaj okuma ve araç işleme kuralları WhatsApp mesajlarıyla aynıdır (wm*). */
-const chat={open:false,msgs:[],rows:[],seq:0,busy:false,built:false};
+const chat={open:false,msgs:[],rows:[],seq:0,busy:false,built:false,undo:[]};
 /* sohbette tarih sorulurken sunulan günler: bugün ve sonraki iş günü (Pazar atlanır) */
 const chatDay=n=>{const d=weekday(TODAY)===0?addDays(TODAY,1):TODAY;return n?nextWorkday(d):d;};
 const chatShown=()=>!!account&&role==='editor'&&!VIEW_TOKEN&&!GUARD_ACCT&&!inGuard()&&ui.page!=='saha';
@@ -1963,15 +1969,17 @@ function cePlan(edits){const jobs=new Map(),lines=[];let bulk=false;
  for(const e of edits){const t=ceTargets(e);if(t.err){lines.push({bad:true,text:t.err});continue;}if(t.bulk)bulk=true;
   for(const v of t.rows){const j=jobs.get(v.id)||{id:v.id,ch:[]};j.ch.push([e.field,e.value]);jobs.set(v.id,j);}}
  return {jobs:[...jobs.values()],lines,bulk};}
-async function ceRun(plan){const out=[...plan.lines];
+async function ceRun(plan){const out=[...plan.lines],undo=[];
  for(const j of plan.jobs){const v=state.visits.find(x=>x.id===j.id);if(!v){out.push({bad:true,text:'Kayıt bu arada silinmiş.'});continue;}
   const cur={...v},diff=[];for(const [f,val] of j.ch){const k=ceKey(f),nv=ceValue(cur,f,val);if(nv===''||nv==null||nv===cur[k])continue;diff.push([f,cur[k],nv]);cur[k]=nv;}
   if(!diff.length){out.push({text:`${v.plate}: zaten böyle, değişiklik yok.`});continue;}
   const ok=await mutate(s=>{const x=s.visits.find(y=>y.id===j.id);if(x)for(const [f,,nv] of diff)x[ceKey(f)]=nv;});
-  if(ok)justChangedMap.set(j.id,Date.now());
+  if(ok){justChangedMap.set(j.id,Date.now());undo.push({id:j.id,ch:diff.map(([f,o,n])=>[ceKey(f),o,n])});}
   out.push(ok?{ok:true,text:`${v.plate} · ${diff.map(([f,o,n])=>`${FE_TR[f]}: ${ceShow(f,o)} → ${ceShow(f,n)}`).join('; ')}`}:{bad:true,text:`${v.plate}: kaydedilemedi.`});}
+ if(undo.length){out.undoId=++chat.seq;chat.undo.push({id:out.undoId,kind:'edit',jobs:undo});if(chat.undo.length>20)chat.undo.shift();}
  return out;}
-const ceHTML=out=>`<p>${out.every(x=>x.bad)?'Yapamadım:':out.some(x=>x.bad)?'Kısmen yaptım:':'Düzelttim:'}</p>${out.map(x=>`<div class="rs-note${x.bad?' warn':''}">${x.bad?'⚠':'✓'} ${esc(x.text)}</div>`).join('')}`;
+const chatUndoBtn=id=>`<div class="rs-acts"><button type="button" class="btn text small" data-action="chat-undo" data-k="${id}">Geri al</button></div>`;
+const ceHTML=out=>`<p>${out.every(x=>x.bad)?'Yapamadım:':out.some(x=>x.bad)?'Kısmen yaptım:':'Düzelttim:'}</p>${out.map(x=>`<div class="rs-note${x.bad?' warn':''}">${x.bad?'⚠':'✓'} ${esc(x.text)}</div>`).join('')}${out.undoId?chatUndoBtn(out.undoId):''}`;
 function cePlanHTML(plan){const names=plan.jobs.slice(0,8).map(j=>{const v=state.visits.find(x=>x.id===j.id);return v?`${esc(v.plate)} · ${esc(v.customer||'Müşterisiz')}`:'';}).filter(Boolean);
  const what=[...new Set(plan.jobs.flatMap(j=>j.ch.map(([f,val])=>`${FE_TR[f]}: ${f==='onsite'||f==='t1'||f==='done'?(val==='true'?'evet':'hayır'):val}`)))].join('; ');
  return `<p><b>${plan.jobs.length} araç</b> değişecek (${esc(what)}):</p>${names.map(n=>`<div class="rs-note">${n}</div>`).join('')}${plan.jobs.length>8?`<div class="rs-note">… ve ${plan.jobs.length-8} araç daha</div>`:''}${plan.lines.map(x=>`<div class="rs-note warn">⚠ ${esc(x.text)}</div>`).join('')}`;}
@@ -2016,6 +2024,17 @@ const CL_NEG=new Set('degil yok kaldir kaldirin geri'.split(' '));
 const CL_EDITFILL=new Set('yazildi yazdim yazdik yazin yaz yazilsin yazilmis islemler islemleri islem yap yapin yapar yapalim yapiniz olsun oldu olarak isaretle isaretlendi isaretleyin isaretini isareti isaret ve ile aracin araci arac araca artik simdi hemen lutfen misin misiniz rica ederim tamamen yi yu i u ye ya dorse dorsesi dorseli cekici cekicisi tir kamyon plaka plakasi plakali olan bu su sunu bunu onu bir sadece de da al alin'.split(' '));
 const CL_POSAFTER=new Set('sirada siradaki siradakini numarali nolu numaradaki satirdaki satirda'.split(' ')),CL_POSBEFORE=new Set('satir sira no numara'.split(' '));
 const CL_EDITTXT={onsite:'tesiste',t1:'T1 yazıldı',done:'bitti'},CL_EDITTXTNEG={onsite:'tesiste değil',t1:'T1 yazılmadı',done:'bitmedi'};
+/* sıralama: "sıralamayı düzenler misin: 1. biten 2. tesiste 3. T1" -> cümledeki durum sözcüklerinin geçiş sırası öncelik sırasıdır */
+const CLB={items:[],customer:'',problem:'',model:'yerel',edits:[],queries:[]};
+const CL_SORTKEY={biten:'done',bitenler:'done',bitmis:'done',bitti:'done',tamamlanan:'done',tamamlananlar:'done',tamamlandi:'done',tesiste:'onsite',tesisteki:'onsite',tesistekiler:'onsite',tesise:'onsite',girmis:'onsite',t1:'t1',gelecek:'waiting',gelecekler:'waiting',bekleyen:'waiting',bekleyenler:'waiting',gelmeyen:'waiting',gelmemis:'waiting'};
+function chatSortCmd(raw){const text=String(raw||'').trim();if(text.length>400)return null;const toks=clAscii(text).split(' ').filter(Boolean);if(!toks.length||toks.length>70||!toks.some(w=>w.startsWith('sirala')))return null;
+ if(toks.some(w=>/^(alta|asagi|asagiya|sona|sonuna|sonlara|dibe|geriye)$/.test(w)))return null;   // "biten araçları en alta al": konum belirtiyor, yapay zekâya
+ if(toks.some(w=>/^(sifirla|sifirlayin|varsayilan|varsayilana|otomatik|otomatige|eskisi|eski)$/.test(w)))return {...CLB,sorts:[{order:[],reset:true}]};
+ const order=[];for(const w of toks){const k=CL_SORTKEY[w];if(k&&!order.includes(k))order.push(k);}
+ return order.length?{...CLB,sorts:[{order,reset:false}]}:null;}
+/* "geri al": son sohbet işlemini (düzeltme ya da sıralama) geri alır */
+const CL_UNDOOK=new Set('geri al alin getir don son islemi islemleri yaptigini yaptigin yaptiklarini degisikligi degisiklikleri bunu onu lutfen eski haline hale undo'.split(' '));
+function chatUndoCmd(raw){const toks=clAscii(raw).split(' ').filter(Boolean);if(!toks.length||toks.length>8||!(toks.includes('geri')||toks.includes('undo'))||!toks.some(w=>/^(al|alin|getir|don|undo)$/.test(w))||!toks.every(w=>CL_UNDOOK.has(w)))return null;return {...CLB,undo:true};}
 /* sayfa gezinme: "raporlara git", "ayarları aç", "panoya git" */
 const CL_NAV={pano:'pano',panoya:'pano',panoyu:'pano',rapor:'reports',raporlar:'reports',raporlara:'reports',raporlari:'reports',rapora:'reports',veri:'data',veriler:'data',verilere:'data',yedek:'data',yedege:'data',ayar:'settings',ayarlar:'settings',ayarlara:'settings',ayarlari:'settings',plakalar:'registry',kayitlar:'registry',kayitlara:'registry',kayitlari:'registry',bekleyenler:'pending',bekleyenlere:'pending'};
 const CL_NAVV=new Set('git gec gidelim ac acin gotur goster'.split(' ')),CL_NAVF=new Set('lutfen bana sayfasi sayfasina sayfayi ekrani ekranina bolumu bolumune ve'.split(' '));
@@ -2095,7 +2114,7 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
  const out=m=>{const k=chat.msgs.indexOf(typing);if(k>=0)chat.msgs.splice(k,1);chat.msgs.push(m);};
  /* yapay zekâ cevabını beklerken geçen süre görünür (yeniden deneme geri sayımı yazıyorsa o kalır) */
  const tick=setInterval(()=>{if(typing.auto){const n=Math.round((Date.now()-typing.t0)/1000);typing.phase=n>=3?`Yanıt bekleniyor… ${n} sn`:'';chatRender();}},1000);
- try{const loc=chatLocal(text),sug=loc?null:chatSuggest(text);
+ try{const loc=chatLocal(text)||chatSortCmd(text)||chatUndoCmd(text),sug=loc?null:chatSuggest(text);
   if(sug){out({who:'ai',html:`<p>“${esc(sug.bad)}” plakasını panoda bulamadım. Şunu mu demek istediniz?</p><div class="chat-chips"><button type="button" class="chat-chip" data-action="chat-say" data-t="${esc(sug.fixed)}">${esc(sug.fixed)}</button></div>`});return;}
   const r=loc?{data:loc}:await wmAi(text,t=>{typing.auto=false;typing.phase=t;chatRender();},true);
   if(r.none)out({who:'ai',error:true,text:'Yapay zekâ kurulu değil (kurulum: supabase/GEMINI.md).'});
@@ -2107,6 +2126,8 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
    if(inp&&!inp.value){inp.value=text;chatGrow();}}
   else{const d=r.data,items=d.items||[],edits=d.edits||[],queries=d.queries||[];
    if(d.nav){ui.page=d.nav;render();out({who:'ai',text:`${CL_NAVT[d.nav]} sayfasını açtım.`});return;}
+   if(d.undo){out({who:'ai',html:await chatUndoLast()});return;}
+   for(const sx of (d.sorts||[]).slice(0,1))out({who:'ai',html:await chatSortRun(sx.reset?[]:sx.order||[])});
    /* 1) sorular: yalnızca okur */
    for(const q of queries)out({who:'ai',html:chatQuery(q)});
    /* 2) düzeltmeler: tek araçsa hemen uygulanır; müşteri adıyla birden fazla araç değişecekse önce onay sorulur */
@@ -2119,10 +2140,46 @@ async function chatSend(text){text=String(text||'').trim();const inp=document.ge
     /* iki ya da daha fazla araçta hiç tarih yazmıyorsa yanlış güne toplu kayıt açmamak için önce gün sorulur */
     row.ask=items.filter(v=>v.action!=='cancel'&&!v.date).length>=2;
     out({who:'ai',rowId:row.id});chatRender();if(!row.ask)await chatAuto(row);}
-   if(!items.length&&!edits.length&&!queries.length)out({who:'ai',text:'Bunu anlayamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Şunları yazabilirsiniz: gelecek / ertelenen / iptal edilen araçlar (plaka ve gün), kayıt düzeltme (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”), soru (“bugün kaç araç tesiste?”).'});}}
+   if(!items.length&&!edits.length&&!queries.length&&!(d.sorts||[]).length)out({who:'ai',text:'Bunu anlayamadım'+(d.problem?' ('+String(d.problem).replace(/[.\s]+$/,'')+')':'')+'. Şunları yazabilirsiniz: gelecek / ertelenen / iptal edilen araçlar (plaka ve gün), kayıt düzeltme (“24. sıradaki aracın müşterisini ... yap”, “CB 1234 AB tesiste”), sıralama (“sıralamayı biten, tesiste, T1 olarak düzenle”), geri alma (“geri al”), soru (“bugün kaç araç tesiste?”).'});}}
  catch(e){out({who:'ai',error:true,text:'Bir sorun oldu: '+(e?.message||e)});}
  finally{clearInterval(tick);chat.busy=false;chatRender();}}
+/* ---- sıralama ve geri alma ---- */
+async function appearanceSave(value){let {error}=await client.rpc('save_app_setting',{p_key:'appearance',p_value:value});
+ if(error&&error.code==='PGRST202'){const r=await client.from('app_settings').update({value,updated_at:new Date().toISOString()}).eq('key','appearance').select('key');error=r.error;if(!error&&!r.data?.length)error={code:'SETUP'};}
+ if(error)throw error;}
+const stSaved=val=>{const a=lastSettings?.appearance&&typeof lastSettings.appearance==='object'?lastSettings.appearance:{};return {...APP_DEFAULT,...a,colors:{...APP_DEFAULT.colors,...(a.colors||{})},statusOrder:val};};
+const stLine=o=>(statusOrder(o)||['done','onsite','t1','waiting']).map((k,i)=>`${i+1}. ${ST_TXT[k]}`).join(' · ');
+/* durum sıralamasını ayarlar (boş liste = varsayılan). Seçili günde elle ayarlanmış sıra varsa o gün otomatiğe döner, yoksa yeni kural görünmez. */
+async function chatSortRun(order){const val=order.join(','),prev=appearance.statusOrder||'';
+ const days=ui.day!=='all'?[ui.day]:dates(),manual=orderReady()?days.filter(d=>state.visits.some(v=>v.date===d&&v.sort_order!=null)):[];
+ const prevOrders=manual.map(d=>({date:d,ids:sortRows(state.visits.filter(v=>v.date===d)).map(v=>v.id)}));
+ busy=true;onlineUI();
+ try{await appearanceSave(stSaved(val));appearance.statusOrder=val;if(lastSettings)lastSettings.appearance=stSaved(val);
+  for(const d of manual){const {data,error}=await client.from('visits').update({sort_order:null}).eq('visit_date',d).select('*');if(error)throw error;applyLocal('visits',data);}
+  generation++;busy=false;render();syncData();}
+ catch(err){busy=false;return `<p>Sıralamayı kaydedemedim: ${esc(err.code==='SETUP'||err.code==='42501'?'önce ayar-kaydetme-kurulumu.sql dosyasını Supabase’de çalıştırın':friendly(err))}</p>`;}
+ finally{busy=false;onlineUI();}
+ const id=++chat.seq;chat.undo.push({id,kind:'sort',prev,orders:prevOrders});if(chat.undo.length>20)chat.undo.shift();
+ return `<p>Sıralamayı düzenledim${val?'':' (varsayılana döndü)'}: <b>${esc(stLine(val))}</b><br><small>Her müşterinin araçları kendi içinde bu sırayla dizilir${manual.length?`; elle ayarlanmış sıra olan gün otomatiğe döndü (${manual.map(d=>esc(fmt(d,{day:'numeric',month:'long'}))).join(', ')})`:''}.</small></p>${chatUndoBtn(id)}`;}
+async function chatUndoEntry(id){const k=chat.undo.findIndex(x=>x.id===id);if(k<0)return '<p>Bu işlem zaten geri alınmış ya da geri alınamıyor.</p>';const e=chat.undo[k];chat.undo.splice(k,1);
+ if(e.kind==='sort'){busy=true;onlineUI();
+  try{await appearanceSave(stSaved(e.prev));appearance.statusOrder=e.prev;if(lastSettings)lastSettings.appearance=stSaved(e.prev);
+   for(const o of e.orders){const {error}=await client.rpc('set_visit_order',{p_ids:o.ids.filter(i=>state.visits.some(v=>v.id===i))});if(error)throw error;}
+   generation++;busy=false;await syncData();render();}
+  catch(err){busy=false;return `<p>Geri alamadım: ${esc(friendly(err))}</p>`;}
+  finally{busy=false;onlineUI();}
+  return `<p>Sıralamayı geri aldım: <b>${esc(stLine(e.prev))}</b></p>`;}
+ const lines=[];
+ for(const j of e.jobs){const v=state.visits.find(x=>x.id===j.id);if(!v){lines.push({bad:true,text:'Kayıt bu arada silinmiş.'});continue;}
+  const back=j.ch.filter(([f,,nv])=>v[f]===nv);if(!back.length){lines.push({bad:true,text:`${v.plate}: bu arada değişmiş, dokunmadım.`});continue;}
+  const ok=await mutate(s=>{const x=s.visits.find(y=>y.id===j.id);if(x)for(const [f,o] of back)x[f]=o;});
+  if(ok)justChangedMap.set(j.id,Date.now());
+  lines.push(ok?{ok:true,text:`${v.plate} · ${back.map(([f,o,n])=>`${FE_TR[f]||f}: ${ceShow(f,n)} → ${ceShow(f,o)}`).join('; ')}`}:{bad:true,text:`${v.plate}: geri alınamadı.`});}
+ return `<p>${lines.every(x=>x.bad)?'Geri alamadım:':'Geri aldım:'}</p>${lines.map(x=>`<div class="rs-note${x.bad?' warn':''}">${x.bad?'⚠':'✓'} ${esc(x.text)}</div>`).join('')}`;}
+const chatUndoLast=()=>chat.undo.length?chatUndoEntry(chat.undo[chat.undo.length-1].id):'<p>Geri alınacak bir işlem yok.</p>';
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="chat-"]');if(!b)return;const a=b.dataset.action;
+ if(a==='chat-undo'){if(chat.busy||!canEdit())return;chat.busy=true;const m=chat.msgs.find(x=>x.html&&x.html.includes(`data-k="${b.dataset.k}"`));if(m)m.html=m.html.replace(/<div class="rs-acts"><button[^>]*data-action="chat-undo"[^>]*>Geri al<\/button><\/div>/,'');chatRender();
+  chatUndoEntry(+b.dataset.k).then(html=>{chat.msgs.push({who:'ai',html});}).finally(()=>{chat.busy=false;chatRender();});return;}
  if(a==='chat-toggle')return chatToggle();
  if(a==='chat-day'){const row=chat.rows.find(r=>r.id===b.dataset.row);if(!row||!row.ask||chat.busy||!canEdit())return;chat.busy=true;row.day=b.dataset.d;row.dayChosen=true;row.ask=false;chatRender();chatAuto(row).finally(()=>{chat.busy=false;chatRender();});return;}
  if(a==='chat-go')return kGoVisit(b.dataset.id);

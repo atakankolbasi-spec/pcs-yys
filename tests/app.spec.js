@@ -2910,3 +2910,88 @@ test('sohbet: yapay zekâ cevap veremezse metinden anlaşılan komut önerilir, 
   expect((await page.evaluate(() => window.__db.visits.find(x => x.id === 'v6'))).t1).toBe(true);
   expect(problems.filter(x => !/50[0-9]|ruhsat-oku/.test(x))).toEqual([]);
 });
+
+test('sohbet: "sıralamayı biten, tesiste, T1 olarak düzenle" durum sıralamasını kaydeder ve elle ayarlı günü otomatiğe döndürür; Geri al düğmesi ve "geri al" eski haline getirir', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  const mk = (id, plate, time, extra, so) => ({ id, plate, customer: 'BULTRANS', declaration: '', carrier: '', registration: '', visit_date: '2026-09-23', visit_time: time, note: '', onsite: false, t1: false, done: false,
+    created_at: '2026-09-21T05:00:00Z', updated_at: '2026-09-21T06:00:00Z', onsite_at: null, done_at: null, sort_order: so, ...extra });
+  data.visits = [
+    mk('a', 'AA 1111 AA', '08:00', { onsite: true, t1: true, done: true }, 3),
+    mk('b', 'BB 2222 BB', '08:10', { t1: true }, 0),                    // yalnızca T1
+    mk('c', 'CC 3333 CC', '08:20', { onsite: true }, 1),                // yalnızca tesiste
+    mk('d', 'DD 4444 DD', '08:30', {}, 2)                               // gelecek
+  ];
+  const problems = await openApp(page, { data, aiText: chatAi({}) });
+  const order = () => page.locator('table.operations tbody tr[data-row-id]').evaluateAll(rows => rows.map(r => r.dataset.rowId));
+  await expect.poll(order).toEqual(['b', 'c', 'd', 'a']);              // elle ayarlı sıra (sort_order)
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel'), last = panel.locator('.chat-msg.ai').last();
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  // kullanıcının yazdığı gibi: çok satırlı, numaralı liste
+  await page.locator('#chat-input').fill('Sıralamayı düzenleyebilir misin ?\n1. İşlemleri biten\n2. Sıra tesiste olan araçlar\n3. Sıra T1 işaretli olan araçlar');
+  await page.locator('#chat-input').press('Enter');
+  await expect(last).toContainText('Sıralamayı düzenledim: 1. Biten · 2. Tesiste · 3. T1 işaretli · 4. Gelecek / diğer');
+  await expect(last).toContainText('elle ayarlanmış sıra olan gün otomatiğe döndü');
+  await expect.poll(order).toEqual(['a', 'c', 'b', 'd']);              // biten, tesiste, T1, diğer
+  expect(await page.evaluate(() => window.__db.visits.map(v => v.sort_order))).toEqual([null, null, null, null]);
+  expect(await page.evaluate(() => window.__db.app_settings.find(s => s.key === 'appearance').value.statusOrder)).toBe('done,onsite,t1');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);   // yerelde anlaşıldı
+  // ayar Ayarlar > Yerleşim'de görünür
+  await page.locator('.nav-item[data-page="settings"]').click();
+  await page.locator('[data-stab="layout"]').click();
+  await expect(page.locator('[data-sk="statusOrder"] [data-v="done,onsite,t1"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.nav-item[data-page="pano"]').click();
+  await expect.poll(order).toEqual(['a', 'c', 'b', 'd']);
+  // Geri al düğmesi: eski ayar ve elle sıra döner
+  await panel.locator('[data-action="chat-undo"]').click();
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('Sıralamayı geri aldım');
+  await expect.poll(order).toEqual(['b', 'c', 'd', 'a']);
+  expect(await page.evaluate(() => window.__db.app_settings.find(s => s.key === 'appearance').value.statusOrder)).toBe('');
+  // başka bir sıra, sonra yazıyla geri al
+  await say('sırala: tesiste, T1, biten');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('1. Tesiste · 2. T1 işaretli · 3. Biten · 4. Gelecek / diğer');
+  await expect.poll(order).toEqual(['c', 'b', 'a', 'd']);
+  await say('geri al');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('Sıralamayı geri aldım');
+  await expect.poll(order).toEqual(['b', 'c', 'd', 'a']);
+  await say('geri al');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('Geri alınacak bir işlem yok.');
+  // sıfırlama
+  await say('sıralamayı varsayılana döndür');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('varsayılana döndü');
+  expect(problems).toEqual([]);
+});
+
+test('sohbet: kayıt düzeltme "Geri al" ile eski değerine döner; araya başkası değiştirmişse dokunulmaz', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page, { aiText: chatAi({}) });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('#chat-fab').click();
+  const panel = page.locator('#chat-panel');
+  const say = async t => { await page.locator('#chat-input').fill(t); await page.locator('#chat-input').press('Enter'); };
+  const v = () => page.evaluate(() => window.__db.visits.find(x => x.id === 'v6'));
+  await say('CB 1234 AB tesiste');
+  await expect(panel).toContainText('Tesiste: hayır → evet');
+  expect((await v()).onsite).toBe(true);
+  await panel.locator('[data-action="chat-undo"]').click();
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('Tesiste: evet → hayır');
+  expect((await v()).onsite).toBe(false);
+  await expect(panel.locator('[data-action="chat-undo"]')).toHaveCount(0);        // kullanılan düğme kalkar
+  // eski bir değişikliği geri alırken araya başka değişiklik girmişse o alana dokunulmaz
+  await say('CB 1234 AB t1 yazıldı');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('T1 yazıldı: hayır → evet');
+  await say('CB 1234 AB T1 yazılmadı');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('T1 yazıldı: evet → hayır');
+  await expect(panel.locator('[data-action="chat-undo"]')).toHaveCount(2);
+  await panel.locator('[data-action="chat-undo"]').first().click();
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('bu arada değişmiş, dokunmadım');
+  expect((await v()).t1).toBe(false);
+  // yazıyla geri al: en son işlem geri alınır
+  await say('lütfen son işlemi geri al');
+  await expect(panel.locator('.chat-msg.ai').last()).toContainText('T1 yazıldı: hayır → evet');
+  expect((await v()).t1).toBe(true);
+  expect(problems).toEqual([]);
+});

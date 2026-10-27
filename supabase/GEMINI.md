@@ -92,6 +92,12 @@ sekmesine girin, eski kodu tamamen silip yenisini yapıştırın ve **Deploy**'a
 - Yerel anlama doğal cümleleri de kapsar: **"CT 29 BWT dorse plakalı aracı T1 yazıldı işaretle"** (çekici ya da dorse plakası, ikisi de olur),
   **"CB 1234 AB tesiste değil"** / **"T1 yazılmadı"** (olumsuz), **"34 ABC 123 ve CT 29 BWT bitti"** (birden fazla araç),
   **"2. sıradaki aracı bitti yap"**, **"bu aracı bitti yap"**, **"CT 29 BWT tesiste mi"**. "lütfen, dorse, plakalı, işaretle, yap" gibi dolgu sözcükler sayılmaz.
+- **Sıralama:** "Sıralamayı düzenleyebilir misin? 1. İşlemleri biten 2. Sıra tesiste olan araçlar 3. Sıra T1 işaretli olan araçlar" gibi bir cümle
+  (ya da "sırala: tesiste, T1, biten") yerelde anlaşılır: durum sözcüklerinin geçiş sırası öncelik sırasıdır. Her müşterinin araçları bu sırayla dizilir;
+  ayar herkes için kaydedilir (Ayarlar > Yerleşim > Durum sıralaması). Seçili günde elle (sürükleyerek) ayarlanmış sıra varsa o gün otomatiğe döner.
+  "Sıralamayı sıfırla" varsayılana döndürür. "En alta al" gibi konum belirten cümleler yapay zekâya gider.
+- **Geri al:** her düzeltme ve sıralama cevabında "Geri al" düğmesi çıkar; "geri al" yazmak son işlemi geri alar. Araya başka biri aynı alanı
+  değiştirmişse o alana dokunulmaz.
 - Gemini'ye giden her sohbet cümlesine panoda seçili günün sıra numaralı araç listesi (plaka | müşteri | durum) ve kayıtlı müşteri adları
   **veri olarak** eklenir; model "hangi araç / hangi müşteri" sorusunu bununla çözer (talimat olarak okunmaz). Gizlilik sayfasında belirtilmiştir.
 - Gemini isteği (örn. şema ya da model sınırı yüzünden) **400** ile reddederse fonksiyon önce aynı modeli şemasız dener, sonra yedek modelleri;

@@ -259,6 +259,10 @@
         if (r) Object.assign(r, v); else rows.push(v);
         return { data: null, error: null };
       }
+      if (name === 'set_visit_order') {   // elle sıralama: verilen sırayla sort_order yazılır
+        (params.p_ids || []).forEach((id, i) => { const v = db.visits.find(x => x.id === id); if (v) v.sort_order = i; });
+        return { data: null, error: null };
+      }
       if (name === 'list_backups') return { data: [{ id: 1, taken_at: now() }], error: null };
       if (name === 'visit_history') return { data: (cfg.history || {})[params.p_visit_id] || [], error: null };
       return { data: null, error: null };
