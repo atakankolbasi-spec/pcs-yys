@@ -7,6 +7,7 @@ import { temizGovde, htmldenMetin, yanitMi, ekleriAyikla, okunacakEkler, istanbu
 import { docxMetni } from './docx.mjs';
 import { tesisKarari, kodListesi, geliyorMu } from './karar.mjs';
 import { musteriBul } from './musteri.mjs';
+import { kisaGonderici } from './gonderici.mjs';
 
 const NL = String.fromCharCode(10);
 const TABLO = 'incoming_messages';
@@ -158,7 +159,11 @@ export async function run(deps = {}) {
       beyannameler: okunan, kodlar, gelirMi: geliyorMu(comes, musteriAdi)
     });
     const aiSonuc = { items, customer: musteriAdi, problem: sorun, model: String(v.model || '') };
-    if (beyannameler.length) aiSonuc.declarations = beyannameler;
+    // Beyanname alanına gönderici/ihracatçının kısa adı yazılır (tek gönderici: adı; birden fazla: PARSİYEL).
+    // Ad okunamazsa eskisi gibi beyanname numaraları kullanılır. Numaralar her durumda notta kalır.
+    const gondericiler = [...new Set(okunan.map(d => kisaGonderici(d)).filter(Boolean))];
+    if (gondericiler.length) aiSonuc.declarations = [gondericiler.length > 1 ? 'PARSİYEL' : gondericiler[0]];
+    else if (beyannameler.length) aiSonuc.declarations = beyannameler;
     const kodOku = [...new Set(okunan.map(d => String(d.facility_code || '').trim()).filter(Boolean))];
     if (kodOku.length) aiSonuc.facility_codes = kodOku;
     sonuc.beyanname += okunan.length;
