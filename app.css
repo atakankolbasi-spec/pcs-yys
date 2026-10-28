@@ -2329,3 +2329,13 @@ html[data-theme="dark"] .chat-det code{background:#ffffff12}
 @keyframes cardFlashDark{0%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent) 55%,transparent)}100%{}}
 html[data-theme="dark"] .operations tr.just-changed td{animation-name:rowFlashDark}
 html[data-theme="dark"] .vcard.just-changed,html[data-theme="dark"] .guard-card.just-changed{animation-name:cardFlashDark}
+
+.msg-mail-tag{display:inline-block;padding:1px 7px;border-radius:99px;background:#e8f0fe;color:#1d4ed8;font-size:11px;font-weight:800;letter-spacing:.02em}
+.rs-src.is-mail svg{color:#2563eb}
+html[data-theme="dark"] .msg-mail-tag{background:#1e2a44;color:#93b4ff}
+.wa-row:has(.wa-mail){grid-template-columns:14px minmax(0,1fr) minmax(200px,260px) minmax(200px,300px)}
+@media(max-width:760px){.wa-row:has(.wa-mail){grid-template-columns:14px minmax(0,1fr)}.wa-row .wa-phone,.wa-row .wa-mail{grid-column:1 / -1}}
+
+.wa-fac{margin:14px 0 6px;display:flex;flex-direction:column;gap:6px}.wa-fac label{font-size:12.5px;color:var(--muted)}.wa-fac input{max-width:420px;min-height:36px;font-weight:700;letter-spacing:.04em}
+.wa-comes-l{grid-column:2 / -1;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer}
+.msg-nocome{margin-top:8px;border:1px dashed var(--line);border-radius:10px;padding:6px 10px}.msg-nocome>summary{cursor:pointer;font-size:12.5px;display:flex;gap:6px;align-items:center}.msg-nocome>summary svg{width:14px;height:14px;flex:none}
