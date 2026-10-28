@@ -59,9 +59,20 @@ hiç dokunmaz.
    - `SUPABASE_SERVICE_ROLE_KEY`: aynı sayfadaki **service_role** anahtarı (gizli tutun; siteye ya da bir yere yazmayın)
 3. **SQL:** Yeni SQL yok. `supabase/mesaj-kurulumu.sql` daha önce çalıştırılmadıysa Supabase > SQL Editor'de bir kez
    çalıştırın (beş satırın hepsi `tamam` olmalı).
-4. **Outlook kuralı:** Outlook'ta *Dosya > Kuralları ve Uyarıları Yönet > Yeni Kural > Gelen iletilere kural uygula*.
-   Koşul: alıcı gumruk@pcstransit.com.tr (isterseniz müşterilerden gelenlerle sınırlayın). Eylem: **iletilere
-   ekleriyle birlikte yönlendir** (*redirect/forward*) ve 1. adımdaki Gmail adresini yazın.
+4. **Outlook kuralı:** Outlook'ta *Kurallar ve Uyarılar > Yeni Kural > Boş kuraldan başla: Aldığım iletilerde
+   kuralı uygula*.
+   - Koşul: **"gönderenin adresinde belirli sözcükler bulunan"** > müşterilerin alan adları (ör. `bultrans.com.tr`;
+     her müşteri için bir tane ekleyin).
+   - Eylem: **"ek olarak kişi veya ortak grup nesnesine ilet"** > 1. adımdaki Gmail adresi.
+
+   **Düz "ilet" değil, mutlaka "ek olarak ilet" seçin:** düz "ilet"te konu `FW: …` olur, gönderen
+   gumruk@pcstransit.com.tr görünür ve müşterinin yazısı "From: … Sent: …" satırının altına iner; müşterinin özgün
+   maili ve ekleri bozulur. "Ek olarak ilet"te özgün mail olduğu gibi (`.eml` eki olarak) Gmail'e ulaşır; betik onu
+   açıp gönderen, konu, Message-ID ve beyanname eklerini özgün maildeki haliyle okur. Aynı müşteri maili iki kez
+   iletilse bile bir kez işlenir; bir iletide en çok 5 özgün mail okunur. Yedek olarak, ek olmadan kendi alan
+   adımızdan (`@pcstransit.com.tr`) düz "ilet" ile gelen `FW:`/`İLT:` mailleri de gövdedeki iletme başlığından
+   (From/Kimden, Subject/Konu) okunur, ama bu yol en iyi çabadır; Outlook'ta `.msg` olarak iletilen ekler
+   okunamaz, yalnızca `.eml`/`message/rfc822` desteklenir.
 5. **Müşteri mail adresleri ve tesis kodları (isteğe bağlı):** Sitede *Ayarlar > WhatsApp* bölümünde her müşteri
    için mail adresi ya da alan adı (`nurhan@bultrans.com.tr` ya da `@bultrans.com.tr`) girin; tam adres alan adından
    önceliklidir. Aynı yerde **Tesis kodları** (virgülle çoğaltılır, varsayılan `Z34089`) ve her müşteri için

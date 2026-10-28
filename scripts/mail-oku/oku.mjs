@@ -3,7 +3,7 @@
 // Gerekli env: GMAIL_ADRES, GMAIL_UYGULAMA_SIFRESI, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Eksikse sessizce çıkar.
 // Test için run(deps) bağımlılıkları (env, fetch, imap, sleep, log) parametreyle alır.
 import { pathToFileURL } from 'node:url';
-import { temizGovde, htmldenMetin, yanitMi, ekleriAyikla, okunacakEkler, istanbulGun, geminiMetni } from './ayristir.mjs';
+import { temizGovde, htmldenMetin, yanitMi, ekleriAyikla, okunacakEkler, istanbulGun, geminiMetni, icMailEkleri, iletilmisMi, ilettiBasligi } from './ayristir.mjs';
 import { docxMetni } from './docx.mjs';
 import { tesisKarari, kodListesi, geliyorMu } from './karar.mjs';
 import { musteriBul } from './musteri.mjs';
@@ -72,8 +72,26 @@ export async function run(deps = {}) {
   log(`Mail okuma bitti: ${JSON.stringify(sonuc)}`);
   return sonuc;
 
-  // true: mail kaydedildi (ya da zaten kayıtlıydı), okundu işaretlenebilir
+  // Dış mailden işlenecek mailleri çıkarır. "Ek olarak ilet"te müşterinin özgün maili message/rfc822 (.eml) ek olarak
+  // durur: gönderen, konu, Message-ID, ekler İÇ mailden alınır; dış mailin FW: konusu ve iletenin adresi karara girmez.
+  // İç mail eki yoksa ve kendi alan adımızdan "ilet" ile gelmişse özgün gönderen/konu gövdedeki iletme başlığından
+  // okunur (en iyi çaba). Bunların dışındaki mailler olduğu gibi işlenir. true: hepsi kaydedildi, okundu işaretlenebilir.
   async function isle(mail) {
+    const ickiler = [];
+    for (const ek of icMailEkleri(mail.attachments)) {
+      try { ickiler.push(await (deps.parse || (await import('mailparser')).simpleParser)(ek.content)); } catch (_) { /* ayrıştırılamayan iç mail yok sayılır */ }
+    }
+    if (ickiler.length) { let hepsi = true; for (const ic of ickiler) hepsi = (await isleMail(ic)) && hepsi; return hepsi; }
+    const adres = String(mail.from?.value?.[0]?.address || mail.from?.address || '').trim().toLowerCase();
+    if (iletilmisMi(adres, mail.subject)) {
+      const b = ilettiBasligi(mail.text || htmldenMetin(mail.html || ''));
+      if (b) return isleMail({ ...mail, from: { value: [{ address: b.adres, name: b.ad }] }, subject: b.konu, text: b.govde, html: '', inReplyTo: '', references: undefined });
+    }
+    return isleMail(mail);
+  }
+
+  // true: mail kaydedildi (ya da zaten kayıtlıydı), okundu işaretlenebilir
+  async function isleMail(mail) {
     sonuc.islenen++;
     const adres = String(mail.from?.value?.[0]?.address || mail.from?.address || '').trim().toLowerCase();
     const ad = String(mail.from?.value?.[0]?.name || mail.from?.name || '').trim();

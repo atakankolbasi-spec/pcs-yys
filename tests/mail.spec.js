@@ -20,7 +20,7 @@ const mailOrnek = (o = {}) => ({
 });
 
 // mailler: [{uid, mail}] · gemini: sıradaki cevaplar {status, body}
-async function kos({ mailler = [{ uid: 1, mail: mailOrnek() }], env = ENV, gemini = [{ body: { items: [{ action: 'add', tractor: 'X7608MA', trailer: 'X1443EM', date: '2026-10-28', time: '', note: '', parties: [], fee: '' }], customer: '', problem: '', model: 'm' } }], existing = [], emails = { BULTRANS: '@bultrans.com.tr' }, beyan = [], ayar = {} } = {}) {
+async function kos({ mailler = [{ uid: 1, mail: mailOrnek() }], env = ENV, gemini = [{ body: { items: [{ action: 'add', tractor: 'X7608MA', trailer: 'X1443EM', date: '2026-10-28', time: '', note: '', parties: [], fee: '' }], customer: '', problem: '', model: 'm' } }], existing = [], emails = { BULTRANS: '@bultrans.com.tr' }, beyan = [], ayar = {}, parse } = {}) {
   const { run } = await yukle('oku.mjs');
   const log = [], satirlar = [], yamalar = [], gorulen = [], cikti = [], gemCagri = [], beyanCagri = [];
   const json = (v, s = 200) => new Response(JSON.stringify(v), { status: s, headers: { 'Content-Type': 'application/json' } });
@@ -35,7 +35,7 @@ async function kos({ mailler = [{ uid: 1, mail: mailOrnek() }], env = ENV, gemin
     return json({ error: 'beklenmeyen ' + method + ' ' + url }, 500);
   };
   const imap = { listUnseen: async () => mailler, markSeen: async uid => { gorulen.push(uid); }, close: async () => {} };
-  const sonuc = await run({ env, fetch: fetchSahte, imap, sleep: async () => {}, log: m => cikti.push(m), error: m => cikti.push(m) });
+  const sonuc = await run({ env, parse, fetch: fetchSahte, imap, sleep: async () => {}, log: m => cikti.push(m), error: m => cikti.push(m) });
   return { sonuc, log, satirlar, yamalar, gorulen, gemCagri, beyanCagri, cikti };
 }
 
@@ -251,5 +251,101 @@ test.describe('mail okuma', () => {
     const r = await kos({ mailler: [{ uid: 1, mail: mailPdf({ text: 'SON BEYAN EKTEDİR' }) }], beyan: [beyanOk('Z34089')] });
     expect(r.beyanCagri).toHaveLength(0);
     expect(r.gemCagri).toHaveLength(0);
+  });
+});
+
+// "Ek olarak ilet": Outlook kuralı müşterinin özgün mailini message/rfc822 ek olarak gönderir.
+test.describe('ek olarak iletilen mailler', () => {
+  const EKLER_IC = [{ filename: 'BULTRANS 18 - X 4999 MB - X 5167 EM.docx' }, { filename: 'Bul20261027154628.pdf' }];
+  const icMail = (o = {}) => ({
+    messageId: '<ic1@bultrans>', subject: 'X 4999 MB / X 5167 EM', date: new Date('2026-10-28T08:30:00Z'),
+    from: { value: [{ address: 'nurhan@bultrans.com.tr', name: 'Nurhan' }] },
+    text: 'Gelecek olan aracın bilgileri ekteki gibidir. 1 beyan daha olacak.', attachments: EKLER_IC, ...o
+  });
+  // Dış mail: gumruk@pcstransit.com.tr'den "FW:" konusuyla gelir; özgün mail .eml ek olarak durur.
+  const dis = (ic, o = {}, anahtar = 'ic1') => ({
+    messageId: '<dis-' + anahtar + '@pcstransit>', subject: 'FW: ' + ic.subject, date: new Date('2026-10-28T09:00:00Z'),
+    from: { value: [{ address: 'gumruk@pcstransit.com.tr', name: 'Gümrük' }] },
+    text: 'Özgün mail ektedir.', inReplyTo: '<x@y>', references: ['<x@y>'],
+    attachments: [{ filename: 'ileti.eml', contentType: 'message/rfc822', content: Buffer.from(anahtar) }], ...o
+  });
+  const parseSahte = tablo => async buf => tablo[buf.toString()];
+
+  test('(a) ek olarak iletilmiş yeni araç maili: iç mailden öneri, gönderen ve konu', async () => {
+    const ic = icMail();
+    const r = await kos({ mailler: [{ uid: 3, mail: dis(ic) }], parse: parseSahte({ ic1: ic }) });
+    expect(r.satirlar).toHaveLength(1);
+    expect(r.satirlar[0]).toMatchObject({ wa_message_id: 'mail:<ic1@bultrans>', from_number: 'nurhan@bultrans.com.tr', sender_name: 'Nurhan' });
+    expect(r.satirlar[0].body).toContain('X 4999 MB / X 5167 EM');
+    expect(r.satirlar[0].body).not.toContain('FW:');
+    expect(r.satirlar[0].from_number).not.toContain('pcstransit');
+    expect(r.gemCagri).toHaveLength(1);
+    expect(r.gemCagri[0].text).toContain('Konu: X 4999 MB / X 5167 EM');
+    expect(r.gemCagri[0].text).toContain('BULTRANS 18 - X 4999 MB - X 5167 EM.docx');
+    expect(r.yamalar[0].status).toBe('bekliyor');
+    expect(r.yamalar[0].ai.customer).toBe('BULTRANS'); // müşteri iç mailin göndericisinden
+    expect(r.gorulen).toEqual([3]);
+  });
+
+  test('(b) ek olarak iletilmiş "RE: … TASLAK OK" devam olarak yoksayılır', async () => {
+    const ic = icMail({ messageId: '<ic2@bultrans>', subject: 'RE: X 4999 MB / X 5167 EM', text: 'TASLAK OK', inReplyTo: '<ic1@bultrans>', attachments: [] });
+    const r = await kos({ mailler: [{ uid: 4, mail: dis(ic, {}, 'ic2') }], parse: parseSahte({ ic2: ic }) });
+    expect(r.satirlar).toHaveLength(1);
+    expect(r.satirlar[0]).toMatchObject({ wa_message_id: 'mail:<ic2@bultrans>', status: 'yoksayildi', note: expect.stringContaining('Konuşmanın devamı') });
+    expect(r.gemCagri).toHaveLength(0);
+    expect(r.sonuc.devam).toBe(1);
+  });
+
+  test('(c) aynı iç mail iki kez iletilirse ikincisi tekrar sayılır', async () => {
+    const ic = icMail();
+    const r = await kos({ mailler: [{ uid: 5, mail: dis(ic, {}, 'ic1') }, { uid: 6, mail: dis(ic, { messageId: '<dis-ikinci@pcstransit>' }, 'ic1') }], parse: parseSahte({ ic1: ic }) });
+    expect(r.satirlar).toHaveLength(1);
+    expect(r.gemCagri).toHaveLength(1);
+    expect(r.sonuc.tekrar).toBe(1);
+    expect(r.gorulen).toEqual([5, 6]);
+  });
+
+  test('bir dış mailde birden fazla iç mail: her biri ayrı işlenir, en çok 5', async () => {
+    const tablo = {}, ekler = [];
+    for (let i = 1; i <= 7; i++) { tablo['k' + i] = icMail({ messageId: '<k' + i + '@bultrans>', subject: 'X ' + (1000 + i) + ' AB' }); ekler.push({ filename: i + '.eml', contentType: 'message/rfc822', content: Buffer.from('k' + i) }); }
+    const r = await kos({ mailler: [{ uid: 9, mail: dis(tablo.k1, { attachments: ekler }) }], parse: parseSahte(tablo) });
+    expect(r.satirlar.map(x => x.wa_message_id)).toEqual([1, 2, 3, 4, 5].map(i => 'mail:<k' + i + '@bultrans>'));
+    expect(r.gorulen).toEqual([9]);
+  });
+
+  test('.eml uzantılı ek (türü genel) de iç mail sayılır; ayrıştırılamayan iç mail yüzünden dış mail kaybolmaz', async () => {
+    const ic = icMail();
+    const eml = dis(ic, { attachments: [{ filename: 'Orijinal.EML', contentType: 'application/octet-stream', content: Buffer.from('ic1') }] });
+    expect((await kos({ mailler: [{ uid: 1, mail: eml }], parse: parseSahte({ ic1: ic }) })).satirlar[0].wa_message_id).toBe('mail:<ic1@bultrans>');
+    const bozuk = await kos({ mailler: [{ uid: 2, mail: dis(ic) }], parse: async () => { throw new Error('bozuk'); } });
+    expect(bozuk.satirlar).toHaveLength(1); // iç mail okunamadı: dış mail olduğu gibi işlenir
+    expect(bozuk.satirlar[0].wa_message_id).toBe('mail:<dis-ic1@pcstransit>');
+  });
+
+  const ILET_GOVDE = 'Müşteri maili aşağıdadır.\n\nFrom: Nurhan Yılmaz <nurhan@bultrans.com.tr>\nSent: Tuesday, October 27, 2026 3:46 PM\nTo: gumruk@pcstransit.com.tr\nSubject: X 4999 MB / X 5167 EM\n\nGelecek olan aracın bilgileri ekteki gibidir. 1 beyan daha olacak.\n\nSaygılarımla\n\nFrom: Eski <e@x.com>\nSent: dün\nEski yazışma ZZ 9999 YY';
+  const normalIlet = (o = {}) => ({
+    messageId: '<fw1@pcstransit>', subject: 'FW: X 4999 MB / X 5167 EM', date: new Date('2026-10-28T09:00:00Z'),
+    from: { value: [{ address: 'gumruk@pcstransit.com.tr', name: 'Gümrük' }] }, text: ILET_GOVDE, inReplyTo: '', attachments: EKLER_IC, ...o
+  });
+
+  test('(d) normal "ilet" (iç ek yok): yedek yol özgün gönderen, konu ve yazıyı iletme başlığından okur', async () => {
+    const r = await kos({ mailler: [{ uid: 8, mail: normalIlet() }] });
+    expect(r.satirlar).toHaveLength(1);
+    expect(r.satirlar[0]).toMatchObject({ from_number: 'nurhan@bultrans.com.tr', sender_name: 'Nurhan Yılmaz' });
+    expect(r.satirlar[0].body).toContain('X 4999 MB / X 5167 EM');
+    expect(r.satirlar[0].body).toContain('1 beyan daha olacak');
+    expect(r.satirlar[0].body).not.toMatch(/FW:|ZZ 9999|gumruk@/);
+    expect(r.gemCagri[0].text).toContain('Konu: X 4999 MB / X 5167 EM');
+    expect(r.yamalar[0].ai.customer).toBe('BULTRANS');
+  });
+
+  test('yedek yol: iletilen yanıt ("RE: … TASLAK OK") yine devam sayılır; yalnızca kendi alan adımızdan iletilen FW: çözülür', async () => {
+    const devam = normalIlet({ text: 'Fyi\n\nFrom: N <nurhan@bultrans.com.tr>\nSent: x\nTo: g\nSubject: RE: X 4999 MB / X 5167 EM\n\nTASLAK OK' });
+    const r = await kos({ mailler: [{ uid: 1, mail: devam }] });
+    expect(r.satirlar[0]).toMatchObject({ status: 'yoksayildi', from_number: 'nurhan@bultrans.com.tr' });
+    expect(r.gemCagri).toHaveLength(0);
+    // dışarıdan gelen FW: konulu mail yedek yola girmez: eskisi gibi yanıt konusu sayılır
+    const dis2 = await kos({ mailler: [{ uid: 2, mail: normalIlet({ from: { value: [{ address: 'biri@baska.com', name: 'B' }] } }) }] });
+    expect(dis2.satirlar[0]).toMatchObject({ status: 'yoksayildi', from_number: 'biri@baska.com' });
   });
 });

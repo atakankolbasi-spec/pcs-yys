@@ -100,3 +100,40 @@ export function geminiMetni({ konu, gonderen, govde, dosyalar, beyannameler, gun
   if (beyannameler.length) s.push('Beyanname numaraları (ek adlarından): ' + beyannameler.join(', '));
   return s.join('\n').slice(0, 4000);
 }
+
+// "Ek olarak ilet" ile gelen dış mailin içindeki özgün mail (message/rfc822 ya da .eml eki). En çok 5.
+export const IC_MAIL_AZAMI = 5;
+export function icMailEkleri(ekler) {
+  return (Array.isArray(ekler) ? ekler : []).filter(e => e?.content && (/^message\/rfc822$/i.test(String(e.contentType || '').trim()) || /\.eml$/i.test(String(e.filename || '')))).slice(0, IC_MAIL_AZAMI);
+}
+
+// Yedek yol: iç mail eki yokken kendi alan adımızdan "ilet" ile gelen FW:/İLT: maili.
+export const KENDI_ALAN = '@pcstransit.com.tr';
+const ILET_KONU = /^\s*((fw|fwd|ilt|wg)\s*:\s*)+/;
+const ILET_ALANLAR = /^\s*(to|cc|bcc|kime|bilgi|importance|onem|date|tarih|sent|gonderilen|attachments|ekler)\s*:/;
+export function iletilmisMi(adres, konu) {
+  return String(adres || '').toLowerCase().endsWith(KENDI_ALAN) && ILET_KONU.test(trNorm(konu));
+}
+
+// Gövdedeki ilk "From:/Kimden:/Gönderen: … Subject:/Konu: …" iletme başlığını okur; özgün gönderen, konu ve
+// başlığın ALTINDAKİ ilk bölümü döndürür (bir sonraki From: bloğunu temizGovde keser). Bulunamazsa null.
+export function ilettiBasligi(metin) {
+  const satirlar = String(metin || '').replace(/\r/g, '').split('\n');
+  for (let i = 0; i < satirlar.length; i++) {
+    const m = /^\s*(from|kimden|gönderen)\s*:\s*(.*)$/i.exec(satirlar[i]);
+    if (!m) continue;
+    let konuSatiri = -1, konu = '';
+    for (let j = i + 1; j < Math.min(satirlar.length, i + 12); j++) {
+      const k = /^\s*(subject|konu)\s*:\s*(.*)$/i.exec(satirlar[j]);
+      if (k) { konuSatiri = j; konu = k[2].trim(); break; }
+    }
+    if (konuSatiri < 0) continue;
+    const a = /<([^<>\s]+@[^<>\s]+)>/.exec(m[2]) || /([^\s<>;,"]+@[^\s<>;,"]+)/.exec(m[2]);
+    if (!a) continue;
+    const ad = m[2].replace(/<[^>]*>/g, '').replace(/["']/g, '').replace(a[1], '').trim();
+    let b = konuSatiri + 1;
+    while (b < satirlar.length && (!satirlar[b].trim() || ILET_ALANLAR.test(trNorm(satirlar[b])))) b++;
+    return { adres: a[1].toLowerCase(), ad, konu, govde: satirlar.slice(b).join('\n') };
+  }
+  return null;
+}
