@@ -3,7 +3,7 @@
 // Gerekli env: GMAIL_ADRES, GMAIL_UYGULAMA_SIFRESI, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Eksikse sessizce çıkar.
 // Test için run(deps) bağımlılıkları (env, fetch, imap, sleep, log) parametreyle alır.
 import { pathToFileURL } from 'node:url';
-import { temizGovde, htmldenMetin, yanitMi, ekleriAyikla, okunacakEkler, istanbulGun, geminiMetni, icMailEkleri, iletilmisMi, ilettiBasligi } from './ayristir.mjs';
+import { temizGovde, htmldenMetin, yanitMi, ekleriAyikla, okunacakEkler, istanbulGun, geminiMetni, icMailEkleri, iletilmisMi, ilettiBasligi, KENDI_ALAN } from './ayristir.mjs';
 import { docxMetni } from './docx.mjs';
 import { tesisKarari, kodListesi, geliyorMu } from './karar.mjs';
 import { musteriBul } from './musteri.mjs';
@@ -50,7 +50,7 @@ export async function run(deps = {}) {
   const baslik = { apikey: anahtar, Authorization: 'Bearer ' + anahtar };
   const sb = (yol, init = {}) => fetchFn(base + yol, { ...init, headers: { ...baslik, ...(init.headers || {}) } });
   const JSON_BASLIK = { 'Content-Type': 'application/json', Prefer: 'return=minimal' };
-  const sonuc = { islenen: 0, yeni: 0, devam: 0, tekrar: 0, hata: 0, yoksayilan: 0, beyanname: 0 };
+  const sonuc = { islenen: 0, yeni: 0, devam: 0, tekrar: 0, hata: 0, yoksayilan: 0, beyanname: 0, yabanci: 0 };
 
   // Ayarlar'daki müşteri e-posta listesi (okunamazsa Gemini'nin müşteri alanı kullanılır)
   let emails = {}, kodlar = [], comes = {};
@@ -83,6 +83,10 @@ export async function run(deps = {}) {
     }
     if (ickiler.length) { let hepsi = true; for (const ic of ickiler) hepsi = (await isleMail(ic)) && hepsi; return hepsi; }
     const adres = String(mail.from?.value?.[0]?.address || mail.from?.address || '').trim().toLowerCase();
+    // Yalnızca Outlook'tan iletilen (kendi alan adımız) ya da Ayarlar'daki müşteri adreslerinden gelen mailler okunur.
+    // Gmail'in kendi bildirimleri gibi alakasız mailler kaydedilmeden okundu işaretlenir. Müşteri listesi okunamadıysa
+    // (boşsa) eski davranış korunur: her mail okunur.
+    if (Object.keys(emails).length && !adres.endsWith(KENDI_ALAN) && !musteriBul(adres, emails)) { sonuc.yabanci++; return true; }
     if (iletilmisMi(adres, mail.subject)) {
       const b = ilettiBasligi(mail.text || htmldenMetin(mail.html || ''));
       if (b) return isleMail({ ...mail, from: { value: [{ address: b.adres, name: b.ad }] }, subject: b.konu, text: b.govde, html: '', inReplyTo: '', references: undefined });
