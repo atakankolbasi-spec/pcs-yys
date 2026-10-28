@@ -150,7 +150,7 @@ export async function run(deps = {}) {
     const docxYazi = docxler.map(b => docxMetni(b)).filter(Boolean).join(NL).slice(0, 2000);
     beyannameler = [...new Set([...okunan.map(d => d.number).filter(Boolean), ...adBeyan])].slice(0, 10);
     const r = await gemini(geminiMetni({ konu, gonderen: ad ? `${ad} <${adres}>` : adres, govde: [govde, docxYazi && 'Ek belge (docx) metni:' + NL + docxYazi].filter(Boolean).join(NL + NL), dosyalar, beyannameler, gun }), gun);
-    if (!r.ok) { await guncelle({ status: 'hata', note: ('Yapay zekâ mesajı okuyamadı' + (r.neden ? ': ' + r.neden : '')).slice(0, 300) }); sonuc.hata++; return true; }
+    if (!r.ok) { await guncelle({ status: 'hata', note: ('Yapay zekâ mesajı okuyamadı' + (r.neden ? ': ' + r.neden : '')).slice(0, 300) }); sonuc.hata++; hata('Yapay zekâ okuyamadı:', r.neden || 'bilinmiyor'); return true; }
     const v = r.veri, sorun = String(v.problem || '').trim();
     const musteriAdi = musteri || String(v.customer || '');
     const items = tesisKarari({
