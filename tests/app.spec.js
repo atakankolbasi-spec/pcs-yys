@@ -3018,3 +3018,202 @@ test('pano: elle sıra varken yeni eklenen araç müşterisinin grubuna girer (m
   expect(await page.locator('.operations tbody tr[data-row-id]').first().locator('td').nth(1).evaluate(td => getComputedStyle(td).animationName)).toBe('rowFlashDark');
   expect(problems).toEqual([]);
 });
+
+// ---- Mail (gumruk@ kutusundan okuyan betik incoming_messages'a WhatsApp ile aynı şemada yazar) ----
+const mailRow = (id, from, extra = {}) => msgRow(id, [mi('add', '06KL4567', '', '2026-09-24')], {
+  wa_message_id: 'mail:<' + id + '@bultrans.com.tr>', from_number: from, sender_name: 'Nurhan', body: 'X 7608 MA / X 1443 EM Gelen aracın bilgileri ekteki gibidir.',
+  ai: { items: [mi('add', '06KL4567', '', '2026-09-24')], customer: '', problem: '', model: 'gemini-test', declarations: ['26BG05000VIB0IBAT8'] }, ...extra
+});
+const mailAi = (plate, extra = {}, date = '2026-09-24') => ({ items: [mi('add', plate, '', date)], customer: '', problem: '', model: 'g', ...extra });
+const mailUi = async (page, data) => {
+  const problems = await openApp(page, { data });
+  await page.locator('.heading [data-action="ruhsat-open"]').click();
+  return problems;
+};
+const visitInserts = page => page.evaluate(() => window.__calls.filter(c => c.table === 'visits' && c.op === 'insert').flatMap(c => c.rows));
+
+test('Mail: satır "Mail" etiketiyle çıkar, adres "+" olmadan görünür, başlık karışık kaynağı belirtir; WhatsApp satırı değişmez; onaylamadan araç eklenmez', async ({ page }) => {
+  const data = sampleData();
+  data.incoming_messages = [mailRow('ml1', 'nurhan@bultrans.com.tr'), msgRow('m1', [mi('add', 'CB1234AB', '', '2026-09-24')])];
+  const problems = await mailUi(page, data);
+  const mail = page.locator('.msg-card', { has: page.locator('.msg-mail-tag') });
+  await expect(mail).toHaveCount(1);
+  await expect(mail.locator('.rs-src')).toContainText('Mail · Nurhan · nurhan@bultrans.com.tr');
+  await expect(mail.locator('.rs-src')).not.toContainText('+nurhan');
+  await expect(page.locator('.rs-wa-head', { hasText: 'Gelen mesajlar (WhatsApp · Mail)' })).toContainText('siz onaylamadan');
+  const wa = page.locator('#msg-m1');   // WhatsApp satırı eskisi gibi: "WhatsApp" etiketi ve +numara
+  await expect(wa.locator('.rs-src')).toContainText('WhatsApp · Ali Şoför · +905321112233');
+  await expect(wa.locator('.msg-mail-tag')).toHaveCount(0);
+  await expect(mail).toContainText('Beyanname: 26BG05000VIB0IBAT8');   // ai.declarations kartta görünür
+  expect(await page.evaluate(() => window.__calls.filter(c => ['visits', 'registry', 'incoming_messages'].includes(c.table) && ['insert', 'update', 'delete'].includes(c.op)).length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('Mail: yalnızca WhatsApp satırı varken başlık eskisi gibi "WhatsApp mesajları"', async ({ page }) => {
+  const data = sampleData();
+  data.incoming_messages = [msgRow('m1', [mi('add', 'CB1234AB', '', '2026-09-24')])];
+  const problems = await mailUi(page, data);
+  await expect(page.locator('.rs-wa-head', { hasText: 'WhatsApp mesajları' })).toBeVisible();
+  await expect(page.locator('.rs-wa-head', { hasText: 'Gelen mesajlar' })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('Mail: müşteri e-posta adresi ya da alan adından eşlenir; tam adres alan adından önceliklidir', async ({ page }) => {
+  const data = sampleData();
+  data.app_settings.push({ key: 'customer_contacts', value: { numbers: {}, templates: {}, emails: { 'BULTRANS': 'x@y.com, @bultrans.com.tr', 'ÖZEL LOJ': 'nurhan@bultrans.com.tr', 'ALAN LOJ': 'Firma.com' } }, updated_at: '2026-09-01T08:00:00Z' });
+  data.incoming_messages = [
+    mailRow('ml1', 'nurhan@bultrans.com.tr', { ai: mailAi('XX9999YY') }),
+    mailRow('ml2', 'baska@bultrans.com.tr', { ai: mailAi('XX9998YY'), created_at: '2026-09-23T06:31:00Z' }),
+    mailRow('ml3', 'biri@FIRMA.com', { ai: mailAi('XX9997YY'), created_at: '2026-09-23T06:32:00Z' }),
+    mailRow('ml4', 'kimse@bilinmeyen.org', { ai: mailAi('XX9996YY'), created_at: '2026-09-23T06:33:00Z' })
+  ];
+  const problems = await mailUi(page, data);
+  const cards = page.locator('.msg-card');
+  await expect(cards).toHaveCount(4);
+  await expect(cards.nth(0).locator('.rs-src b').last()).toHaveText('ÖZEL LOJ');   // tam adres
+  await expect(cards.nth(1).locator('.rs-src b').last()).toHaveText('BULTRANS');    // @alanadi.com
+  await expect(cards.nth(2).locator('.rs-src b').last()).toHaveText('ALAN LOJ');    // alanadi.com, büyük/küçük harf fark etmez
+  await expect(cards.nth(3).locator('.rs-src b')).toHaveCount(1);                   // yalnızca "Mail" etiketi; müşteri bulunamadı
+  expect((await visitInserts(page)).length).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('Mail: eski customer_contacts (emails yok; düz biçim dahil) sorunsuz çalışır, WhatsApp numara eşlemesi bozulmaz', async ({ page, browser }) => {
+  const mk = value => {
+    const data = sampleData();
+    data.app_settings.push({ key: 'customer_contacts', value, updated_at: '2026-09-01T08:00:00Z' });
+    data.incoming_messages = [mailRow('ml1', 'nurhan@bultrans.com.tr', { ai: mailAi('XX9999YY') }), msgRow('m1', [mi('add', 'XX9998YY', '', '2026-09-24')], { created_at: '2026-09-23T06:31:00Z' })];
+    return data;
+  };
+  const problems = await mailUi(page, mk({ numbers: { 'ESKİ LOJ': '0532 111 22 33' } }));
+  await expect(page.locator('.msg-card')).toHaveCount(2);
+  await expect(page.locator('.msg-card', { has: page.locator('.msg-mail-tag') }).locator('.rs-src b')).toHaveCount(1);
+  await expect(page.locator('#msg-m1 .rs-src')).toContainText('ESKİ LOJ');            // WhatsApp numarası hâlâ müşteriye eşlenir
+  expect(problems).toEqual([]);
+  const flat = await browser.newPage();   // düz (numbers anahtarsız) eski biçim
+  const p2 = await mailUi(flat, mk({ 'ESKİ LOJ': '0532 111 22 33' }));
+  await expect(flat.locator('.msg-card')).toHaveCount(2);
+  await expect(flat.locator('#msg-m1 .rs-src')).toContainText('ESKİ LOJ');
+  expect(p2).toEqual([]);
+  await flat.close();
+});
+
+test('Mail: Ayarlar > WhatsApp bölümünde mail alanı kaydedilir; numaralar ve şablon korunur', async ({ page }) => {
+  const data = sampleData();
+  data.app_settings.push({ key: 'customer_contacts', value: { numbers: { 'ABC NAKLİYAT': '0532 111 22 33' } }, updated_at: '2026-09-01T08:00:00Z' });
+  const problems = await openApp(page, { data });
+  await page.locator('.nav-item', { hasText: 'Ayarlar' }).first().click();
+  await page.locator('nav[aria-label="Ayar bölümleri"] button', { hasText: 'WhatsApp' }).click();
+  await expect(page.locator('main')).toContainText('mail adresleri');
+  await page.locator('.wa-mail[data-name="ABC NAKLİYAT"]').fill('a@abc.com, @abc.com.tr');
+  await page.locator('[data-action="wa-contacts-save"]').click();
+  await expect(page.locator('#toast')).toContainText('mail adresleri');
+  const v = await page.evaluate(() => window.__db.app_settings.find(x => x.key === 'customer_contacts').value);
+  expect(v.numbers).toEqual({ 'ABC NAKLİYAT': '0532 111 22 33' });
+  expect(v.emails).toEqual({ 'ABC NAKLİYAT': 'a@abc.com, @abc.com.tr' });
+  expect(typeof v.templates.single).toBe('string');
+  expect(problems).toEqual([]);
+});
+
+test('Mail: tek beyanname araç kaydına yazılır, birden fazlaysa nota eklenir; mail satırında "Yeniden oku" yok', async ({ page }) => {
+  const data = sampleData();
+  data.incoming_messages = [
+    mailRow('ml1', 'nurhan@bultrans.com.tr'),
+    mailRow('ml2', 'nurhan@bultrans.com.tr', { ai: mailAi('B123XYZ', { declarations: ['26BG0000000000AAA1', '26BG0000000000AAA2'] }, '2026-10-15'), created_at: '2026-09-23T06:31:00Z' }),
+    mailRow('ml3', 'nurhan@bultrans.com.tr', { status: 'hata', ai: null, note: 'Yapay zekâ mesajı okuyamadı', created_at: '2026-09-23T06:32:00Z' })
+  ];
+  const problems = await mailUi(page, data);
+  const cards = page.locator('.msg-card');
+  await expect(cards.nth(0)).toContainText('Beyanname: 26BG05000VIB0IBAT8');
+  await expect(cards.nth(1)).toContainText('26BG0000000000AAA1, 26BG0000000000AAA2');
+  await expect(cards.nth(2).locator('[data-action="msg-reread"]')).toHaveCount(0);
+  expect((await visitInserts(page)).length).toBe(0);                                  // onaydan önce hiçbir şey eklenmez
+  await cards.nth(0).locator('[data-action="msg-apply"]').click();
+  await expect.poll(async () => (await visitInserts(page)).map(v => [v.plate, v.declaration])).toEqual([['06 KL 4567', '26BG05000VIB0IBAT8']]);
+  const second = page.locator('.msg-card', { hasText: '26BG0000000000AAA1' });
+  await second.locator('[data-action="msg-apply"]').first().click();
+  await expect.poll(async () => (await visitInserts(page)).length).toBe(2);
+  const last = (await visitInserts(page)).pop();
+  expect(last.declaration).toBe('');
+  expect(last.note).toContain('Beyanname: 26BG0000000000AAA1, 26BG0000000000AAA2');
+  expect(problems).toEqual([]);
+});
+
+// ---- Mail: tesise gelecek / gelmeyecek (beyanname 30. kutu) ----
+const facItem = (tractor, facility, extra = {}) => mi('add', tractor, '', '2026-10-15', { facility, ...extra });
+const facRow = (id, items, extra = {}) => mailRow(id, 'nurhan@bultrans.com.tr', { ai: { items, customer: '', problem: '', model: 'g', declarations: [], facility_codes: ['Z34089'] }, ...extra });
+
+test('Mail tesis: "gelmeyecek" araçlar kapalı ayrı bölümde; "belirsiz" uyarılı; tek uygun araç varken toplu düğme çıkmaz', async ({ page }) => {
+  const data = sampleData();
+  data.incoming_messages = [facRow('f1', [facItem('06KL4567', 'gelecek'), facItem('B123XYZ', 'belirsiz'), facItem('XX9999YY', 'gelmeyecek', { facility_note: '30. kutu: boş' }), facItem('34ABC123', 'gelmeyecek', { facility_note: '30. kutu: Z99999' })])];
+  const problems = await mailUi(page, data);
+  const card = page.locator('#msg-f1'), nc = card.locator('details.msg-nocome');
+  await expect(nc).toHaveCount(1);
+  await expect(nc).toContainText('Tesise gelmeyecek (2)');
+  expect(await nc.evaluate(d => d.open)).toBe(false);                       // varsayılan kapalı
+  await expect(card.locator('.msg-item')).toHaveCount(4);
+  await expect(card.locator('.msg-item').nth(1)).toContainText('Beyanname görülmedi, tesis kodunu kontrol edin');
+  await expect(nc.locator('.msg-item').first()).toContainText('30. kutu: boş');
+  await expect(card.locator('[data-action="msg-all"]')).toHaveCount(0);
+  expect((await visitInserts(page)).length).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('Mail tesis: Hepsini uygula "gelmeyecek" ve "belirsiz" araçları işlemez', async ({ page }) => {
+  const data = sampleData();
+  data.incoming_messages = [facRow('f2', [facItem('06KL4567', 'gelecek'), facItem('B123XYZ', 'gelecek'), facItem('34ABC123', 'belirsiz'), facItem('CB1234AB', 'gelmeyecek')])];
+  const problems = await mailUi(page, data);
+  const card = page.locator('#msg-f2');
+  await expect(card.locator('[data-action="msg-all"]')).toHaveText('Hepsini uygula (2)');
+  page.on('dialog', d => d.accept());
+  await card.locator('[data-action="msg-all"]').click();
+  await expect.poll(async () => (await visitInserts(page)).map(v => v.plate).sort()).toEqual(['06 KL 4567', 'B 123 XYZ']);
+  expect(problems).toEqual([]);
+});
+
+test('Mail tesis: gelmeyecek bölümündeki araç "Panoya ekle" ile tek tek eklenir; WhatsApp satırında facility alanı yok sayılır', async ({ page }) => {
+  const data = sampleData();
+  data.incoming_messages = [facRow('f3', [facItem('06KL4567', 'gelmeyecek', { facility_note: '30. kutu: boş' })]), msgRow('m1', [facItem('B123XYZ', 'gelmeyecek')], { created_at: '2026-09-23T06:31:00Z' })];
+  const problems = await mailUi(page, data);
+  await expect(page.locator('#msg-m1 details.msg-nocome')).toHaveCount(0);   // WhatsApp: eskisi gibi normal
+  await expect(page.locator('#msg-m1 .msg-item')).toHaveCount(1);
+  const nc = page.locator('#msg-f3 details.msg-nocome');
+  await nc.locator('summary').click();
+  expect((await visitInserts(page)).length).toBe(0);
+  await nc.locator('[data-action="msg-apply"]').click();
+  await expect.poll(async () => (await visitInserts(page)).map(v => v.plate)).toEqual(['06 KL 4567']);
+  expect(problems).toEqual([]);
+});
+
+test('Mail tesis: müşteri "genelde tesise gelir" kapalıysa belirsiz araç gelmeyecek bölümüne düşer', async ({ page }) => {
+  const data = sampleData();
+  data.app_settings.push({ key: 'customer_contacts', value: { numbers: {}, emails: { 'ABC NAKLİYAT': 'nurhan@bultrans.com.tr' }, comes: { 'ABC NAKLİYAT': false } }, updated_at: '2026-09-01T08:00:00Z' });
+  data.incoming_messages = [facRow('f4', [facItem('06KL4567', 'belirsiz')])];
+  const problems = await mailUi(page, data);
+  await expect(page.locator('#msg-f4 details.msg-nocome')).toContainText('Tesise gelmeyecek (1)');
+  expect(problems).toEqual([]);
+});
+
+test('Mail tesis: Ayarlar\'da tesis kodları ve "genelde tesise gelir" kaydedilir; boş kod varsayılana döner; eski kayıtlar korunur', async ({ page }) => {
+  const data = sampleData();
+  data.app_settings.push({ key: 'customer_contacts', value: { numbers: { 'ABC NAKLİYAT': '0532 111 22 33' }, emails: { 'ABC NAKLİYAT': 'a@abc.com' } }, updated_at: '2026-09-01T08:00:00Z' });
+  const problems = await openApp(page, { data });
+  await page.locator('.nav-item', { hasText: 'Ayarlar' }).first().click();
+  await page.locator('nav[aria-label="Ayar bölümleri"] button', { hasText: 'WhatsApp' }).click();
+  await expect(page.locator('#wa-fac')).toHaveValue('Z34089');                        // eski kayıt: varsayılan
+  await expect(page.locator('.wa-comes[data-name="ABC NAKLİYAT"]')).toBeChecked();   // varsayılan açık
+  await page.locator('#wa-fac').fill('z34089, Z11111');
+  await page.locator('.wa-comes[data-name="ABC NAKLİYAT"]').uncheck();
+  await page.locator('[data-action="wa-contacts-save"]').click();
+  await expect(page.locator('#toast')).toContainText('kaydedildi');
+  const val = () => page.evaluate(() => window.__db.app_settings.find(x => x.key === 'customer_contacts').value);
+  const v = await val();
+  expect(v.facility_codes).toEqual(['Z34089', 'Z11111']);
+  expect(v.comes).toEqual({ 'ABC NAKLİYAT': false });
+  expect(v.numbers).toEqual({ 'ABC NAKLİYAT': '0532 111 22 33' });
+  expect(v.emails).toEqual({ 'ABC NAKLİYAT': 'a@abc.com' });
+  await page.locator('#wa-fac').fill('');
+  await page.locator('[data-action="wa-contacts-save"]').click();
+  await expect.poll(async () => (await val()).facility_codes).toEqual(['Z34089']);
+  expect(problems).toEqual([]);
+});

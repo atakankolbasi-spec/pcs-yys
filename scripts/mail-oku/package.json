@@ -1,0 +1,11 @@
+{
+  "name": "pcs-mail-oku",
+  "private": true,
+  "description": "PCS TRANSİT YYS müşteri maillerini okuyup araç mesajı olarak kaydeder (GitHub Actions'ta çalışır)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "imapflow": "1.0.191",
+    "mailparser": "3.7.3"
+  }
+}
