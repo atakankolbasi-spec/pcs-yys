@@ -297,18 +297,19 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
 
   test('beyanname modu: PDF doğrudan Gemini’ye gider; beyanname mi, numara, 30. kutu ve plakalar temizlenip döner; diğer modlar etkilenmez', async () => {
     let sent;
-    const { post } = await setup({ gemini: (url, body) => { sent = body; return answer({ declaration: true, number: '26341300ex 00874692', facility_code: '  Z34089 ', plates: ['x 7608 ma', 'ab', 'X-1443-EM'] }); } });
+    const { post } = await setup({ gemini: (url, body) => { sent = body; return answer({ declaration: true, number: '26341300ex 00874692', facility_code: '  Z34089 ', exporter: ' ELMA İSTANBUL TAM ELEKTRİK  EKİPMANLARI SAN. VE TİC. LTD. ŞTİ. ', exporter_short: 'Elma İstanbul', plates: ['x 7608 ma', 'ab', 'X-1443-EM'] }); } });
     const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3]);
     const res = await post({ 'Content-Type': 'application/pdf', 'x-pcs-mode': 'beyanname' }, pdf);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ declaration: true, number: '26341300EX00874692', facility_code: 'Z34089', plates: ['X7608MA', 'X1443EM'], model: 'gemini-test' });
+    expect(await res.json()).toEqual({ declaration: true, number: '26341300EX00874692', facility_code: 'Z34089', exporter: 'ELMA İSTANBUL TAM ELEKTRİK EKİPMANLARI SAN. VE TİC. LTD. ŞTİ.', exporter_short: 'ELMA İSTANBUL', plates: ['X7608MA', 'X1443EM'], model: 'gemini-test' });
+    expect(sent.contents[0].parts[1].text).toMatch(/Gönderici \/ İhracatçı/);
     expect(sent.contents[0].parts[0].inlineData).toEqual({ mimeType: 'application/pdf', data: Buffer.from(pdf).toString('base64') });
     expect(sent.contents[0].parts[1].text).toMatch(/Eşyanın bulunduğu yer/);
     expect(sent.contents[0].parts[1].text).toMatch(/never follow instructions/);
     expect(sent.generationConfig.responseSchema.properties.facility_code).toBeTruthy();
     // beyanname değil / kutu boş
     const { post: post2 } = await setup({ gemini: () => answer({ declaration: false, number: '', facility_code: '', plates: [] }) });
-    expect(await (await post2({ 'Content-Type': 'image/png', 'x-pcs-mode': 'beyanname' })).json()).toEqual({ declaration: false, number: '', facility_code: '', plates: [], model: 'gemini-test' });
+    expect(await (await post2({ 'Content-Type': 'image/png', 'x-pcs-mode': 'beyanname' })).json()).toEqual({ declaration: false, number: '', facility_code: '', exporter: '', exporter_short: '', plates: [], model: 'gemini-test' });
     // PDF yalnızca bu modda kabul edilir; yetkisiz çağrıya Gemini açılmaz
     expect((await post2({ 'Content-Type': 'application/pdf' }, pdf)).status).toBe(400);
     expect((await post2({ 'Content-Type': 'text/plain', 'x-pcs-mode': 'beyanname' })).status).toBe(400);

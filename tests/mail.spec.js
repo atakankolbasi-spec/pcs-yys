@@ -160,6 +160,18 @@ test.describe('mail okuma', () => {
   const beyanOk = kod => ({ body: { declaration: true, number: '26341300EX00874692', facility_code: kod, plates: ['X7608MA'], model: 'm' } });
   const mailPdf = (o = {}) => mailOrnek({ attachments: [pdfEk('Bul20261027154628.pdf'), ...IMZA], ...o });
 
+  test('beyanname alanına göndericinin kısa adı yazılır; numara notta kalır; birden fazla gönderici PARSİYEL olur', async () => {
+    const tek = await kos({ mailler: [{ uid: 1, mail: mailPdf() }], beyan: [{ body: { ...beyanOk('Z34089').body, exporter: 'ELMA İSTANBUL TAM ELEKTRİK EKİPMANLARI SAN. VE TİC. LTD. ŞTİ.', exporter_short: 'Elma İstanbul' } }] });
+    expect(tek.yamalar[0].ai.declarations).toEqual(['ELMA İSTANBUL']);
+    expect(tek.yamalar[0].ai.items[0].note).toContain('26341300EX00874692');
+    // yapay zekâ kısa ad vermezse tam addan kısaltılır
+    const kisa = await kos({ mailler: [{ uid: 1, mail: mailPdf() }], beyan: [{ body: { ...beyanOk('Z34089').body, exporter: 'BERG METAL SAN. VE TİC. A.Ş.', exporter_short: '' } }] });
+    expect(kisa.yamalar[0].ai.declarations).toEqual(['BERG METAL']);
+    const iki = await kos({ mailler: [{ uid: 1, mail: mailOrnek({ attachments: [pdfEk('a.pdf'), pdfEk('b.pdf'), ...IMZA] }) }],
+      beyan: [{ body: { ...beyanOk('Z34089').body, exporter_short: 'ELMA İSTANBUL' } }, { body: { ...beyanOk('Z34089').body, number: '26341300EX00874990', exporter_short: 'DGS' } }] });
+    expect(iki.yamalar[0].ai.declarations).toEqual(['PARSİYEL']);
+  });
+
   test('beyanname: 30. kutu Z34089 -> gelecek, numara ve kod kaydedilir; ek adı güvenilmez', async () => {
     const r = await kos({ mailler: [{ uid: 1, mail: mailPdf() }], beyan: [beyanOk(' z34089 ')] });
     expect(r.beyanCagri).toEqual([{ tur: 'application/pdf', boyut: 20000 }]); // imza resmi okunmadı

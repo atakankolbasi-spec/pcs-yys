@@ -19,8 +19,10 @@ hiç dokunmaz.
   ya da "TASLAK OK", "Beyannameler Kapandı", "SON BEYAN EKTEDİR" gibi devam cümleleri olan mailler Gemini'ye
   gönderilmez; "Konuşmanın devamı" notuyla yoksayılmış olarak kaydedilir (ekte beyanname numarası varsa notta yazar).
 - **Tesise gelecek mi, gelmeyecek mi?** Asıl ölçü beyannamenin **30. kutusu ("Eşyanın bulunduğu yer")**:
-  - Kutuda tesis kodu varsa (varsayılan `Z34089`) araç **tesise gelecektir**: normal öneri olarak düşer, beyanname
-    numarası (sağ üstte barkodun altındaki, örn. `26341300EX00874692`) beyanname alanına yazılır.
+  - Kutuda tesis kodu varsa (varsayılan `Z34089`) araç **tesise gelecektir**: normal öneri olarak düşer. **Beyanname
+    alanına göndericinin/ihracatçının kısa adı** yazılır (2. kutu; "ELMA İSTANBUL TAM ELEKTRİK EKİPMANLARI SAN. VE TİC.
+    LTD. ŞTİ." → `ELMA İSTANBUL`); farklı göndericilerden birden fazla beyanname varsa `PARSİYEL`. Beyanname numarası
+    (sağ üstte barkodun altındaki, örn. `26341300EX00874692`) nota yazılır.
   - Kutu **boşsa ya da başka bir koddaysa** araç tesise gelmeyecektir: panoya önerilmez, onay listesinde kapalı bir
     **"Tesise gelmeyecek"** bölümünde durur. Yanlışsa oradan yine tek tek eklenebilir.
   - **Beyanname eki yoksa ya da okunamadıysa** müşterinin Ayarlar'daki **"Genelde tesise gelir"** işaretine bakılır

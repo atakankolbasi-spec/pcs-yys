@@ -233,12 +233,16 @@ const DECL_PROMPT = `The attached document (PDF or image, possibly a scan) was s
 Return: "declaration" = true only if it is a customs declaration (a registration certificate, invoice, packing list, etc. is false);
 "number" = the declaration number printed at the top right under the barcode (e.g. 26341300EX00874692), else "";
 "facility_code" = the text in box 30 "Eşyanın bulunduğu yer" (e.g. Z34089), empty string if the box is empty or unreadable;
+"exporter" = the full company name in box 2 "Gönderici / İhracatçı" (top left, under the tax number), as printed, else "";
+"exporter_short" = the short trade name of that exporter as an operator would say it: keep the distinctive name words, drop the legal form and generic activity words (SAN., TİC., VE, LTD., ŞTİ., A.Ş., DIŞ TİCARET, İTH., İHR., PAZ., ELEKTRİK EKİPMANLARI and similar), uppercase Turkish. Examples: "ELMA İSTANBUL TAM ELEKTRİK EKİPMANLARI SAN. VE TİC. LTD. ŞTİ." -> "ELMA İSTANBUL"; "BERG METAL SAN. VE TİC. A.Ş." -> "BERG METAL"; "DGS DIŞ TİCARET A.Ş." -> "DGS". "" if there is no exporter;
 "plates" = vehicle plates (tractor / trailer) that appear in the document, Latin capital letters and digits only, [] if none. Never invent values.`;
-const DECL_SCHEMA = { type: 'OBJECT', properties: { declaration: { type: 'BOOLEAN' }, number: { type: 'STRING' }, facility_code: { type: 'STRING' }, plates: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['declaration', 'number', 'facility_code', 'plates'] };
+const DECL_SCHEMA = { type: 'OBJECT', properties: { declaration: { type: 'BOOLEAN' }, number: { type: 'STRING' }, facility_code: { type: 'STRING' }, exporter: { type: 'STRING' }, exporter_short: { type: 'STRING' }, plates: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['declaration', 'number', 'facility_code', 'exporter', 'exporter_short', 'plates'] };
 const cleanDecl = (parsed, model) => ({
   declaration: parsed?.declaration === true,
   number: String(parsed?.number || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 30),
   facility_code: String(parsed?.facility_code || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+  exporter: String(parsed?.exporter || '').replace(/\s+/g, ' ').trim().slice(0, 150),
+  exporter_short: String(parsed?.exporter_short || '').replace(/\s+/g, ' ').trim().toLocaleUpperCase('tr-TR').slice(0, 60),
   plates: (Array.isArray(parsed?.plates) ? parsed.plates : []).map(p => String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)).filter(p => p.length >= 4).slice(0, 6),
   model
 });
