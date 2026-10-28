@@ -53,8 +53,10 @@ hiç dokunmaz.
    üretin. IMAP Gmail'de varsayılan olarak açıktır (kapalıysa Gmail > Ayarlar > Yönlendirme ve POP/IMAP'tan açın).
 2. **GitHub Secrets:** GitHub'da depo > *Settings > Secrets and variables > Actions > New repository secret* ile
    dört değer ekleyin:
-   - `GMAIL_ADRES`: mailleri alacak Gmail adresi
-   - `GMAIL_UYGULAMA_SIFRESI`: 1. adımdaki 16 harfli şifre
+   - `GMAIL_ADRES1`: mailleri alacak Gmail adresi
+   - `GMAIL_UYGULAMA_SIFRESI1`: 1. adımdaki 16 harfli şifre
+   - (Adların sonundaki "1" bilinçlidir: `GMAIL_ADRES` / `GMAIL_UYGULAMA_SIFRESI` günlük rapor ve gece yedeğini
+     gönderen hesaba aittir; onlara dokunmayın.)
    - `SUPABASE_URL`: Supabase projenizin adresi (*Project Settings > API > Project URL*)
    - `SUPABASE_SERVICE_ROLE_KEY`: aynı sayfadaki **service_role** anahtarı (gizli tutun; siteye ya da bir yere yazmayın)
 3. **SQL:** Yeni SQL yok. `supabase/mesaj-kurulumu.sql` daha önce çalıştırılmadıysa Supabase > SQL Editor'de bir kez

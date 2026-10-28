@@ -3,8 +3,9 @@ name: Müşteri maillerini oku
 # 5 dakikada bir Gmail kutusundaki okunmamış müşteri maillerini okur; araç bildirimlerini sitede onay bekleyen
 # "Mail" mesajı olarak kaydeder (hiçbir araç siz onaylamadan panoya eklenmez). Kurulum: supabase/MAIL.md.
 # Not: GitHub zamanlanmış görevleri yoğunlukta birkaç dakika gecikebilir.
-# Gerekli gizli değerler (Settings > Secrets and variables > Actions): GMAIL_ADRES (okunacak Gmail adresi),
-# GMAIL_UYGULAMA_SIFRESI, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Eksikse görev hiçbir şey yapmadan biter.
+# Gerekli gizli değerler (Settings > Secrets and variables > Actions): GMAIL_ADRES1 (okunacak Gmail adresi),
+# GMAIL_UYGULAMA_SIFRESI1, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. ("1"li adlar: GMAIL_ADRES / GMAIL_UYGULAMA_SIFRESI
+# günlük rapor ve gece yedeğini GÖNDEREN hesaba aittir; mail okuyan hesap ayrıdır.) Eksikse görev hiçbir şey yapmadan biter.
 # Elle denemek için: Actions > Müşteri maillerini oku > Run workflow.
 
 on:
@@ -36,7 +37,7 @@ jobs:
       - name: Mailleri oku
         run: node scripts/mail-oku/oku.mjs
         env:
-          GMAIL_ADRES: ${{ secrets.GMAIL_ADRES }}
-          GMAIL_UYGULAMA_SIFRESI: ${{ secrets.GMAIL_UYGULAMA_SIFRESI }}
+          GMAIL_ADRES: ${{ secrets.GMAIL_ADRES1 }}
+          GMAIL_UYGULAMA_SIFRESI: ${{ secrets.GMAIL_UYGULAMA_SIFRESI1 }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
