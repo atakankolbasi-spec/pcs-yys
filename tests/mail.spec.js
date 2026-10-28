@@ -344,8 +344,29 @@ test.describe('ek olarak iletilen mailler', () => {
     const r = await kos({ mailler: [{ uid: 1, mail: devam }] });
     expect(r.satirlar[0]).toMatchObject({ status: 'yoksayildi', from_number: 'nurhan@bultrans.com.tr' });
     expect(r.gemCagri).toHaveLength(0);
-    // dışarıdan gelen FW: konulu mail yedek yola girmez: eskisi gibi yanıt konusu sayılır
+    // dışarıdan (müşteri listesinde olmayan) gelen FW: konulu mail yedek yola girmez ve hiç kaydedilmez
     const dis2 = await kos({ mailler: [{ uid: 2, mail: normalIlet({ from: { value: [{ address: 'biri@baska.com', name: 'B' }] } }) }] });
-    expect(dis2.satirlar[0]).toMatchObject({ status: 'yoksayildi', from_number: 'biri@baska.com' });
+    expect(dis2.satirlar).toHaveLength(0);
+    expect(dis2.sonuc.yabanci).toBe(1);
+    // müşteri listesi boşken eski davranış: yanıt konusu sayılıp yoksayılmış kaydedilir
+    const dis3 = await kos({ emails: {}, mailler: [{ uid: 2, mail: normalIlet({ from: { value: [{ address: 'biri@baska.com', name: 'B' }] } }) }] });
+    expect(dis3.satirlar[0]).toMatchObject({ status: 'yoksayildi', from_number: 'biri@baska.com' });
+  });
+});
+
+test.describe('mail okuma: alakasız gönderenler', () => {
+  test('müşteri listesinde olmayan ve iletilmemiş mail (Google bildirimi) kaydedilmez, okundu işaretlenir', async () => {
+    const g = { ...mailOrnek(), from: { value: [{ address: 'no-reply@accounts.google.com', name: 'Google' }] }, subject: 'Güvenlik uyarısı', messageId: '<g1@google>', attachments: [] };
+    const r = await kos({ mailler: [{ uid: 3, mail: g }] });
+    expect(r.satirlar).toHaveLength(0);
+    expect(r.gemCagri).toHaveLength(0);
+    expect(r.gorulen).toEqual([3]);
+    expect(r.sonuc.yabanci).toBe(1);
+    expect(r.sonuc.hata).toBe(0);
+  });
+  test('müşteri listesi boşsa eski davranış korunur (her mail okunur)', async () => {
+    const r = await kos({ emails: {} });
+    expect(r.satirlar).toHaveLength(1);
+    expect(r.sonuc.yabanci).toBe(0);
   });
 });

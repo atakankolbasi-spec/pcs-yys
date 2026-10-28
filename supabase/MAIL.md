@@ -91,6 +91,8 @@ hiç dokunmaz.
 | Mail geldi, kart yok | Mail bir yanıttı ("Konuşmanın devamı" olarak yoksayılır), rakam içermiyordu ya da Gmail'de zaten okunmuş |
 | Kartta "Yapay zekâ mesajı okuyamadı" | Gemini sınırı ya da yoğunluğu: **Yeniden oku** |
 | Müşteri boş geliyor | Ayarlar'da o müşterinin mail adresi/alan adı yok |
+| Kartlarda "Yapay zekâ mesajı okuyamadı: sunucu hatası 403" | `SUPABASE_SERVICE_ROLE_KEY` secret'ına yeni tür (`sb_secret_…`) anahtar girilmiş. *Project Settings > API Keys > Legacy API keys* sekmesindeki **service_role** (`eyJ…` ile başlar) anahtarını girin |
+| Bir mail hiç kaydedilmedi | Gönderen ne `@pcstransit.com.tr` (Outlook iletmesi) ne de Ayarlar'daki müşteri adreslerinden; bu mailler (ör. Gmail'in kendi bildirimleri) okundu işaretlenip atlanır. Günlükte `yabanci` sayısı görünür |
 
 ## Gizlilik
 
