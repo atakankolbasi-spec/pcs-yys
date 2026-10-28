@@ -20,14 +20,14 @@ const mailOrnek = (o = {}) => ({
 });
 
 // mailler: [{uid, mail}] · gemini: sıradaki cevaplar {status, body}
-async function kos({ mailler = [{ uid: 1, mail: mailOrnek() }], env = ENV, gemini = [{ body: { items: [{ action: 'add', tractor: 'X7608MA', trailer: 'X1443EM', date: '2026-10-28', time: '', note: '', parties: [], fee: '' }], customer: '', problem: '', model: 'm' } }], existing = [], emails = { BULTRANS: '@bultrans.com.tr' }, beyan = [], ayar = {}, parse } = {}) {
+async function kos({ mailler = [{ uid: 1, mail: mailOrnek() }], env = ENV, gemini = [{ body: { items: [{ action: 'add', tractor: 'X7608MA', trailer: 'X1443EM', date: '2026-10-28', time: '', note: '', parties: [], fee: '' }], customer: '', problem: '', model: 'm' } }], existing = [], yarim = [], emails = { BULTRANS: '@bultrans.com.tr' }, beyan = [], ayar = {}, parse } = {}) {
   const { run } = await yukle('oku.mjs');
   const log = [], satirlar = [], yamalar = [], gorulen = [], cikti = [], gemCagri = [], beyanCagri = [];
   const json = (v, s = 200) => new Response(JSON.stringify(v), { status: s, headers: { 'Content-Type': 'application/json' } });
   const fetchSahte = async (url, init = {}) => {
     url = String(url); const method = init.method || 'GET'; log.push({ url, method });
     if (url.includes('/app_settings')) return json([{ value: { emails, ...ayar } }]);
-    if (url.includes('/incoming_messages?select=id&wa_message_id=')) return json(existing.filter(id => url.endsWith(encodeURIComponent(id))).map(id => ({ id })));
+    if (url.includes('/incoming_messages?select=id,status&wa_message_id=')) return json([...existing.filter(id => url.endsWith(encodeURIComponent(id))).map(id => ({ id, status: 'bekliyor' })), ...yarim.filter(id => url.endsWith(encodeURIComponent(id))).map(id => ({ id, status: 'okunuyor' }))]);
     if (url.includes('/incoming_messages?on_conflict=') && method === 'POST') { const b = JSON.parse(init.body); if (!existing.includes(b.wa_message_id)) { satirlar.push(b); existing.push(b.wa_message_id); } return new Response(null, { status: 201 }); }
     if (url.includes('/incoming_messages?') && method === 'PATCH') { yamalar.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
     if (url.endsWith('/functions/v1/ruhsat-oku') && init.headers['x-pcs-mode'] === 'beyanname') { beyanCagri.push({ tur: init.headers['Content-Type'], boyut: init.body.length }); const r = beyan.length > 1 ? beyan.shift() : beyan[0]; return r ? json(r.body, r.status || 200) : json({ error: 'yok' }, 404); }
@@ -368,5 +368,47 @@ test.describe('mail okuma: alakasız gönderenler', () => {
     const r = await kos({ emails: {} });
     expect(r.satirlar).toHaveLength(1);
     expect(r.sonuc.yabanci).toBe(0);
+  });
+});
+
+test.describe('mail okuma: süre koruması', () => {
+  test('yanıt vermeyen beyanname okuması beklenmeden geçilir; mail yine kaydedilir', async () => {
+    const { run } = await yukle('oku.mjs');
+    const satirlar = [], yamalar = [], gorulen = [];
+    const json = (v, st = 200) => new Response(JSON.stringify(v), { status: st, headers: { 'Content-Type': 'application/json' } });
+    const fetch = (url, init = {}) => {
+      url = String(url); const m = init.method || 'GET';
+      if (url.includes('/app_settings')) return Promise.resolve(json([{ value: { emails: { BULTRANS: '@bultrans.com.tr' } } }]));
+      if (m === 'PATCH') { yamalar.push(JSON.parse(init.body)); return Promise.resolve(new Response(null, { status: 204 })); }
+      if (url.includes('on_conflict=') && m === 'POST') { satirlar.push(JSON.parse(init.body)); return Promise.resolve(new Response(null, { status: 201 })); }
+      if (url.includes('wa_message_id=')) return Promise.resolve(json([]));
+      if (init.headers['x-pcs-mode'] === 'beyanname') return new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(init.signal.reason)));
+      return Promise.resolve(json({ items: [{ action: 'add', tractor: 'X7608MA', trailer: 'X1443EM', date: '2026-10-28', time: '', note: '', parties: [], fee: '' }], customer: '', problem: '', model: 'm' }));
+    };
+    const imap = { listUnseen: async () => [{ uid: 1, mail: mailOrnek() }], markSeen: async u => { gorulen.push(u); }, close: async () => {} };
+    const t0 = Date.now();
+    const s = await run({ env: ENV, fetch, imap, sleep: async () => {}, istekMs: 300, log: () => {}, error: () => {} });
+    expect(Date.now() - t0).toBeLessThan(10000);
+    expect(satirlar).toHaveLength(1);
+    expect(yamalar.at(-1).status).toBe('bekliyor');
+    expect(gorulen).toEqual([1]);
+    expect(s.hata).toBe(0);
+  });
+  test('süre bütçesi dolunca kalan mailler okunmamış bırakılır (sonraki çalışmaya kalır)', async () => {
+    const { run } = await yukle('oku.mjs');
+    let t = 0; const gorulen = [];
+    const imap = { listUnseen: async () => [{ uid: 1, mail: mailOrnek() }, { uid: 2, mail: mailOrnek() }], markSeen: async u => { gorulen.push(u); }, close: async () => {} };
+    const s = await run({ env: ENV, fetch: async () => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }), imap, simdi: () => t, sureMs: 60000, log: () => {}, error: () => {} });
+    expect(s.ertelenen).toBe(2);
+    expect(gorulen).toEqual([]);
+  });
+});
+
+test.describe('mail okuma: yarıda kalan kayıt', () => {
+  test('önceki çalışma kesildiyse "okunuyor"da kalan mail tekrar sayılmaz, yeniden okunur', async () => {
+    const r = await kos({ yarim: ['mail:<m1@bultrans>'] });
+    expect(r.sonuc.tekrar).toBe(0);
+    expect(r.gemCagri).toHaveLength(1);
+    expect(r.yamalar.at(-1).status).toBe('bekliyor');
   });
 });

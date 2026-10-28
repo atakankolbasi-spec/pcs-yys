@@ -42,6 +42,12 @@ export async function run(deps = {}) {
   const hata = deps.error || console.error;
   const fetchFn = deps.fetch || globalThis.fetch;
   const sleep = deps.sleep || (ms => new Promise(r => setTimeout(r, ms)));
+  // Süre koruması: GitHub görevi 8 dakikada kesilir. Tek istek en çok ISTEK_MS bekler; toplam bütçe dolunca kalan
+  // mailler okunmamış bırakılır, sonraki çalışmada (5 dk sonra) devam edilir.
+  const simdi = deps.simdi || (() => Date.now());
+  const ISTEK_MS = deps.istekMs ?? 90000;
+  const BITIS = simdi() + (deps.sureMs ?? 6 * 60000);
+  const kalan = () => BITIS - simdi();
   const eksik = GEREKLI.filter(k => !String(env[k] || '').trim());
   if (eksik.length) { log('Mail okuma atlandı: eksik gizli değerler: ' + eksik.join(', ')); return { atlandi: true }; }
 
@@ -63,6 +69,7 @@ export async function run(deps = {}) {
   try {
     const mailler = await imap.listUnseen(AZAMI_MAIL);
     for (const { uid, mail } of mailler) {
+      if (kalan() < 120000) { sonuc.ertelenen = (sonuc.ertelenen || 0) + 1; continue; } // sonraki çalışmaya kalsın
       try {
         const bitti = await isle(mail);
         if (bitti) await imap.markSeen(uid);
@@ -102,9 +109,11 @@ export async function run(deps = {}) {
     const konu = String(mail.subject || '').trim();
     const kimlik = 'mail:' + (String(mail.messageId || '').trim() || `${adres}|${konu}|${new Date(mail.date || 0).toISOString()}`);
 
-    const var_ = await sb(`/rest/v1/${TABLO}?select=id&wa_message_id=eq.${encodeURIComponent(kimlik)}`);
+    const var_ = await sb(`/rest/v1/${TABLO}?select=id,status&wa_message_id=eq.${encodeURIComponent(kimlik)}`);
     if (!var_.ok) throw new Error(`Mesaj kontrolü: ${var_.status} ${(await var_.text().catch(() => '')).slice(0, 200)}`);
-    if ((await var_.json()).length) { sonuc.tekrar++; return true; }
+    // Önceki çalışma yarıda kesildiyse satır "okunuyor"da kalmıştır: tekrar sayılmaz, okuma baştan yapılır
+    // (ekleme çakışmayı yoksayar, güncelleme yalnızca "okunuyor" satırına uygulanır).
+    if ((await var_.json()).some(r => r.status !== 'okunuyor')) { sonuc.tekrar++; return true; }
 
     const ham = mail.text || htmldenMetin(mail.html || '');
     const govde = temizGovde(ham);
@@ -163,11 +172,12 @@ export async function run(deps = {}) {
     let neden = '';
     for (let i = 1; i <= 3; i++) {
       let durum = 0, govde = null;
+      if (kalan() < 15000) { neden = neden || 'süre doldu'; break; }
       try {
-        const r = await sb('/functions/v1/ruhsat-oku', { method: 'POST', ...init });
+        const r = await sb('/functions/v1/ruhsat-oku', { method: 'POST', ...init, signal: AbortSignal.timeout(Math.max(1000, Math.min(ISTEK_MS, kalan() - 10000))) });
         durum = r.status; govde = await r.json().catch(() => null);
         if (r.ok && gecerli(govde)) return { ok: true, veri: govde };
-      } catch (_) { durum = 0; }
+      } catch (e) { durum = 0; if (e?.name === 'TimeoutError' || e?.name === 'AbortError') { neden = 'yanıt ' + Math.round(ISTEK_MS / 1000) + ' sn içinde gelmedi'; break; } }
       neden = govde?.reason || (durum ? 'sunucu hatası ' + durum : 'bağlantı kurulamadı');
       if (govde?.fatal || !(durum === 0 || durum === 429 || durum >= 500) || i === 3) break;
       await sleep(Math.min(40, durum === 429 ? Math.max(5, +govde?.retry_after || 15) : 8) * 1000);
