@@ -2995,3 +2995,26 @@ test('sohbet: kayıt düzeltme "Geri al" ile eski değerine döner; araya başka
   expect((await v()).t1).toBe(true);
   expect(problems).toEqual([]);
 });
+
+test('pano: elle sıra varken yeni eklenen araç müşterisinin grubuna girer (müşteri başlığı ikinci kez açılmaz); gece modunda satır parlaması koyu zemine uygundur', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  const mk = (id, plate, customer, so, extra = {}) => ({ id, plate, customer, declaration: '', carrier: '', registration: '', visit_date: '2026-09-23', visit_time: '08:00', note: '', onsite: false, t1: false, done: false,
+    created_at: '2026-09-21T05:00:00Z', updated_at: '2026-09-21T06:00:00Z', onsite_at: null, done_at: null, sort_order: so, ...extra });
+  data.visits = [
+    mk('a', 'AA 1111 AA', 'BULTRANS', 0), mk('b', 'BB 2222 BB', 'BULTRANS', 1), mk('c', 'CC 3333 CC', 'BULTRANS', 2),
+    mk('t', 'TT 4444 TT', 'TORNADO', 3),
+    mk('n', 'NN 5555 NN', 'BULTRANS', null, { created_at: '2026-09-23T06:00:00Z' }),    // yeni eklenen: sırası yok
+    mk('z', 'ZZ 6666 ZZ', 'YENİ FİRMA', null, { created_at: '2026-09-23T06:05:00Z' })   // hiç elle sıralı aracı olmayan müşteri: sona
+  ];
+  const problems = await openApp(page, { data });
+  const order = () => page.locator('table.operations tbody tr[data-row-id]').evaluateAll(rows => rows.map(r => r.dataset.rowId));
+  await expect.poll(order).toEqual(['a', 'b', 'c', 'n', 't', 'z']);                      // n, BULTRANS grubunun sonunda
+  await expect(page.locator('.block-head-name')).toHaveText(['BULTRANS', 'TORNADO', 'YENİ FİRMA']);
+  await expect(page.locator('.block-head-count').first()).toHaveText('4 araç');
+  // gece modunda parlama animasyonu koyu zemine uygun olanı kullanır
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; document.querySelector('.operations tbody tr[data-row-id]').classList.add('just-changed'); });
+  expect(await page.locator('.operations tbody tr[data-row-id]').first().locator('td').nth(1).evaluate(td => getComputedStyle(td).animationName)).toBe('rowFlashDark');
+  expect(problems).toEqual([]);
+});
