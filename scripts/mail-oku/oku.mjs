@@ -193,5 +193,7 @@ export async function run(deps = {}) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  run().catch(e => { console.error('Mail okuma hatası:', e.message); process.exit(1); }).then(s => { if (s && s.hata) process.exitCode = 1; });
+  run({ error: (...a) => { console.error(...a); if (process.env.GITHUB_ACTIONS) console.log('::warning title=Mail işlenemedi::' + a.join(' ').replace(/[\r\n]+/g, ' ').slice(0, 300)); } })
+    .catch(e => { console.error('Mail okuma hatası:', e.message); if (process.env.GITHUB_ACTIONS) console.log('::error title=Mail okuma hatası::' + String(e.message).replace(/[\r\n]+/g, ' ').slice(0, 300)); process.exit(1); })
+    .then(s => { if (s && process.env.GITHUB_ACTIONS) console.log('::notice title=Mail okuma sonucu::' + JSON.stringify(s)); if (s && s.hata) process.exitCode = 1; });
 }
