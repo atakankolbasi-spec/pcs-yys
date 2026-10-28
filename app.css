@@ -2324,3 +2324,8 @@ html[data-theme="dark"] .wait-badge{background:#450a0a;color:#fca5a5}
 .chat-det summary{cursor:pointer;font-weight:700}
 .chat-det code{display:block;margin-top:4px;padding:6px 8px;border-radius:8px;background:#0b15300d;word-break:break-word;white-space:pre-wrap;font:11px/1.45 ui-monospace,Menlo,monospace}
 html[data-theme="dark"] .chat-det code{background:#ffffff12}
+/* gece modunda satır / kart parlaması: açık renk yerine koyu zemine uygun ton (açık parlama beyaz yazıyı okunmaz yapıyordu) */
+@keyframes rowFlashDark{0%{background-color:color-mix(in srgb,var(--c-accent) 38%,#121a2e)}100%{}}
+@keyframes cardFlashDark{0%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent) 55%,transparent)}100%{}}
+html[data-theme="dark"] .operations tr.just-changed td{animation-name:rowFlashDark}
+html[data-theme="dark"] .vcard.just-changed,html[data-theme="dark"] .guard-card.just-changed{animation-name:cardFlashDark}
