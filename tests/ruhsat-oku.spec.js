@@ -21,6 +21,7 @@ async function setup({ env = {}, role = 'editor', gemini } = {}) {
     log.push({ url, headers, body: init.body });
     const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'Content-Type': 'application/json' } });
     if (url === ENV.SUPABASE_URL + '/rest/v1/rpc/current_app_role') return headers.Authorization === 'Bearer kullanici' ? json(role) : json({ message: 'JWT' }, 401);
+    if (url.startsWith(ENV.SUPABASE_URL + '/auth/v1/admin/users')) return headers.Authorization === 'Bearer sb_secret_gercek' ? json({ users: [] }) : json({ msg: 'not admin' }, 403);
     if (url.startsWith('https://generativelanguage.googleapis.com/')) return gemini(url, JSON.parse(init.body), headers, init.signal);
     return json({ error: 'beklenmeyen istek ' + url }, 500);
   };
@@ -443,5 +444,15 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     // düzenleyici değilse mesaj da okutulamaz
     const viewer = await setup({ role: 'viewer', gemini: () => answer({ items: [] }) });
     expect((await viewer.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'merhaba' }))).status).toBe(403);
+  });
+});
+
+test.describe('Ruhsat okuma: sunucu anahtarıyla çağrı', () => {
+  test.afterEach(() => { console.error = realConsoleError; console.log = realConsoleLog; });
+  test('ortam değişkeniyle birebir aynı olmasa da Supabase\'in onayladığı sunucu anahtarı kabul edilir; tanınmayan anahtar reddedilir (401)', async () => {
+    const gemini = () => answer({ vehicles: [{ plate: 'X 4999 MB', kind: 'tractor', empty_weight_kg: 8000, country: 'BG' }], problem: '' });
+    const { post } = await setup({ env: { SUPABASE_SERVICE_ROLE_KEY: 'eyJ.eski.anahtar' }, gemini });
+    expect((await post({ Authorization: 'Bearer sb_secret_gercek', apikey: 'sb_secret_gercek' })).status).toBe(200);
+    expect((await post({ Authorization: 'Bearer uydurma', apikey: 'uydurma' })).status).toBe(401);
   });
 });

@@ -268,8 +268,26 @@ async function caller(req) {
     method: 'POST', headers: { apikey, Authorization: auth, 'Content-Type': 'application/json' }, body: '{}'
   }).catch(() => null);
   if (!res || res.status >= 500) return 'hata';
-  if (res.status === 401) return 'suresi-doldu';
-  return res.ok && (await res.json().catch(() => '')) === 'editor' ? 'ok' : 'hayir';
+  if (res.status === 401) return (await sunucuAnahtariMi(auth)) ? 'ok' : 'suresi-doldu';
+  if (res.ok && (await res.json().catch(() => '')) === 'editor') return 'ok';
+  return (await sunucuAnahtariMi(auth)) ? 'ok' : 'hayir';
+}
+
+// Mail okuma görevi (GitHub) Supabase'in gizli sunucu anahtarıyla çağırır. Supabase'in yeni anahtar sisteminde
+// (sb_secret_…) ya da anahtar yenilendiğinde fonksiyonun ortam değişkeni GitHub'daki anahtarla birebir aynı
+// olmayabilir. Bu yüzden anahtarın gerçekten yönetici yetkisi taşıdığı Supabase'e sorulur: yalnızca sunucu
+// anahtarları kullanıcı yönetimi uç noktasını okuyabilir. Sonuç bu işlem süresince hatırlanır.
+const sunucuAnahtarlari = new Map();
+async function sunucuAnahtariMi(auth) {
+  const tok = String(auth || '').replace(/^Bearer\s+/i, '').trim();
+  if (!tok || !env('SUPABASE_URL')) return false;
+  if (sunucuAnahtarlari.has(tok)) return sunucuAnahtarlari.get(tok);
+  const r = await fetch(`${env('SUPABASE_URL')}/auth/v1/admin/users?page=1&per_page=1`, {
+    headers: { apikey: tok, Authorization: `Bearer ${tok}` }
+  }).catch(() => null);
+  const ok = !!r && r.ok;
+  if (r) sunucuAnahtarlari.set(tok, ok);
+  return ok;
 }
 
 // Kısa sohbet komutlarında Gemini'nin "düşünme" adımı kapatılır: cevap birkaç saniye yerine bir iki saniyede gelir.
