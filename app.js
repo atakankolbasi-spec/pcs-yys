@@ -930,7 +930,8 @@ function kPanel(ctl=''){const hidden=kGet(K_PANEL)==='1';
    render() bütün sayfayı yeniden çizdiği için çerçeve #app'in dışında tek bir kez oluşturulur ve bölümdeki
    yer tutucunun üstüne konumlanır (yeniden yüklenmez). Bugünün kayıtları ve müşteri renkleri çerçeveye
    postMessage ile gider; çerçevede bir tıra tıklanınca araç panoda seçilir. */
-const kSahaGizli=()=>{const v=kGet(K_SAHA);return v==='1'||(v==null&&innerWidth<700);}; // telefonda varsayılan kapalı
+/* telefonda ve otomasyon tarayıcısında (testler) varsayılan kapalı; açıkça açılırsa açılır */
+const kSahaGizli=()=>{const v=kGet(K_SAHA);return v==='1'||(v==null&&(innerWidth<700||!!navigator.webdriver));};
 function kSaha(){const hidden=kSahaGizli();
  const leg=[['Yolda','var(--k-wait)'],['Tesiste','var(--c-onsite)'],['T1 yazıldı','var(--c-t1)'],['Bitti → çıkış','var(--c-done)'],['6 sa+','#e11d48']];
  const head=`<div class="k-panel-head"><span>Canlı saha · Muratbey</span>${hidden?'':`<span class="k-saha-leg">${leg.map(([l,c])=>`<i style="background:${c}"></i>${l}`).join('')}</span>`}<span class="k-saha-btns">${hidden?'':`<a class="k-link" href="saha.html" target="_blank" rel="noopener">Tam ekran</a>`}<button type="button" class="k-link" data-action="k-saha" aria-expanded="${!hidden}">${hidden?'Göster':'Gizle'}</button></span></div>`;
