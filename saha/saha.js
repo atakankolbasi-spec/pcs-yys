@@ -820,6 +820,48 @@ function kur3B(){
   $('s3kapi').addEventListener('click',()=>{intro=null;if(secim){sec(secim);sonSecim=secim;}takip=null;Object.assign(hedef,{...KAPI,th:yakinTh(KAPI.th)});});
   $('s3yakin').addEventListener('click',()=>{intro=null;if(secim){if(tirlar.has(secim))odak(secim,true);else yakinIstek=true;return;}yakinIstek=true;
     const id=[...tirlar.keys()].find(k=>araclar.get(k)?.state==='park')||[...tirlar.keys()][0];if(id)sec(id);});
+  // ---------- köpek ----------
+  // Sahanın ortasında gezinen küçük bir köpek: 12 küçük kutu, gölgesiz; kare() içinde ilerler, yani çizim durunca (görünmüyor / kayıyor) o da durur.
+  // Rastgele noktalara yürür, ara sıra durup koklar, tır 6 m yaklaşırsa kaçar. Hareket azaltma tercihinde yerinde durur.
+  const kopek=(()=>{
+    const g=new T.Group(),S=3;
+    const tuy=mk({color:'#c98f50',roughness:.9,metalness:0}),acik=mk({color:'#ecd9b8',roughness:.9,metalness:0}),koyu=mk({color:'#6e4220',roughness:.9,metalness:0}),burun=mk({color:'#1b1b1b',roughness:.6,metalness:0});
+    const p=(w,h,d,m,x,y,z,ust=g)=>{const o=kutu(w,h,d,m,x,y,z,false);o.receiveShadow=false;ust.add(o);return o;};
+    p(.52,.2,.2,tuy,0,.4,0);                      // gövde
+    p(.2,.12,.17,acik,.12,.34,0);                 // göğüs
+    const bas=new T.Group();bas.position.set(.3,.5,0);g.add(bas);
+    p(.2,.17,.17,tuy,.04,.04,0,bas);              // kafa
+    p(.13,.08,.1,acik,.17,-.01,0,bas);            // burun-ağız
+    p(.035,.04,.05,burun,.245,.01,0,bas);         // burun ucu
+    for(const z of [-1,1]){const k=p(.06,.11,.03,koyu,0,.14,z*.085,bas);k.rotation.x=z*.35;}   // kulaklar
+    const kuy=new T.Group();kuy.position.set(-.27,.46,0);g.add(kuy);p(.22,.045,.045,tuy,-.11,0,0,kuy);kuy.rotation.z=.6;   // kuyruk
+    const bacak=[];for(const [x,z] of [[.2,.075],[.2,-.075],[-.2,.075],[-.2,-.075]]){const h=new T.Group();h.position.set(x,.3,z);g.add(h);p(.07,.3,.07,tuy,0,-.15,0,h);p(.08,.04,.09,acik,.01,-.29,0,h);bacak.push(h);}
+    g.scale.setScalar(S);SC.add(g);
+    return {g,bas,kuy,bacak};
+  })();
+  const kx0=Math.max(yx0+3,ycx-14),kx1=Math.min(yx1-3,ycx+14),kz0=Math.max(yz0+3,ycz-9),kz1=Math.min(yz1-3,ycz+9);
+  const K={x:ycx+3,z:ycz+2,yaw:0,hedef:null,bekle:2,hiz:0,faz:0,kuyruk:0,kos:false};
+  const kSin=(v,a,b)=>Math.min(b,Math.max(a,v));
+  kopek.g.position.set(K.x,0,K.z);
+  function kopekAdim(dt){
+    if(reduce)return;
+    let kd=1e9,kp=null;for(const t of tirlar.values()){const d=Math.hypot(t.g.position.x-K.x,t.g.position.z-K.z);if(d<kd){kd=d;kp=t.g.position;}}
+    if(kp&&kd<6){const dx=K.x-kp.x,dz=K.z-kp.z,l=Math.hypot(dx,dz)||1;K.hedef=[kSin(K.x+dx/l*9,kx0,kx1),kSin(K.z+dz/l*9,kz0,kz1)];K.kos=true;K.bekle=0;}
+    let vh=0;
+    if(K.bekle>0)K.bekle-=dt;
+    else{if(!K.hedef){K.hedef=[kx0+Math.random()*(kx1-kx0),kz0+Math.random()*(kz1-kz0)];K.kos=false;}
+      const dx=K.hedef[0]-K.x,dz=K.hedef[1]-K.z,d=Math.hypot(dx,dz);
+      if(d<.5){K.hedef=null;K.kos=false;K.bekle=1.5+Math.random()*4;}
+      else{vh=K.kos?3.4:1.05;let da=Math.atan2(-dz,dx)-K.yaw;da=Math.atan2(Math.sin(da),Math.cos(da));K.yaw+=da*Math.min(1,dt*(K.kos?7:3.5));if(Math.abs(da)>1.2)vh*=.25;}}
+    K.hiz+=(vh-K.hiz)*Math.min(1,dt*5);
+    K.x=kSin(K.x+Math.cos(K.yaw)*K.hiz*dt,kx0,kx1);K.z=kSin(K.z-Math.sin(K.yaw)*K.hiz*dt,kz0,kz1);
+    K.faz+=K.hiz*dt*5.5;K.kuyruk+=dt*(K.hiz>.3?10:6);
+    const gen=Math.min(.8,K.hiz*.5);
+    kopek.bacak.forEach((h,i)=>{h.rotation.z=Math.sin(K.faz+(i===0||i===3?0:Math.PI))*gen;});
+    kopek.g.position.set(K.x,Math.abs(Math.sin(K.faz))*.02*K.hiz,K.z);kopek.g.rotation.y=K.yaw;
+    kopek.kuy.rotation.y=Math.sin(K.kuyruk)*(K.hiz>.3?.35:.6);
+    kopek.bas.rotation.z=K.bekle>0?-.35*Math.max(0,Math.sin(K.kuyruk*.2)):Math.sin(K.faz*2)*.04;   // dururken ara sıra yere eğilip koklar
+  }
   // ---------- boyut ----------
   function boyut(){const w=box.clientWidth,h=box.clientHeight;if(!w||!h)return;R.setSize(w,h,false);CAM.aspect=w/h;CAM.updateProjectionMatrix();const yeni=112*Math.pow(Math.max(1,1.75/CAM.aspect),.85);if(!takip&&Math.abs(hedef.r-VARS.r)<1)hedef.r=yeni;VARS.r=yeni;}
   new ResizeObserver(boyut).observe(box);
@@ -846,6 +888,7 @@ function kur3B(){
     // TV modu: kullanıcı bir süre dokunmazsa sahanın üstünde yavaşça dönen, yükselip alçalan sinematik tur
     const tv=document.body.classList.contains('tv');if(tv&&!reduce&&!takip&&!intro&&performance.now()-sonEtk>8000){tur+=dt;hedef.th+=dt*.03;hedef.ph=VARS.ph+.42+.2*Math.sin(tur*.05);hedef.r=VARS.r*(.82+.16*Math.sin(tur*.037));hedef.tx=VARS.tx+14*Math.sin(tur*.041);hedef.tz=VARS.tz+8*Math.sin(tur*.029);}else tur=0;
     if(!reduce)bulutlar.forEach((b,i)=>{b.position.x+=dt*(1.2+i%3*.4);if(b.position.x>1500)b.position.x=-1500;});
+    kopekAdim(dt);
     if(intro){intro.t+=dt;const u=Math.min(1,intro.t/intro.sure),e=u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;for(const n of ['tx','tz','r','th','ph'])cam[n]=intro.bas[n]+(hedef[n]-intro.bas[n])*e;if(u>=1)intro=null;}
     else{const k=reduce?1:1-Math.exp(-dt*(tur?.8:3.2));for(const n of ['tx','tz','r','th','ph'])cam[n]+=(hedef[n]-cam[n])*k;}
     kameraUygula();tekerGuncelle();R.render(SC,CAM);
@@ -859,7 +902,7 @@ function kur3B(){
   }
   function ilkSecim(){sonSecim=secim;}
   isik(kaynak.simdi());kameraUygula();
-  return {kare,boyut,ilkSecim,_bilgi:()=>({...R.info.render,geo:R.info.memory.geometries,tex:R.info.memory.textures}),_kamera:(o)=>{Object.assign(hedef,o);Object.assign(cam,o);takip=null;}};
+  return {kare,boyut,ilkSecim,_kopekAdim:kopekAdim,_kopek:()=>({x:K.x,z:K.z,hiz:K.hiz,sinir:[kx0,kx1,kz0,kz1],bacak:kopek.bacak.map(h=>h.rotation.z)}),_bilgi:()=>({...R.info.render,geo:R.info.memory.geometries,tex:R.info.memory.textures}),_kamera:(o)=>{Object.assign(hedef,o);Object.assign(cam,o);takip=null;}};
 }
 
 /* =========================== LİSTE VE PANELLER =========================== */
@@ -956,7 +999,7 @@ function loop(now){const dt=Math.min(.1,(now-last)/1000);last=now;
   acc+=dt;if(acc>.5){acc=0;yenile();}
   if(G3)G3.kare(dt);else draw();requestAnimationFrame(loop);}
 let ucOldu=false;const ikiB=()=>{$('s3note').hidden=false;cv.style.visibility='';};
-function uc(){if(ucOldu)return;ucOldu=true;G3=kur3B();if(G3){cv.hidden=true;$('s3').hidden=false;G3.boyut();G3.ilkSecim();}else ikiB();}
+function uc(){if(ucOldu)return;ucOldu=true;G3=kur3B();if(G3){cv.hidden=true;$('s3').hidden=false;G3.boyut();G3.ilkSecim();window.__kopek={adim:G3._kopekAdim,bilgi:G3._kopek,kare:G3.kare,kamera:G3._kamera};}else ikiB();}   // __kopek: testler için (köpeğin durumunu okur, çizmeden ilerletir)
 cv.style.visibility='hidden';
 if(window.THREE)uc();else{addEventListener('uc-hazir',uc,{once:true});setTimeout(()=>{if(!ucOldu){ucOldu=true;ikiB();}},10000);}
 resize();yenile(true);if(!GOMULU)secim='v1';yenile(true);draw();requestAnimationFrame(loop);

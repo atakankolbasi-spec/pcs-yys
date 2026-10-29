@@ -3280,3 +3280,35 @@ test('canlı saha: sayfa kayarken ve bölüm gizliyken 3B çizim durdurulur, kay
   expect(await dur()).toEqual([true, false, true]);
   expect(problems).toEqual([]);
 });
+
+test('canlı saha: küçük köpek sahanın ortasında gezinir, sınırlar içinde kalır, bacakları yürürken sallanır', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('[data-action="k-saha"]').click();
+  let frame;
+  await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
+  await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
+  await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));   // gerçek çizim gerekmez
+  await frame.waitForFunction(() => window.__kopek, null, { timeout: 60000 });
+  const r = await frame.evaluate(() => {
+    const a = __kopek.bilgi(), [x0, x1, z0, z1] = a.sinir;
+    let yol = 0, px = a.x, pz = a.z, disarda = 0, sallandi = 0, durdu = 0;
+    for (let i = 0; i < 1200; i++) {                       // 120 sn'lik benzetim, çizim yok
+      __kopek.adim(.1);
+      const k = __kopek.bilgi();
+      yol += Math.hypot(k.x - px, k.z - pz); px = k.x; pz = k.z;
+      if (k.x < x0 - 1e-6 || k.x > x1 + 1e-6 || k.z < z0 - 1e-6 || k.z > z1 + 1e-6) disarda++;
+      if (Math.abs(k.bacak[0]) > .1) sallandi++;
+      if (k.hiz < .05) durdu++;
+    }
+    return { yol, disarda, sallandi, durdu, genislik: x1 - x0, derinlik: z1 - z0 };
+  });
+  expect(r.disarda).toBe(0);                    // hep sahanın ortasındaki sınırın içinde
+  expect(r.yol).toBeGreaterThan(20);            // gezindi
+  expect(r.sallandi).toBeGreaterThan(50);       // yürürken bacaklar sallanır
+  expect(r.durdu).toBeGreaterThan(10);          // ara sıra durup bekler
+  expect(r.genislik).toBeLessThanOrEqual(28.01); expect(r.derinlik).toBeLessThanOrEqual(18.01);   // küçük bir alan, tüm sahayı gezmez
+  expect(problems).toEqual([]);
+});
