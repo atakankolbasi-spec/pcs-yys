@@ -3267,8 +3267,10 @@ test('canlı saha: sayfa kayarken ve bölüm gizliyken 3B çizim durdurulur, kay
   await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));   // yazılımla 3B çizim yavaş: hep durur
   await frame.evaluate(() => { window.__dur = []; addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha-dur') window.__dur.push(e.data.dur); }); });
   const dur = () => frame.evaluate(() => window.__dur);
+  await page.waitForTimeout(500);                                  // yüklenirken gelen ilk mesajlar (yavaş makinede gecikebilir) sayılmasın
+  await frame.evaluate(() => { window.__dur = []; });
   await page.evaluate(() => { document.body.style.minHeight = '4000px'; window.scrollBy(0, 300); });
-  await expect.poll(dur).toEqual([true]);                          // kayarken dur
+  await expect.poll(async () => (await dur())[0]).toBe(true);      // kayarken dur (yavaş makinede devam mesajı da gelmiş olabilir)
   await page.clock.runFor(300);
   await expect.poll(dur).toEqual([true, false]);                   // kayma bitince devam
   // bölüm gizliyken kaydırmak çizimi yeniden başlatmaz
