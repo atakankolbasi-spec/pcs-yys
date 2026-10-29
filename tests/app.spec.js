@@ -3254,3 +3254,29 @@ test('canlı saha: bant kısa/açık olur, 3B çerçeve bugünün kayıtlarını
   await expect(page.locator('iframe.k-saha-frame')).toBeHidden();
   expect(problems).toEqual([]);
 });
+
+test('canlı saha: sayfa kayarken ve bölüm gizliyken 3B çizim durdurulur, kayma bitince devam eder (liste takılmasın)', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('[data-action="k-saha"]').click();
+  let frame;
+  await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
+  await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
+  await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));   // yazılımla 3B çizim yavaş: hep durur
+  await frame.evaluate(() => { window.__dur = []; addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha-dur') window.__dur.push(e.data.dur); }); });
+  const dur = () => frame.evaluate(() => window.__dur);
+  await page.evaluate(() => { document.body.style.minHeight = '4000px'; window.scrollBy(0, 300); });
+  await expect.poll(dur).toEqual([true]);                          // kayarken dur
+  await page.clock.runFor(300);
+  await expect.poll(dur).toEqual([true, false]);                   // kayma bitince devam
+  // bölüm gizliyken kaydırmak çizimi yeniden başlatmaz
+  await page.evaluate(() => document.querySelector('[data-action="k-saha"]').click());
+  await expect.poll(dur).toEqual([true, false, true]);
+  await page.evaluate(() => window.scrollBy(0, -200));
+  await page.clock.runFor(400);
+  await page.waitForTimeout(300);
+  expect(await dur()).toEqual([true, false, true]);
+  expect(problems).toEqual([]);
+});

@@ -903,11 +903,12 @@ function kHeading(p,actions){
  /* aşağı inilince bandın kısa hali üstte sabit kalır (üst çubuktaki hızlı aramanın yerine) */
  `<div class="k-pinwrap"><div class="k-pinbar" role="region" aria-label="Pano özeti">${pinInner}</div></div>`;}
 /* sabit özet çubuğu: bant ekrandan çıkınca (çubuğun yeri üste yapışınca) görünür */
-function kPinCheck(init){const w=document.querySelector('.k-pinwrap'),top=w?parseFloat(getComputedStyle(w).top):NaN;
+let kPinTop=NaN,kPinW=null;
+function kPinCheck(init){const w=document.querySelector('.k-pinwrap');if(w!==kPinW||init||!(kPinTop>=0)){kPinW=w;kPinTop=w?parseFloat(getComputedStyle(w).top):NaN;}const top=kPinTop;
  document.body.classList.toggle('k-hpin',!!w);document.documentElement.classList.toggle('k-pinned',!!w&&w.getBoundingClientRect().top<=top+1);
  if(init&&w)for(const b of w.querySelectorAll('.btn'))b.title=b.textContent.trim();}
 let kPinRaf=0;const kPinLater=()=>{if(!kPinRaf)kPinRaf=requestAnimationFrame(()=>{kPinRaf=0;kPinCheck();});};
-addEventListener('scroll',kPinLater,{passive:true});addEventListener('resize',kPinLater,{passive:true});
+addEventListener('scroll',kPinLater,{passive:true});addEventListener('resize',()=>{kPinTop=NaN;kPinLater();},{passive:true});
 /* panodaki genel bakış kartları: son 14 iş günü, haftanın durum dağılımı, en uzun bekleyenler, bugün */
 function kPanel(ctl=''){const hidden=kGet(K_PANEL)==='1';
  const head=`<div class="k-panel-head"><span>Genel bakış</span><button type="button" class="k-link" data-action="k-panel" aria-expanded="${!hidden}">${hidden?'Göster':'Gizle'}</button></div>`;
@@ -937,17 +938,22 @@ function kSaha(){const hidden=kSahaGizli();
  const head=`<div class="k-panel-head"><span>Canlı saha · Muratbey</span>${hidden?'':`<span class="k-saha-leg">${leg.map(([l,c])=>`<i style="background:${c}"></i>${l}`).join('')}</span>`}<span class="k-saha-btns">${hidden?'':`<a class="k-link" href="saha.html" target="_blank" rel="noopener">Tam ekran</a>`}<button type="button" class="k-link" data-action="k-saha" aria-expanded="${!hidden}">${hidden?'Göster':'Gizle'}</button></span></div>`;
  return `<section class="k-panel k-saha${hidden?' is-hidden':''}" aria-label="Canlı saha">${head}${hidden?'':'<div class="k-saha-yer" id="k-saha-yer"><p>Saha yükleniyor…</p></div>'}</section>`;}
 var sahaFrame=null,sahaHazir=false;
+/* 3B çizim yalnızca görünürken ve sayfa kaydırılmıyorken çalışır: aksi hâlde ekran dışındaki sahanın her karesi (gölge, 3B) sayfanın
+   kaydırılmasıyla yarışır ve liste takılır. Durum birleştirilir: bölüm gizli ya da sayfa şu an kayıyor = dur. */
+const sahaDurum={gizli:false,kayiyor:false};let sahaDurSon=null,sahaKayT=0;
+function sahaDurUygula(){const d=sahaDurum.gizli||sahaDurum.kayiyor;if(d===sahaDurSon||!sahaFrame)return;sahaDurSon=d;try{sahaFrame.contentWindow.postMessage({tip:'pcs-saha-dur',dur:d},location.origin);}catch(e){}}
+addEventListener('scroll',()=>{if(!sahaFrame||sahaDurum.gizli)return;sahaDurum.kayiyor=true;sahaDurUygula();clearTimeout(sahaKayT);sahaKayT=setTimeout(()=>{sahaDurum.kayiyor=false;sahaDurUygula();},180);},{passive:true});
 function sahaVeri(){const t=TODAY;const z=state.visits.filter(v=>v.date===t||(v.onsite&&!v.done&&v.date<t)).map(v=>({id:v.id,plate:v.plate,customer:v.customer,declaration:v.declaration,carrier:v.carrier,registration:v.registration,visit_date:v.date,visit_time:v.time||'',onsite:!!v.onsite,t1:!!v.t1,done:!!v.done,onsite_at:v.onsite_at||null,t1_at:v.t1_at||null,done_at:v.done_at||null,created_at:v.created_at||v.createdAt||null}));
  const renkler={};for(const v of z)if(v.customer&&!renkler[v.customer])renkler[v.customer]=custColor(v.customer);return {tip:'pcs-saha',ziyaretler:z,renkler,secili:ui.selected||null};}
 function sahaGonder(){if(sahaFrame&&sahaHazir)try{sahaFrame.contentWindow.postMessage(sahaVeri(),location.origin);}catch(e){}}
 function sahaKonum(){const yer=document.getElementById('k-saha-yer');
- if(!yer){if(sahaFrame&&sahaFrame.style.visibility!=='hidden'){sahaFrame.style.visibility='hidden';try{sahaFrame.contentWindow.postMessage({tip:'pcs-saha-dur',dur:true},location.origin);}catch(e){}}return;}
+ if(!yer){if(sahaFrame&&sahaFrame.style.visibility!=='hidden'){sahaFrame.style.visibility='hidden';sahaDurum.gizli=true;sahaDurUygula();}return;}
  if(!sahaFrame){sahaFrame=document.createElement('iframe');sahaFrame.className='k-saha-frame';sahaFrame.title='Canlı saha (3B)';sahaFrame.src='saha.html?gomulu';sahaFrame.setAttribute('loading','eager');document.body.appendChild(sahaFrame);}
  const r=yer.getBoundingClientRect();Object.assign(sahaFrame.style,{top:(r.top+scrollY)+'px',left:(r.left+scrollX)+'px',width:r.width+'px',height:r.height+'px'});
- if(sahaFrame.style.visibility==='hidden'){sahaFrame.style.visibility='';try{sahaFrame.contentWindow.postMessage({tip:'pcs-saha-dur',dur:false},location.origin);}catch(e){}}
+ if(sahaFrame.style.visibility==='hidden'){sahaFrame.style.visibility='';sahaDurum.gizli=false;sahaDurUygula();}
  sahaGonder();}
 addEventListener('message',e=>{if(e.origin!==location.origin||!sahaFrame||e.source!==sahaFrame.contentWindow||!e.data)return;
- if(e.data.tip==='pcs-saha-hazir'){sahaHazir=true;sahaGonder();}
+ if(e.data.tip==='pcs-saha-hazir'){sahaHazir=true;sahaDurSon=null;sahaDurUygula();sahaGonder();}
  else if(e.data.tip==='pcs-saha-sec'){const id=e.data.id;if(id&&!state.visits.some(v=>v.id===id))return;ui.selected=id||null;render();}});
 addEventListener('resize',()=>{if(sahaFrame)sahaKonum();},{passive:true});
 if(typeof ResizeObserver!=='undefined'){let ro=0;new ResizeObserver(()=>{if(!ro)ro=requestAnimationFrame(()=>{ro=0;if(sahaFrame)sahaKonum();});}).observe(document.documentElement);}

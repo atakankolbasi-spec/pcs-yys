@@ -292,7 +292,7 @@ function kur3B(){
   try{const t=document.createElement('canvas');if(!(t.getContext('webgl2')||t.getContext('webgl')))return null;}catch(e){return null;}
   const T=THREE,box=$('s3'),ov=$('s3ov');
   let R;try{R=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}catch(e){return null;}
-  R.setPixelRatio(Math.min(2,devicePixelRatio||1));R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
+  R.setPixelRatio(Math.min(GOMULU?1.5:2,devicePixelRatio||1));R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
   R.toneMapping=T.ACESFilmicToneMapping;R.toneMappingExposure=1.0;R.outputColorSpace=T.SRGBColorSpace;
   box.prepend(R.domElement);R.domElement.setAttribute('aria-label','Tesis sahasının 3B görünümü: kantar, güvenlik kulübesi, bekleme salonu, antrepo, park alanı ve tırlar');
   const SC=new T.Scene(),CAM=new T.PerspectiveCamera(34,16/9,.5,2200);
@@ -946,9 +946,12 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.cont
 /* =========================== DÖNGÜ =========================== */
 let sonListe=0;
 function yenile(zorla){const sim=kaynak.simdi();son=kaynak.liste();senkron(son,sim);ilk=false;olaylar(son,sim);kpi(son,sim);listeCiz(son,sim);uzunlarCiz(son,sim);seciliCiz(son,sim);}
-let last=performance.now(),acc=0;
+let last=performance.now(),acc=0,gorunur=true,sonKare=0;
+/* gömülüyken: ekranda görünmüyorsa (sayfanın altında kaldı) hiç çizilmez; görünürken en çok ~30 kare/sn */
+if(GOMULU&&typeof IntersectionObserver!=='undefined')try{new IntersectionObserver(es=>{gorunur=es[es.length-1].isIntersecting;}).observe(document.documentElement);}catch(e){}
 function loop(now){const dt=Math.min(.1,(now-last)/1000);last=now;
-  if(GOMULU&&dur){requestAnimationFrame(loop);return;}
+  if(GOMULU&&(dur||!gorunur||document.hidden)){requestAnimationFrame(loop);return;}
+  if(GOMULU&&now-sonKare<30){requestAnimationFrame(loop);last-=dt*1000;return;}sonKare=now;
   if(!dur){kaynak.adim(dt*1.2*carp);adimla(dt);}
   acc+=dt;if(acc>.5){acc=0;yenile();}
   if(G3)G3.kare(dt);else draw();requestAnimationFrame(loop);}

@@ -433,7 +433,8 @@ html.kule[data-theme="dark"] .k-bar.today i{background-color:var(--k-af)}
  html.kule:not([data-frame-look="sade"]) .set-panel[open]{border-color:transparent}
  /* çerçeve 1 px'ten kalınlaşınca kart içi daralmasın (örn. durum dağılımı yazıları satır kırmasın) */
  html.kule:not([data-frame-look="sade"]) .k-card{padding:calc(18px - var(--k-fw) + 1px) calc(20px - var(--k-fw) + 1px)}
- html.kule:not([data-frame-look="sade"]) .topbar{box-shadow:var(--k-glow)}
+ html.kule:not([data-frame-look="sade"]) .topbar{box-shadow:var(--k-glow);backdrop-filter:none;-webkit-backdrop-filter:none}   /* çerçeveli üst çubuğun dolgusu zaten opak; bulanıklık görünmez ama kaydırırken her karede hesaplanırdı */
+ html.kule:not([data-frame-look="sade"]) .day-block{box-shadow:var(--k-sh1)}   /* uzun liste kutusunda büyük parıltı gölgesi yok: kaydırmayı yavaşlatmasın */
  /* kendi renkli zemini olan kartlar: zemin padding-box'ta, geçiş çerçevesi border-box'ta */
  html.kule:not([data-frame-look="sade"]) .k-card.k-ctl{border:var(--k-fw) solid transparent;box-shadow:var(--k-glow);
   background-image:radial-gradient(240px 160px at 100% 0%,color-mix(in srgb,var(--c-accent) 55%,transparent),transparent 70%),linear-gradient(150deg,var(--k-brand2),var(--k-brand,#16233a)),var(--k-frame);
