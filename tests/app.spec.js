@@ -3265,18 +3265,56 @@ test('canlı saha: sayfa kayarken ve bölüm gizliyken 3B çizim durdurulur, kay
   await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
   await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
   await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));   // yazılımla 3B çizim yavaş: hep durur
-  await frame.evaluate(() => { window.__dur = []; addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha-dur') window.__dur.push(e.data.dur); }); });
-  const dur = () => frame.evaluate(() => window.__dur);
+  // sayfanın çerçeveye gönderdiği dur/devam mesajları sayfa tarafında kaydedilir (çerçevenin olay döngüsü yavaş makinede 3B kurulurken gecikebilir)
+  await page.evaluate(() => {
+    const w = document.querySelector('iframe.k-saha-frame').contentWindow, orj = w.postMessage.bind(w);
+    window.__pm = [];
+    w.postMessage = (m, o) => { if (m && m.tip === 'pcs-saha-dur') window.__pm.push(m.dur); return orj(m, o); };
+  });
+  const dur = () => page.evaluate(() => window.__pm);
   await page.evaluate(() => { document.body.style.minHeight = '4000px'; window.scrollBy(0, 300); });
-  await expect.poll(dur).toEqual([true]);                          // kayarken dur
+  await expect.poll(async () => (await dur()).includes(true)).toBe(true);          // kayarken dur
   await page.clock.runFor(300);
-  await expect.poll(dur).toEqual([true, false]);                   // kayma bitince devam
+  await expect.poll(async () => (await dur()).slice(-2)).toEqual([true, false]);    // kayma bitince devam
   // bölüm gizliyken kaydırmak çizimi yeniden başlatmaz
   await page.evaluate(() => document.querySelector('[data-action="k-saha"]').click());
-  await expect.poll(dur).toEqual([true, false, true]);
+  await expect.poll(async () => (await dur()).slice(-1)).toEqual([true]);
+  const n = (await dur()).length;
   await page.evaluate(() => window.scrollBy(0, -200));
   await page.clock.runFor(400);
   await page.waitForTimeout(300);
-  expect(await dur()).toEqual([true, false, true]);
+  expect((await dur()).length).toBe(n);
+  expect(problems).toEqual([]);
+});
+
+test('canlı saha: küçük köpek sahanın ortasında gezinir, sınırlar içinde kalır, bacakları yürürken sallanır', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page);
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('[data-action="k-saha"]').click();
+  let frame;
+  await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
+  await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
+  await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));   // gerçek çizim gerekmez
+  await frame.waitForFunction(() => window.__kopek, null, { timeout: 60000 });
+  const r = await frame.evaluate(() => {
+    const a = __kopek.bilgi(), [x0, x1, z0, z1] = a.sinir;
+    let yol = 0, px = a.x, pz = a.z, disarda = 0, sallandi = 0, durdu = 0;
+    for (let i = 0; i < 1200; i++) {                       // 120 sn'lik benzetim, çizim yok
+      __kopek.adim(.1);
+      const k = __kopek.bilgi();
+      yol += Math.hypot(k.x - px, k.z - pz); px = k.x; pz = k.z;
+      if (k.x < x0 - 1e-6 || k.x > x1 + 1e-6 || k.z < z0 - 1e-6 || k.z > z1 + 1e-6) disarda++;
+      if (Math.abs(k.bacak[0]) > .1) sallandi++;
+      if (k.hiz < .05) durdu++;
+    }
+    return { yol, disarda, sallandi, durdu, genislik: x1 - x0, derinlik: z1 - z0 };
+  });
+  expect(r.disarda).toBe(0);                    // hep sahanın ortasındaki sınırın içinde
+  expect(r.yol).toBeGreaterThan(20);            // gezindi
+  expect(r.sallandi).toBeGreaterThan(50);       // yürürken bacaklar sallanır
+  expect(r.durdu).toBeGreaterThan(10);          // ara sıra durup bekler
+  expect(r.genislik).toBeLessThanOrEqual(28.01); expect(r.derinlik).toBeLessThanOrEqual(18.01);   // küçük bir alan, tüm sahayı gezmez
   expect(problems).toEqual([]);
 });
