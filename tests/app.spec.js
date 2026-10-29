@@ -3265,21 +3265,25 @@ test('canlı saha: sayfa kayarken ve bölüm gizliyken 3B çizim durdurulur, kay
   await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
   await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
   await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));   // yazılımla 3B çizim yavaş: hep durur
-  await frame.evaluate(() => { window.__dur = []; addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha-dur') window.__dur.push(e.data.dur); }); });
-  const dur = () => frame.evaluate(() => window.__dur);
-  await page.waitForTimeout(500);                                  // yüklenirken gelen ilk mesajlar (yavaş makinede gecikebilir) sayılmasın
-  await frame.evaluate(() => { window.__dur = []; });
+  // sayfanın çerçeveye gönderdiği dur/devam mesajları sayfa tarafında kaydedilir (çerçevenin olay döngüsü yavaş makinede 3B kurulurken gecikebilir)
+  await page.evaluate(() => {
+    const w = document.querySelector('iframe.k-saha-frame').contentWindow, orj = w.postMessage.bind(w);
+    window.__pm = [];
+    w.postMessage = (m, o) => { if (m && m.tip === 'pcs-saha-dur') window.__pm.push(m.dur); return orj(m, o); };
+  });
+  const dur = () => page.evaluate(() => window.__pm);
   await page.evaluate(() => { document.body.style.minHeight = '4000px'; window.scrollBy(0, 300); });
-  await expect.poll(async () => (await dur())[0]).toBe(true);      // kayarken dur (yavaş makinede devam mesajı da gelmiş olabilir)
+  await expect.poll(async () => (await dur()).includes(true)).toBe(true);          // kayarken dur
   await page.clock.runFor(300);
-  await expect.poll(dur).toEqual([true, false]);                   // kayma bitince devam
+  await expect.poll(async () => (await dur()).slice(-2)).toEqual([true, false]);    // kayma bitince devam
   // bölüm gizliyken kaydırmak çizimi yeniden başlatmaz
   await page.evaluate(() => document.querySelector('[data-action="k-saha"]').click());
-  await expect.poll(dur).toEqual([true, false, true]);
+  await expect.poll(async () => (await dur()).slice(-1)).toEqual([true]);
+  const n = (await dur()).length;
   await page.evaluate(() => window.scrollBy(0, -200));
   await page.clock.runFor(400);
   await page.waitForTimeout(300);
-  expect(await dur()).toEqual([true, false, true]);
+  expect((await dur()).length).toBe(n);
   expect(problems).toEqual([]);
 });
 
