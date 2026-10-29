@@ -40,6 +40,8 @@ async function openApp(page, cfg = {}, url = '/') {
   page.on('response', r => { if (r.status() >= 400) problems.push(`HTTP ${r.status()} ${r.url()}`); });
   await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
   await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: true, role: 'editor', data: sampleData(), ...cfg });
+  // eski testler karşılama bandını açık varsayar (varsayılan artık ince çubuk); kısa hal ayrı testte
+  if (!cfg.heroMini) await page.addInitScript(() => { try { if (localStorage.getItem('pcs-transit-yys.v1.heroMini') === null) localStorage.setItem('pcs-transit-yys.v1.heroMini', '0'); } catch (e) {} });
   await page.clock.install({ time: NOW });
   await page.goto(url);
   return problems;
@@ -3215,5 +3217,40 @@ test('Mail tesis: Ayarlar\'da tesis kodları ve "genelde tesise gelir" kaydedili
   await page.locator('#wa-fac').fill('');
   await page.locator('[data-action="wa-contacts-save"]').click();
   await expect.poll(async () => (await val()).facility_codes).toEqual(['Z34089']);
+  expect(problems).toEqual([]);
+});
+
+test('canlı saha: bant kısa/açık olur, 3B çerçeve bugünün kayıtlarını alır, tıra tıklayınca araç seçilir', async ({ page }) => {
+  const problems = await openApp(page, { heroMini: true });
+  // karşılama bandı varsayılan olarak ince çubuk; düğmeyle açılır ve kapanır
+  await expect(page.locator('.k-pinwrap.k-mini .k-pinbar')).toBeVisible();
+  await expect(page.locator('.heading.k-hero')).toHaveCount(0);
+  await page.locator('.k-mini [data-action="k-hero-mini"]').click();
+  await expect(page.locator('.heading.k-hero')).toBeVisible();
+  await page.locator('.heading.k-hero [data-action="k-hero-mini"]').click();
+  await expect(page.locator('.k-pinwrap.k-mini')).toBeVisible();
+  // canlı saha bölümü genel bakışın hemen altında; otomasyon tarayıcısında varsayılan kapalı, "Göster" ile açılır
+  const order = await page.evaluate(() => [...document.querySelectorAll('.k-panel')].map(s => s.getAttribute('aria-label')));
+  expect(order.slice(0, 2)).toEqual(['Genel bakış', 'Canlı saha']);
+  await expect(page.locator('iframe.k-saha-frame')).toHaveCount(0);
+  await page.locator('[data-action="k-saha"]').click();
+  await expect(page.locator('iframe.k-saha-frame')).toHaveAttribute('src', 'saha.html?gomulu');
+  let frame;
+  await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
+  await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
+  // 3B çizim bu testte gerekmez (yazılımla çizim yavaş): çerçeve duraklatılır, yalnızca mesajlar denetlenir
+  await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));
+  const box = await page.locator('#k-saha-yer').boundingBox(), fb = await page.locator('iframe.k-saha-frame').boundingBox();
+  expect(Math.abs(box.y - fb.y)).toBeLessThan(2); expect(Math.abs(box.width - fb.width)).toBeLessThan(2);
+  // yalnızca bugünün kayıtları gider
+  const got = frame.evaluate(() => new Promise(r => addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha') r(e.data.ziyaretler.map(v => v.id).sort()); })));
+  await page.evaluate(() => document.querySelector('[data-action="k-panel"]').click());
+  expect(await got).toEqual(['v5', 'v6', 'v7']);
+  // çerçeveden gelen seçim panoda aracı seçer
+  await frame.evaluate(() => parent.postMessage({ tip: 'pcs-saha-sec', id: 'v7' }, location.origin));
+  await expect(page.locator('.side-panel')).toContainText('B 123 XYZ');
+  // bölüm gizlenince çerçeve de gizlenir
+  await page.evaluate(() => document.querySelector('[data-action="k-saha"]').click());
+  await expect(page.locator('iframe.k-saha-frame')).toBeHidden();
   expect(problems).toEqual([]);
 });
