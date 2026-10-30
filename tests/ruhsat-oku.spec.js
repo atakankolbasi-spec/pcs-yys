@@ -343,7 +343,7 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     await chat('yarın şu araçlar gelecek: ' + 'PB 7831 KT - PB 7569 EB (90 EURO) 1.GALATA PETROL OTOMOTİV 2.PLASTEK PLASTİK '.repeat(8));
     await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }));
     await post({ 'Content-Type': 'image/png' });
-    expect(seen.map(x => x.think)).toEqual([undefined, undefined, undefined]);
+    expect(seen.map(x => x.think)).toEqual([{ thinkingBudget: 1024 }, { thinkingBudget: 1024 }, undefined]);   // uzun sohbet ve müşteri mesajı kısa düşünür (kapalı değil); ruhsat fotoğrafı ayarsız
     expect(seen.map(x => x.model)).toEqual(['gemini-flash-latest', 'gemini-flash-latest', 'gemini-flash-latest']);   // GEMINI_CHAT_MODEL yalnızca kısa sohbet komutlarında kullanılır
     // hiçbir düşünme ayarı kabul edilmezse ayarsız istek gider (hata yerine cevap alınır)
     seen.length = 0;
@@ -430,6 +430,41 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     const cust = await (await post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }))).json();
     expect(cust.sorts).toBeUndefined();
     expect(cust.undo).toBeUndefined();
+  });
+
+  test('arka plan okumaları: takılan model bir kez beklenir, aynı model tekrarlanmaz ve bir süre sona alınır; beyanname düşünmesiz ve önce kararlı modelle okunur', async () => {
+    const tried = [];
+    const hang = signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new DOMException('zaman aşımı', 'TimeoutError'))));
+    const { post } = await setup({ env: { GEMINI_TRY_MS: '60' }, gemini: (url, body, headers, signal) => {
+      const model = /models\/([^:]+):/.exec(url)[1], decl = body.contents[0].parts.some(p => p.inlineData);
+      tried.push({ model, think: body.generationConfig.thinkingConfig || null, decl });
+      if (model === 'gemini-flash-latest') return hang(signal);                                  // takma ad cevap vermiyor
+      return decl ? answer({ declaration: true, number: '26341300EX0001', facility_code: 'Z34089', exporter: '', exporter_short: '', plates: [] })
+        : answer({ items: [], customer: '', problem: '' });
+    } });
+    const text = () => post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }));
+    const t0 = Date.now();
+    let res = await text();
+    expect(res.status).toBe(200);
+    expect(tried.map(x => x.model)).toEqual(['gemini-flash-latest', 'gemini-2.5-flash']);        // takılan model tekrarlanmadan sıradakine geçildi
+    expect(tried[0].think).toEqual({ thinkingBudget: 1024 });                                    // mesaj okuma: kısa düşünme
+    expect(Date.now() - t0).toBeLessThan(3000);
+    // takılan model 10 dakika sona alınır: sonraki istek doğrudan çalışan modelle başlar
+    tried.length = 0;
+    res = await text();
+    expect(res.status).toBe(200);
+    expect(tried.map(x => x.model)).toEqual(['gemini-2.5-flash']);
+    // beyanname: düşünme kapalı, önce kararlı model (GEMINI_MODEL elle seçilmediyse)
+    tried.length = 0;
+    res = await post({ 'Content-Type': 'application/pdf', 'x-pcs-mode': 'beyanname' }, new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3]));
+    expect(res.status).toBe(200);
+    expect(tried).toEqual([{ model: 'gemini-2.5-flash', think: { thinkingBudget: 0 }, decl: true }]);
+    // hiçbir model cevap vermezse sunucu toplam sınırı aşmadan hata döner (mail betiği 90 sn sonra bırakır)
+    const hepsi = await setup({ env: { GEMINI_TRY_MS: '40' }, gemini: (url, body, headers, signal) => hang(signal) });
+    const t1 = Date.now();
+    res = await hepsi.post({ 'Content-Type': 'application/json' }, JSON.stringify({ text: 'yarın 34 ABC 123 gelecek', today: '2026-10-22' }));
+    expect(res.status).toBe(502);
+    expect(Date.now() - t1).toBeLessThan(3000);
   });
 
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {
