@@ -147,7 +147,8 @@ export async function run(deps = {}) {
     // Ekler yalnızca bellekte okunur: beyanname adayları Gemini'ye, .docx düz metne çevrilip mesaja eklenir.
     const { belgeler, docxler } = okunacakEkler(mail.attachments);
     const okunan = [];
-    for (const b of belgeler) { const d = await beyannameOku(b); if (d?.declaration) okunan.push(d); }
+    // Yapay zekâ cevap vermiyorsa (zaman aşımı) kalan belgeler için de beklenmez: beyanname görülmedi sayılır, mailin yazısı yine okunur
+    for (const b of belgeler) { const d = await beyannameOku(b); if (d === false) break; if (d?.declaration) okunan.push(d); }
     const docxYazi = docxler.map(b => docxMetni(b)).filter(Boolean).join(NL).slice(0, 2000);
     beyannameler = [...new Set([...okunan.map(d => d.number).filter(Boolean), ...adBeyan])].slice(0, 10);
     const r = await gemini(geminiMetni({ konu, gonderen: ad ? `${ad} <${adres}>` : adres, govde: [govde, docxYazi && 'Ek belge (docx) metni:' + NL + docxYazi].filter(Boolean).join(NL + NL), dosyalar, beyannameler, gun }), gun);
@@ -184,7 +185,8 @@ export async function run(deps = {}) {
         if (r.ok && gecerli(govde)) return { ok: true, veri: govde };
       } catch (e) { durum = 0; if (e?.name === 'TimeoutError' || e?.name === 'AbortError') { neden = 'yanıt ' + Math.round(ISTEK_MS / 1000) + ' sn içinde gelmedi'; break; } }
       neden = govde?.reason || (durum ? 'sunucu hatası ' + durum : 'bağlantı kurulamadı');
-      if (govde?.fatal || !(durum === 0 || durum === 429 || durum >= 500) || i === 3) break;
+      // sunucu birden fazla modeli sınırı dolana kadar denedi (Gemini 504): aynı çalışmada yeniden denemek süreyi boşa harcar, 5 dk sonraki çalışmaya kalır
+      if (govde?.fatal || govde?.error === 'Gemini 504' || !(durum === 0 || durum === 429 || durum >= 500) || i === 3) break;
       await sleep(Math.min(40, durum === 429 ? Math.max(5, +govde?.retry_after || 15) : 8) * 1000);
     }
     return { ok: false, neden };
@@ -193,7 +195,8 @@ export async function run(deps = {}) {
   // Beyanname modu: okunamazsa ya da beyanname değilse null (sessizce atlanır)
   async function beyannameOku(b) {
     const r = await cagir({ headers: { 'Content-Type': b.tur, 'x-pcs-mode': 'beyanname' }, body: b.icerik }, g => typeof g?.declaration === 'boolean');
-    return r.ok ? r.veri : null;
+    if (r.ok) return r.veri;
+    return /gelmedi|zamanında cevap|süre doldu/.test(r.neden || '') ? false : null;   // false: yapay zekâ cevap vermiyor (zaman aşımı); null: bu belge okunamadı
   }
 }
 

@@ -80,6 +80,15 @@ sekmesine girin, eski kodu tamamen silip yenisini yapıştırın ve **Deploy**'a
   sınırları çok daha yüksektir).
 - `Gemini 503`: Google o an çok yoğun; site bekleyip yeniden dener.
 
+## Mail / WhatsApp / beyanname okuma yavaşsa ("süre doldu", "yanıt 90 sn içinde gelmedi")
+- Arka plandaki okumalar (mail, WhatsApp, yapıştırılan mesaj, liste, beyanname) artık bir deneme en çok 40-45 saniye bekler, toplamda en çok 80 saniye
+  (mail betiği 90 saniye sonra bıraktığı için sunucu daha önce cevap ya da net hata verir). Google bir modelden cevap vermezse **aynı model tekrar
+  beklenmez**, sıradaki modele geçilir ve takılan model 10 dakika sona alınır.
+- **Beyanname (PDF / resim)** düşünme kapalı, önce kararlı `gemini-2.5-flash` ile okunur; mesaj ve liste okuma kısa düşünür.
+- Mail betiği: yapay zekâ cevap vermiyorsa kalan ekler beklenmez, aynı çalışmada yeniden denenmez; mailin yazısı yine okunur (beyanname "görülmedi" uyarısıyla),
+  okunamayan mail sonraki çalışmada (5 dk) yeniden denenir.
+- Süreleri değiştirmek için isteğe bağlı gizli değer `GEMINI_TRY_MS` (bir denemenin bekleme sınırı, milisaniye).
+
 ## Sohbet balonu neden yavaş olabilir, ne yapıldı
 - Sık sorular ve plakalı durum komutları (**"bugün kaç araç tesiste?"**, **"gelecek araçları listele"**, **"CB 1234 AB tesiste"**,
   **"CB 1234 AB ne durumda"**) sitede yerelde, yapay zekâya gitmeden anında cevaplanır. Cümledeki her sözcük bilinmiyorsa ya da

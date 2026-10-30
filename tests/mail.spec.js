@@ -225,6 +225,21 @@ test.describe('mail okuma', () => {
     expect(r.yamalar[0].ai.declarations).toBeUndefined();
   });
 
+  test('yapay zekâ cevap vermiyorsa (zaman aşımı) kalan belgeler beklenmez ve aynı çalışmada yeniden denenmez; mailin yazısı yine okunur', async () => {
+    const m = mailPdf({ attachments: [pdfEk('a.pdf'), pdfEk('b.pdf'), pdfEk('c.pdf')] });
+    const zamanAsimi = { status: 502, body: { error: 'Gemini 504', reason: 'Gemini zamanında cevap vermedi' } };
+    const r = await kos({ mailler: [{ uid: 1, mail: m }], beyan: [zamanAsimi] });
+    expect(r.beyanCagri).toHaveLength(1);                         // ilk belge zaman aşımına uğradı: ikinci ve üçüncü denenmedi, aynı belge yeniden denenmedi
+    expect(r.gemCagri).toHaveLength(1);                           // mailin yazısı yine okundu
+    expect(r.yamalar[0].status).toBe('bekliyor');
+    expect(r.yamalar[0].ai.items[0].facility).toBe('belirsiz');   // beyanname görülmedi uyarısıyla
+    // mesaj okuma da zaman aşımına uğrarsa tek denemeyle bırakılır; mail "hata" olarak kalır ve sonraki çalışmada denenir
+    const r2 = await kos({ mailler: [{ uid: 2, mail: mailPdf() }], gemini: [zamanAsimi] });
+    expect(r2.gemCagri).toHaveLength(1);
+    expect(r2.yamalar[0]).toMatchObject({ status: 'hata' });
+    expect(r2.yamalar[0].note).toContain('Gemini zamanında cevap vermedi');
+  });
+
   test('boyut sınırı: çok küçük ve çok büyük ekler okunmaz; en çok 4 belge', async () => {
     const ekler = [pdfEk('kucuk.pdf', 100), pdfEk('dev.pdf', 9 * 1024 * 1024), ...[1, 2, 3, 4, 5, 6].map(i => pdfEk(`b${i}.pdf`))];
     const r = await kos({ mailler: [{ uid: 1, mail: mailPdf({ attachments: ekler }) }], beyan: [beyanOk('Z34089')] });
