@@ -3399,3 +3399,32 @@ test('güvenlik ekranı: sürücü kaydı kurulu değilse uyarı verilir ama mes
   await expect(view.locator('[data-action="guard-drv"]')).toHaveCount(0);
   expect(problems.filter(x => !/PGRST202|404|guard_driver/.test(x))).toEqual([]);
 });
+
+test('canlı saha: tır "işlemler bitti" ile değil, güvenlik ÇIKIŞ yapınca sahadan çıkar; pano çerçeveye çıkış saatini de gönderir', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  // v7 (B 123 XYZ): tesiste, T1 yazıldı, işlemler bitti ama güvenlik çıkışı yok; v5: güvenlik çıkış yapmış
+  Object.assign(data.visits.find(v => v.id === 'v7'), { done: true, done_at: '2026-09-23T06:50:00Z' });
+  Object.assign(data.visits.find(v => v.id === 'v5'), { t1: true, done: true, done_at: '2026-09-23T06:40:00Z', exit_at: '2026-09-23T06:45:00Z' });
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('[data-action="k-saha"]').click();
+  let frame;
+  await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
+  await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
+  await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));
+  // çerçeveye giden kayıtlarda exit_at da var
+  const got = frame.evaluate(() => new Promise(r => addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha') r(e.data.ziyaretler.map(v => [v.id, v.done, v.exit_at]).sort()); })));
+  await page.evaluate(() => document.querySelector('[data-action="k-panel"]').click());
+  expect(await got).toEqual([['v5', true, '2026-09-23T06:45:00Z'], ['v6', false, null], ['v7', true, null]]);
+  // sahadaki liste: işlemleri bitmiş ama çıkış yapmamış v7 hâlâ sahada; çıkış yapan v5 yok
+  await expect.poll(() => frame.evaluate(() => [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id).sort())).toEqual(['v6', 'v7']);
+  // güvenlik çıkış yapınca v7 de sahadan çıkar
+  await frame.evaluate(() => {
+    const z = ['v5', 'v6', 'v7'].map(id => ({ id, plate: id, customer: 'X', registration: '', declaration: '', carrier: '', visit_date: '2026-09-23', visit_time: '08:00', onsite: true, t1: true, done: id !== 'v6', onsite_at: '2026-09-23T05:00:00Z', done_at: id !== 'v6' ? '2026-09-23T06:00:00Z' : null, exit_at: id === 'v6' ? null : '2026-09-23T06:30:00Z', created_at: '2026-09-23T04:00:00Z' }));
+    window.postMessage({ tip: 'pcs-saha', ziyaretler: z, renkler: {}, secili: null }, location.origin);
+  });
+  await expect.poll(() => frame.evaluate(() => [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id))).toEqual(['v6']);
+  expect(problems).toEqual([]);
+});
