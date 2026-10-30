@@ -2260,7 +2260,7 @@ document.addEventListener('input',e=>{if(e.target.id==='chat-input')chatGrow();}
    müşteri bazında kopyalanır / WhatsApp'ta paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
    (sunucu da aynı kuralları uygular). Liste 10 sn'de bir yenilenir. */
 const GUARD_UNDO_MS=15*60000,GUARD_POLL_MS=10000;
-const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',why:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true};
+const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',why:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true,drv:null};
 const gView=()=>GUARD_VIEW||!guard.canMark; // izleme linki: GİRİŞ / ÇIKIŞ yok
 const gIn=v=>!!(v.onsite||v.onsite_at),gOut=v=>!!v.exit_at,gNow=()=>Date.now()+guard.skew;
 const gToday=()=>guard.today||localToday();
@@ -2287,6 +2287,50 @@ async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.fro
   else if(e?.code==='22023'&&guard.from){guard.from=guard.to='';toast(e.message,true);return guardLoad();}
   else guard.error=e?.code==='TIMEOUT'?'Bağlantı yavaş; liste birkaç saniye içinde yeniden denenecek.':isNetErr(e)?'İnternet bağlantısı yok. Bağlantı gelince liste kendiliğinden yenilenir.':'Liste yenilenemedi: '+(e?.message||e);}
  guard.loading=false;renderGuard();}
+/* ---- Sürücüye mesaj (güvenlik ekranı) ----
+   Güvenlik sürücünün adını ve telefonunu karta yazar; "PARK ALANI MÜSAİT KANTARA GELİNİZ" mesajı plakanın ülkesine uygun dilde
+   hazırlanır (dil elle de seçilir) ve WhatsApp'ta o numaraya açılır; gönder düğmesine güvenlik basar. Ad ve telefon araç kaydına
+   yazılır (guard_driver, supabase/guvenlik-kurulumu.sql); kayıt yazılamazsa mesaj yine açılır. */
+const DRV_LANG={
+ tr:['Türkçe','PARK ALANI MÜSAİT KANTARA GELİNİZ'],
+ en:['English','PARKING AREA IS AVAILABLE. PLEASE COME TO THE WEIGHBRIDGE.'],
+ bg:['Български','ПАРКИНГЪТ Е СВОБОДЕН. МОЛЯ, ЕЛАТЕ НА КАНТАРА.'],
+ ro:['Română','LOCUL DE PARCARE ESTE LIBER. VĂ RUGĂM SĂ VENIȚI LA CÂNTAR.'],
+ el:['Ελληνικά','Ο ΧΩΡΟΣ ΣΤΑΘΜΕΥΣΗΣ ΕΙΝΑΙ ΔΙΑΘΕΣΙΜΟΣ. ΠΑΡΑΚΑΛΟΥΜΕ ΠΡΟΣΕΛΘΕΤΕ ΣΤΗ ΓΕΦΥΡΟΠΛΑΣΤΙΓΓΑ.'],
+ hu:['Magyar','A PARKOLÓ SZABAD. KÉRJÜK, JÖJJÖN A HÍDMÉRLEGHEZ.'],
+ cs:['Čeština','PARKOVIŠTĚ JE VOLNÉ. PŘIJEĎTE PROSÍM NA VÁHU.'],
+ sq:['Shqip','VENDPARKIMI ËSHTË I LIRË. JU LUTEMI VINI TEK PESHORJA.'],
+ uk:['Українська','МІСЦЕ НА ПАРКІНГУ ВІЛЬНЕ. БУДЬ ЛАСКА, ПІД’ЇЖДЖАЙТЕ НА ВАГИ.'],
+ ru:['Русский','ПАРКОВКА СВОБОДНА. ПОЖАЛУЙСТА, ПОДЪЕЗЖАЙТЕ НА ВЕСЫ.'],
+ sr:['Srpski','PARKING JE SLOBODAN. MOLIMO VAS, DOĐITE NA VAGU.'],
+ pl:['Polski','MIEJSCE NA PARKINGU JEST WOLNE. PROSZĘ PODJECHAĆ NA WAGĘ.']};
+const DRV_BY_COUNTRY={TR:'tr',BG:'bg',RO:'ro',MD:'ro',GR:'el',HU:'hu',CZ:'cs',AL:'sq',UA:'uk'},DRV_CALL={TR:'90',BG:'359',RO:'40',MD:'373',GR:'30',HU:'36',CZ:'420',AL:'355',UA:'380'};
+const drvCountry=v=>{const c=plateCountries(v.plate,'');return c[0]||c[1]||'';};
+const drvAutoLang=v=>DRV_BY_COUNTRY[drvCountry(v)]||'en';
+const drvLang=(v,d)=>DRV_LANG[d.lang]?d.lang:drvAutoLang(v);
+/* telefon -> WhatsApp numarası (yalnızca rakam, ülke kodlu). "+359…" ve "00359…" olduğu gibi; "0532…" ve ülke kodsuz kısa numara plakanın ülke koduyla */
+function drvPhone(raw,v){let s=String(raw||'').replace(/[^\d+]/g,'');if(!s)return '';
+ if(s.startsWith('+'))s=s.slice(1);else if(s.startsWith('00'))s=s.slice(2);
+ else{const code=DRV_CALL[drvCountry(v)]||'90';s=s.startsWith('0')?code+s.slice(1):s.length<=10?code+s:s;}
+ return /^\d{8,15}$/.test(s)?s:'';}
+const drvMessage=(v,d)=>[String(d.name||'').trim(),String(d.phone||'').trim(),'PCS TRANSİT',DRV_LANG[drvLang(v,d)][1]].filter(Boolean).join('\n');
+function drvForm(v){const d=guard.drv,auto=drvAutoLang(v),num=drvPhone(d.phone,v);
+ return `<form class="guard-drv" data-id="${esc(v.id)}" autocomplete="off"><label>Ad soyad<input id="drv-name" data-drv="name" value="${esc(d.name)}" maxlength="80" autocapitalize="words" enterkeyhint="next" aria-label="Sürücünün adı soyadı"></label>
+ <label>Telefon<input id="drv-phone" data-drv="phone" type="tel" inputmode="tel" value="${esc(d.phone)}" maxlength="24" placeholder="+359 88 123 4567" aria-label="Sürücünün telefon numarası"></label>
+ <label>Mesaj dili<select id="drv-lang" data-drv="lang" aria-label="Mesaj dili"><option value="auto"${d.lang==='auto'?' selected':''}>Otomatik · ${esc(DRV_LANG[auto][0])} (plakaya göre)</option>${Object.entries(DRV_LANG).map(([k,l])=>`<option value="${k}"${d.lang===k?' selected':''}>${esc(l[0])}</option>`).join('')}</select></label>
+ <pre class="guard-drv-prev" id="drv-prev">${esc(drvMessage(v,d))}</pre><small class="guard-drv-num" id="drv-num">${num?'WhatsApp numarası: +'+esc(num):'Telefon yazılınca WhatsApp numarası burada görünür'}</small>
+ <div class="guard-drv-acts"><button type="button" class="guard-drv-send" data-action="guard-drv-send" data-id="${esc(v.id)}">${icon('wa')}<span>WhatsApp’ta gönder</span></button><button type="button" class="guard-drv-save" data-action="guard-drv-save" data-id="${esc(v.id)}">Kaydet</button><button type="button" class="guard-drv-close" data-action="guard-drv" data-id="${esc(v.id)}">Kapat</button></div></form>`;}
+function drvPreview(){const d=guard.drv,v=d&&guard.rows.find(x=>x.id===d.id);if(!v)return;const p=document.getElementById('drv-prev'),n=document.getElementById('drv-num'),num=drvPhone(d.phone,v);
+ if(p)p.textContent=drvMessage(v,d);if(n)n.textContent=num?'WhatsApp numarası: +'+num:'Telefon yazılınca WhatsApp numarası burada görünür';}
+/* sürücü bilgisini kaydeder; sessiz=true: hata olursa yalnızca uyarı verir (mesaj yine de açılacak) */
+async function drvSave(v,silent){const d=guard.drv;if(!d||d.id!==v.id||gView())return false;
+ const name=String(d.name||'').trim(),phone=String(d.phone||'').replace(/[^\d+]/g,'');if(name===(v.driver_name||'')&&phone===(v.driver_phone||''))return true;
+ try{const {data,error}=await guardRpc('guard_driver',{p_token:GUARD_TOKEN||null,p_visit_id:v.id,p_name:name,p_phone:phone},20000);if(error)throw error;
+  if(data&&typeof data==='object')Object.assign(v,data);renderGuard();if(!silent)toast('Sürücü bilgisi kaydedildi.');return true;}
+ catch(e){toast(e?.code==='PGRST202'?'Sürücü bilgisi kaydedilemedi: ofis Supabase’de guvenlik-kurulumu.sql dosyasını yeniden çalıştırmalı.':e?.code==='TIMEOUT'?'Bağlantı yavaş; sürücü bilgisi kaydedilmemiş olabilir.':e?.code==='42501'?'Sürücü bilgisi kaydedilemedi: '+(e?.message||'yetki yok'):isNetErr(e)?'İnternet yok; sürücü bilgisi kaydedilmedi.':(e?.message||'Sürücü bilgisi kaydedilemedi.'),true);return false;}}
+async function drvSend(v){const d=guard.drv;if(!d||d.id!==v.id)return;const num=drvPhone(d.phone,v);
+ if(!num){toast('Sürücünün telefon numarasını yazın (örn. +359 88 123 4567).',true);document.getElementById('drv-phone')?.focus();return;}
+ const msg=drvMessage(v,d);await drvSave(v,true);waLaunch(num,msg);}
 /* Kart: GİRİŞ ve ÇIKIŞ yan yana, aynı blokta. Basılan düğme saatini gösterir ("✓ GİRİŞ 10:29").
    ÇIKIŞ, giriş yapılmadan basılamaz. Eski günlerin araçlarında düğmeler yalnızca bilgi gösterir.
    Çıkış yapan aracın kartında giriş-çıkış bilgisini WhatsApp'ta paylaşma düğmesi vardır. */
@@ -2304,6 +2348,7 @@ function guardCard(v,ctx){const board=ctx==='board',busy=guard.busy.has(v.id),in
  <div class="guard-meta"><div class="saha-cust"><i></i>${esc(v.customer||'Müşterisiz')}</div>${kgText(v.registration)?`<span class="guard-reg" title="Ruhsat">${icon('doc')}Ruhsat <b>${esc(kgText(v.registration))}</b></span>`:''}</div>
  ${!board&&(ready||inn&&!out)?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti · çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
  <div class="guard-pair">${inBtn}${outBtn}</div>
+ ${gView()?(v.driver_name||v.driver_phone?`<div class="guard-driver"><span class="guard-drv-info">${esc([v.driver_name,v.driver_phone].filter(Boolean).join(' · '))}</span></div>`:''):`<div class="guard-driver">${v.driver_name||v.driver_phone?`<span class="guard-drv-info">${esc([v.driver_name,v.driver_phone].filter(Boolean).join(' · '))}</span>`:''}<button type="button" class="guard-drv-btn" data-action="guard-drv" data-id="${esc(v.id)}" aria-expanded="${guard.drv?.id===v.id}">${icon('wa')}<span>${v.driver_phone?'Sürücüye mesaj':'Sürücü · mesaj'}</span></button></div>${guard.drv?.id===v.id?drvForm(v):''}`}
  ${undo||out?`<div class="guard-foot">${out?`<button type="button" class="guard-wa" data-action="guard-card-wa" data-id="${esc(v.id)}" title="Giriş-çıkış bilgisini WhatsApp’ta paylaş">${icon('wa')}<span>WhatsApp</span></button>`:''}${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}"${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</div>`:''}</article>`;}
 /* Rapor: seçilen aralığın araçları müşteri bazında; panodaki "Günlük giriş – çıkış" penceresiyle aynı biçim */
 function guardRepRows(st,cust){const {from,to}=guardRange(),q=norm(guard.q);
@@ -2349,7 +2394,7 @@ function renderGuard(){const app=document.getElementById('app');document.title=g
  <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
  <div class="saha-tabs" role="group" aria-label="Liste">${tabs.map(([k,l,n])=>`<button type="button" class="saha-tab${tab===k?' active':''}" data-action="guard-tab" data-k="${k}" aria-pressed="${tab===k}">${l}<b>${n}</b></button>`).join('')}</div></div>
  ${guard.error?`<div class="guard-alert" role="alert">${icon('info')}<span>${esc(guard.error)}</span></div>`:''}${body}</div>`;
- if(focus==='guard-q'){const i=document.getElementById('guard-q');i?.focus();if(sel!=null)i?.setSelectionRange(sel,sel);}}
+ if(focus==='guard-q'||focus==='drv-name'||focus==='drv-phone'){const i=document.getElementById(focus);i?.focus();if(sel!=null)try{i?.setSelectionRange(sel,sel);}catch(_){}}}
 function setGuardRange(f,t){const today=gToday();if(!validDate(f)||!validDate(t))return;if(t<f)[f,t]=[t,f];
  if((dateObj(t)-dateObj(f))/DAY>30){toast('En fazla 31 günlük aralık seçilebilir.',true);t=addDays(f,30);}
  if(t>addDays(today,7)){toast('İleri tarih en fazla 1 hafta seçilebilir.',true);return renderGuard();}
@@ -2380,6 +2425,8 @@ document.addEventListener('click',e=>{if(!inGuard())return;const b=e.target.clos
  if(a==='guard-tab'){guard.tab=b.dataset.k;return renderGuard();}
  if(a==='guard-refresh')return guardLoad();
  if(a==='guard-mark')return guardMark(b.dataset.id,b.dataset.k);
+ if(a==='guard-drv'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(!v||gView())return;guard.drv=guard.drv?.id===v.id?null:{id:v.id,name:v.driver_name||'',phone:v.driver_phone||'',lang:'auto'};renderGuard();if(guard.drv)document.getElementById('drv-name')?.focus();return;}
+ if(a==='guard-drv-save'||a==='guard-drv-send'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(!v||gView()||b.disabled)return;b.disabled=true;(a==='guard-drv-send'?drvSend(v):drvSave(v,false)).finally(()=>{b.disabled=false;});return;}
  if(a==='guard-card-wa'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(v)waLaunch('',gateText(v));return;}
  if(a==='guard-rep-st'){guard.repSt=b.dataset.st;return renderGuard();}
  if(a==='guard-rep-copy'||a==='guard-rep-wa')return guardShare(a==='guard-rep-wa'?'wa':'copy','cust' in b.dataset?b.dataset.cust:null);
@@ -2388,6 +2435,7 @@ document.addEventListener('click',e=>{if(!inGuard())return;const b=e.target.clos
  if(a==='guard-jump'){document.getElementById('guard-col-'+b.dataset.k)?.scrollIntoView({behavior:'smooth',block:'start'});return;}
  if(a==='guard-day-step'){const {from,to}=guardRange(),n=Math.round((dateObj(to)-dateObj(from))/DAY)+1,st=Number(b.dataset.step)*n;return setGuardRange(addDays(from,st),addDays(to,st));}});
 document.addEventListener('input',e=>{if(!inGuard()||e.target.id!=='guard-q')return;guard.q=e.target.value;renderGuard();});
+for(const ev of ['input','change'])document.addEventListener(ev,e=>{const t=e.target;if(!inGuard()||!guard.drv||!t.dataset?.drv)return;guard.drv[t.dataset.drv]=t.value;drvPreview();});
 document.addEventListener('change',e=>{if(!inGuard())return;const id=e.target.id;if(id!=='guard-from'&&id!=='guard-to')return;const r=guardRange();
  let f=id==='guard-from'?e.target.value:r.from,t=id==='guard-to'?e.target.value:r.to;if(t<f){if(id==='guard-from')t=f;else f=t;}setGuardRange(f,t);});
 

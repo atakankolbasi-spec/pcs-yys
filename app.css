@@ -2339,3 +2339,24 @@ html[data-theme="dark"] .msg-mail-tag{background:#1e2a44;color:#93b4ff}
 .wa-fac{margin:14px 0 6px;display:flex;flex-direction:column;gap:6px}.wa-fac label{font-size:12.5px;color:var(--muted)}.wa-fac input{max-width:420px;min-height:36px;font-weight:700;letter-spacing:.04em}
 .wa-comes-l{grid-column:2 / -1;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer}
 .msg-nocome{margin-top:8px;border:1px dashed var(--line);border-radius:10px;padding:6px 10px}.msg-nocome>summary{cursor:pointer;font-size:12.5px;display:flex;gap:6px;align-items:center}.msg-nocome>summary svg{width:14px;height:14px;flex:none}
+/* güvenlik ekranı: sürücüye mesaj (ad soyad, telefon, dil, WhatsApp) */
+.guard-driver{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;margin-top:2px}
+.guard-drv-info{flex:1 1 140px;min-width:0;font-size:13px;font-weight:700;color:#3b4d66;overflow-wrap:anywhere}
+.guard-drv-btn{flex:0 0 auto;min-height:36px;padding:0 12px;border:1px solid #16a34a;border-radius:9px;background:#fff;color:#15803d;font-family:inherit;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.guard-drv-btn svg{width:16px;height:16px;flex:none}.guard-drv-btn:hover,.guard-drv-btn[aria-expanded="true"]{background:#f0fdf4}
+.guard-drv{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc}
+.guard-drv label{display:grid;gap:3px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5b6b82}
+.guard-drv input,.guard-drv select{min-height:44px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#16233a;font:600 16px/1.2 inherit;text-transform:none;letter-spacing:0;width:100%;box-sizing:border-box}
+.guard-drv-prev{margin:0;padding:10px 12px;border-radius:10px;background:#e7f8ee;border:1px solid #b7e4c7;color:#14532d;font:700 14px/1.45 inherit;white-space:pre-wrap;overflow-wrap:anywhere}
+.guard-drv-num{font-size:12px;font-weight:700;color:#5b6b82}
+.guard-drv-acts{display:flex;flex-wrap:wrap;gap:8px}
+.guard-drv-send{flex:1 1 180px;min-height:44px;border:0;border-radius:10px;background:#16a34a;color:#fff;font-family:inherit;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.guard-drv-send svg{width:18px;height:18px}.guard-drv-send:hover{background:#15803d}.guard-drv-send:disabled{opacity:.6}
+.guard-drv-save,.guard-drv-close{min-height:44px;padding:0 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#16233a;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer}
+html[data-theme="dark"] .guard-drv-info{color:#c4cdd9}
+html[data-theme="dark"] .guard-drv-btn{background:#16233a;border-color:#2f8a57;color:#86efac}html[data-theme="dark"] .guard-drv-btn:hover,html[data-theme="dark"] .guard-drv-btn[aria-expanded="true"]{background:#173a2a}
+html[data-theme="dark"] .guard-drv{background:#141c2b;border-color:#2a3757}
+html[data-theme="dark"] .guard-drv label,html[data-theme="dark"] .guard-drv-num{color:#9fb0c8}
+html[data-theme="dark"] .guard-drv input,html[data-theme="dark"] .guard-drv select{background:#0f1729;border-color:#2a3757;color:#e8edf8}
+html[data-theme="dark"] .guard-drv-prev{background:#10301f;border-color:#1f6b52;color:#b7f0cd}
+html[data-theme="dark"] .guard-drv-save,html[data-theme="dark"] .guard-drv-close{background:#16233a;border-color:#2a3757;color:#e8edf8}

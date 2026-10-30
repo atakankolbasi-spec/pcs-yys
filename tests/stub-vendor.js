@@ -220,7 +220,7 @@
         }
         return { data: name === 'list_guard_accounts' ? clone(list) : null, error: null };
       }
-      if (name === 'guard_board' || name === 'guard_mark') {
+      if (name === 'guard_board' || name === 'guard_mark' || name === 'guard_driver') {
         const acct = params.p_token == null && !!session && !!cfg.guardAccount && cfg.guardAccount.active !== false && !cfg.guardOldBoard;
         const canMark = acct || (!!cfg.guardToken && params.p_token === cfg.guardToken);
         const viewOk = name === 'guard_board' && !!cfg.guardViewToken && params.p_token === cfg.guardViewToken;
@@ -231,7 +231,7 @@
         }
         const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
         const ymdIst = iso => new Date(Date.parse(iso) + 3 * 36e5).toISOString().slice(0, 10); // İstanbul (UTC+3) günü
-        const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, registration: v.registration || '', visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, exit_at: v.exit_at || null });
+        const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, registration: v.registration || '', visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, driver_name: v.driver_name || null, driver_phone: v.driver_phone || null, exit_at: v.exit_at || null });
         if (name === 'guard_board') {
           if (cfg.guardOldSql && params.p_from) return guardErr('PGRST202', 'Could not find the function public.guard_board(p_from, p_to, p_token)');
           const f = params.p_from || today, t = params.p_to || f;
@@ -241,6 +241,13 @@
         }
         const v = db.visits.find(x => x.id === params.p_visit_id && x.visit_date >= back(7) && x.visit_date <= back(-1));
         if (!v) return guardErr('P0002', 'Araç bulunamadı');
+        if (name === 'guard_driver') {   // cfg.guardNoDriver: veritabanında guard_driver (sürücü alanları) henüz kurulmamış
+          if (cfg.guardNoDriver) return guardErr('PGRST202', 'Could not find the function public.guard_driver(p_name, p_phone, p_token, p_visit_id)');
+          v.driver_name = String(params.p_name || '').trim() || null;
+          v.driver_phone = String(params.p_phone || '').replace(/[^0-9+]/g, '') || null;
+          v.updated_at = now();
+          return { data: { id: v.id, driver_name: v.driver_name, driver_phone: v.driver_phone }, error: null };
+        }
         const recent = t => t && Date.now() - Date.parse(t) < 15 * 60000;
         const a = params.p_action;
         if (a === 'giris') Object.assign(v, { onsite: true, onsite_at: v.onsite_at || now() });

@@ -21,6 +21,9 @@
 -- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
 
 alter table public.visits add column if not exists exit_at timestamptz;
+-- Sürücü bilgisi: güvenlik ekranından yazılır (ad soyad + telefon); sürücüye WhatsApp mesajı bu numaraya hazırlanır.
+alter table public.visits add column if not exists driver_name text;
+alter table public.visits add column if not exists driver_phone text;
 
 -- Güvenlik oturum açmadığı için "son değiştiren" (updated_by) boş yazılır; sütun boş bırakılamaz
 -- tanımlıysa bu kısıt kaldırılır. Kimin yaptığı işlem geçmişinde "Güvenlik" olarak görünür.
@@ -211,7 +214,8 @@ begin
       select jsonb_agg(jsonb_build_object(
                'id', v.id, 'plate', v.plate, 'customer', v.customer, 'registration', v.registration, 'visit_date', v.visit_date,
                'visit_time', v.visit_time, 'onsite', v.onsite, 'onsite_at', v.onsite_at,
-               'done', v.done, 'done_at', v.done_at, 'exit_at', v.exit_at)
+               'done', v.done, 'done_at', v.done_at, 'exit_at', v.exit_at,
+               'driver_name', v.driver_name, 'driver_phone', v.driver_phone)
              order by v.visit_date, v.visit_time nulls last, v.plate)
       from public.visits v
       where v.visit_date between f and t
@@ -269,19 +273,46 @@ begin
           from public.visits x where x.id = v.id);
 end $$;
 
+-- Güvenlik ekranından sürücünün adını ve telefonunu kaydetme (guard_mark ile aynı yetki ve tarih kuralı; izleme linki yazamaz)
+create or replace function public.guard_driver(p_token text, p_visit_id text, p_name text, p_phone text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  today date := (now() at time zone 'Europe/Istanbul')::date;
+  v public.visits%rowtype;
+  acct jsonb;
+  who text := 'Güvenlik';
+  nm text := left(btrim(coalesce(p_name, '')), 80);
+  ph text := left(regexp_replace(coalesce(p_phone, ''), '[^0-9+]', '', 'g'), 20);
+begin
+  if p_token is null then
+    acct := public.guard_account();
+    if not coalesce((acct ->> 'active')::boolean, false) then
+      raise exception 'Güvenlik hesabı kapalı' using errcode = '42501';
+    end if;
+    who := 'Güvenlik · ' || (acct ->> 'name');
+  elsif not exists (select 1 from private.guard_link g where g.id = 1 and g.token = p_token) then
+    raise exception 'Güvenlik linki geçersiz' using errcode = '42501';
+  end if;
+  select * into v from public.visits x where x.id::text = p_visit_id and x.visit_date between today - 7 and today + 1 for update;
+  if not found then raise exception 'Araç bulunamadı' using errcode = 'P0002'; end if;
+  perform set_config('pcs.actor', who, true);
+  update public.visits set driver_name = nullif(nm, ''), driver_phone = nullif(ph, '') where id = v.id;
+  return jsonb_build_object('id', v.id, 'driver_name', nullif(nm, ''), 'driver_phone', nullif(ph, ''));
+end $$;
+
 revoke all on function public.get_guard_link(), public.rotate_guard_link(), public.get_guard_view_link(), public.rotate_guard_view_link() from public;
-revoke all on function public.guard_board(text, date, date), public.guard_mark(text, text, text) from public;
+revoke all on function public.guard_board(text, date, date), public.guard_mark(text, text, text), public.guard_driver(text, text, text, text) from public;
 revoke all on function public.guard_account(), public.is_guard_account(), public.list_guard_accounts(),
   public.save_guard_account(text, text, boolean), public.delete_guard_account(text) from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     execute 'revoke all on function public.get_guard_link(), public.rotate_guard_link(), public.get_guard_view_link(), public.rotate_guard_view_link() from anon';
     execute 'revoke all on function public.guard_account(), public.is_guard_account(), public.list_guard_accounts(), public.save_guard_account(text, text, boolean), public.delete_guard_account(text) from anon';
-    execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text) to anon';
+    execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text), public.guard_driver(text, text, text, text) to anon';
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     execute 'grant execute on function public.get_guard_link(), public.rotate_guard_link(), public.get_guard_view_link(), public.rotate_guard_view_link() to authenticated';
-    execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text) to authenticated';
+    execute 'grant execute on function public.guard_board(text, date, date), public.guard_mark(text, text, text), public.guard_driver(text, text, text, text) to authenticated';
     execute 'grant execute on function public.guard_account(), public.is_guard_account(), public.list_guard_accounts(), public.save_guard_account(text, text, boolean), public.delete_guard_account(text) to authenticated';
   end if;
 end $$;
@@ -382,13 +413,14 @@ select 'çıkış saati sütunu' as kontrol,
        case when exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'visits' and column_name = 'exit_at') then 'tamam' else 'EKSİK' end as durum
 union all
 select 'güvenlik fonksiyonları (güncel sürüm)',
-       case when count(*) = 11
+       case when count(*) = 12
              and pg_get_functiondef('public.guard_board(text,date,date)'::regprocedure) like '%guard_account()%'
+             and pg_get_functiondef('public.guard_board(text,date,date)'::regprocedure) like '%driver_phone%'
              and pg_get_functiondef('public.guard_mark(text,text,text)'::regprocedure) like '%guard_account()%'
             then 'tamam' else 'EKSİK · dosyanın tamamını yeniden çalıştırın' end
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname in ('get_guard_link', 'rotate_guard_link', 'get_guard_view_link', 'rotate_guard_view_link', 'guard_board', 'guard_mark',
-                                              'guard_account', 'is_guard_account', 'list_guard_accounts', 'save_guard_account', 'delete_guard_account')
+                                              'guard_account', 'is_guard_account', 'list_guard_accounts', 'save_guard_account', 'delete_guard_account', 'guard_driver')
 union all
 select 'link anahtarları (güvenlik + izleme)', case when exists (select 1 from information_schema.columns where table_schema = 'private' and table_name = 'guard_link' and column_name = 'view_token') then 'tamam' else 'EKSİK' end
 union all
