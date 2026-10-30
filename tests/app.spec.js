@@ -3318,3 +3318,113 @@ test('canlı saha: küçük köpek sahanın ortasında gezinir, sınırlar için
   expect(r.genislik).toBeLessThanOrEqual(28.01); expect(r.derinlik).toBeLessThanOrEqual(18.01);   // küçük bir alan, tüm sahayı gezmez
   expect(problems).toEqual([]);
 });
+
+test('güvenlik ekranı: sürücü adı ve telefonu yazılır, mesaj plakanın ülkesine uygun dilde hazırlanır, dil seçilir, WhatsApp o numaraya açılır', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 430, height: 900 });
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  const card = plate => page.locator('.guard-card', { hasText: plate }).first();
+  const row = id => page.evaluate(i => window.__db.visits.find(v => v.id === i), id);
+  await expect(card('CB 1234 AB')).toBeVisible();
+  // Bulgar plakası (CB): otomatik dil Bulgarca
+  await card('CB 1234 AB').locator('[data-action="guard-drv"]').click();
+  await expect(page.locator('#drv-lang option[value="auto"]')).toHaveText('Otomatik · Български (plakaya göre)');
+  await page.locator('#drv-name').fill('Ivan Petrov');
+  await page.locator('#drv-phone').fill('0881234567');
+  const BG = 'Ivan Petrov\n0881234567\nPCS TRANSİT\nПАРКИНГЪТ Е СВОБОДЕН. МОЛЯ, ЕЛАТЕ НА КАНТАРА.';
+  await expect(page.locator('#drv-prev')).toHaveText(BG);
+  await expect(page.locator('#drv-num')).toHaveText('WhatsApp numarası: +359881234567');   // 0 atılır, plakanın ülke kodu eklenir
+  // dil elle değiştirilir: istenen cümle aynen
+  await page.locator('#drv-lang').selectOption('tr');
+  await expect(page.locator('#drv-prev')).toHaveText('Ivan Petrov\n0881234567\nPCS TRANSİT\nPARK ALANI MÜSAİT KANTARA GELİNİZ');
+  await page.locator('#drv-lang').selectOption('en');
+  await expect(page.locator('#drv-prev')).toContainText('PARKING AREA IS AVAILABLE. PLEASE COME TO THE WEIGHBRIDGE.');
+  await page.locator('#drv-lang').selectOption('auto');
+  // kaydet: bilgi araç kaydına yazılır ve kartta görünür
+  await page.locator('[data-action="guard-drv-save"]').click();
+  await expect.poll(async () => (await row('v6')).driver_name).toBe('Ivan Petrov');
+  expect((await row('v6')).driver_phone).toBe('0881234567');
+  await expect(card('CB 1234 AB').locator('.guard-drv-info')).toHaveText('Ivan Petrov · 0881234567');
+  // liste yenilenince açık form ve yazılan kaybolmaz
+  await page.locator('#drv-phone').fill('+40 722 123 456');
+  await page.locator('[data-action="guard-refresh"]').click();
+  await expect(page.locator('#drv-phone')).toHaveValue('+40 722 123 456');
+  // Türk plakası (34 ABC 123): Türkçe, numara +90 ile; aynı anda tek form
+  await card('34 ABC 123').locator('[data-action="guard-drv"]').click();
+  await expect(page.locator('.guard-drv')).toHaveCount(1);
+  await page.locator('#drv-name').fill('Ahmet Yılmaz');
+  await page.locator('#drv-phone').fill('0532 123 45 67');
+  await expect(page.locator('#drv-prev')).toContainText('PARK ALANI MÜSAİT KANTARA GELİNİZ');
+  await expect(page.locator('#drv-num')).toHaveText('WhatsApp numarası: +905321234567');
+  await page.locator('[data-action="guard-drv-save"]').click();
+  await expect.poll(async () => (await row('v5')).driver_name).toBe('Ahmet Yılmaz');
+  // Romen plakası (B 123 XYZ): Romence; numara yazılmadan gönderilmez
+  await card('B 123 XYZ').locator('[data-action="guard-drv"]').click();
+  await expect(page.locator('#drv-lang option[value="auto"]')).toHaveText('Otomatik · Română (plakaya göre)');
+  await page.locator('[data-action="guard-drv-send"]').click();
+  await expect(page.locator('#toast')).toContainText('telefon numarasını yazın');
+  // son olarak Bulgar araç: kayıtlı bilgi forma gelir, gönder WhatsApp'ı o numaraya açar (açıldıktan sonra sayfa etkileşimi bu testte biter)
+  await card('CB 1234 AB').locator('[data-action="guard-drv"]').click();
+  await expect(page.locator('#drv-name')).toHaveValue('Ivan Petrov');
+  await expect(page.locator('#drv-phone')).toHaveValue('0881234567');
+  const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
+  await page.locator('[data-action="guard-drv-send"]').click();
+  const url = new URL((await launched).url());
+  expect(url.searchParams.get('phone')).toBe('359881234567');
+  expect(url.searchParams.get('text')).toBe(BG);
+  expect(problems).toEqual([]);
+});
+
+test('güvenlik ekranı: sürücü kaydı kurulu değilse uyarı verilir ama mesaj yine açılır; izleme linkinde sürücü düğmesi yoktur', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 430, height: 900 });
+  const problems = await openApp(page, { session: false, guardToken: 'g1', guardNoDriver: true }, '/?guvenlik=g1');
+  const card = page.locator('.guard-card', { hasText: 'B 123 XYZ' }).first();
+  await card.locator('[data-action="guard-drv"]').click();
+  await page.locator('#drv-name').fill('Ion Popescu');
+  await page.locator('#drv-phone').fill('+40 722 123 456');
+  const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
+  await page.locator('[data-action="guard-drv-send"]').click();
+  const url = new URL((await launched).url());
+  expect(url.searchParams.get('phone')).toBe('40722123456');
+  expect(url.searchParams.get('text')).toContain('LOCUL DE PARCARE ESTE LIBER. VĂ RUGĂM SĂ VENIȚI LA CÂNTAR.');
+  await expect(page.locator('#toast')).toContainText('guvenlik-kurulumu.sql');
+  // izleme linki: düğme ve form yok
+  const view = await page.context().newPage();
+  await view.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
+  await view.addInitScript(c => { window.__PCS_STUB = c; }, { session: false, guardToken: 'g1', guardViewToken: 'v1', data: sampleData() });
+  await view.clock.install({ time: NOW });
+  await view.goto('/?guvenlik-izle=v1');
+  await expect(view.locator('.guard-card').first()).toBeVisible();
+  await expect(view.locator('[data-action="guard-drv"]')).toHaveCount(0);
+  expect(problems.filter(x => !/PGRST202|404|guard_driver/.test(x))).toEqual([]);
+});
+
+test('canlı saha: tır "işlemler bitti" ile değil, güvenlik ÇIKIŞ yapınca sahadan çıkar; pano çerçeveye çıkış saatini de gönderir', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = sampleData();
+  // v7 (B 123 XYZ): tesiste, T1 yazıldı, işlemler bitti ama güvenlik çıkışı yok; v5: güvenlik çıkış yapmış
+  Object.assign(data.visits.find(v => v.id === 'v7'), { done: true, done_at: '2026-09-23T06:50:00Z' });
+  Object.assign(data.visits.find(v => v.id === 'v5'), { t1: true, done: true, done_at: '2026-09-23T06:40:00Z', exit_at: '2026-09-23T06:45:00Z' });
+  const problems = await openApp(page, { data });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.locator('[data-action="k-saha"]').click();
+  let frame;
+  await expect.poll(() => { frame = page.frames().find(f => f.url().includes('saha.html')); return !!frame; }).toBe(true);
+  await frame.waitForFunction(() => document.documentElement.classList.contains('gomulu'));
+  await page.evaluate(() => document.querySelector('iframe.k-saha-frame').contentWindow.postMessage({ tip: 'pcs-saha-dur', dur: true }, location.origin));
+  // çerçeveye giden kayıtlarda exit_at da var
+  const got = frame.evaluate(() => new Promise(r => addEventListener('message', e => { if (e.data && e.data.tip === 'pcs-saha') r(e.data.ziyaretler.map(v => [v.id, v.done, v.exit_at]).sort()); })));
+  await page.evaluate(() => document.querySelector('[data-action="k-panel"]').click());
+  expect(await got).toEqual([['v5', true, '2026-09-23T06:45:00Z'], ['v6', false, null], ['v7', true, null]]);
+  // sahadaki liste: işlemleri bitmiş ama çıkış yapmamış v7 hâlâ sahada; çıkış yapan v5 yok
+  await expect.poll(() => frame.evaluate(() => [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id).sort())).toEqual(['v6', 'v7']);
+  // güvenlik çıkış yapınca v7 de sahadan çıkar
+  await frame.evaluate(() => {
+    const z = ['v5', 'v6', 'v7'].map(id => ({ id, plate: id, customer: 'X', registration: '', declaration: '', carrier: '', visit_date: '2026-09-23', visit_time: '08:00', onsite: true, t1: true, done: id !== 'v6', onsite_at: '2026-09-23T05:00:00Z', done_at: id !== 'v6' ? '2026-09-23T06:00:00Z' : null, exit_at: id === 'v6' ? null : '2026-09-23T06:30:00Z', created_at: '2026-09-23T04:00:00Z' }));
+    window.postMessage({ tip: 'pcs-saha', ziyaretler: z, renkler: {}, secili: null }, location.origin);
+  });
+  await expect.poll(() => frame.evaluate(() => [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id))).toEqual(['v6']);
+  expect(problems).toEqual([]);
+});

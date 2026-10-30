@@ -127,6 +127,24 @@ yalnızca seçilen aralığın araçlarını gösterir ve her kartta o aracın b
 vardır. "Rapor" sekmesinden giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Kurulmadıkça
 site bu özelliği kapalı tutar.
 
+**Sürücüye mesaj:** her kartta **Sürücü · mesaj** düğmesi vardır. Güvenlik sürücünün **ad soyadını** ve **telefonunu** yazar;
+mesaj şu biçimde hazırlanır ve WhatsApp'ta o numaraya açılır (gönder düğmesine güvenlik basar):
+
+```
+Sürücü Ad Soyad
+Telefon numarası
+PCS TRANSİT
+PARK ALANI MÜSAİT KANTARA GELİNİZ
+```
+
+Son satırın dili **plakanın ülkesine göre** seçilir (TR Türkçe, BG Bulgarca, RO ve MD Romence, GR Yunanca, HU Macarca, CZ Çekçe,
+AL Arnavutça, UA Ukraynaca; tanınmayan plaka İngilizce) ve kartta **Mesaj dili** listesinden elle değiştirilir (ayrıca Rusça,
+Sırpça, Lehçe). Numara `+359…` ya da `00359…` yazılırsa olduğu gibi, `0532…` gibi başında 0 olan ya da ülke kodsuz kısa numara
+plakanın ülke koduyla tamamlanır; formda "WhatsApp numarası" önizlenir. Ad ve telefon araç kaydına yazılır (kartta görünür,
+sonraki mesajlarda hazır gelir). Bu özellik için `guvenlik-kurulumu.sql` dosyasının **yeni halinin tamamı** bir kez çalıştırılmalıdır
+(`driver_name` / `driver_phone` sütunları ve `guard_driver` fonksiyonu); çalıştırılmadıysa mesaj yine hazırlanır ama sürücü
+bilgisi kaydedilemez. İzleme linkinde bu düğme yoktur.
+
 **Ayarlar → Güvenlik ekranı izleme linki** aynı ekranı yalnızca görüntüleme için açar (`?guvenlik-izle=…`):
 açan kişi listeleri ve raporu görür, GİRİŞ / ÇIKIŞ yapamaz (sunucu da reddeder). Anahtarı güvenlik linkinden
 ayrıdır; biri yenilenince diğeri etkilenmez. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.

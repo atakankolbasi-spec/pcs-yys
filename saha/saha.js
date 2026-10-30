@@ -68,7 +68,7 @@ function disKaynak(){let liste=[];
       liste=z.map(v=>{const geldi=!!v.onsite||!!v.done;const ziyaret=v.visit_time?GUN0+((+v.visit_time.slice(0,2))*60+(+v.visit_time.slice(3,5)))*60000:null;
         const on=v.onsite_at||(geldi?(v.created_at||null):null);
         return {...v,onsite:geldi,onsite_at:on,t1:!!v.t1||!!v.done,t1_at:v.t1_at||null,done:!!v.done,done_at:v.done_at||null,
-          out_at:v.done?(v.done_at||new Date(simdi).toISOString()):null,
+          out_at:v.exit_at||null,   // tır sahadan yalnızca güvenlik ÇIKIŞ yaptığında çıkar; "işlemler bitti" onu çıkarmaz (Bitti durumunda park yerinde bekler)
           arriving:!geldi&&v.visit_date===TODAY&&ziyaret!=null&&Math.abs(simdi-ziyaret)<75*60000};});}};}
 const kaynak=GOMULU?disKaynak():ornekKaynak();
 if(!GOMULU)try{const q=new URLSearchParams(location.search).get('saat');if(q)kaynak.adim(parseFloat(q)*60-kaynak.simdi());}catch(e){}
