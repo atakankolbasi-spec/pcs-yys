@@ -2261,7 +2261,7 @@ document.addEventListener('input',e=>{if(e.target.id==='chat-input')chatGrow();}
    "NCTS'den al" penceresi: Hareket Gümrük İdaresi listesi (kopyalayıp yapıştırma ya da "Tümünü Dışa Aktar" Excel / CSV dosyası) ya da
    Beyanname Detay > Yazdır çıktısı (Transit Refakat Belgesi PDF'i / fotoğrafı; yapay zekâ okur) okunur, plakaya göre panodaki
    gelişlerle eşleştirilir ve ÖNİZLEME sonrası onayla araç kaydına yazılır. Siteye giriş yapılmaz, şifre alınmaz; hiçbir araç eklenmez.
-   Mesaj biçimi (WhatsApp):  çekici plakası / MRN / mühür no  (üç satır; araç başına, boş satırla ayrılır). */
+   Mesaj biçimi (WhatsApp):  dorse plakası / MRN / mühür no  (üç satır; araç başına, boş satırla ayrılır). */
 const NC_MRN_RE=/\b\d{2}[A-Z]{2}[A-Z0-9]{14}\b/,nc={recs:[],busy:false,note:''};
 const ncKnown=()=>{const m=new Set();for(const r of [...state.visits,...state.registry])for(const p of splitPlate(r.plate).map(compactPlate))if(p.length>=5&&/\d/.test(p)&&/[A-Z]/.test(p))m.add(p);return m;};
 function ncSeals(t){const T=String(t||'').toLocaleUpperCase('tr-TR');if(!/M[ÜU]H[ÜU]R/.test(T))return [];const out=[];
@@ -2295,24 +2295,25 @@ function ncMatch(r){const ps=r.plates.map(compactPlate).filter(Boolean);if(!ps.l
 const ncSealText=r=>(r.seals||[]).join(', ');
 const ncChange=(r,v)=>{const m=r.mrn&&r.mrn!==(v.mrn||''),s=ncSealText(r)&&ncSealText(r)!==(v.seal_no||'');return m||s;};
 function ncRows(){return nc.recs.map(r=>{const v=ncMatch(r);return {r,v};});}
-const tractorOf=v=>compactPlate(splitPlate(v.plate)[0]||v.plate);
+/* mesajda yalnızca DORSE plakası yazılır (kayıtta ikinci plaka; yoksa belgedeki ikinci plaka). Dorse yoksa (tek parça araç) elde olan tek plaka yazılır. */
+const trailerOf=(v,r)=>{const p=splitPlate(v.plate).map(compactPlate).filter(Boolean);if(p.length>1)return p[1];
+ const d=(r?.plates||[]).map(compactPlate).filter(Boolean);if(d.length>1&&d[1]!==p[0])return d[1];return p[0]||compactPlate(v.plate);};
 const sealList=v=>String(v.seal_no||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean);
-/* WhatsApp mesajı: çekici plakası, MRN, mühür numarası (üç satır); birden fazla araçta boş satırla ayrılır */
-function mrnMessage(list){return list.filter(v=>v.mrn).map(v=>[tractorOf(v),v.mrn,sealList(v).join(', ')].filter(Boolean).join('\n')).join('\n\n');}
-/* tablodaki satırdan (okunan belge + eşleşen araç) mesaj: çekici plakası / MRN / mühür; yazılması beklenmez */
-const ncRowMsg=(r,v)=>{const sl=(r.seals&&r.seals.length)?r.seals:sealList(v);return [tractorOf(v),r.mrn||v.mrn,sl.join(', ')].filter(Boolean).join('\n');};
-function sendNcRows(list){if(!list.length)return;const v=list[0].v,num=waNumber(v.customer);waLaunch(num,list.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'));
- if(!num)toast(`${v.customer||'Bu müşteri'} için numara kayıtlı değil; WhatsApp'ta kişiyi seçin. Numarayı Ayarlar > WhatsApp numaraları bölümüne ekleyebilirsiniz.`);}
-function sendMrn(list){const l=list.filter(v=>v.mrn);if(!l.length){toast('Bu araçta MRN yok.',true);return;}const num=waNumber(l[0].customer);waLaunch(num,mrnMessage(l));if(!num)toast(`${l[0].customer||'Bu müşteri'} için numara kayıtlı değil; WhatsApp'ta kişiyi seçin. Numarayı Ayarlar > WhatsApp numaraları bölümüne ekleyebilirsiniz.`);}
+/* WhatsApp mesajı: dorse plakası, MRN, mühür numarası (üç satır); birden fazla araçta boş satırla ayrılır */
+function mrnMessage(list){return list.filter(v=>v.mrn).map(v=>[trailerOf(v),v.mrn,sealList(v).join(', ')].filter(Boolean).join('\n')).join('\n\n');}
+/* tablodaki satırdan (okunan belge + eşleşen araç) mesaj: dorse plakası / MRN / mühür; yazılması beklenmez */
+const ncRowMsg=(r,v)=>{const sl=(r.seals&&r.seals.length)?r.seals:sealList(v);return [trailerOf(v,r),r.mrn||v.mrn,sl.join(', ')].filter(Boolean).join('\n');};
+function sendNcRows(list){if(!list.length)return;waLaunch('',list.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'));}   // numara yok: mesaj WhatsApp'ta açılır, grubu / kişiyi siz seçersiniz
+function sendMrn(list){const l=list.filter(v=>v.mrn);if(!l.length){toast('Bu araçta MRN yok.',true);return;}waLaunch('',mrnMessage(l));}
 function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'Okunuyor…')}</p>`;if(nc.note&&!nc.recs.length)return `<p class="help-note">${esc(nc.note)}</p>`;
  if(!nc.recs.length)return '<p class="help-note nc-empty">Henüz okunan belge yok. Belgeler NCTS klasörüne düştüğünde burada görünür.</p>';
  const rows=ncRows(),canApply=ncCol&&rows.some(({r,v},i)=>v&&ncMrnOk(r)&&ncChange(r,v)&&r.inc!==false);
  const body=rows.map(({r,v},i)=>{const state_=!ncMrnOk(r)?'MRN henüz yok':!v?'panoda eşleşen araç yok':r.applied?'yazıldı ✓':ncChange(r,v)?(v.mrn?'değişecek':'eklenecek'):'zaten aynı';
   const ok=!!v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied;
-  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?`<small>${r.via==='yerel'?'bilgisayarda okundu':'yapay zekâyla okundu'}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç">${icon('wa')}WhatsApp</button>`:''}</td></tr>`;}).join('');
- const sendable=[...new Map(rows.filter(({r,v})=>v&&ncMrnOk(r)).map(x=>[x.v.id,x])).values()],groups=new Map();for(const x of sendable){const k=x.v.customer||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
- const wa=[...groups.entries()].map(([k,l],gi)=>`<div class="nc-wa"><b>${esc(k||'Müşterisiz')} · ${l.length} araç</b><pre>${esc(l.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="${gi}">${icon('wa')}WhatsApp ile gönder</button></div>`).join('');
- ncGroups=[...groups.values()];ncRowsNow=rows;
+  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?`<small>${r.via==='yerel'?'bilgisayarda okundu':'yapay zekâyla okundu'}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç (grubu siz seçersiniz)">${icon('wa')}WhatsApp</button>`:''}</td></tr>`;}).join('');
+ const sendable=[...new Map(rows.filter(({r,v})=>v&&ncMrnOk(r)).map(x=>[x.v.id,x])).values()];
+ const wa=sendable.length?`<div class="nc-wa"><b>${sendable.length} araç</b><pre>${esc(sendable.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="0">${icon('wa')}WhatsApp'ta aç</button></div>`:'';
+ ncGroups=[sendable];ncRowsNow=rows;
  return `<div class="table-scroll"><table class="nc-table"><thead><tr><th></th><th>Plaka</th><th>MRN</th><th>Mühür</th><th>Panodaki araç</th><th>Durum</th><th></th></tr></thead><tbody>${body}</tbody></table></div>
   ${ncCol?'':'<div class="rs-note warn">MRN / mühür alanları henüz kurulu değil: <b>supabase/guvenlik-kurulumu.sql</b> dosyasının tamamını Supabase SQL Editor’de bir kez çalıştırın.</div>'}
   <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-apply" ${canApply?'':'disabled'}>${icon('check')}Seçilenleri araç kaydına yaz</button></div>${wa?`<h3 class="nc-h">WhatsApp mesajı</h3>${wa}`:''}`;}
