@@ -147,7 +147,7 @@ bilgisi kaydedilemez. İzleme linkinde bu düğme yoktur.
 
 **MRN ve mühür (NCTS):** araç kaydında **MRN** ve **mühür** alanları vardır; güvenlik kartında da görünür. Panoda **NCTS'den al**
 düğmesi BİLGE (NCTS) ekranındaki bilgiyi plakaya göre araçlara eşler: listeyi yapıştırın, **Tümünü Dışa Aktar** dosyasını (Excel / CSV)
-seçin ya da Transit Refakat Belgesi'ni (PDF / fotoğraf) yükleyin; mühür numarası yalnızca belgeden (yapay zekâ ile) gelir ya da elle
+seçin ya da Transit Refakat Belgesi'ni (PDF / fotoğraf) yükleyin; PDF belgeler önce **bilgisayarınızda** (pdf.js; ücretsiz, sınırsız, belge dışarı gitmez) okunur, yalnızca yazısı okunamayan (taranmış) PDF'ler ve fotoğraflar yapay zekâya (Gemini) gider; mühür numarası belgeden gelir ya da elle
 yazılır. Önizlemede neyin hangi araca yazılacağını görür, onaylarsanız yazılır; yeni araç eklenmez. Her araç için **çekici plakası /
 MRN / mühür** şeklinde üç satırlık WhatsApp mesajı hazırlanır (gönder düğmesine siz basarsınız). **Klasörden otomatik okuma:** tarayıcı İndirilenler klasörünün kendisini seçtirmez; İndirilenler içinde bir klasör açın (ör. **NCTS**),
 belgeleri (T1 PDF'i, fotoğraf, Excel) oraya kaydedin ve NCTS penceresindeki **Klasör seç** ile bir kez seçin (Chrome / Edge, bilgisayarda).

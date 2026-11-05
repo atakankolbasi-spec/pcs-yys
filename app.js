@@ -2304,7 +2304,7 @@ function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'
  const rows=ncRows(),canApply=ncCol&&rows.some(({r,v},i)=>v&&ncMrnOk(r)&&ncChange(r,v)&&r.inc!==false);
  const body=rows.map(({r,v},i)=>{const state_=!ncMrnOk(r)?'MRN henüz yok':!v?'panoda eşleşen araç yok':r.applied?'yazıldı ✓':ncChange(r,v)?(v.mrn?'değişecek':'eklenecek'):'zaten aynı';
   const ok=!!v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied;
-  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td></tr>`;}).join('');
+  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?`<small>${r.via==='yerel'?'bilgisayarda okundu':'yapay zekâyla okundu'}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td></tr>`;}).join('');
  const withMrn=[...new Map(rows.filter(({v})=>v&&v.mrn).map(({v})=>[v.id,v])).values()],groups=new Map();for(const v of withMrn){const k=v.customer||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(v);}
  const wa=[...groups.entries()].map(([k,l],gi)=>`<div class="nc-wa"><b>${esc(k||'Müşterisiz')} · ${l.length} araç</b><pre>${esc(mrnMessage(l))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="${gi}">${icon('wa')}WhatsApp ile gönder</button></div>`).join('');
  ncGroups=[...groups.values()];
@@ -2314,17 +2314,50 @@ function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'
 let ncGroups=[];
 const ncRefresh=()=>{const o=document.getElementById('nc-out');if(o)o.innerHTML=ncResultHTML();};
 function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!r.applied);nc.note='';nc.busy=false;
- openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body"><p class="help-note">NCTS listesini (MRN ve plaka sütunları) kopyalayıp yapıştırın ya da <b>Tümünü Dışa Aktar</b> dosyasını (Excel / CSV) seçin. Mühür numarası için <b>Beyanname Detay › Yazdır › Beyanname</b> çıktısını (PDF ya da fotoğraf) seçin. Plakaya göre panodaki araçlarla eşleşir; <b>siz onaylamadan hiçbir şey yazılmaz</b>, yeni araç eklenmez.</p>
+ openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body"><p class="help-note">NCTS listesini (MRN ve plaka sütunları) kopyalayıp yapıştırın ya da <b>Tümünü Dışa Aktar</b> dosyasını (Excel / CSV) seçin. Mühür numarası için <b>Beyanname Detay › Yazdır › Beyanname</b> çıktısını (PDF ya da fotoğraf) seçin; PDF önce bilgisayarınızda (ücretsiz, sınırsız) okunur, okunamazsa yapay zekâ denenir. Plakaya göre panodaki araçlarla eşleşir; <b>siz onaylamadan hiçbir şey yazılmaz</b>, yeni araç eklenmez.</p>
  <div class="field full"><label for="nc-text">Yapıştırın</label><textarea id="nc-text" rows="5" placeholder="26LR…  26TR…  GUA_INV  …  A6301EM, A4627HM" spellcheck="false"></textarea></div>
  <div class="field full"><label for="nc-file">Dosya <span class="optional">(Excel, CSV, PDF, fotoğraf · birden fazla seçilebilir)</span></label><input id="nc-file" type="file" accept=".xlsx,.csv,.tsv,.pdf,image/*" multiple></div>
  <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-read">Oku</button></div><div id="nc-out">${ncResultHTML()}</div>
  <div id="ncw-box">${ncwHTML()}</div></div>`);}
-/* tek dosyadan kayıtlar: Excel / CSV listesi ya da PDF / fotoğraf (yapay zekâ, transit modu) */
+/* PDF'in yazı katmanı bilgisayarda okunur (pdf.js, Apache-2.0): ücretsiz, sınırsız, belge dışarı gitmez. Taranmış (resim) PDF'te yazı yoktur: yapay zekâya geçilir. */
+const PDFJS_BASE=new URL('pdfjs/',location.href).href;let pdfjsP=null;
+function pdfjsLoad(){if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+ return pdfjsP||(pdfjsP=new Promise((ok,fail)=>{const s=document.createElement('script');s.src=PDFJS_BASE+'pdf.min.js';
+  s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_BASE+'pdf.worker.min.js';ok(window.pdfjsLib);};
+  s.onerror=()=>{pdfjsP=null;fail(new Error('PDF okuyucu yüklenemedi'));};document.head.appendChild(s);}));}
+async function pdfText(file,maxPages=4){const lib=await pdfjsLoad();
+ const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
+ try{let out='';for(let p=1;p<=Math.min(doc.numPages,maxPages);p++){const tc=await (await doc.getPage(p)).getTextContent();let y0=null;
+   for(const it of tc.items){if(typeof it.str!=='string')continue;const y=it.transform?.[5];if(y0!==null&&Math.abs(y-y0)>2)out+='\n';else if(out&&!out.endsWith('\n'))out+=' ';out+=it.str;y0=y;}
+   out+='\n';}
+  return out;}
+ finally{try{doc.destroy();}catch(_){}}}
+/* tek bir Transit Refakat Belgesi'nin yazısından MRN, LRN, plakalar ve mühürler (MRN yoksa null) */
+function ncFromDocText(text){const T=String(text||'').replace(/ /g,' ').replace(/\r/g,'').toLocaleUpperCase('tr-TR');
+ let ms=[...T.matchAll(/\b\d{2}[A-Z]{2}[A-Z0-9]{14}\b/g)].map(m=>m[0]);
+ if(!ms.length)ms=[...T.replace(/\s+/g,'').matchAll(/\d{2}TR[A-Z0-9]{14}/g)].map(m=>m[0]);   // MRN parçalara bölünmüşse
+ if(!ms.length)return null;
+ const cnt={};for(const m of ms)cnt[m]=(cnt[m]||0)+1;const mrn=[...new Set(ms)].sort((a,b)=>cnt[b]-cnt[a])[0];   // en çok geçen; eşitse ilk görünen
+ const lrn=(/\b\d{2}LR[A-Z0-9]{8,16}\b/.exec(T)||[''])[0];
+ const plates=[],comp=T.replace(/[^A-Z0-9]/g,'');for(const p of ncKnown())if(comp.includes(p))plates.push(p);
+ for(const m of T.matchAll(/(?:TAŞIMA ARAC[İI]|PLAKA)([^]{0,120})/g))for(const w of m[1].split(/[\s,;/()]+/)){const c=w.replace(/[^A-Z0-9]/g,'');
+  if(c.length>=5&&c.length<=10&&/\d/.test(c)&&/[A-Z]/.test(c)&&!/^[A-Z]{2}\d{6}$/.test(c)&&c!==mrn&&!ms.includes(c)&&!c.includes('LR')&&plates.length<4)plates.push(c);}
+ const seals=ncSeals(T);
+ for(const m of T.matchAll(/M[ÜU]H[ÜU]R([^]{0,90})/g))for(const w of m[1].split(/[\s,;/()]+/)){const c=w.replace(/[^A-ZİŞĞÜÖÇ0-9]/g,'');if(/^[A-ZİŞĞÜÖÇ]{1,3}\d{6,10}$/.test(c)&&!seals.includes(c)&&c!==lrn)seals.push(c);}
+ return {lrn,mrn,status:'',plates:[...new Set(plates)].slice(0,4),seals:[...new Set(seals)].slice(0,10),doc:true,via:'yerel'};}
+/* yapay zekâ (Gemini, transit modu): kota sınırı olabilir; PDF'te yedek, fotoğrafta tek yol */
+async function ncAiRec(f,onNote){const r=await wmAi(f,onNote,false,'transit');
+ if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err+(r.detail?` · ${r.detail}`:'')+` · ${f.type||'?'}, ${Math.round(f.size/1024)} KB`);
+ const d=r.data;return {lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true,via:'yz'};}
+/* tek dosyadan kayıtlar: Excel / CSV listesi; PDF (önce bilgisayarda, olmazsa yapay zekâ) ya da fotoğraf (yapay zekâ) */
 async function ncFileRecs(f,onNote=()=>{}){
  if(/\.(xlsx|csv|tsv)$/i.test(f.name)){if(!window.PCSXLSX?.readRows)throw new Error('Excel bileşeni yüklenemedi.');return ncFromRows(await PCSXLSX.readRows(f));}
- if(/\.pdf$/i.test(f.name)||/^image\//.test(f.type)||/\.pdf$/i.test(f.type)){const r=await wmAi(f,onNote,false,'transit');
-  if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err+(r.detail?` · ${r.detail}`:'')+` · ${f.type||'?'}, ${Math.round(f.size/1024)} KB`);const d=r.data;
-  return [{lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true}];}
+ const isPdf=/\.pdf$/i.test(f.name)||f.type==='application/pdf';
+ if(isPdf||/^image\//.test(f.type)){let local=null,why='';
+  if(isPdf){onNote('PDF bilgisayarda okunuyor…');try{local=ncFromDocText(await pdfText(f));if(!local)why='belgede MRN bulunamadı (taranmış PDF olabilir)';}catch(e){why=String(e?.name==='PasswordException'?'PDF şifreli':e?.message||e).slice(0,80);}}
+  if(local&&local.seals.length)return [local];
+  try{const ai=await ncAiRec(f,onNote);if(!local)return [ai];return [{...local,seals:ai.seals.length?ai.seals:local.seals,plates:[...new Set([...local.plates,...ai.plates])],lrn:local.lrn||ai.lrn}];}
+  catch(e){if(local)return [local];throw new Error(e.message+(why?` · bilgisayarda okunamadı: ${why}`:''));}}
  throw new Error('Desteklenmeyen dosya türü.');}
 /* aynı MRN iki kez gelirse (liste + belge) birleştirilir: mühür belgeden, plaka ikisinden */
 function ncMerge(all){const by=new Map();for(const r of all){const key=r.mrn||'~'+by.size;const o=by.get(key);if(!o)by.set(key,{...r});else{o.plates=[...new Set([...o.plates,...r.plates])];o.seals=[...new Set([...o.seals,...r.seals])];o.lrn=o.lrn||r.lrn;o.status=o.status||r.status;}}
