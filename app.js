@@ -2293,11 +2293,13 @@ function ncRows(){return nc.recs.map(r=>{const v=ncMatch(r);return {r,v};});}
 /* ana ekrandaki NCTS WhatsApp kartı: eşleşen, MRN'si okunmuş, henüz gönderilmemiş araçların mesajı */
 const ncReady=()=>[...new Map(ncRows().filter(({r,v})=>v&&ncMrnOk(r)&&!r.sent).map(x=>[x.v.id,x])).values()];
 function kWaCard(){if(!canEdit()||VIEW_TOKEN)return '';
- const list=ncReady(),msg=list.map(({r,v})=>ncRowMsg(r,v)).join('\n\n');
+ const list=ncReady();
  const st=!ncw.sup?'Bu tarayıcı klasör izlemeyi desteklemiyor (Chrome / Edge kullanın)':!ncw.h?'<button type="button" class="k-link" data-action="ncts-open">NCTS klasörünü seç</button>':ncw.perm!=='granted'?'<button type="button" class="k-link" data-action="ncw-scan">Klasör izni ver</button>':'<i class="k-wa-dot" aria-hidden="true"></i>NCTS klasörü izleniyor';
+ /* her araç ayrı satır: kendi mesajı ve kendi WhatsApp düğmesi; gönderilince satır kalkar */
+ const items=list.map(({r,v})=>`<li class="k-wa-item"><pre class="k-wa-pre">${esc(ncRowMsg(r,v))}</pre><div class="k-wa-acts"><button type="button" class="k-wa-btn" data-action="k-wa-send" data-id="${esc(v.id)}" title="${esc(v.plate)} · WhatsApp'ta aç">${icon('wa')}Gönder</button><button type="button" class="k-wa-x" data-action="k-wa-skip" data-id="${esc(v.id)}" title="Göndermeden listeden kaldır" aria-label="Listeden kaldır">×</button></div></li>`).join('');
  return `<article class="k-card k-wa"><div class="k-card-h"><span>NCTS · WhatsApp</span>${list.length?`<b>${list.length} araç</b>`:''}</div>
- ${list.length?`<pre class="k-wa-pre">${esc(msg)}</pre>`:`<p class="k-wa-empty">${nc.lastSent?'Son mesaj WhatsApp’a gönderildi ✓':'Gönderilecek mesaj yok. NCTS klasörüne belge düşünce burada görünür.'}</p>`}
- <button type="button" class="k-wa-btn" data-action="k-wa-send" ${list.length?'':'disabled'}>${icon('wa')}WhatsApp’ta aç</button><div class="k-wa-st">${st}</div></article>`;}
+ ${list.length?`<ul class="k-wa-list">${items}</ul>`:`<p class="k-wa-empty">${nc.lastSent?'Hepsi WhatsApp’a gönderildi ✓':'Gönderilecek mesaj yok. NCTS klasörüne belge düşünce burada görünür.'}</p>`}
+ <div class="k-wa-st">${st}</div></article>`;}
 const NC_KEY='pcs.nctsRecs';
 function ncSave(){try{const now=Date.now();for(const r of nc.recs)r.t=r.t||now;nc.recs=nc.recs.filter(r=>now-r.t<(r.sent?864e5:3*864e5));localStorage.setItem(NC_KEY,JSON.stringify(nc.recs.slice(-60)));}catch(_){}}
 function ncLoad(){try{const a=JSON.parse(localStorage.getItem(NC_KEY)||'[]'),now=Date.now();return Array.isArray(a)?a.filter(r=>r&&typeof r.mrn==='string'&&Array.isArray(r.plates)&&Array.isArray(r.seals)&&now-(r.t||now)<(r.sent?864e5:3*864e5)):[];}catch(_){return [];}}
@@ -2317,14 +2319,12 @@ function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'
  const rows=ncRows(),canApply=ncCol&&rows.some(({r,v},i)=>v&&ncMrnOk(r)&&ncChange(r,v)&&r.inc!==false);
  const body=rows.map(({r,v},i)=>{const state_=!ncMrnOk(r)?'MRN henüz yok':!v?'panoda eşleşen araç yok':r.applied?'yazıldı ✓':ncChange(r,v)?(v.mrn?'değişecek':'eklenecek'):'zaten aynı';
   const ok=!!v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied;
-  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?'<small>bilgisayarda okundu</small>':''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç (grubu siz seçersiniz)">${icon('wa')}WhatsApp</button>`:''}</td></tr>`;}).join('');
- const sendable=[...new Map(rows.filter(({r,v})=>v&&ncMrnOk(r)).map(x=>[x.v.id,x])).values()];
- const wa=sendable.length?`<div class="nc-wa"><b>${sendable.length} araç</b><pre>${esc(sendable.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="0">${icon('wa')}WhatsApp'ta aç</button></div>`:'';
- ncGroups=[sendable];ncRowsNow=rows;
+  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?'<small>bilgisayarda okundu</small>':''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?(r.sent?'<span class="nc-sent">gönderildi ✓</span>':`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç (grubu siz seçersiniz)">${icon('wa')}WhatsApp</button>`):''}</td></tr>`;}).join('');
+ ncRowsNow=rows;
  return `<div class="table-scroll"><table class="nc-table"><thead><tr><th></th><th>Plaka</th><th>MRN</th><th>Mühür</th><th>Panodaki araç</th><th>Durum</th><th></th></tr></thead><tbody>${body}</tbody></table></div>
   ${ncCol?'':'<div class="rs-note warn">MRN / mühür alanları henüz kurulu değil: <b>supabase/guvenlik-kurulumu.sql</b> dosyasının tamamını Supabase SQL Editor’de bir kez çalıştırın.</div>'}
-  <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-apply" ${canApply?'':'disabled'}>${icon('check')}Seçilenleri araç kaydına yaz</button></div>${wa?`<h3 class="nc-h">WhatsApp mesajı</h3>${wa}`:''}`;}
-let ncGroups=[],ncRowsNow=[];
+  <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-apply" ${canApply?'':'disabled'}>${icon('check')}Seçilenleri araç kaydına yaz</button></div>`;}
+let ncRowsNow=[];
 const ncRefresh=()=>{ncSave();const o=document.getElementById('nc-out');if(o)o.innerHTML=ncResultHTML();ncwRender();};
 function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!(r.applied&&r.sent));nc.note='';nc.busy=false;
  openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body">
@@ -2445,16 +2445,15 @@ async function ncwPick(){let h;try{h=await window.showDirectoryPicker({id:'pcs-n
  const ok=await ncwSet('dir',h);await ncwSet('since',ncw.since);await ncwSet('seen',{});if(!ok)toast('Klasör bu oturum için seçildi; tarayıcı kalıcı saklayamadı.',true);
  ncw.ready=true;ncwTimers();ncwRefresh();ncwScan(true);}
 async function ncwOff(){ncw.h=null;ncw.perm='';ncw.seen={};await ncwSet('dir');await ncwSet('seen');await ncwSet('since');ncwRefresh();ncwRender();}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="nc-"],[data-action^="ncw-"],[data-action="ncts-open"],[data-action="wa-mrn"],[data-action="k-wa-send"]');if(!b)return;const a=b.dataset.action;
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="nc-"],[data-action^="ncw-"],[data-action="ncts-open"],[data-action="wa-mrn"],[data-action^="k-wa-"]');if(!b)return;const a=b.dataset.action;
  if(a==='ncts-open'){const ask=ncw.h&&ncw.perm!=='granted'?ncwPerm(true):null;openNcts();if(ask)ask.then(p=>{ncw.perm=p;ncwRefresh();ncwRender();ncwScan(true);});else if(ncw.h)ncwScan(true);return;}
  if(a==='ncw-pick')return ncwPick();
  if(a==='ncw-scan'){ncwPerm(true).then(p=>{ncw.perm=p;ncwRefresh();ncwScan(true);});return;}
  if(a==='ncw-off')return ncwOff();
  if(a==='nc-read')return ncRead(b);
  if(a==='nc-apply')return ncApply(b);
- if(a==='nc-wa'){const l=ncGroups[+b.dataset.g];if(l)sendNcRows(l);return;}
- if(a==='k-wa-send'){const l=ncReady();if(!l.length)return;sendNcRows(l);for(const {r} of l)r.sent=Date.now();nc.lastSent=Date.now();ncSave();render();return;}
- if(a==='nc-wa-row'){const x=ncRowsNow[+b.dataset.i];if(x&&x.v)sendNcRows([x]);return;}
+ if(a==='k-wa-send'||a==='k-wa-skip'){const x=ncReady().find(y=>y.v.id===b.dataset.id);if(!x)return;if(a==='k-wa-send')sendNcRows([x]);x.r.sent=Date.now();nc.lastSent=Date.now();ncSave();render();return;}
+ if(a==='nc-wa-row'){const x=ncRowsNow[+b.dataset.i];if(x&&x.v){sendNcRows([x]);x.r.sent=Date.now();nc.lastSent=Date.now();ncRefresh();}return;}
  if(a==='wa-mrn'){const v=state.visits.find(x=>x.id===b.dataset.id);if(v)sendMrn([v]);}});
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='ncw-auto'){ncw.auto=t.checked;try{localStorage.setItem(NCW_AUTO_KEY,t.checked?'1':'0');}catch(_){}if(t.checked)ncwScan(true);return;}if(!t.classList?.contains('nc-inc'))return;const r=nc.recs[+t.dataset.i];if(r){r.inc=t.checked;ncRefresh();}});
 /* Güvenlik ekranı (?guvenlik=ANAHTAR, kurulum: supabase/guvenlik-kurulumu.sql).

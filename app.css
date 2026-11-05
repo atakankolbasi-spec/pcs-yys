@@ -2369,10 +2369,7 @@ html[data-theme="dark"] .guard-drv-save,html[data-theme="dark"] .guard-drv-close
 .nc-table .nc-mrn{font-family:ui-monospace,Menlo,monospace;font-size:12px;overflow-wrap:anywhere}
 .nc-table tr.nc-off td{opacity:.6}
 .nc-h{margin:16px 0 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
-.nc-wa{display:grid;gap:8px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--line,#e3e8f1);border-radius:12px}
-.nc-wa pre{margin:0;padding:10px 12px;border-radius:10px;background:#e7f8ee;border:1px solid #b7e4c7;color:#14532d;font:700 13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
-html[data-theme="dark"] .nc-wa pre{background:#10301f;border-color:#1f6b52;color:#b7f0cd}
-.guard-ncts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;font-weight:700;color:#3b4d66}
+html[data-theme="dark"] .guard-ncts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;font-weight:700;color:#3b4d66}
 .guard-ncts b{font-family:ui-monospace,Menlo,monospace;letter-spacing:.02em;color:#16233a}
 html[data-theme="dark"] .guard-ncts{color:#c4cdd9}html[data-theme="dark"] .guard-ncts b{color:#e8edf8}
 
@@ -2387,4 +2384,5 @@ html[data-theme="dark"] .guard-ncts{color:#c4cdd9}html[data-theme="dark"] .guard
 .nc-manual summary{cursor:pointer;color:var(--muted,#6b7a90);font-weight:700}
 .nc-manual[open] summary{margin-bottom:10px}
 .nc-wa-row{white-space:nowrap}
+.nc-sent{color:#16a34a;font-weight:800;font-size:12px;white-space:nowrap}
 .nc-empty{margin:0 0 6px}
