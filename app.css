@@ -2360,3 +2360,18 @@ html[data-theme="dark"] .guard-drv label,html[data-theme="dark"] .guard-drv-num{
 html[data-theme="dark"] .guard-drv input,html[data-theme="dark"] .guard-drv select{background:#0f1729;border-color:#2a3757;color:#e8edf8}
 html[data-theme="dark"] .guard-drv-prev{background:#10301f;border-color:#1f6b52;color:#b7f0cd}
 html[data-theme="dark"] .guard-drv-save,html[data-theme="dark"] .guard-drv-close{background:#16233a;border-color:#2a3757;color:#e8edf8}
+/* NCTS: MRN ve mühür */
+.side-info .full{grid-column:1/-1}.side-info .full b{overflow-wrap:anywhere}
+.nc-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.nc-table th{padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#6b7a90);border-bottom:1px solid var(--line,#e3e8f1);white-space:nowrap}
+.nc-table td{padding:8px 10px;border-bottom:1px solid var(--line,#e3e8f1);vertical-align:top}
+.nc-table td small{display:block;color:var(--muted,#6b7a90);font-size:11px;margin-top:2px}
+.nc-table .nc-mrn{font-family:ui-monospace,Menlo,monospace;font-size:12px;overflow-wrap:anywhere}
+.nc-table tr.nc-off td{opacity:.6}
+.nc-h{margin:16px 0 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.nc-wa{display:grid;gap:8px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--line,#e3e8f1);border-radius:12px}
+.nc-wa pre{margin:0;padding:10px 12px;border-radius:10px;background:#e7f8ee;border:1px solid #b7e4c7;color:#14532d;font:700 13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+html[data-theme="dark"] .nc-wa pre{background:#10301f;border-color:#1f6b52;color:#b7f0cd}
+.guard-ncts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;font-weight:700;color:#3b4d66}
+.guard-ncts b{font-family:ui-monospace,Menlo,monospace;letter-spacing:.02em;color:#16233a}
+html[data-theme="dark"] .guard-ncts{color:#c4cdd9}html[data-theme="dark"] .guard-ncts b{color:#e8edf8}

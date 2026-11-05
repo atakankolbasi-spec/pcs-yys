@@ -134,12 +134,13 @@
         const isJson = !!(opts.headers && opts.headers['Content-Type'] === 'application/json');
         // liste fotoğrafı: resim gövdesi + "x-pcs-mode: liste" başlığı; cevabı yine cfg.aiText verir (mesaj biçiminde)
         const isList = !!(opts.headers && opts.headers['x-pcs-mode'] === 'liste');
+        const isTransit = !!(opts.headers && opts.headers['x-pcs-mode'] === 'transit');   // NCTS transit belgesi (PDF / fotoğraf): cevabı cfg.transit verir
         const isText = isJson || isList;
         calls.push({ fn: name, timeout: opts.timeout, type: opts.headers && opts.headers['Content-Type'], size: opts.body && opts.body.size, text: isJson ? JSON.parse(opts.body) : undefined, list: isList ? { today: opts.headers['x-pcs-today'] } : undefined });
         if (cfg.offline) return { data: null, error: { message: 'Failed to send a request to the Edge Function' } };
         if (cfg.aiDelay) await new Promise(r => setTimeout(r, cfg.aiDelay));   // yavaş cevap (sahte saatle ilerler)
         // dizi verilirse sırayla kullanılır (ör. önce 429, sonra cevap); son eleman tekrar eder
-        const src = isList ? (cfg.aiText || { items: [], customer: '', problem: '', model: 'gemini-test' }) : isText ? cfg.aiText : name !== 'ruhsat-oku' ? null : cfg.ai;
+        const src = isTransit ? cfg.transit : isList ? (cfg.aiText || { items: [], customer: '', problem: '', model: 'gemini-test' }) : isText ? cfg.aiText : name !== 'ruhsat-oku' ? null : cfg.ai;
         const r = Array.isArray(src) ? (src.length > 1 ? src.shift() : src[0]) : src;
         const err = (status, body) => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: new Response(body ? JSON.stringify(body) : null, { status }) } });
         if (!r) return err(404);
@@ -231,7 +232,7 @@
         }
         const today = cfg.today || '2026-09-23', back = d => new Date(Date.parse(today) - d * 864e5).toISOString().slice(0, 10);
         const ymdIst = iso => new Date(Date.parse(iso) + 3 * 36e5).toISOString().slice(0, 10); // İstanbul (UTC+3) günü
-        const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, registration: v.registration || '', visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, driver_name: v.driver_name || null, driver_phone: v.driver_phone || null, exit_at: v.exit_at || null });
+        const pick = v => ({ id: v.id, plate: v.plate, customer: v.customer, registration: v.registration || '', visit_date: v.visit_date, visit_time: v.visit_time, onsite: v.onsite, onsite_at: v.onsite_at || null, done: v.done, done_at: v.done_at || null, driver_name: v.driver_name || null, driver_phone: v.driver_phone || null, mrn: v.mrn || null, seal_no: v.seal_no || null, exit_at: v.exit_at || null });
         if (name === 'guard_board') {
           if (cfg.guardOldSql && params.p_from) return guardErr('PGRST202', 'Could not find the function public.guard_board(p_from, p_to, p_token)');
           const f = params.p_from || today, t = params.p_to || f;

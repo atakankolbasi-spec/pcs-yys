@@ -3275,10 +3275,11 @@ test('canlı saha: sayfa kayarken ve bölüm gizliyken 3B çizim durdurulur, kay
   await page.evaluate(() => { document.body.style.minHeight = '4000px'; window.scrollBy(0, 300); });
   await expect.poll(async () => (await dur()).includes(true)).toBe(true);          // kayarken dur
   await page.clock.runFor(300);
-  await expect.poll(async () => (await dur()).slice(-2)).toEqual([true, false]);    // kayma bitince devam
+  // devam mesajı gelince çerçevedeki 3B çizim ana iş parçacığını (yazılımla çizimde) birkaç saniye meşgul edebilir: bekleme payı geniş
+  await expect.poll(async () => (await dur()).slice(-2), { timeout: 30000 }).toEqual([true, false]);    // kayma bitince devam
   // bölüm gizliyken kaydırmak çizimi yeniden başlatmaz
   await page.evaluate(() => document.querySelector('[data-action="k-saha"]').click());
-  await expect.poll(async () => (await dur()).slice(-1)).toEqual([true]);
+  await expect.poll(async () => (await dur()).slice(-1), { timeout: 30000 }).toEqual([true]);
   const n = (await dur()).length;
   await page.evaluate(() => window.scrollBy(0, -200));
   await page.clock.runFor(400);
@@ -3426,5 +3427,116 @@ test('canlı saha: tır "işlemler bitti" ile değil, güvenlik ÇIKIŞ yapınca
     window.postMessage({ tip: 'pcs-saha', ziyaretler: z, renkler: {}, secili: null }, location.origin);
   });
   await expect.poll(() => frame.evaluate(() => [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id))).toEqual(['v6']);
+  expect(problems).toEqual([]);
+});
+
+// NCTS (BİLGE) testleri: örnek MRN / LRN / plakalar uydurmadır
+function nctsData() {
+  const data = sampleData();
+  data.visits.forEach(v => { v.mrn = null; v.seal_no = null; });   // sütunlar kurulu (guvenlik-kurulumu.sql)
+  return data;
+}
+const NC_LIST = [
+  '26LR000000000001\t-\tPOS_ACK\t05.11.2026, 12:58:33\t1111111111\tDENEME GMBH\tDE007701\tCB1234AB',
+  '26LR000000000002\t26TR000000000000A1\tREL_TRA\t05.11.2026, 12:38:59\t1111111111\tDENEME JSC\tBG001008\t34ABC123,\nZZ9999ZZ',
+  '26LR000000000003\t26TR000000000000A2\tREL_TRA\t05.11.2026, 12:30:19\t1111111111\tDENEME KFT\tHU811190\tQQ0000QQ'
+].join('\n');
+
+test('NCTS\'den al: yapıştırılan listeden MRN plakaya göre eşleşir, onayla yazılır, WhatsApp mesajı çekici plakası / MRN / mühür olur', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page, { data: nctsData() });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.locator('#nc-text').fill(NC_LIST);
+  await page.locator('[data-action="nc-read"]').click();
+  const rows = page.locator('.nc-table tbody tr');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('MRN henüz yok');                              // POS_ACK: MRN verilmemiş
+  await expect(rows.nth(1)).toContainText('26TR000000000000A1');
+  await expect(rows.nth(1)).toContainText('34 ABC 123');                                 // plakaya göre eşleşen gelişin plakası
+  await expect(rows.nth(1)).toContainText('eklenecek');
+  await expect(rows.nth(2)).toContainText('panoda eşleşen araç yok');                    // panoda olmayan plaka: araç eklenmez
+  // hiçbir şey onaydan önce yazılmaz
+  expect(await page.evaluate(() => window.__db.visits.map(v => v.mrn))).toEqual([null, null, null, null, null, null, null]);
+  await page.locator('[data-action="nc-apply"]').click();
+  await expect(rows.nth(1)).toContainText('yazıldı');
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v5').mrn)).toBe('26TR000000000000A1');
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(1);
+  expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
+  // mesaj önizlemesi: çekici plakası, MRN (mühür henüz yok)
+  await expect(page.locator('.nc-wa pre')).toHaveText('34ABC123\n26TR000000000000A1');
+  // araç kaydında alanlar görünür ve düzenlenir
+  await page.evaluate(() => document.querySelector('[data-action="close-modal"]').click());
+  await page.evaluate(() => document.querySelector('[data-action="edit-visit"], [data-action="select-visit"]'));
+  await page.locator('tr[data-row-id="v5"]').click();
+  await expect(page.locator('.side-info')).toContainText('26TR000000000000A1');
+  await page.locator('[data-action="edit-visit"][data-id="v5"]').click();
+  await expect(page.locator('#f-mrn')).toHaveValue('26TR000000000000A1');
+  await page.locator('#f-seal_no').fill('ig01362070, ig01362071');
+  await page.locator('#visit-form [type="submit"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v5').seal_no)).toBe('İG01362070, İG01362071');
+  // mesaj: çekici plakası, MRN, mühür (üç satır); WhatsApp açılışı son işlem
+  await page.locator('tr[data-row-id="v5"]').click();
+  const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
+  await page.locator('[data-action="wa-mrn"][data-id="v5"]').click();
+  expect(new URL((await launched).url()).searchParams.get('text')).toBe('34ABC123\n26TR000000000000A1\nİG01362070, İG01362071');
+  expect(problems).toEqual([]);
+});
+
+test('NCTS\'den al: PDF/fotoğraf (yapay zekâ) ile mühür, CSV dışa aktarma ile MRN okunur; sütun kurulu değilse yazılmaz', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const transit = { mrn: '26TR000000000000B2', lrn: '26LR000000000009', plates: ['CB1234AB', 'CB4728EE'], seals: ['İG01362070'], seal_count: 1, model: 'm' };
+  const problems = await openApp(page, { data: nctsData(), transit });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  // PDF + CSV birlikte
+  const csv = 'LRN;MRN;Durum;Plaka\n26LR000000000003;26TR000000000000A3;REL_TRA;"B123XYZ, XX1111XX"\n';
+  await page.locator('#nc-file').setInputFiles([
+    { name: 'beyanname.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 sahte') },
+    { name: 'liste.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') }
+  ]);
+  await page.locator('[data-action="nc-read"]').click();
+  const rows = page.locator('.nc-table tbody tr');
+  await expect(rows).toHaveCount(2);
+  const pdfRow = rows.filter({ hasText: '26TR000000000000B2' });
+  await expect(pdfRow).toContainText('İG01362070');                  // mühür belgeden
+  await expect(pdfRow).toContainText('CB 1234 AB');                  // Bulgar plakalı gelişle eşleşti
+  const csvRow = rows.filter({ hasText: '26TR000000000000A3' });
+  await expect(csvRow).toContainText('B 123 XYZ');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.type))).toEqual(['application/pdf']);
+  await page.locator('[data-action="nc-apply"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000A3');
+  // ikinci okuma: aynı veri artık "zaten aynı"
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('.nc-table tbody tr').filter({ hasText: '26TR000000000000B2' })).toContainText('zaten aynı');
+  expect(problems).toEqual([]);
+});
+
+test('NCTS: sütunlar kurulu değilse (SQL çalıştırılmamış) uyarı verilir ve yazılmaz; güvenlik kartında MRN ve mühür görünür', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page);                              // sampleData: mrn / seal_no sütunu yok
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.locator('#nc-text').fill(NC_LIST);
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('.rs-note.warn')).toContainText('guvenlik-kurulumu.sql');
+  await expect(page.locator('[data-action="nc-apply"]')).toBeDisabled();
+  await page.evaluate(() => document.querySelector('[data-action="close-modal"]').click());
+  await expect(page.locator('#f-mrn')).toHaveCount(0);
+  // güvenlik ekranı
+  const g = await page.context().newPage();
+  await g.setViewportSize({ width: 430, height: 900 });
+  await g.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
+  const data = nctsData(); Object.assign(data.visits.find(v => v.id === 'v6'), { mrn: '26TR000000000000B2', seal_no: 'İG01362070' });
+  await g.addInitScript(c => { window.__PCS_STUB = c; }, { session: false, guardToken: 'g1', data });
+  await g.clock.install({ time: NOW });
+  await g.goto('/?guvenlik=g1');
+  const card = g.locator('.guard-card', { hasText: 'CB 1234 AB' }).first();
+  await expect(card.locator('.guard-ncts')).toContainText('MRN 26TR000000000000B2');
+  await expect(card.locator('.guard-ncts')).toContainText('Mühür İG01362070');
   expect(problems).toEqual([]);
 });
