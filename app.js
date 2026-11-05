@@ -2299,26 +2299,34 @@ const tractorOf=v=>compactPlate(splitPlate(v.plate)[0]||v.plate);
 const sealList=v=>String(v.seal_no||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean);
 /* WhatsApp mesajı: çekici plakası, MRN, mühür numarası (üç satır); birden fazla araçta boş satırla ayrılır */
 function mrnMessage(list){return list.filter(v=>v.mrn).map(v=>[tractorOf(v),v.mrn,sealList(v).join(', ')].filter(Boolean).join('\n')).join('\n\n');}
+/* tablodaki satırdan (okunan belge + eşleşen araç) mesaj: çekici plakası / MRN / mühür; yazılması beklenmez */
+const ncRowMsg=(r,v)=>{const sl=(r.seals&&r.seals.length)?r.seals:sealList(v);return [tractorOf(v),r.mrn||v.mrn,sl.join(', ')].filter(Boolean).join('\n');};
+function sendNcRows(list){if(!list.length)return;const v=list[0].v,num=waNumber(v.customer);waLaunch(num,list.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'));
+ if(!num)toast(`${v.customer||'Bu müşteri'} için numara kayıtlı değil; WhatsApp'ta kişiyi seçin. Numarayı Ayarlar > WhatsApp numaraları bölümüne ekleyebilirsiniz.`);}
 function sendMrn(list){const l=list.filter(v=>v.mrn);if(!l.length){toast('Bu araçta MRN yok.',true);return;}const num=waNumber(l[0].customer);waLaunch(num,mrnMessage(l));if(!num)toast(`${l[0].customer||'Bu müşteri'} için numara kayıtlı değil; WhatsApp'ta kişiyi seçin. Numarayı Ayarlar > WhatsApp numaraları bölümüne ekleyebilirsiniz.`);}
-function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'Okunuyor…')}</p>`;if(nc.note&&!nc.recs.length)return `<p class="help-note">${esc(nc.note)}</p>`;if(!nc.recs.length)return '';
+function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'Okunuyor…')}</p>`;if(nc.note&&!nc.recs.length)return `<p class="help-note">${esc(nc.note)}</p>`;
+ if(!nc.recs.length)return '<p class="help-note nc-empty">Henüz okunan belge yok. Belgeler NCTS klasörüne düştüğünde burada görünür.</p>';
  const rows=ncRows(),canApply=ncCol&&rows.some(({r,v},i)=>v&&ncMrnOk(r)&&ncChange(r,v)&&r.inc!==false);
  const body=rows.map(({r,v},i)=>{const state_=!ncMrnOk(r)?'MRN henüz yok':!v?'panoda eşleşen araç yok':r.applied?'yazıldı ✓':ncChange(r,v)?(v.mrn?'değişecek':'eklenecek'):'zaten aynı';
   const ok=!!v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied;
-  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?`<small>${r.via==='yerel'?'bilgisayarda okundu':'yapay zekâyla okundu'}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td></tr>`;}).join('');
- const withMrn=[...new Map(rows.filter(({v})=>v&&v.mrn).map(({v})=>[v.id,v])).values()],groups=new Map();for(const v of withMrn){const k=v.customer||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(v);}
- const wa=[...groups.entries()].map(([k,l],gi)=>`<div class="nc-wa"><b>${esc(k||'Müşterisiz')} · ${l.length} araç</b><pre>${esc(mrnMessage(l))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="${gi}">${icon('wa')}WhatsApp ile gönder</button></div>`).join('');
- ncGroups=[...groups.values()];
- return `<div class="table-scroll"><table class="nc-table"><thead><tr><th></th><th>Plaka</th><th>MRN</th><th>Mühür</th><th>Panodaki araç</th><th>Durum</th></tr></thead><tbody>${body}</tbody></table></div>
+  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?`<small>${r.via==='yerel'?'bilgisayarda okundu':'yapay zekâyla okundu'}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç">${icon('wa')}WhatsApp</button>`:''}</td></tr>`;}).join('');
+ const sendable=[...new Map(rows.filter(({r,v})=>v&&ncMrnOk(r)).map(x=>[x.v.id,x])).values()],groups=new Map();for(const x of sendable){const k=x.v.customer||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
+ const wa=[...groups.entries()].map(([k,l],gi)=>`<div class="nc-wa"><b>${esc(k||'Müşterisiz')} · ${l.length} araç</b><pre>${esc(l.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="${gi}">${icon('wa')}WhatsApp ile gönder</button></div>`).join('');
+ ncGroups=[...groups.values()];ncRowsNow=rows;
+ return `<div class="table-scroll"><table class="nc-table"><thead><tr><th></th><th>Plaka</th><th>MRN</th><th>Mühür</th><th>Panodaki araç</th><th>Durum</th><th></th></tr></thead><tbody>${body}</tbody></table></div>
   ${ncCol?'':'<div class="rs-note warn">MRN / mühür alanları henüz kurulu değil: <b>supabase/guvenlik-kurulumu.sql</b> dosyasının tamamını Supabase SQL Editor’de bir kez çalıştırın.</div>'}
   <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-apply" ${canApply?'':'disabled'}>${icon('check')}Seçilenleri araç kaydına yaz</button></div>${wa?`<h3 class="nc-h">WhatsApp mesajı</h3>${wa}`:''}`;}
-let ncGroups=[];
+let ncGroups=[],ncRowsNow=[];
 const ncRefresh=()=>{const o=document.getElementById('nc-out');if(o)o.innerHTML=ncResultHTML();};
 function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!r.applied);nc.note='';nc.busy=false;
- openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body"><p class="help-note">NCTS listesini (MRN ve plaka sütunları) kopyalayıp yapıştırın ya da <b>Tümünü Dışa Aktar</b> dosyasını (Excel / CSV) seçin. Mühür numarası için <b>Beyanname Detay › Yazdır › Beyanname</b> çıktısını (PDF ya da fotoğraf) seçin; PDF önce bilgisayarınızda (ücretsiz, sınırsız) okunur, okunamazsa yapay zekâ denenir. Plakaya göre panodaki araçlarla eşleşir; <b>siz onaylamadan hiçbir şey yazılmaz</b>, yeni araç eklenmez.</p>
- <div class="field full"><label for="nc-text">Yapıştırın</label><textarea id="nc-text" rows="5" placeholder="26LR…  26TR…  GUA_INV  …  A6301EM, A4627HM" spellcheck="false"></textarea></div>
- <div class="field full"><label for="nc-file">Dosya <span class="optional">(Excel, CSV, PDF, fotoğraf · birden fazla seçilebilir)</span></label><input id="nc-file" type="file" accept=".xlsx,.csv,.tsv,.pdf,image/*" multiple></div>
- <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-read">Oku</button></div><div id="nc-out">${ncResultHTML()}</div>
- <div id="ncw-box">${ncwHTML()}</div></div>`);}
+ openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body">
+ <div id="nc-out">${ncResultHTML()}</div>
+ <div id="ncw-box">${ncwHTML()}</div>
+ <details class="nc-manual"><summary>Elle ekle (yapıştır / dosya seç)</summary>
+  <div class="field full"><label for="nc-text">Yapıştırın</label><textarea id="nc-text" rows="4" placeholder="26LR…  26TR…  GUA_INV  …  A6301EM, A4627HM" spellcheck="false"></textarea></div>
+  <div class="field full"><label for="nc-file">Dosya <span class="optional">(Excel, CSV, PDF, fotoğraf · birden fazla seçilebilir)</span></label><input id="nc-file" type="file" accept=".xlsx,.csv,.tsv,.pdf,image/*" multiple></div>
+  <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-read">Oku</button></div>
+ </details></div>`);}
 /* PDF'in yazı katmanı bilgisayarda okunur (pdf.js, Apache-2.0): ücretsiz, sınırsız, belge dışarı gitmez. Taranmış (resim) PDF'te yazı yoktur: yapay zekâya geçilir. */
 const PDFJS_BASE=new URL('pdfjs/',location.href).href;let pdfjsP=null;
 function pdfjsLoad(){if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
@@ -2398,7 +2406,7 @@ function ncBadge(){const n=ncPending();return n?` <span class="nc-badge" title="
 function ncwHTML(){
  if(!ncw.sup)return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">Bu tarayıcı klasör izlemeyi desteklemiyor. Bilgisayarda Chrome ya da Edge kullanın.</p></div>`;
  const st=ncw.h?(ncw.perm==='granted'?`İzlenen klasör: <b>${esc(ncw.h.name)}</b>${ncw.busy?' · taranıyor…':''}`:`Klasör: <b>${esc(ncw.h.name)}</b> · izin gerekiyor (“Şimdi tara”ya basın)`):'Klasör seçilmedi';
- return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">İndirdiğiniz belgelerin düştüğü klasörü bir kez seçin. Tarayıcı <b>İndirilenler</b> klasörünün kendisini seçtirmez; onun içinde yeni bir klasör açın (ör. <b>İndirilenler › NCTS</b>) ve belgeleri oraya kaydedin. Site o klasöre yeni düşen PDF / fotoğraf / Excel dosyalarını kendisi okur; yalnızca MRN içeren belgeler kullanılır, başka klasöre bakılmaz.</p>
+ return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">Belgeleri kaydettiğiniz klasörü bir kez seçin (ör. <b>İndirilenler › NCTS</b>; tarayıcı İndirilenler’in kendisini seçtirmez). Oraya düşen yeni PDF / fotoğraf / Excel dosyaları kendiliğinden okunur; yalnızca MRN içerenler kullanılır.</p>
  <div class="nc-folder-st">${st}${ncw.msg?`<small>${esc(ncw.msg)}</small>`:''}</div>
  <div class="rs-acts"><button type="button" class="btn small" data-action="ncw-pick">${ncw.h?'Klasörü değiştir':'Klasör seç'}</button>${ncw.h?'<button type="button" class="btn small" data-action="ncw-scan">Şimdi tara</button><button type="button" class="btn small" data-action="ncw-off">Bırak</button>':''}</div>
  <label class="ncw-auto"><input type="checkbox" id="ncw-auto" ${ncw.auto?'checked':''}> Eşleşenleri sormadan araç kaydına yaz <span class="optional">(Geri al ile döner)</span></label></div>`;}
@@ -2439,7 +2447,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="n
  if(a==='ncw-off')return ncwOff();
  if(a==='nc-read')return ncRead(b);
  if(a==='nc-apply')return ncApply(b);
- if(a==='nc-wa'){const l=ncGroups[+b.dataset.g];if(l)sendMrn(l);return;}
+ if(a==='nc-wa'){const l=ncGroups[+b.dataset.g];if(l)sendNcRows(l);return;}
+ if(a==='nc-wa-row'){const x=ncRowsNow[+b.dataset.i];if(x&&x.v)sendNcRows([x]);return;}
  if(a==='wa-mrn'){const v=state.visits.find(x=>x.id===b.dataset.id);if(v)sendMrn([v]);}});
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='ncw-auto'){ncw.auto=t.checked;try{localStorage.setItem(NCW_AUTO_KEY,t.checked?'1':'0');}catch(_){}if(t.checked)ncwScan(true);return;}if(!t.classList?.contains('nc-inc'))return;const r=nc.recs[+t.dataset.i];if(r){r.inc=t.checked;ncRefresh();}});
 /* Güvenlik ekranı (?guvenlik=ANAHTAR, kurulum: supabase/guvenlik-kurulumu.sql).

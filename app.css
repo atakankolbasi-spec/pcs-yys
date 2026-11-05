@@ -2382,3 +2382,9 @@ html[data-theme="dark"] .guard-ncts{color:#c4cdd9}html[data-theme="dark"] .guard
 .nc-folder-st{font-size:13px}.nc-folder-st small{display:block;color:var(--muted,#6b7a90);margin-top:2px}
 .nc-folder .rs-acts{margin:0}
 .ncw-auto{display:flex;align-items:center;gap:8px;font-size:12.5px}
+
+.nc-manual{margin-top:14px;font-size:12.5px}
+.nc-manual summary{cursor:pointer;color:var(--muted,#6b7a90);font-weight:700}
+.nc-manual[open] summary{margin-bottom:10px}
+.nc-wa-row{white-space:nowrap}
+.nc-empty{margin:0 0 6px}
