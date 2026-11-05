@@ -3485,18 +3485,18 @@ test('NCTS\'den al: yapıştırılan listeden MRN plakaya göre eşleşir, onayl
   expect(problems).toEqual([]);
 });
 
-test('NCTS\'den al: PDF/fotoğraf (yapay zekâ) ile mühür, CSV dışa aktarma ile MRN okunur; sütun kurulu değilse yazılmaz', async ({ page }) => {
+test('NCTS\'den al: yazı katmanlı PDF (mühür) ve CSV dışa aktarma (MRN) birlikte bilgisayarda okunur; sütun kurulu değilse yazılmaz', async ({ page, browser }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: 1600, height: 1000 });
-  const transit = { mrn: '26TR000000000000B2', lrn: '26LR000000000009', plates: ['CB1234AB', 'CB4728EE'], seals: ['İG01362070'], seal_count: 1, model: 'm' };
-  const problems = await openApp(page, { data: nctsData(), transit });
+  const pdf = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000B2', 'LRN (12 03) 26LR000000000009', 'Hareketteki taşıma aracı (18 05 / 13 05)', 'CB1234AB / CB4728EE', 'Mühür (13 10 / 19 10)', 'İG01362070']);
+  const problems = await openApp(page, { data: nctsData() });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
   await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
   // PDF + CSV birlikte
   const csv = 'LRN;MRN;Durum;Plaka\n26LR000000000003;26TR000000000000A3;REL_TRA;"B123XYZ, XX1111XX"\n';
   await page.locator('#nc-file').setInputFiles([
-    { name: 'beyanname.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 sahte') },
+    { name: 'beyanname.pdf', mimeType: 'application/pdf', buffer: pdf },
     { name: 'liste.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') }
   ]);
   await page.locator('[data-action="nc-read"]').click();
@@ -3511,7 +3511,7 @@ test('NCTS\'den al: PDF/fotoğraf (yapay zekâ) ile mühür, CSV dışa aktarma 
   await expect(page.locator('.nc-wa')).toHaveCount(1);
   await expect(page.locator('.nc-wa pre')).toContainText('26TR000000000000B2');
   await expect(page.locator('.nc-wa pre')).toContainText('26TR000000000000A3');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.type))).toEqual(['application/pdf']);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);   // yapay zekâya hiç gidilmez
   await page.locator('[data-action="nc-apply"]').click();
   await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
   expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000A3');
@@ -3548,76 +3548,6 @@ test('NCTS: sütunlar kurulu değilse (SQL çalıştırılmamış) uyarı verili
   expect(problems).toEqual([]);
 });
 
-// Klasör izleme: gerçek bir FileSystemDirectoryHandle gerekir; tarayıcının kendi dosya sistemi (OPFS) kullanılır, seçiciyi test taklit eder.
-async function opfsWrite(page, name, text) {
-  await page.evaluate(async ([n, t]) => {
-    const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('ncts', { create: true });
-    const w = await (await dir.getFileHandle(n, { create: true })).createWritable();
-    await w.write(t); await w.close();
-  }, [name, text]);
-}
-const opfsPicker = () => { window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('ncts', { create: true }); };
-
-test('NCTS klasörü: seçilen klasördeki yeni belgeler kendiliğinden okunur, bir kez okunur, T1 olmayanlar yok sayılır; sormadan yazma seçeneği', async ({ page }) => {
-  test.setTimeout(120000);
-  await page.setViewportSize({ width: 1600, height: 1000 });
-  const T = (mrn, plates, seals) => ({ mrn, lrn: '26LR000000000009', plates, seals, seal_count: seals.length, model: 'm' });
-  const problems = await openApp(page, { data: nctsData(), transit: [T('26TR000000000000B2', ['CB1234AB'], ['İG01362070']), T('26TR000000000000C3', ['B123XYZ'], ['İG01362099']), { mrn: '', lrn: '', plates: [], seals: [], seal_count: 0, model: 'm' }] });
-  await page.addInitScript(opfsPicker);
-  await page.goto('/');
-  await expect(page.locator('#app')).toContainText('34 ABC 123');
-  await opfsWrite(page, 'T1-1.pdf', '%PDF-1.4 birinci');
-  await opfsWrite(page, 'notlar.txt', 'bu dosya okunmaz');
-  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
-  await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
-  await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
-  await page.locator('[data-action="ncw-pick"]').click();
-  const rows = page.locator('.nc-table tbody tr');
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('26TR000000000000B2');
-  await expect(rows.first()).toContainText('CB 1234 AB');
-  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
-  // onaylanmadan hiçbir şey yazılmaz; düğmede hazır sayısı görünür
-  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
-  await expect(page.locator('[data-action="ncts-open"] .nc-badge').first()).toHaveText('1');
-  // .txt okunmadı; aynı dosya ikinci taramada yeniden okunmaz
-  await page.locator('[data-action="ncw-scan"]').click();
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);
-  await page.locator('[data-action="nc-apply"]').click();
-  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
-  // yeni belge düşer (ikincisi T1 değil); "sormadan yaz" açıkken kendiliğinden okunur ve yazılır
-  await opfsWrite(page, 'T1-2.pdf', '%PDF-1.4 ikinci belge');
-  await opfsWrite(page, 'baska.pdf', '%PDF-1.4 T1 değil');
-  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
-  await page.locator('#ncw-auto').check();
-  await page.locator('[data-action="ncw-scan"]').click();
-  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000C3');
-  expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
-  // T1 olmayan belge (MRN yok) yok sayıldı ve bir daha gönderilmedi
-  const before = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
-  await page.locator('[data-action="ncw-scan"]').click();
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(before);
-  // klasör bırakılınca unutulur
-  await page.locator('[data-action="ncw-off"]').click();
-  await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
-  expect(problems).toEqual([]);
-});
-
-test('NCTS: yapay zekâ belgeyi kabul etmezse nedeni (Gemini ayrıntısı, dosya türü ve boyutu) yazılır', async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 1000 });
-  const problems = await openApp(page, { data: nctsData(), transit: { status: 400, body: { fatal: true, reason: 'Gemini bu içeriği kabul etmedi', detail: JSON.stringify({ error: { message: 'The document has no pages.' } }) } } });
-  await expect(page.locator('#app')).toContainText('34 ABC 123');
-  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
-  await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
-  await page.locator('#nc-file').setInputFiles({ name: 'MNF0000001-NCTS-TR.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 sahte') });
-  await page.locator('[data-action="nc-read"]').click();
-  await expect(page.locator('#nc-out')).toContainText('Gemini bu içeriği kabul etmedi · The document has no pages. · application/pdf, 0 KB');
-  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
-  expect(problems.filter(p => !/HTTP 4\d\d/.test(p))).toEqual([]);
-});
-
 // Sahte (uydurma) bir Transit Refakat Belgesi: gerçek yazı katmanlı PDF'i Chromium üretir
 async function t1Pdf(browser, lines) {
   const p = await browser.newPage();
@@ -3627,58 +3557,81 @@ async function t1Pdf(browser, lines) {
   return buf;
 }
 
-test('NCTS: PDF önce bilgisayarda (pdf.js) okunur; yapay zekâya hiç gidilmez; mühürsüz olursa yapay zekâ tamamlar; yazısız PDF yapay zekâya gider', async ({ page, browser }) => {
+// Klasör izleme: gerçek bir FileSystemDirectoryHandle gerekir; tarayıcının kendi dosya sistemi (OPFS) kullanılır, seçiciyi test taklit eder.
+async function opfsWrite(page, name, data) {
+  const bytes = Array.from(typeof data === 'string' ? Buffer.from(data) : data);
+  await page.evaluate(async ([n, b]) => {
+    const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('ncts', { create: true });
+    const w = await (await dir.getFileHandle(n, { create: true })).createWritable();
+    await w.write(new Uint8Array(b)); await w.close();
+  }, [name, bytes]);
+}
+const opfsPicker = () => { window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('ncts', { create: true }); };
+
+test('NCTS klasörü: seçilen klasördeki yeni PDF belgeler kendiliğinden bilgisayarda okunur, bir kez okunur, T1 olmayanlar yok sayılır; sormadan yazma seçeneği', async ({ page, browser }) => {
   test.setTimeout(120000);
   await page.setViewportSize({ width: 1600, height: 1000 });
-  const full = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000Z9', 'LRN (12 03) 26LR000000000012', 'Hareketteki taşıma aracı (18 05 / 13 05)', 'CB1234AB / CB4728EE', 'Mühür (13 10 / 19 10) Adedi 2', 'İG01362070 İG01362071']);
-  const noSeal = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000Y8', 'LRN (12 03) 26LR000000000013', 'Plaka B123XYZ', 'Mühür numaraları: okunaksız']);
-  const blank = await t1Pdf(browser, ['']);
-  const transit = [{ mrn: '26TR000000000000Y8', lrn: '', plates: ['B123XYZ'], seals: ['İG05550001'], seal_count: 1, model: 'm' }, { mrn: '26TR000000000000X7', lrn: '', plates: ['QQ0000QQ'], seals: [], seal_count: 0, model: 'm' }];
-  const problems = await openApp(page, { data: nctsData(), transit });
+  const pdf1 = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000B2', 'Plaka CB1234AB / CB4728EE', 'Mühür İG01362070']);
+  const pdf2 = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000C3', 'Plaka B123XYZ', 'Mühür İG01362099']);
+  const other = await t1Pdf(browser, ['Fatura', 'Toplam 100 EUR']);
+  const problems = await openApp(page, { data: nctsData() });
+  await page.addInitScript(opfsPicker);
+  await page.goto('/');
   await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await opfsWrite(page, 'T1-1.pdf', pdf1);
+  await opfsWrite(page, 'notlar.txt', 'bu dosya okunmaz');
   await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
-  await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
-  // 1) tam belge: yalnızca bilgisayarda okunur
-  await page.locator('#nc-file').setInputFiles({ name: 'tam.pdf', mimeType: 'application/pdf', buffer: full });
-  await page.locator('[data-action="nc-read"]').click();
-  let rows = page.locator('.nc-table tbody tr');
+  await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
+  await page.locator('[data-action="ncw-pick"]').click();
+  const rows = page.locator('.nc-table tbody tr');
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('26TR000000000000Z9');
-  await expect(rows.first()).toContainText('İG01362070');
-  await expect(rows.first()).toContainText('İG01362071');
+  await expect(rows.first()).toContainText('26TR000000000000B2');
   await expect(rows.first()).toContainText('CB 1234 AB');
   await expect(rows.first()).toContainText('bilgisayarda okundu');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
-  // 2) mühür yok: yapay zekâ tamamlar, MRN yerel kalır
-  await page.locator('#nc-file').setInputFiles({ name: 'musursuz.pdf', mimeType: 'application/pdf', buffer: noSeal });
-  await page.locator('[data-action="nc-read"]').click();
-  rows = page.locator('.nc-table tbody tr');
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('26TR000000000000Y8');
-  await expect(rows.first()).toContainText('İG05550001');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);
-  // 3) yazısız (taranmış gibi) PDF: yapay zekâ okur
-  await page.locator('#nc-file').setInputFiles({ name: 'tarama.pdf', mimeType: 'application/pdf', buffer: blank });
-  await page.locator('[data-action="nc-read"]').click();
-  await expect(page.locator('.nc-table tbody tr').first()).toContainText('26TR000000000000X7');
-  await expect(page.locator('.nc-table tbody tr').first()).toContainText('yapay zekâyla okundu');
-  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(2);
+  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
+  // onaylanmadan hiçbir şey yazılmaz; düğmede hazır sayısı görünür
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
+  await expect(page.locator('[data-action="ncts-open"] .nc-badge').first()).toHaveText('1');
+  await page.locator('[data-action="nc-apply"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
+  // yeni belgeler düşer (biri T1 değil, biri resim); "sormadan yaz" açıkken kendiliğinden okunur ve yazılır
+  await opfsWrite(page, 'T1-2.pdf', pdf2);
+  await opfsWrite(page, 'baska.pdf', other);
+  await opfsWrite(page, 'foto.png', 'png gibi');
+  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
+  await page.locator('#ncw-auto').check();
+  await page.locator('[data-action="ncw-scan"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000C3');
+  expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
+  await expect(page.locator('#ncw-box')).toContainText('baska.pdf');                    // T1 olmadığı söylenir ve yok sayılır
+  await expect(page.locator('#ncw-box')).toContainText('yok sayıldı');
+  // aynı dosyalar bir daha okunmaz (mesaj yinelenmez)
+  await page.locator('[data-action="ncw-scan"]').click();
+  await expect(page.locator('#ncw-box')).not.toContainText('baska.pdf');
+  // klasör bırakılınca unutulur
+  await page.locator('[data-action="ncw-off"]').click();
+  await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
   expect(problems).toEqual([]);
 });
 
-test('NCTS: yapay zekâ kurulu değilken bile yazı katmanlı PDF okunur', async ({ page, browser }) => {
+test('NCTS: okunamayan belgenin nedeni yazılır (MRN yok, yazı katmanı yok, desteklenmeyen tür); yapay zekâya gidilmez', async ({ page, browser }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: 1600, height: 1000 });
-  const pdf = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000W6', 'Plaka CB1234AB', 'Mühür İG01362070']);
-  const problems = await openApp(page, { data: nctsData(), transit: { status: 404 } });
+  const fatura = await t1Pdf(browser, ['Fatura', 'Toplam tutar 100 EUR, ödeme yapılmıştır, teşekkür ederiz']);
+  const blank = await t1Pdf(browser, ['']);
+  const problems = await openApp(page, { data: nctsData() });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
   await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
-  await page.locator('#nc-file').setInputFiles({ name: 'tam.pdf', mimeType: 'application/pdf', buffer: pdf });
-  await page.locator('[data-action="nc-read"]').click();
-  await expect(page.locator('.nc-table tbody tr').first()).toContainText('26TR000000000000W6');
-  await expect(page.locator('.nc-table tbody tr').first()).toContainText('İG01362070');
+  const read = async file => { await page.locator('#nc-file').setInputFiles(file); await page.locator('[data-action="nc-read"]').click(); };
+  await read({ name: 'MNF0000001-NCTS-TR.pdf', mimeType: 'application/pdf', buffer: fatura });
+  await expect(page.locator('#nc-out')).toContainText('MNF0000001-NCTS-TR.pdf: belgede MRN bulunamadı');
+  await read({ name: 'tarama.pdf', mimeType: 'application/pdf', buffer: blank });
+  await expect(page.locator('#nc-out')).toContainText('yazı katmanı yok');
+  await read({ name: 'foto.png', mimeType: 'image/png', buffer: Buffer.from('png gibi') });
+  await expect(page.locator('#nc-out')).toContainText('Desteklenmeyen dosya türü');
   expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
   expect(problems).toEqual([]);
 });
 
@@ -3691,7 +3644,7 @@ test('NCTS: gerçek belgenin düzeni (etiketler köşeli kodlu, çekici ve dorse
     'MRN', '26TR000000000000V5', 'LRN[12 09] UCR Numarası [12 08] TIR [12 06]', '26LR000000000014 MNF0000000',
     'Hareketteki Taşıma Aracı [19 05]', '30 T0001AA T0002BB BG', 'BM Tehlikeli Eşya Kodu CUS Kodu[18 08]', 'VARIŞ GÜMRÜK İDARESİ [17 05]', 'BG002008 - Varış'
   ]);
-  const problems = await openApp(page, { data: nctsData(), transit: { status: 404 } });
+  const problems = await openApp(page, { data: nctsData() });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
   await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
@@ -3711,7 +3664,7 @@ test('NCTS: gerçek belgenin düzeni (etiketler köşeli kodlu, çekici ve dorse
 test('NCTS: tablodaki her satırda WhatsApp düğmesi; yazmayı beklemeden dorse plakası / MRN / mühür mesajı doğrudan açılır', async ({ page }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: 1600, height: 1000 });
-  const problems = await openApp(page, { data: nctsData(), transit: { status: 404 } });
+  const problems = await openApp(page, { data: nctsData() });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
   await expect(page.locator('.nc-empty')).toContainText('Henüz okunan belge yok');
@@ -3738,7 +3691,7 @@ test('NCTS: WhatsApp mesajında yalnızca dorse plakası yazılır (çekici değ
   await page.setViewportSize({ width: 1600, height: 1000 });
   const data = nctsData();
   data.visits.push({ ...data.visits[5], id: 'v8', plate: 'PB 1234 AB - PB 5678 CD', customer: 'DORSELİ LOJ', mrn: null, seal_no: null });
-  const problems = await openApp(page, { data, transit: { status: 404 } });
+  const problems = await openApp(page, { data });
   await expect(page.locator('#app')).toContainText('34 ABC 123');
   await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
   await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });

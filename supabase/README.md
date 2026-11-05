@@ -147,7 +147,7 @@ bilgisi kaydedilemez. İzleme linkinde bu düğme yoktur.
 
 **MRN ve mühür (NCTS):** araç kaydında **MRN** ve **mühür** alanları vardır; güvenlik kartında da görünür. Panoda **NCTS'den al**
 düğmesi BİLGE (NCTS) ekranındaki bilgiyi plakaya göre araçlara eşler: listeyi yapıştırın, **Tümünü Dışa Aktar** dosyasını (Excel / CSV)
-seçin ya da Transit Refakat Belgesi'ni (PDF / fotoğraf) yükleyin; PDF belgeler önce **bilgisayarınızda** (pdf.js; ücretsiz, sınırsız, belge dışarı gitmez) okunur, yalnızca yazısı okunamayan (taranmış) PDF'ler ve fotoğraflar yapay zekâya (Gemini) gider; mühür numarası belgeden gelir ya da elle
+seçin ya da Transit Refakat Belgesi'ni (PDF) yükleyin; PDF ve Excel / CSV dosyaları **bilgisayarınızda** okunur (pdf.js; ücretsiz, sınırsız, belge dışarı gitmez, yapay zekâ kullanılmaz); yalnızca yazı katmanı olan PDF okunur (taranmış / resim PDF ve fotoğraf okunmaz); mühür numarası belgeden gelir ya da elle
 yazılır. Önizlemede neyin hangi araca yazılacağını görür, onaylarsanız yazılır; yeni araç eklenmez. Her araç için **çekici plakası /
 MRN / mühür** şeklinde üç satırlık WhatsApp mesajı hazırlanır (gönder düğmesine siz basarsınız); mesaj müşteriye ayrılmaz, numara da eklenmez: WhatsApp açılınca grubu (ya da kişiyi) siz seçersiniz. WhatsApp, bir gruba hazır yazıyla doğrudan bağlanmaya izin vermez. **Tablo ve WhatsApp:** okunan belgeler tabloda plaka, MRN, mühür ve eşleşen araçla görünür; her satırda **WhatsApp** düğmesi vardır ve dorse plakası / MRN / mühür mesajını (araç kaydına yazmayı beklemeden) doğrudan WhatsApp'ta açar. Listeyi yapıştırma ya da dosya seçme, penceredeki kapalı **Elle ekle** satırının altındadır.
 
@@ -158,7 +158,7 @@ plakaya göre eşler ve **NCTS'den al** düğmesinde hazır sayısını gösteri
 onay beklenmeden yazılır (işlem geçmişinden geri alınır). Tarayıcı kapanıp açılınca bir kez izin sorar (düğmede turuncu **!** görünür).
 Her kullanıcı kendi bilgisayarında kendi klasörünü seçer; kayıtlar ortaktır. Siteye NCTS şifresi **girilmez**,
 site NCTS'ye kendiliğinden bağlanmaz. Bu özellik için `guvenlik-kurulumu.sql` dosyasının yeni halinin tamamı bir kez çalıştırılmalıdır
-(`mrn` ve `seal_no` sütunları); belge okuma için `ruhsat-oku` fonksiyonu yeniden yüklenmelidir.
+(`mrn` ve `seal_no` sütunları). `ruhsat-oku` fonksiyonuna gerek yoktur.
 
 **Ayarlar → Güvenlik ekranı izleme linki** aynı ekranı yalnızca görüntüleme için açar (`?guvenlik-izle=…`):
 açan kişi listeleri ve raporu görür, GİRİŞ / ÇIKIŞ yapamaz (sunucu da reddeder). Anahtarı güvenlik linkinden
