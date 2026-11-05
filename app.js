@@ -2408,9 +2408,13 @@ const ncwRefresh=()=>{const o=document.getElementById('ncw-box');if(o)o.innerHTM
 async function ncwInit(){if(ncw.ready||!ncw.sup||VIEW_TOKEN)return;ncw.ready=true;ncw.h=(await ncwGet('dir'))||null;ncw.since=(await ncwGet('since'))||0;ncw.seen=(await ncwGet('seen'))||{};
  if(!ncw.h)return;ncw.perm=await ncwPerm(false);ncwRender();ncwTimers();if(ncw.perm==='granted')ncwScan(true);}
 let ncwTimed=false;
-function ncwTimers(){if(ncwTimed)return;ncwTimed=true;setInterval(()=>{if(!document.hidden)ncwScan();},60000);
- addEventListener('focus',()=>ncwScan());document.addEventListener('visibilitychange',()=>{if(!document.hidden)ncwScan();});}
-async function ncwScan(force){if(!ncw.h||ncw.busy||nc.busy||!canEdit()||ncw.perm!=='granted'||(!force&&Date.now()-ncw.last<15000))return;
+const NCW_EVERY=12000;   // klasör 12 saniyede bir taranır (sekme arka plandayken tarayıcı en çok dakikada bire düşürebilir)
+function ncwTimers(){if(ncwTimed)return;ncwTimed=true;setInterval(()=>ncwScan(),NCW_EVERY);
+ addEventListener('focus',()=>ncwScan());document.addEventListener('visibilitychange',()=>{if(!document.hidden)ncwScan();});
+ /* tarayıcı yeniden açıldıktan sonra klasör izni, ilk dokunuşta (kullanıcı hareketiyle) bir kez istenir; reddedilirse bu açılışta bir daha sorulmaz */
+ const ask=()=>{document.removeEventListener('pointerdown',ask,true);if(ncw.h&&ncw.perm!=='granted')ncwPerm(true).then(p=>{ncw.perm=p;ncwRefresh();ncwRender();ncwScan(true);});};
+ document.addEventListener('pointerdown',ask,true);}
+async function ncwScan(force){if(!ncw.h||ncw.busy||nc.busy||!canEdit()||ncw.perm!=='granted'||(!force&&Date.now()-ncw.last<NCW_EVERY-4000))return;
  ncw.busy=true;ncw.last=Date.now();ncw.msg='';ncwRefresh();const fresh=[];let seenDirty=false;
  try{const cand=[];
   for await(const [name,h] of ncw.h.entries()){if(h.kind!=='file'||!NCW_EXT.test(name))continue;const f=await h.getFile(),key=`${name}|${f.size}|${f.lastModified}`;

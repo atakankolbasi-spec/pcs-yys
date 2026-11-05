@@ -3595,12 +3595,14 @@ test('NCTS klasörü: seçilen klasördeki yeni PDF belgeler kendiliğinden bilg
   await page.locator('[data-action="nc-apply"]').click();
   await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
   // yeni belgeler düşer (biri T1 değil, biri resim); "sormadan yaz" açıkken kendiliğinden okunur ve yazılır
+  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
+  await page.locator('#ncw-auto').check();
+  await page.clock.runFor(2000);                                                         // işaretlemenin kendi taraması bitsin (yeni dosya yok)
   await opfsWrite(page, 'T1-2.pdf', pdf2);
   await opfsWrite(page, 'baska.pdf', other);
   await opfsWrite(page, 'foto.png', 'png gibi');
-  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
-  await page.locator('#ncw-auto').check();
-  await page.locator('[data-action="ncw-scan"]').click();
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBeNull();
+  await page.clock.runFor(13000);                                                        // düğmeye basılmaz: klasör kendiliğinden (12 sn'de bir) taranır
   await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000C3');
   expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
   await expect(page.locator('#ncw-box')).toContainText('baska.pdf');                    // T1 olmadığı söylenir ve yok sayılır
