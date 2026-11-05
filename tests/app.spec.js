@@ -82,13 +82,11 @@ test('Kontrol Kulesi tasarımı: karşılama bandı, genel bakış kartları, me
   expect(await hero.locator('.k-stat b').allTextContents()).toEqual(['3', '2', '1', '0']);
   await expect(hero.locator('.k-stats-label')).toHaveText('Bugün');
   await expect(hero.locator('[data-action="add-visit"]')).toBeVisible();
-  // genel bakış: bugünün kontrol kartı, bekleyenler, son 14 iş günü
+  // genel bakış: bugünün kontrol kartı, bekleyenler (Son 14 iş günü grafiği kaldırıldı)
   await expect(page.locator('.k-card.k-ctl')).toContainText('Bugün');
   await expect(page.locator('.k-waits li')).toHaveCount(3);
-  await expect(page.locator('.k-bar')).toHaveCount(14);
-  // grafikte bir güne tıklayınca o gün açılır
-  await page.locator('.k-bar[data-date="2026-09-22"]').click();
-  await expect(page.locator('.day-tab.active')).toContainText('Salı');
+  await expect(page.locator('.k-bar')).toHaveCount(0);
+  await expect(page.locator('.k-cards')).not.toContainText('Son 14 iş günü');
   // bekleyen araca tıklayınca panoda seçilir
   await page.locator('.k-waits button', { hasText: 'CB 1234 AB' }).click();
   await expect(page.locator('.day-tab.active')).toContainText('Çarşamba');
@@ -3595,12 +3593,14 @@ test('NCTS klasörü: seçilen klasördeki yeni PDF belgeler kendiliğinden bilg
   await page.locator('[data-action="nc-apply"]').click();
   await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
   // yeni belgeler düşer (biri T1 değil, biri resim); "sormadan yaz" açıkken kendiliğinden okunur ve yazılır
+  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
+  await page.locator('#ncw-auto').check();
+  await page.clock.runFor(2000);                                                         // işaretlemenin kendi taraması bitsin (yeni dosya yok)
   await opfsWrite(page, 'T1-2.pdf', pdf2);
   await opfsWrite(page, 'baska.pdf', other);
   await opfsWrite(page, 'foto.png', 'png gibi');
-  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
-  await page.locator('#ncw-auto').check();
-  await page.locator('[data-action="ncw-scan"]').click();
+  expect(await page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBeNull();
+  await page.clock.runFor(13000);                                                        // düğmeye basılmaz: klasör kendiliğinden (12 sn'de bir) taranır
   await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000C3');
   expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
   await expect(page.locator('#ncw-box')).toContainText('baska.pdf');                    // T1 olmadığı söylenir ve yok sayılır
@@ -3702,5 +3702,37 @@ test('NCTS: WhatsApp mesajında yalnızca dorse plakası yazılır (çekici değ
   const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
   await page.locator('.nc-table .nc-wa-row').click();
   expect(new URL((await launched).url()).searchParams.get('text')).toBe('PB5678CD\n26TR000000000000D4');
+  expect(problems).toEqual([]);
+});
+
+test('genel bakış: "Son 14 iş günü" yerine NCTS WhatsApp kartı; okunan MRN mesajı burada hazır durur, yenilenince kalır, düğmeyle WhatsApp\'ta açılır', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page, { data: nctsData() });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  const card = page.locator('.k-card.k-wa');
+  await expect(card).toBeVisible();
+  await expect(page.locator('.k-bars')).toHaveCount(0);
+  await expect(card).toContainText('Gönderilecek mesaj yok');
+  await expect(card.locator('.k-wa-btn')).toBeDisabled();
+  // belge okununca (burada yapıştırılan liste) mesaj karta düşer
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
+  await page.locator('#nc-text').fill(NC_LIST);
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('.nc-table tbody tr')).toHaveCount(3);
+  await page.evaluate(() => document.querySelector('[data-action="close-modal"]').click());
+  await expect(card.locator('.k-wa-pre')).toHaveText('ZZ9999ZZ\n26TR000000000000A1');
+  await expect(card).toContainText('1 araç');
+  // sayfa yenilense de mesaj gönderilene kadar kartta kalır
+  await page.reload();
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await expect(page.locator('.k-card.k-wa .k-wa-pre')).toHaveText('ZZ9999ZZ\n26TR000000000000A1');
+  // düğme WhatsApp'ı hazır mesajla açar (numarasız); gönderilen mesaj karttan kalkar
+  const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
+  await page.locator('.k-card.k-wa .k-wa-btn').click();
+  const u = new URL((await launched).url());
+  expect(u.searchParams.get('text')).toBe('ZZ9999ZZ\n26TR000000000000A1');
+  expect(u.searchParams.get('phone')).toBeNull();
   expect(problems).toEqual([]);
 });
