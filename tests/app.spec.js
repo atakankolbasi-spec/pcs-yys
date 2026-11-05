@@ -3670,3 +3670,28 @@ test('NCTS: yapay zekâ kurulu değilken bile yazı katmanlı PDF okunur', async
   expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
   expect(problems).toEqual([]);
 });
+
+test('NCTS: gerçek belgenin düzeni (etiketler köşeli kodlu, çekici ve dorse ayrı yerde): doğru plaka, MRN ve mühür; gürültü alınmaz', async ({ page, browser }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const pdf = await t1Pdf(browser, [
+    'TRANSİT REFAKAT BELGESİ', 'Hareketteki Taşıma Aracı [19 05]', 'T0001AA BG 30', 'Taşıma Ekipmanı[19 07]',
+    'Eşyanın Bulunduğu Yer [16 15] Yükleme Yeri [16 13]', 'TR, Z34089', 'Mühür [19 10]', 'İG01362070', 'Yeni Mühürler: Adet:',
+    'MRN', '26TR000000000000V5', 'LRN[12 09] UCR Numarası [12 08] TIR [12 06]', '26LR000000000014 MNF0000000',
+    'Hareketteki Taşıma Aracı [19 05]', '30 T0001AA T0002BB BG', 'BM Tehlikeli Eşya Kodu CUS Kodu[18 08]', 'VARIŞ GÜMRÜK İDARESİ [17 05]', 'BG002008 - Varış'
+  ]);
+  const problems = await openApp(page, { data: nctsData(), transit: { status: 404 } });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.locator('#nc-file').setInputFiles({ name: 'beyanname_ve_kalem.pdf', mimeType: 'application/pdf', buffer: pdf });
+  await page.locator('[data-action="nc-read"]').click();
+  const row = page.locator('.nc-table tbody tr').first();
+  await expect(row).toContainText('26TR000000000000V5');
+  await expect(row).toContainText('T 0001 AA');
+  await expect(row).toContainText('T 0002 BB');
+  await expect(row).toContainText('İG01362070');
+  const text = await row.innerText();
+  expect(text).not.toMatch(/Z\s?34089|EKPMAN|BG002008/i);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
+  expect(problems).toEqual([]);
+});

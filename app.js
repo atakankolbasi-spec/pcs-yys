@@ -1882,7 +1882,7 @@ function wmListHTML(){const rows=wmAll().filter(r=>r.status!=='yoksayildi'&&!wmD
 function wmBoxHTML(){return ai.state==='none'?'':`<details class="msg-paste"><summary>${icon('doc')}<b>Mesajdan araç ekle</b> · müşterinin yazdığı listeyi yapıştırın</summary><textarea id="msg-text" rows="5" maxlength="6000" placeholder="Örn: Yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD, CB 1234 AB. Perşembedeki 06 KL 4567 iptal.">${esc(wmsg.text)}</textarea><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-read">${icon('refresh')}Yapay zekâyla oku</button></div></details>`;}
 function wmRefresh(){const l=document.getElementById('msg-list');if(l)l.innerHTML=wmListHTML();waBadge();onlineUI();if(chat.open)chatRender();}
 /* Mesaj metnini Gemini'ye okutur (ruhsat-oku, mesaj modu). Sonuç: {data} · {none:true} kurulu değil · {err:'neden'} */
-async function wmAi(text,onPhase=()=>{},chatMode=false,imgMode='liste'){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='',detail='';
+async function wmAi(text,onPhase=()=>{},chatMode=false,imgMode='liste',once=false){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='',detail='';
  /* text bir dosyaysa (liste ekran görüntüsü) fotoğraf "liste" modunda okunur: ruhsat-oku içindeki yazı mesaj gibi okunur */
  const img=text&&typeof text==='object'?text:null;
  for(let i=1;i<=3;i++){let st=0,body=null;
@@ -1899,7 +1899,7 @@ async function wmAi(text,onPhase=()=>{},chatMode=false,imgMode='liste'){if(ai.st
   if(st===401&&!refreshed){refreshed=true;try{await client.auth.refreshSession();}catch(_){}i--;continue;}
   /* sohbet: cevap bekleyen kişi dakikalarca beklemesin; sunucu en çok ~40 sn dener, zaman aşımında tekrar denenmez, en çok 2 deneme */
   if(chatMode&&st===0){last='yapay zekâ zamanında cevap vermedi';break;}
-  if(body?.fatal||!(st===429||st>=500||st===0)||i===(chatMode?2:3))break;
+  if(once||body?.fatal||!(st===429||st>=500||st===0)||i===(chatMode?2:3))break;
   await aiCountdown(Math.min(40,st===429?Math.max(5,+body?.retry_after||15):8)*1000,n=>onPhase(`${n} sn sonra yeniden denenecek`));}
  return {err:last,detail};}
 async function wmReadPaste(b){if(!canEdit()||wmsg.reading)return;const ta=document.getElementById('msg-text'),text=String(ta?.value||'').trim();wmsg.text=text;
@@ -2340,13 +2340,18 @@ function ncFromDocText(text){const T=String(text||'').replace(/ /g,' ').replace(
  const cnt={};for(const m of ms)cnt[m]=(cnt[m]||0)+1;const mrn=[...new Set(ms)].sort((a,b)=>cnt[b]-cnt[a])[0];   // en çok geçen; eşitse ilk görünen
  const lrn=(/\b\d{2}LR[A-Z0-9]{8,16}\b/.exec(T)||[''])[0];
  const plates=[],comp=T.replace(/[^A-Z0-9]/g,'');for(const p of ncKnown())if(comp.includes(p))plates.push(p);
- for(const m of T.matchAll(/(?:TAŞIMA ARAC[İI]|PLAKA)([^]{0,120})/g))for(const w of m[1].split(/[\s,;/()]+/)){const c=w.replace(/[^A-Z0-9]/g,'');
-  if(c.length>=5&&c.length<=10&&/\d/.test(c)&&/[A-Z]/.test(c)&&!/^[A-Z]{2}\d{6}$/.test(c)&&c!==mrn&&!ms.includes(c)&&!c.includes('LR')&&plates.length<4)plates.push(c);}
+ /* etiketin hemen altındaki / yanındaki yazı (bir sonraki "[12 34]" etiketine kadar): plaka biçiminde belirteçler */
+ const toks=w=>w.split(/[\s,;/()[\]:]+/);
+ for(const m of T.matchAll(/(?:TAŞIMA ARAC[İI]\s*(?:\[[\d ]+\])?|PLAKA)([^[]{0,100})/g))for(const w of toks(m[1])){
+  if(/^[A-Z0-9]{5,10}$/.test(w)&&/\d/.test(w)&&/[A-Z]/.test(w)&&!/^[A-Z]{2}\d{6}$/.test(w)&&w!==mrn&&!ms.includes(w)&&!w.includes('LR')&&plates.length<4)plates.push(w);}
+ /* çekici ile dorse aynı satırda ise (ör. "T2328AM  BG 30  T2721EB") satırdaki diğer plaka biçimli belirteçler de alınır */
+ const plateLike=w=>/^[A-Z0-9]{5,10}$/.test(w)&&/\d/.test(w)&&/[A-Z]/.test(w)&&!/^[A-Z]{2}\d{6}$/.test(w)&&w!==mrn&&!ms.includes(w)&&!w.includes('LR');
+ for(const line of T.split('\n')){const ws=toks(line);if(ws.some(w=>plates.includes(w)))for(const w of ws)if(plateLike(w)&&plates.length<4)plates.push(w);}
  const seals=ncSeals(T);
- for(const m of T.matchAll(/M[ÜU]H[ÜU]R([^]{0,90})/g))for(const w of m[1].split(/[\s,;/()]+/)){const c=w.replace(/[^A-ZİŞĞÜÖÇ0-9]/g,'');if(/^[A-ZİŞĞÜÖÇ]{1,3}\d{6,10}$/.test(c)&&!seals.includes(c)&&c!==lrn)seals.push(c);}
+ for(const m of T.matchAll(/M[ÜU]H[ÜU]R([^]{0,90})/g))for(const w of toks(m[1])){if(/^[A-ZİŞĞÜÖÇ]{1,3}\d{7,10}$/.test(w)&&!seals.includes(w)&&w!==lrn)seals.push(w);}
  return {lrn,mrn,status:'',plates:[...new Set(plates)].slice(0,4),seals:[...new Set(seals)].slice(0,10),doc:true,via:'yerel'};}
 /* yapay zekâ (Gemini, transit modu): kota sınırı olabilir; PDF'te yedek, fotoğrafta tek yol */
-async function ncAiRec(f,onNote){const r=await wmAi(f,onNote,false,'transit');
+async function ncAiRec(f,onNote,once=false){const r=await wmAi(f,onNote,false,'transit',once);
  if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err+(r.detail?` · ${r.detail}`:'')+` · ${f.type||'?'}, ${Math.round(f.size/1024)} KB`);
  const d=r.data;return {lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true,via:'yz'};}
 /* tek dosyadan kayıtlar: Excel / CSV listesi; PDF (önce bilgisayarda, olmazsa yapay zekâ) ya da fotoğraf (yapay zekâ) */
@@ -2356,7 +2361,8 @@ async function ncFileRecs(f,onNote=()=>{}){
  if(isPdf||/^image\//.test(f.type)){let local=null,why='';
   if(isPdf){onNote('PDF bilgisayarda okunuyor…');try{local=ncFromDocText(await pdfText(f));if(!local)why='belgede MRN bulunamadı (taranmış PDF olabilir)';}catch(e){why=String(e?.name==='PasswordException'?'PDF şifreli':e?.message||e).slice(0,80);}}
   if(local&&local.seals.length)return [local];
-  try{const ai=await ncAiRec(f,onNote);if(!local)return [ai];return [{...local,seals:ai.seals.length?ai.seals:local.seals,plates:[...new Set([...local.plates,...ai.plates])],lrn:local.lrn||ai.lrn}];}
+  const note=t=>onNote(why?`${why} · ${t}`:t);if(why)note('yapay zekâ deneniyor…');
+  try{const ai=await ncAiRec(f,note,!!local);if(!local)return [ai];return [{...local,seals:ai.seals.length?ai.seals:local.seals,plates:[...new Set([...local.plates,...ai.plates])],lrn:local.lrn||ai.lrn}];}
   catch(e){if(local)return [local];throw new Error(e.message+(why?` · bilgisayarda okunamadı: ${why}`:''));}}
  throw new Error('Desteklenmeyen dosya türü.');}
 /* aynı MRN iki kez gelirse (liste + belge) birleştirilir: mühür belgeden, plaka ikisinden */
