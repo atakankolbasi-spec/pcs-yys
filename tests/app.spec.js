@@ -3442,7 +3442,7 @@ const NC_LIST = [
   '26LR000000000003\t26TR000000000000A2\tREL_TRA\t05.11.2026, 12:30:19\t1111111111\tDENEME KFT\tHU811190\tQQ0000QQ'
 ].join('\n');
 
-test('NCTS\'den al: yapıştırılan listeden MRN plakaya göre eşleşir, onayla yazılır, WhatsApp mesajı çekici plakası / MRN / mühür olur', async ({ page }) => {
+test('NCTS\'den al: yapıştırılan listeden MRN plakaya göre eşleşir, onayla yazılır, WhatsApp mesajı dorse plakası / MRN / mühür olur', async ({ page }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: 1600, height: 1000 });
   const problems = await openApp(page, { data: nctsData() });
@@ -3466,7 +3466,7 @@ test('NCTS\'den al: yapıştırılan listeden MRN plakaya göre eşleşir, onayl
   expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(1);
   expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
   // mesaj önizlemesi: çekici plakası, MRN (mühür henüz yok)
-  await expect(page.locator('.nc-wa pre')).toHaveText('34ABC123\n26TR000000000000A1');
+  await expect(page.locator('.nc-wa pre')).toHaveText('ZZ9999ZZ\n26TR000000000000A1');   // belgedeki ikinci plaka (dorse); çekici 34ABC123 yazılmaz
   // araç kaydında alanlar görünür ve düzenlenir
   await page.evaluate(() => document.querySelector('[data-action="close-modal"]').click());
   await page.evaluate(() => document.querySelector('[data-action="edit-visit"], [data-action="select-visit"]'));
@@ -3507,6 +3507,10 @@ test('NCTS\'den al: PDF/fotoğraf (yapay zekâ) ile mühür, CSV dışa aktarma 
   await expect(pdfRow).toContainText('CB 1234 AB');                  // Bulgar plakalı gelişle eşleşti
   const csvRow = rows.filter({ hasText: '26TR000000000000A3' });
   await expect(csvRow).toContainText('B 123 XYZ');
+  // iki farklı müşterinin araçları da tek WhatsApp mesajında (müşteri ayrımı yok)
+  await expect(page.locator('.nc-wa')).toHaveCount(1);
+  await expect(page.locator('.nc-wa pre')).toContainText('26TR000000000000B2');
+  await expect(page.locator('.nc-wa pre')).toContainText('26TR000000000000A3');
   expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').map(c => c.type))).toEqual(['application/pdf']);
   await page.locator('[data-action="nc-apply"]').click();
   await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
@@ -3704,7 +3708,7 @@ test('NCTS: gerçek belgenin düzeni (etiketler köşeli kodlu, çekici ve dorse
   expect(problems).toEqual([]);
 });
 
-test('NCTS: tablodaki her satırda WhatsApp düğmesi; yazmayı beklemeden çekici plakası / MRN / mühür mesajı doğrudan açılır', async ({ page }) => {
+test('NCTS: tablodaki her satırda WhatsApp düğmesi; yazmayı beklemeden dorse plakası / MRN / mühür mesajı doğrudan açılır', async ({ page }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: 1600, height: 1000 });
   const problems = await openApp(page, { data: nctsData(), transit: { status: 404 } });
@@ -3722,7 +3726,28 @@ test('NCTS: tablodaki her satırda WhatsApp düğmesi; yazmayı beklemeden çeki
   expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);   // hiçbir şey yazılmadı
   const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
   await rows.nth(1).locator('.nc-wa-row').click();
-  expect(new URL((await launched).url()).searchParams.get('text')).toBe('34ABC123\n26TR000000000000A1');
+  const u = new URL((await launched).url());
+  expect(u.searchParams.get('text')).toBe('ZZ9999ZZ\n26TR000000000000A1');
+  expect(u.searchParams.get('phone')).toBeNull();                                          // numara yok: grubu WhatsApp'ta siz seçersiniz
   expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
+  expect(problems).toEqual([]);
+});
+
+test('NCTS: WhatsApp mesajında yalnızca dorse plakası yazılır (çekici değil); dorse yoksa tek plaka', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const data = nctsData();
+  data.visits.push({ ...data.visits[5], id: 'v8', plate: 'PB 1234 AB - PB 5678 CD', customer: 'DORSELİ LOJ', mrn: null, seal_no: null });
+  const problems = await openApp(page, { data, transit: { status: 404 } });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.evaluate(() => { document.querySelector('.nc-manual').open = true; });
+  await page.locator('#nc-text').fill('26LR000000000007\t26TR000000000000D4\tREL_TRA\t05.11.2026, 12:30:19\t1111111111\tDENEME KFT\tBG001008\tPB1234AB, PB5678CD');
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('.nc-table tbody tr')).toHaveCount(1);
+  await expect(page.locator('.nc-wa pre')).toHaveText('PB5678CD\n26TR000000000000D4');   // çekici PB1234AB yazılmaz
+  const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
+  await page.locator('.nc-table .nc-wa-row').click();
+  expect(new URL((await launched).url()).searchParams.get('text')).toBe('PB5678CD\n26TR000000000000D4');
   expect(problems).toEqual([]);
 });
