@@ -688,11 +688,16 @@ html.kule .k-saha-yer p{color:#16233a;font-size:12px;font-weight:700;letter-spac
 html.kule .k-cards.k-cards-3{grid-template-columns:.95fr 1.15fr 1.3fr}
 html.kule .k-wa{border-color:color-mix(in srgb,#25d366 45%,var(--k-line))}
 html.kule .k-wa .k-card-h b{color:#16a34a}
-html.kule .k-wa-pre{margin:0 0 12px;padding:10px 12px;max-height:118px;overflow:auto;border-radius:10px;background:#e7f8ee;border:1px solid #b7e4c7;color:#14532d;font:700 12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+html.kule .k-wa-list{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:8px;max-height:206px;overflow:auto}
+html.kule .k-wa-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+html.kule .k-wa-pre{margin:0;padding:7px 10px;border-radius:10px;background:#e7f8ee;border:1px solid #b7e4c7;color:#14532d;font:700 11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 html.kule[data-theme="dark"] .k-wa-pre{background:#10301f;border-color:#1f6b52;color:#b7f0cd}
 html.kule .k-wa-empty{margin:0 0 12px;flex:1;color:var(--k-mut);font-size:12.5px;line-height:1.5}
-html.kule .k-wa-btn{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border:0;border-radius:12px;background:#25d366;color:#fff;font:800 14px/1 inherit;cursor:pointer;box-shadow:0 8px 22px rgba(37,211,102,.35)}
-html.kule .k-wa-btn:hover:not(:disabled){background:#1fbd5a}
-html.kule .k-wa-btn:disabled{background:var(--k-soft);color:var(--k-mut);box-shadow:none;cursor:default}
-html.kule .k-wa-st{display:flex;align-items:center;gap:7px;margin-top:10px;color:var(--k-mut);font-size:11px;font-weight:700}
+html.kule .k-wa-acts{display:flex;align-items:center;gap:4px}
+html.kule .k-wa-btn{display:flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 12px;border:0;border-radius:11px;background:#25d366;color:#fff;font:800 12.5px/1 inherit;cursor:pointer;box-shadow:0 6px 16px rgba(37,211,102,.32)}
+html.kule .k-wa-btn svg{width:18px;height:18px}
+html.kule .k-wa-btn:hover{background:#1fbd5a}
+html.kule .k-wa-x{width:26px;height:26px;border:0;border-radius:8px;background:transparent;color:var(--k-mut);font:700 17px/1 inherit;cursor:pointer}
+html.kule .k-wa-x:hover{background:var(--k-soft);color:var(--k-ink)}
+html.kule .k-wa-st{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:10px;color:var(--k-mut);font-size:11px;font-weight:700}
 html.kule .k-wa-dot{width:8px;height:8px;border-radius:50%;background:#25d366;box-shadow:0 0 0 4px rgba(37,211,102,.22)}
