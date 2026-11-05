@@ -1882,12 +1882,12 @@ function wmListHTML(){const rows=wmAll().filter(r=>r.status!=='yoksayildi'&&!wmD
 function wmBoxHTML(){return ai.state==='none'?'':`<details class="msg-paste"><summary>${icon('doc')}<b>Mesajdan araç ekle</b> · müşterinin yazdığı listeyi yapıştırın</summary><textarea id="msg-text" rows="5" maxlength="6000" placeholder="Örn: Yarın şu araçlar gelecek: 34 ABC 123 / PB 5678 CD, CB 1234 AB. Perşembedeki 06 KL 4567 iptal.">${esc(wmsg.text)}</textarea><div class="rs-acts"><button type="button" class="btn primary small" data-action="msg-read">${icon('refresh')}Yapay zekâyla oku</button></div></details>`;}
 function wmRefresh(){const l=document.getElementById('msg-list');if(l)l.innerHTML=wmListHTML();waBadge();onlineUI();if(chat.open)chatRender();}
 /* Mesaj metnini Gemini'ye okutur (ruhsat-oku, mesaj modu). Sonuç: {data} · {none:true} kurulu değil · {err:'neden'} */
-async function wmAi(text,onPhase=()=>{},chatMode=false,imgMode='liste',once=false){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='',detail='';
+async function wmAi(text,onPhase=()=>{},chatMode=false,imgMode='liste'){if(ai.state==='none'||!client?.functions)return {none:true};let refreshed=false,last='',detail='';
  /* text bir dosyaysa (liste ekran görüntüsü) fotoğraf "liste" modunda okunur: ruhsat-oku içindeki yazı mesaj gibi okunur */
  const img=text&&typeof text==='object'?text:null;
  for(let i=1;i<=3;i++){let st=0,body=null;
   try{const {data,error}=await client.functions.invoke('ruhsat-oku',img?{body:img,headers:{'Content-Type':img.type||'image/jpeg','x-pcs-mode':imgMode,'x-pcs-today':TODAY},timeout:150000}:{body:JSON.stringify(chatMode?{text,today:TODAY,chat:true,context:chatContext()}:{text,today:TODAY}),headers:{'Content-Type':'application/json'},timeout:chatMode?50000:150000});
-   if(!error&&(imgMode==='transit'&&img?typeof data?.mrn==='string':Array.isArray(data?.items))){ai.state='on';return {data};}
+   if(!error&&Array.isArray(data?.items)){ai.state='on';return {data};}
    /* liste modunu bilmeyen eski sürüm fotoğrafı ruhsat gibi okur ve "vehicles" döndürür */
    if(!error&&img&&Array.isArray(data?.vehicles))return {err:'ruhsat-oku fonksiyonunun güncel hali Supabase’e yüklenmemiş (supabase/GEMINI.md)'};
    if(error){st=error.context?.status||0;if(typeof error.context?.json==='function')body=await error.context.json().catch(()=>null);}}
@@ -1899,7 +1899,7 @@ async function wmAi(text,onPhase=()=>{},chatMode=false,imgMode='liste',once=fals
   if(st===401&&!refreshed){refreshed=true;try{await client.auth.refreshSession();}catch(_){}i--;continue;}
   /* sohbet: cevap bekleyen kişi dakikalarca beklemesin; sunucu en çok ~40 sn dener, zaman aşımında tekrar denenmez, en çok 2 deneme */
   if(chatMode&&st===0){last='yapay zekâ zamanında cevap vermedi';break;}
-  if(once||body?.fatal||!(st===429||st>=500||st===0)||i===(chatMode?2:3))break;
+  if(body?.fatal||!(st===429||st>=500||st===0)||i===(chatMode?2:3))break;
   await aiCountdown(Math.min(40,st===429?Math.max(5,+body?.retry_after||15):8)*1000,n=>onPhase(`${n} sn sonra yeniden denenecek`));}
  return {err:last,detail};}
 async function wmReadPaste(b){if(!canEdit()||wmsg.reading)return;const ta=document.getElementById('msg-text'),text=String(ta?.value||'').trim();wmsg.text=text;
@@ -2310,7 +2310,7 @@ function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'
  const rows=ncRows(),canApply=ncCol&&rows.some(({r,v},i)=>v&&ncMrnOk(r)&&ncChange(r,v)&&r.inc!==false);
  const body=rows.map(({r,v},i)=>{const state_=!ncMrnOk(r)?'MRN henüz yok':!v?'panoda eşleşen araç yok':r.applied?'yazıldı ✓':ncChange(r,v)?(v.mrn?'değişecek':'eklenecek'):'zaten aynı';
   const ok=!!v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied;
-  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?`<small>${r.via==='yerel'?'bilgisayarda okundu':'yapay zekâyla okundu'}</small>`:''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç (grubu siz seçersiniz)">${icon('wa')}WhatsApp</button>`:''}</td></tr>`;}).join('');
+  return `<tr class="${ok?'':'nc-off'}"><td><input type="checkbox" class="nc-inc" data-i="${i}" ${ok&&r.inc!==false?'checked':''} ${ok?'':'disabled'} aria-label="Uygula"></td><td>${r.plates.slice(0,2).map(p=>`<b>${esc(fmtCompactPlate(p))}</b>`).join('<br>')||DASH}</td><td class="nc-mrn">${esc(r.mrn)||DASH}${r.status?`<small>${esc(r.status)}</small>`:''}${r.via?'<small>bilgisayarda okundu</small>':''}</td><td>${esc(ncSealText(r))||DASH}</td><td>${v?`${esc(v.plate)}<small>${esc(v.customer||'Müşterisiz')} · ${esc(fmt(v.date,{day:'numeric',month:'short'}))}</small>`:DASH}</td><td>${esc(state_)}</td><td>${v&&ncMrnOk(r)?`<button type="button" class="btn small nc-wa-row" data-action="nc-wa-row" data-i="${i}" title="WhatsApp'ta aç (grubu siz seçersiniz)">${icon('wa')}WhatsApp</button>`:''}</td></tr>`;}).join('');
  const sendable=[...new Map(rows.filter(({r,v})=>v&&ncMrnOk(r)).map(x=>[x.v.id,x])).values()];
  const wa=sendable.length?`<div class="nc-wa"><b>${sendable.length} araç</b><pre>${esc(sendable.map(({r,v})=>ncRowMsg(r,v)).join('\n\n'))}</pre><button type="button" class="btn small" data-action="nc-wa" data-g="0">${icon('wa')}WhatsApp'ta aç</button></div>`:'';
  ncGroups=[sendable];ncRowsNow=rows;
@@ -2325,7 +2325,7 @@ function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!r.applied);n
  <div id="ncw-box">${ncwHTML()}</div>
  <details class="nc-manual"><summary>Elle ekle (yapıştır / dosya seç)</summary>
   <div class="field full"><label for="nc-text">Yapıştırın</label><textarea id="nc-text" rows="4" placeholder="26LR…  26TR…  GUA_INV  …  A6301EM, A4627HM" spellcheck="false"></textarea></div>
-  <div class="field full"><label for="nc-file">Dosya <span class="optional">(Excel, CSV, PDF, fotoğraf · birden fazla seçilebilir)</span></label><input id="nc-file" type="file" accept=".xlsx,.csv,.tsv,.pdf,image/*" multiple></div>
+  <div class="field full"><label for="nc-file">Dosya <span class="optional">(Excel, CSV, PDF · birden fazla seçilebilir)</span></label><input id="nc-file" type="file" accept=".xlsx,.csv,.tsv,.pdf" multiple></div>
   <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-read">Oku</button></div>
  </details></div>`);}
 /* PDF'in yazı katmanı bilgisayarda okunur (pdf.js, Apache-2.0): ücretsiz, sınırsız, belge dışarı gitmez. Taranmış (resim) PDF'te yazı yoktur: yapay zekâya geçilir. */
@@ -2359,21 +2359,14 @@ function ncFromDocText(text){const T=String(text||'').replace(/ /g,' ').replace(
  const seals=ncSeals(T);
  for(const m of T.matchAll(/M[ÜU]H[ÜU]R([^]{0,90})/g))for(const w of toks(m[1])){if(/^[A-ZİŞĞÜÖÇ]{1,3}\d{7,10}$/.test(w)&&!seals.includes(w)&&w!==lrn)seals.push(w);}
  return {lrn,mrn,status:'',plates:[...new Set(plates)].slice(0,4),seals:[...new Set(seals)].slice(0,10),doc:true,via:'yerel'};}
-/* yapay zekâ (Gemini, transit modu): kota sınırı olabilir; PDF'te yedek, fotoğrafta tek yol */
-async function ncAiRec(f,onNote,once=false){const r=await wmAi(f,onNote,false,'transit',once);
- if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err+(r.detail?` · ${r.detail}`:'')+` · ${f.type||'?'}, ${Math.round(f.size/1024)} KB`);
- const d=r.data;return {lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true,via:'yz'};}
-/* tek dosyadan kayıtlar: Excel / CSV listesi; PDF (önce bilgisayarda, olmazsa yapay zekâ) ya da fotoğraf (yapay zekâ) */
+/* tek dosyadan kayıtlar: Excel / CSV listesi ya da yazı katmanlı PDF (hepsi bilgisayarda okunur; yapay zekâ ve kota yok) */
 async function ncFileRecs(f,onNote=()=>{}){
  if(/\.(xlsx|csv|tsv)$/i.test(f.name)){if(!window.PCSXLSX?.readRows)throw new Error('Excel bileşeni yüklenemedi.');return ncFromRows(await PCSXLSX.readRows(f));}
- const isPdf=/\.pdf$/i.test(f.name)||f.type==='application/pdf';
- if(isPdf||/^image\//.test(f.type)){let local=null,why='';
-  if(isPdf){onNote('PDF bilgisayarda okunuyor…');try{local=ncFromDocText(await pdfText(f));if(!local)why='belgede MRN bulunamadı (taranmış PDF olabilir)';}catch(e){why=String(e?.name==='PasswordException'?'PDF şifreli':e?.message||e).slice(0,80);}}
-  if(local&&local.seals.length)return [local];
-  const note=t=>onNote(why?`${why} · ${t}`:t);if(why)note('yapay zekâ deneniyor…');
-  try{const ai=await ncAiRec(f,note,!!local);if(!local)return [ai];return [{...local,seals:ai.seals.length?ai.seals:local.seals,plates:[...new Set([...local.plates,...ai.plates])],lrn:local.lrn||ai.lrn}];}
-  catch(e){if(local)return [local];throw new Error(e.message+(why?` · bilgisayarda okunamadı: ${why}`:''));}}
- throw new Error('Desteklenmeyen dosya türü.');}
+ if(/\.pdf$/i.test(f.name)||f.type==='application/pdf'){onNote('PDF okunuyor…');let txt='';
+  try{txt=await pdfText(f);}catch(e){throw new Error('PDF açılamadı: '+(e?.name==='PasswordException'?'şifreli':String(e?.message||e).slice(0,80)));}
+  const rec=ncFromDocText(txt);if(rec)return [rec];
+  const n=txt.replace(/\s/g,'').length,err=new Error(n<20?'PDF’te yazı katmanı yok (taranmış / resim PDF): yazı katmanlı PDF gerekir':`belgede MRN bulunamadı (${n} karakter okundu${/MRN/i.test(txt)?', “MRN” yazısı var ama numara yok':''})`);err.soft=true;throw err;}
+ throw new Error('Desteklenmeyen dosya türü: yazı katmanlı PDF, Excel ya da CSV kullanın.');}
 /* aynı MRN iki kez gelirse (liste + belge) birleştirilir: mühür belgeden, plaka ikisinden */
 function ncMerge(all){const by=new Map();for(const r of all){const key=r.mrn||'~'+by.size;const o=by.get(key);if(!o)by.set(key,{...r});else{o.plates=[...new Set([...o.plates,...r.plates])];o.seals=[...new Set([...o.seals,...r.seals])];o.lrn=o.lrn||r.lrn;o.status=o.status||r.status;}}
  return [...by.values()].filter(r=>r.mrn||r.plates.length);}
@@ -2393,7 +2386,7 @@ async function ncApply(btn){if(!ncCol||!canEdit()||nc.busy)return;const todo=ncR
  nc.busy=false;nc.note='';ncRefresh();toast(fail?`${ok} araç güncellendi, ${fail} araç yazılamadı.`:`${ok} araca MRN / mühür yazıldı.`,!!fail);}
 /* İndirilenlerden otomatik okuma: tarayıcı İndirilenler klasörünün kendisini seçtirmez; bunun içinde açılan bir klasör (ör. NCTS) bir kez seçilir.
    Klasör (izin) tarayıcıda saklanır; yeni düşen dosyalar okunur, MRN içermeyenler yok sayılır, yalnızca seçilen klasöre bakılır. */
-const NCW_EXT=/\.(pdf|jpe?g|png|webp|xlsx|csv|tsv)$/i,NCW_AUTO_KEY='pcs.nctsAuto';
+const NCW_EXT=/\.(pdf|xlsx|csv|tsv)$/i,NCW_AUTO_KEY='pcs.nctsAuto';
 const ncw={sup:typeof window.showDirectoryPicker==='function',h:null,perm:'',since:0,seen:{},fails:{},busy:false,last:0,msg:'',ready:false,auto:false};
 try{ncw.auto=localStorage.getItem(NCW_AUTO_KEY)==='1';}catch(_){}
 const ncwDb=()=>new Promise((res,rej)=>{const q=indexedDB.open('pcs-ncts',1);q.onupgradeneeded=()=>q.result.createObjectStore('kv');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});
@@ -2407,7 +2400,7 @@ function ncBadge(){const n=ncPending();return n?` <span class="nc-badge" title="
 function ncwHTML(){
  if(!ncw.sup)return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">Bu tarayıcı klasör izlemeyi desteklemiyor. Bilgisayarda Chrome ya da Edge kullanın.</p></div>`;
  const st=ncw.h?(ncw.perm==='granted'?`İzlenen klasör: <b>${esc(ncw.h.name)}</b>${ncw.busy?' · taranıyor…':''}`:`Klasör: <b>${esc(ncw.h.name)}</b> · izin gerekiyor (“Şimdi tara”ya basın)`):'Klasör seçilmedi';
- return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">Belgeleri kaydettiğiniz klasörü bir kez seçin (ör. <b>İndirilenler › NCTS</b>; tarayıcı İndirilenler’in kendisini seçtirmez). Oraya düşen yeni PDF / fotoğraf / Excel dosyaları kendiliğinden okunur; yalnızca MRN içerenler kullanılır.</p>
+ return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">Belgeleri kaydettiğiniz klasörü bir kez seçin (ör. <b>İndirilenler › NCTS</b>; tarayıcı İndirilenler’in kendisini seçtirmez). Oraya düşen yeni PDF / Excel dosyaları kendiliğinden okunur; yalnızca MRN içerenler kullanılır. Hepsi bilgisayarınızda okunur.</p>
  <div class="nc-folder-st">${st}${ncw.msg?`<small>${esc(ncw.msg)}</small>`:''}</div>
  <div class="rs-acts"><button type="button" class="btn small" data-action="ncw-pick">${ncw.h?'Klasörü değiştir':'Klasör seç'}</button>${ncw.h?'<button type="button" class="btn small" data-action="ncw-scan">Şimdi tara</button><button type="button" class="btn small" data-action="ncw-off">Bırak</button>':''}</div>
  <label class="ncw-auto"><input type="checkbox" id="ncw-auto" ${ncw.auto?'checked':''}> Eşleşenleri sormadan araç kaydına yaz <span class="optional">(Geri al ile döner)</span></label></div>`;}
@@ -2428,7 +2421,7 @@ async function ncwScan(force){if(!ncw.h||ncw.busy||nc.busy||!canEdit()||ncw.perm
   for(const {f,key} of cand.slice(0,5)){ncw.msg=`Okunuyor… ${f.name}`;ncwRefresh();
    try{const recs=await ncFileRecs(f,t=>{ncw.msg=t;ncwRefresh();});ncw.msg='';
     fresh.push(...recs.filter(r=>r.mrn||!r.doc&&r.plates.length).map(r=>({...r,src:f.name})));ncw.seen[key]=Date.now();seenDirty=true;}
-   catch(e){ncw.fails[key]=(ncw.fails[key]||0)+1;ncw.msg=`${f.name}: ${e.message||e}`;}}
+   catch(e){if(e?.soft){ncw.seen[key]=Date.now();seenDirty=true;ncw.msg=`${f.name}: ${e.message} · yok sayıldı`;}else{ncw.fails[key]=(ncw.fails[key]||0)+1;ncw.msg=`${f.name}: ${e.message||e}`;}}}
   if(seenDirty){const lim=Date.now()-30*864e5;for(const k of Object.keys(ncw.seen))if(ncw.seen[k]<lim)delete ncw.seen[k];await ncwSet('seen',ncw.seen);}}
  catch(e){ncw.msg=e?.name==='NotFoundError'?'Klasör bulunamadı; yeniden seçin.':'Klasör okunamadı: '+(e.message||e);if(e?.name==='NotFoundError'||e?.name==='NotAllowedError')ncw.perm='prompt';}
  ncw.busy=false;

@@ -32,9 +32,7 @@ kullanım: `supabase/MESAJ.md`.
 görüntüsü ya da liste fotoğrafı) liste mesaj gibi okunur; kurulum ve kullanım: `supabase/MESAJ.md`. Fotoğraftan
 okunan listedeki araçlar hiçbir zaman kendiliğinden eklenmez.
 
-**Transit Refakat Belgesi (NCTS):** yazı katmanlı PDF'ler önce tarayıcıda (pdf.js, `pdfjs/` klasörü) okunur; Gemini kota ya da hata verse bile çalışır. Panodaki **NCTS'den al** penceresine yüklenen taranmış PDF ya da fotoğraf yedek olarak aynı fonksiyonla
-(`x-pcs-mode: transit`) okunur: MRN, çekici / dorse plakası ve mühür numaraları. MRN biçimi (2 rakam + 2 harf + 14 harf/rakam)
-doğrulanır, uymayan boş bırakılır. Okunan bilgi önce önizlemede gösterilir; onaylamadan hiçbir kayda yazılmaz ve araç eklenmez.
+**NCTS (Transit Refakat Belgesi) yapay zekâ kullanmaz:** MRN ve mühür okuma tarayıcıda (pdf.js) yapılır; kota ve Gemini gerekmez (`supabase/README.md`).
 
 Hangi yolla okunursa okunsun, hiçbir araç siz onaylamadan panoya eklenmez: kartta **Panoya ekle** ya da
 pencerenin üstündeki **Hepsini panoya ekle** ile eklersiniz.
