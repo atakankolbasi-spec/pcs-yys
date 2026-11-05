@@ -3596,3 +3596,15 @@ test('NCTS klasörü: seçilen klasördeki yeni belgeler kendiliğinden okunur, 
   await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
   expect(problems).toEqual([]);
 });
+
+test('NCTS: yapay zekâ belgeyi kabul etmezse nedeni (Gemini ayrıntısı, dosya türü ve boyutu) yazılır', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const problems = await openApp(page, { data: nctsData(), transit: { status: 400, body: { fatal: true, reason: 'Gemini bu içeriği kabul etmedi', detail: JSON.stringify({ error: { message: 'The document has no pages.' } }) } } });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.locator('#nc-file').setInputFiles({ name: 'MNF0000001-NCTS-TR.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 sahte') });
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('#nc-out')).toContainText('Gemini bu içeriği kabul etmedi · The document has no pages. · application/pdf, 0 KB');
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
+  expect(problems.filter(p => !/HTTP 4\d\d/.test(p))).toEqual([]);
+});
