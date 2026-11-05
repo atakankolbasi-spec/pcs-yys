@@ -2323,7 +2323,7 @@ function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!r.applied);n
 async function ncFileRecs(f,onNote=()=>{}){
  if(/\.(xlsx|csv|tsv)$/i.test(f.name)){if(!window.PCSXLSX?.readRows)throw new Error('Excel bileşeni yüklenemedi.');return ncFromRows(await PCSXLSX.readRows(f));}
  if(/\.pdf$/i.test(f.name)||/^image\//.test(f.type)||/\.pdf$/i.test(f.type)){const r=await wmAi(f,onNote,false,'transit');
-  if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err);const d=r.data;
+  if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err+(r.detail?` · ${r.detail}`:'')+` · ${f.type||'?'}, ${Math.round(f.size/1024)} KB`);const d=r.data;
   return [{lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true}];}
  throw new Error('Desteklenmeyen dosya türü.');}
 /* aynı MRN iki kez gelirse (liste + belge) birleştirilir: mühür belgeden, plaka ikisinden */
