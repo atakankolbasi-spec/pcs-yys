@@ -24,6 +24,16 @@ alter table public.visits add column if not exists exit_at timestamptz;
 -- Sürücü bilgisi: güvenlik ekranından yazılır (ad soyad + telefon); sürücüye WhatsApp mesajı bu numaraya hazırlanır.
 alter table public.visits add column if not exists driver_name text;
 alter table public.visits add column if not exists driver_phone text;
+-- NCTS (BİLGE Gümrük Platformu): transit beyannamesinin MRN numarası ve mühür numarası (birden fazlaysa virgülle). Sitede
+-- "NCTS'den al" penceresi bu alanları doldurur, araç kaydında düzenlenir, güvenlik ekranında görünür.
+alter table public.visits add column if not exists mrn text;
+alter table public.visits add column if not exists seal_no text;
+-- Tablo yetkileri zaten tablo düzeyindeyse bu satır bir şey değiştirmez; sütun düzeyindeyse yeni sütunları da kapsar.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'grant select (mrn, seal_no), insert (mrn, seal_no), update (mrn, seal_no) on public.visits to authenticated';
+  end if;
+end $$;
 
 -- Güvenlik oturum açmadığı için "son değiştiren" (updated_by) boş yazılır; sütun boş bırakılamaz
 -- tanımlıysa bu kısıt kaldırılır. Kimin yaptığı işlem geçmişinde "Güvenlik" olarak görünür.
@@ -215,7 +225,7 @@ begin
                'id', v.id, 'plate', v.plate, 'customer', v.customer, 'registration', v.registration, 'visit_date', v.visit_date,
                'visit_time', v.visit_time, 'onsite', v.onsite, 'onsite_at', v.onsite_at,
                'done', v.done, 'done_at', v.done_at, 'exit_at', v.exit_at,
-               'driver_name', v.driver_name, 'driver_phone', v.driver_phone)
+               'driver_name', v.driver_name, 'driver_phone', v.driver_phone, 'mrn', v.mrn, 'seal_no', v.seal_no)
              order by v.visit_date, v.visit_time nulls last, v.plate)
       from public.visits v
       where v.visit_date between f and t
@@ -416,6 +426,7 @@ select 'güvenlik fonksiyonları (güncel sürüm)',
        case when count(*) = 12
              and pg_get_functiondef('public.guard_board(text,date,date)'::regprocedure) like '%guard_account()%'
              and pg_get_functiondef('public.guard_board(text,date,date)'::regprocedure) like '%driver_phone%'
+             and pg_get_functiondef('public.guard_board(text,date,date)'::regprocedure) like '%seal_no%'
              and pg_get_functiondef('public.guard_mark(text,text,text)'::regprocedure) like '%guard_account()%'
             then 'tamam' else 'EKSİK · dosyanın tamamını yeniden çalıştırın' end
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace

@@ -467,6 +467,25 @@ test.describe('Ruhsat okuma sunucu fonksiyonu (Gemini)', () => {
     expect(Date.now() - t1).toBeLessThan(3000);
   });
 
+  test('transit belgesi modu: MRN, plakalar ve mühür numaraları temizlenip döner; düşünmesiz ve önce kararlı modelle okunur; geçersiz MRN boş döner', async () => {
+    const seen = [];
+    const { post } = await setup({ gemini: (url, body) => {
+      seen.push({ model: /models\/([^:]+):/.exec(url)[1], think: body.generationConfig.thinkingConfig || null, text: body.contents[0].parts.map(p => p.text || '').join(' '), pdf: body.contents[0].parts.some(p => p.inlineData) });
+      return answer({ mrn: '26tr000000000000a1', lrn: '26lr 000000000001', plates: ['cb 1234 ab', 'CB-4728-EE', 'x', 'cb1234ab'], seals: ['İG 01362070', 'ab', 'İG01362070', 'IG-01362071'], seal_count: 2 });
+    } });
+    const res = await post({ 'Content-Type': 'application/pdf', 'x-pcs-mode': 'transit' }, new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3]));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ mrn: '26TR000000000000A1', lrn: '26LR000000000001', plates: ['CB1234AB', 'CB4728EE'], seals: ['İG01362070', 'IG01362071'], seal_count: 2, model: 'gemini-test' });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ model: 'gemini-2.5-flash', think: { thinkingBudget: 0 }, pdf: true });
+    expect(seen[0].text).toContain('Transit Refakat Belgesi');
+    // 18 karakterlik MRN biçimine uymayan değer atılır; fotoğraf da kabul edilir, diğer türler reddedilir
+    const bad = await setup({ gemini: () => answer({ mrn: '12345', plates: [], seals: [] }) });
+    const r2 = await bad.post({ 'Content-Type': 'image/png', 'x-pcs-mode': 'transit' });
+    expect((await r2.json()).mrn).toBe('');
+    expect((await bad.post({ 'Content-Type': 'text/plain', 'x-pcs-mode': 'transit' }, new Uint8Array([65]))).status).toBe(400);
+  });
+
   test('müşteri mesajı: boş ya da çok uzun mesaj reddedilir; bugün verilmezse Türkiye saati kullanılır; yetki yine denetlenir', async () => {
     let sent;
     const { post } = await setup({ gemini: (url, body) => { sent = body; return answer({ items: [], problem: 'Mesajda plaka yok.' }); } });

@@ -145,6 +145,14 @@ sonraki mesajlarda hazır gelir). Bu özellik için `guvenlik-kurulumu.sql` dosy
 (`driver_name` / `driver_phone` sütunları ve `guard_driver` fonksiyonu); çalıştırılmadıysa mesaj yine hazırlanır ama sürücü
 bilgisi kaydedilemez. İzleme linkinde bu düğme yoktur.
 
+**MRN ve mühür (NCTS):** araç kaydında **MRN** ve **mühür** alanları vardır; güvenlik kartında da görünür. Panoda **NCTS'den al**
+düğmesi BİLGE (NCTS) ekranındaki bilgiyi plakaya göre araçlara eşler: listeyi yapıştırın, **Tümünü Dışa Aktar** dosyasını (Excel / CSV)
+seçin ya da Transit Refakat Belgesi'ni (PDF / fotoğraf) yükleyin; mühür numarası yalnızca belgeden (yapay zekâ ile) gelir ya da elle
+yazılır. Önizlemede neyin hangi araca yazılacağını görür, onaylarsanız yazılır; yeni araç eklenmez. Her araç için **çekici plakası /
+MRN / mühür** şeklinde üç satırlık WhatsApp mesajı hazırlanır (gönder düğmesine siz basarsınız). Siteye NCTS şifresi **girilmez**,
+site NCTS'ye kendiliğinden bağlanmaz. Bu özellik için `guvenlik-kurulumu.sql` dosyasının yeni halinin tamamı bir kez çalıştırılmalıdır
+(`mrn` ve `seal_no` sütunları); belge okuma için `ruhsat-oku` fonksiyonu yeniden yüklenmelidir.
+
 **Ayarlar → Güvenlik ekranı izleme linki** aynı ekranı yalnızca görüntüleme için açar (`?guvenlik-izle=…`):
 açan kişi listeleri ve raporu görür, GİRİŞ / ÇIKIŞ yapamaz (sunucu da reddeder). Anahtarı güvenlik linkinden
 ayrıdır; biri yenilenince diğeri etkilenmez. Dosya güncellendiğinde yeniden çalıştırmak zararsızdır.
