@@ -3608,3 +3608,65 @@ test('NCTS: yapay zekâ belgeyi kabul etmezse nedeni (Gemini ayrıntısı, dosya
   expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
   expect(problems.filter(p => !/HTTP 4\d\d/.test(p))).toEqual([]);
 });
+
+// Sahte (uydurma) bir Transit Refakat Belgesi: gerçek yazı katmanlı PDF'i Chromium üretir
+async function t1Pdf(browser, lines) {
+  const p = await browser.newPage();
+  await p.setContent(`<html><body style="font:14px Arial">${lines.map(l => `<p>${l}</p>`).join('')}</body></html>`);
+  const buf = await p.pdf({ format: 'A4' });
+  await p.close();
+  return buf;
+}
+
+test('NCTS: PDF önce bilgisayarda (pdf.js) okunur; yapay zekâya hiç gidilmez; mühürsüz olursa yapay zekâ tamamlar; yazısız PDF yapay zekâya gider', async ({ page, browser }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const full = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000Z9', 'LRN (12 03) 26LR000000000012', 'Hareketteki taşıma aracı (18 05 / 13 05)', 'CB1234AB / CB4728EE', 'Mühür (13 10 / 19 10) Adedi 2', 'İG01362070 İG01362071']);
+  const noSeal = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000Y8', 'LRN (12 03) 26LR000000000013', 'Plaka B123XYZ', 'Mühür numaraları: okunaksız']);
+  const blank = await t1Pdf(browser, ['']);
+  const transit = [{ mrn: '26TR000000000000Y8', lrn: '', plates: ['B123XYZ'], seals: ['İG05550001'], seal_count: 1, model: 'm' }, { mrn: '26TR000000000000X7', lrn: '', plates: ['QQ0000QQ'], seals: [], seal_count: 0, model: 'm' }];
+  const problems = await openApp(page, { data: nctsData(), transit });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  // 1) tam belge: yalnızca bilgisayarda okunur
+  await page.locator('#nc-file').setInputFiles({ name: 'tam.pdf', mimeType: 'application/pdf', buffer: full });
+  await page.locator('[data-action="nc-read"]').click();
+  let rows = page.locator('.nc-table tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('26TR000000000000Z9');
+  await expect(rows.first()).toContainText('İG01362070');
+  await expect(rows.first()).toContainText('İG01362071');
+  await expect(rows.first()).toContainText('CB 1234 AB');
+  await expect(rows.first()).toContainText('bilgisayarda okundu');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
+  // 2) mühür yok: yapay zekâ tamamlar, MRN yerel kalır
+  await page.locator('#nc-file').setInputFiles({ name: 'musursuz.pdf', mimeType: 'application/pdf', buffer: noSeal });
+  await page.locator('[data-action="nc-read"]').click();
+  rows = page.locator('.nc-table tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('26TR000000000000Y8');
+  await expect(rows.first()).toContainText('İG05550001');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);
+  // 3) yazısız (taranmış gibi) PDF: yapay zekâ okur
+  await page.locator('#nc-file').setInputFiles({ name: 'tarama.pdf', mimeType: 'application/pdf', buffer: blank });
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('.nc-table tbody tr').first()).toContainText('26TR000000000000X7');
+  await expect(page.locator('.nc-table tbody tr').first()).toContainText('yapay zekâyla okundu');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(2);
+  expect(problems).toEqual([]);
+});
+
+test('NCTS: yapay zekâ kurulu değilken bile yazı katmanlı PDF okunur', async ({ page, browser }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const pdf = await t1Pdf(browser, ['Transit Refakat Belgesi', '26TR000000000000W6', 'Plaka CB1234AB', 'Mühür İG01362070']);
+  const problems = await openApp(page, { data: nctsData(), transit: { status: 404 } });
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await page.locator('#nc-file').setInputFiles({ name: 'tam.pdf', mimeType: 'application/pdf', buffer: pdf });
+  await page.locator('[data-action="nc-read"]').click();
+  await expect(page.locator('.nc-table tbody tr').first()).toContainText('26TR000000000000W6');
+  await expect(page.locator('.nc-table tbody tr').first()).toContainText('İG01362070');
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(0);
+  expect(problems).toEqual([]);
+});
