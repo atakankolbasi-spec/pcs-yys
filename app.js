@@ -913,20 +913,17 @@ function kPinCheck(init){const w=document.querySelector('.k-pinwrap');if(w!==kPi
  if(init&&w)for(const b of w.querySelectorAll('.btn'))b.title=b.textContent.trim();}
 let kPinRaf=0;const kPinLater=()=>{if(!kPinRaf)kPinRaf=requestAnimationFrame(()=>{kPinRaf=0;kPinCheck();});};
 addEventListener('scroll',kPinLater,{passive:true});addEventListener('resize',()=>{kPinTop=NaN;kPinLater();},{passive:true});
-/* panodaki genel bakış kartları: son 14 iş günü, haftanın durum dağılımı, en uzun bekleyenler, bugün */
+/* panodaki genel bakış kartları: NCTS WhatsApp mesajı, haftanın durum dağılımı, en uzun bekleyenler, bugün */
 function kPanel(ctl=''){const hidden=kGet(K_PANEL)==='1';
  const head=`<div class="k-panel-head"><span>Genel bakış</span><button type="button" class="k-link" data-action="k-panel" aria-expanded="${!hidden}">${hidden?'Göster':'Gizle'}</button></div>`;
  if(hidden)return `<section class="k-panel is-hidden" aria-label="Genel bakış">${head}</section>`;
- const days=[];for(let d=TODAY;days.length<14;d=addDays(d,-1))if(weekday(d)!==0)days.unshift(d);
- const cnt=days.map(d=>state.visits.filter(v=>v.date===d).length),max=Math.max(1,...cnt),sum=cnt.reduce((a,b)=>a+b,0);
- const bars=days.map((d,i)=>`<button type="button" class="k-bar${d===TODAY?' today':''}" data-action="k-day" data-date="${d}" title="${esc(fmt(d,{day:'numeric',month:'long'}))} · ${cnt[i]} araç" aria-label="${esc(fmt(d,{day:'numeric',month:'long'}))}: ${cnt[i]} araç"><em>${cnt[i]||''}</em><i style="height:${cnt[i]?Math.max(8,Math.round(cnt[i]/max*100)):3}%"></i><small>${fmt(d,{day:'numeric'})}</small></button>`).join('');
  const wv=weekVisits(),st={wait:0,onsite:0,t1:0,done:0};for(const v of wv){if(v.done)st.done++;else if(v.t1)st.t1++;else if(v.onsite)st.onsite++;else st.wait++;}
  const seg=[['wait','Gelmedi','var(--k-wait)'],['onsite','Tesiste','var(--c-onsite)'],['t1','T1 yazıldı','var(--c-t1)'],['done','Bitti','var(--c-done)']];
  let acc=0;const stops=wv.length?seg.map(([k,,c])=>{const a=acc;acc+=st[k]/wv.length*100;return `${c} ${a}% ${acc}%`;}).join(','):'var(--k-line) 0 100%';
  const age=d=>Math.max(0,Math.round((dateObj(TODAY)-dateObj(d))/DAY));
  const old=state.visits.filter(v=>!v.done&&v.date<=TODAY).sort((a,b)=>a.date.localeCompare(b.date)||String(a.time||'').localeCompare(String(b.time||''))).slice(0,4);
- return `<section class="k-panel" aria-label="Genel bakış">${head}<div class="k-cards">
- <article class="k-card"><div class="k-card-h"><span>Son 14 iş günü</span><b>${sum} araç</b></div><div class="k-bars">${bars}</div></article>
+ return `<section class="k-panel" aria-label="Genel bakış">${head}<div class="k-cards${canEdit()&&!VIEW_TOKEN?'':' k-cards-3'}">
+ ${kWaCard()}
  <article class="k-card"><div class="k-card-h"><span>${ui.week}. hafta durum</span></div><div class="k-donut-wrap"><div class="k-donut" style="background:conic-gradient(${stops})"><div><b>${wv.length}</b><small>araç</small></div></div><ul class="k-legend">${seg.map(([k,l,c])=>`<li><i style="background:${c}"></i>${l}<b>${st[k]}</b></li>`).join('')}</ul></div></article>
  <article class="k-card"><div class="k-card-h"><span>En uzun bekleyenler</span>${old.length?`<button type="button" class="k-link" data-action="nav" data-page="pending">Tümü</button>`:''}</div>${old.length?`<ul class="k-waits">${old.map(v=>{const a=age(v.date);return `<li><button type="button" data-action="k-go" data-id="${esc(v.id)}"><b>${esc(v.plate)}</b><small>${esc(v.customer||'Müşterisiz')}</small><span class="age-badge ${a>=7?'bad':a>=3?'warn':'ok'}">${a?a+' gün':'Bugün'}</span></button></li>`;}).join('')}</ul>`:`<p class="k-empty">${icon('check')}Bekleyen araç yok</p>`}</article>
  ${ctl}
@@ -971,7 +968,6 @@ function kControls(miss){const d=ui.day,one=d!=='all',all=one?state.visits.filte
 function kGoVisit(id){const v=state.visits.find(x=>x.id===id);if(!v)return;const t=weekInfo(v.date);
  Object.assign(ui,{page:'pano',year:t.year,week:t.week,day:v.date,search:'',missingOnly:false,selected:v.id});ui.collapsed?.clear?.();render();
  requestAnimationFrame(()=>document.querySelector(`[data-row-id="${CSS.escape(v.id)}"]`)?.scrollIntoView({block:'center',behavior:'smooth'}));}
-function kGoDay(d){const t=weekInfo(d);Object.assign(ui,{page:'pano',year:t.year,week:t.week,day:d,search:''});render();}
 /* hızlı arama (Ctrl+K): sayfalar, işlemler, gelişler ve plaka kayıtları */
 const kq={items:[],sel:0};
 function kAct(action,data={}){const b=document.createElement('button');b.type='button';b.hidden=true;b.dataset.action=action;Object.assign(b.dataset,data);document.body.appendChild(b);b.click();b.remove();}
@@ -1009,7 +1005,6 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="k
  if(a==='k-panel'){kSet(K_PANEL,kGet(K_PANEL)==='1'?null:'1');return render();}
  if(a==='k-hero-mini'){kSet(K_HEROMINI,kHeroMini()?'0':null);return render();}
  if(a==='k-saha'){kSet(K_SAHA,kSahaGizli()?'0':'1');return render();}
- if(a==='k-day')return kGoDay(b.dataset.date);
  if(a==='k-go')return kGoVisit(b.dataset.id);
 });
 
@@ -2262,7 +2257,7 @@ document.addEventListener('input',e=>{if(e.target.id==='chat-input')chatGrow();}
    Beyanname Detay > Yazdır çıktısı (Transit Refakat Belgesi PDF'i / fotoğrafı; yapay zekâ okur) okunur, plakaya göre panodaki
    gelişlerle eşleştirilir ve ÖNİZLEME sonrası onayla araç kaydına yazılır. Siteye giriş yapılmaz, şifre alınmaz; hiçbir araç eklenmez.
    Mesaj biçimi (WhatsApp):  dorse plakası / MRN / mühür no  (üç satır; araç başına, boş satırla ayrılır). */
-const NC_MRN_RE=/\b\d{2}[A-Z]{2}[A-Z0-9]{14}\b/,nc={recs:[],busy:false,note:''};
+const NC_MRN_RE=/\b\d{2}[A-Z]{2}[A-Z0-9]{14}\b/,nc={recs:[],busy:false,note:'',lastSent:0};
 const ncKnown=()=>{const m=new Set();for(const r of [...state.visits,...state.registry])for(const p of splitPlate(r.plate).map(compactPlate))if(p.length>=5&&/\d/.test(p)&&/[A-Z]/.test(p))m.add(p);return m;};
 function ncSeals(t){const T=String(t||'').toLocaleUpperCase('tr-TR');if(!/M[ÜU]H[ÜU]R/.test(T))return [];const out=[];
  for(const m of T.matchAll(/\b[İI][A-Z0-9]\d{7,9}\b/g))out.push(m[0]);
@@ -2295,6 +2290,18 @@ function ncMatch(r){const ps=r.plates.map(compactPlate).filter(Boolean);if(!ps.l
 const ncSealText=r=>(r.seals||[]).join(', ');
 const ncChange=(r,v)=>{const m=r.mrn&&r.mrn!==(v.mrn||''),s=ncSealText(r)&&ncSealText(r)!==(v.seal_no||'');return m||s;};
 function ncRows(){return nc.recs.map(r=>{const v=ncMatch(r);return {r,v};});}
+/* ana ekrandaki NCTS WhatsApp kartı: eşleşen, MRN'si okunmuş, henüz gönderilmemiş araçların mesajı */
+const ncReady=()=>[...new Map(ncRows().filter(({r,v})=>v&&ncMrnOk(r)&&!r.sent).map(x=>[x.v.id,x])).values()];
+function kWaCard(){if(!canEdit()||VIEW_TOKEN)return '';
+ const list=ncReady(),msg=list.map(({r,v})=>ncRowMsg(r,v)).join('\n\n');
+ const st=!ncw.sup?'Bu tarayıcı klasör izlemeyi desteklemiyor (Chrome / Edge kullanın)':!ncw.h?'<button type="button" class="k-link" data-action="ncts-open">NCTS klasörünü seç</button>':ncw.perm!=='granted'?'<button type="button" class="k-link" data-action="ncw-scan">Klasör izni ver</button>':'<i class="k-wa-dot" aria-hidden="true"></i>NCTS klasörü izleniyor';
+ return `<article class="k-card k-wa"><div class="k-card-h"><span>NCTS · WhatsApp</span>${list.length?`<b>${list.length} araç</b>`:''}</div>
+ ${list.length?`<pre class="k-wa-pre">${esc(msg)}</pre>`:`<p class="k-wa-empty">${nc.lastSent?'Son mesaj WhatsApp’a gönderildi ✓':'Gönderilecek mesaj yok. NCTS klasörüne belge düşünce burada görünür.'}</p>`}
+ <button type="button" class="k-wa-btn" data-action="k-wa-send" ${list.length?'':'disabled'}>${icon('wa')}WhatsApp’ta aç</button><div class="k-wa-st">${st}</div></article>`;}
+const NC_KEY='pcs.nctsRecs';
+function ncSave(){try{const now=Date.now();for(const r of nc.recs)r.t=r.t||now;nc.recs=nc.recs.filter(r=>now-r.t<(r.sent?864e5:3*864e5));localStorage.setItem(NC_KEY,JSON.stringify(nc.recs.slice(-60)));}catch(_){}}
+function ncLoad(){try{const a=JSON.parse(localStorage.getItem(NC_KEY)||'[]'),now=Date.now();return Array.isArray(a)?a.filter(r=>r&&typeof r.mrn==='string'&&Array.isArray(r.plates)&&Array.isArray(r.seals)&&now-(r.t||now)<(r.sent?864e5:3*864e5)):[];}catch(_){return [];}}
+nc.recs=ncLoad();
 /* mesajda yalnızca DORSE plakası yazılır (kayıtta ikinci plaka; yoksa belgedeki ikinci plaka). Dorse yoksa (tek parça araç) elde olan tek plaka yazılır. */
 const trailerOf=(v,r)=>{const p=splitPlate(v.plate).map(compactPlate).filter(Boolean);if(p.length>1)return p[1];
  const d=(r?.plates||[]).map(compactPlate).filter(Boolean);if(d.length>1&&d[1]!==p[0])return d[1];return p[0]||compactPlate(v.plate);};
@@ -2318,8 +2325,8 @@ function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'
   ${ncCol?'':'<div class="rs-note warn">MRN / mühür alanları henüz kurulu değil: <b>supabase/guvenlik-kurulumu.sql</b> dosyasının tamamını Supabase SQL Editor’de bir kez çalıştırın.</div>'}
   <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-apply" ${canApply?'':'disabled'}>${icon('check')}Seçilenleri araç kaydına yaz</button></div>${wa?`<h3 class="nc-h">WhatsApp mesajı</h3>${wa}`:''}`;}
 let ncGroups=[],ncRowsNow=[];
-const ncRefresh=()=>{const o=document.getElementById('nc-out');if(o)o.innerHTML=ncResultHTML();};
-function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!r.applied);nc.note='';nc.busy=false;
+const ncRefresh=()=>{ncSave();const o=document.getElementById('nc-out');if(o)o.innerHTML=ncResultHTML();ncwRender();};
+function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!(r.applied&&r.sent));nc.note='';nc.busy=false;
  openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body">
  <div id="nc-out">${ncResultHTML()}</div>
  <div id="ncw-box">${ncwHTML()}</div>
@@ -2372,11 +2379,11 @@ function ncMerge(all){const by=new Map();for(const r of all){const key=r.mrn||'~
  return [...by.values()].filter(r=>r.mrn||r.plates.length);}
 async function ncRead(btn){const text=document.getElementById('nc-text')?.value||'',files=[...(document.getElementById('nc-file')?.files||[])];if(nc.busy)return;
  if(!text.trim()&&!files.length){toast('Önce listeyi yapıştırın ya da bir dosya seçin.',true);return;}
- nc.busy=true;nc.recs=[];nc.note='Okunuyor…';if(btn)btn.disabled=true;ncRefresh();const errs=[];let all=[];
+ nc.busy=true;nc.note='Okunuyor…';if(btn)btn.disabled=true;ncRefresh();const errs=[];let all=[];
  try{if(text.trim())all.push(...ncFromText(text));
   let k=0;for(const f of files){k++;nc.note=`Okunuyor… ${k}/${files.length} · ${f.name}`;ncRefresh();
    try{all.push(...await ncFileRecs(f,t=>{nc.note=t;ncRefresh();}));}catch(e){errs.push(`${f.name}: ${e.message||e}`);}}
-  nc.recs=ncMerge(all);
+  const rd=ncMerge(all);nc.recs=[...nc.recs.filter(r=>!r.sent&&!rd.some(x=>x.mrn&&x.mrn===r.mrn)),...rd];
   nc.note=errs.length?errs.join(' · '):nc.recs.length?'':'Okunabilen kayıt bulunamadı. MRN ve plaka sütunlarıyla birlikte yapıştırın.';}
  catch(e){nc.note='Okunamadı: '+(e.message||e);}
  finally{nc.busy=false;if(btn)btn.disabled=false;ncRefresh();}}
@@ -2394,7 +2401,7 @@ async function ncwGet(k){try{const db=await ncwDb();return await new Promise(res
 async function ncwSet(k,v){try{const db=await ncwDb();await new Promise((res,rej)=>{const t=db.transaction('kv','readwrite'),o=t.objectStore('kv');if(v===undefined)o.delete(k);else o.put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);});return true;}catch(_){return false;}}
 async function ncwPerm(ask){if(!ncw.h)return '';try{let p=await ncw.h.queryPermission({mode:'read'});if(p!=='granted'&&ask)p=await ncw.h.requestPermission({mode:'read'});return p;}catch(_){return 'denied';}}
 let ncwSig='';
-const ncwRender=()=>{const g=ncBadge();if(g!==ncwSig){ncwSig=g;render();}};   // bant yalnızca düğme rozeti değişince yeniden çizilir (yazarken bozulmasın)
+const ncwRender=()=>{const g=ncBadge()+'|'+ncReady().length+'|'+(ncw.h?ncw.perm:'x');if(g!==ncwSig){ncwSig=g;render();}};   // bant yalnızca düğme rozeti değişince yeniden çizilir (yazarken bozulmasın)
 const ncPending=()=>ncRows().filter(({r,v})=>v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied).length;
 function ncBadge(){const n=ncPending();return n?` <span class="nc-badge" title="Okunan belgelerden ${n} araç için MRN / mühür hazır">${n}</span>`:(ncw.h&&ncw.perm!=='granted'?' <span class="nc-badge off" title="NCTS klasörü için izin gerekiyor">!</span>':'');}
 function ncwHTML(){
@@ -2429,7 +2436,7 @@ async function ncwScan(force){if(!ncw.h||ncw.busy||nc.busy||!canEdit()||ncw.perm
   if(seenDirty){const lim=Date.now()-30*864e5;for(const k of Object.keys(ncw.seen))if(ncw.seen[k]<lim)delete ncw.seen[k];await ncwSet('seen',ncw.seen);}}
  catch(e){ncw.msg=e?.name==='NotFoundError'?'Klasör bulunamadı; yeniden seçin.':'Klasör okunamadı: '+(e.message||e);if(e?.name==='NotFoundError'||e?.name==='NotAllowedError')ncw.perm='prompt';}
  ncw.busy=false;
- if(fresh.length){nc.recs=ncMerge([...nc.recs.filter(r=>!r.applied),...fresh]);ncRefresh();
+ if(fresh.length){nc.recs=ncMerge([...nc.recs,...fresh]);ncRefresh();
   if(ncw.auto&&ncCol&&canEdit())await ncApply();
   else{const n=ncPending();toast(n?`NCTS belgesi okundu: ${n} araç için MRN / mühür hazır. “NCTS’den al” düğmesinden onaylayın.`:'NCTS belgesi okundu, panoda eşleşen yeni araç yok.');}}
  ncwRefresh();ncwRender();}
@@ -2438,7 +2445,7 @@ async function ncwPick(){let h;try{h=await window.showDirectoryPicker({id:'pcs-n
  const ok=await ncwSet('dir',h);await ncwSet('since',ncw.since);await ncwSet('seen',{});if(!ok)toast('Klasör bu oturum için seçildi; tarayıcı kalıcı saklayamadı.',true);
  ncw.ready=true;ncwTimers();ncwRefresh();ncwScan(true);}
 async function ncwOff(){ncw.h=null;ncw.perm='';ncw.seen={};await ncwSet('dir');await ncwSet('seen');await ncwSet('since');ncwRefresh();ncwRender();}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="nc-"],[data-action^="ncw-"],[data-action="ncts-open"],[data-action="wa-mrn"]');if(!b)return;const a=b.dataset.action;
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="nc-"],[data-action^="ncw-"],[data-action="ncts-open"],[data-action="wa-mrn"],[data-action="k-wa-send"]');if(!b)return;const a=b.dataset.action;
  if(a==='ncts-open'){const ask=ncw.h&&ncw.perm!=='granted'?ncwPerm(true):null;openNcts();if(ask)ask.then(p=>{ncw.perm=p;ncwRefresh();ncwRender();ncwScan(true);});else if(ncw.h)ncwScan(true);return;}
  if(a==='ncw-pick')return ncwPick();
  if(a==='ncw-scan'){ncwPerm(true).then(p=>{ncw.perm=p;ncwRefresh();ncwScan(true);});return;}
@@ -2446,6 +2453,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="n
  if(a==='nc-read')return ncRead(b);
  if(a==='nc-apply')return ncApply(b);
  if(a==='nc-wa'){const l=ncGroups[+b.dataset.g];if(l)sendNcRows(l);return;}
+ if(a==='k-wa-send'){const l=ncReady();if(!l.length)return;sendNcRows(l);for(const {r} of l)r.sent=Date.now();nc.lastSent=Date.now();ncSave();render();return;}
  if(a==='nc-wa-row'){const x=ncRowsNow[+b.dataset.i];if(x&&x.v)sendNcRows([x]);return;}
  if(a==='wa-mrn'){const v=state.visits.find(x=>x.id===b.dataset.id);if(v)sendMrn([v]);}});
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='ncw-auto'){ncw.auto=t.checked;try{localStorage.setItem(NCW_AUTO_KEY,t.checked?'1':'0');}catch(_){}if(t.checked)ncwScan(true);return;}if(!t.classList?.contains('nc-inc'))return;const r=nc.recs[+t.dataset.i];if(r){r.inc=t.checked;ncRefresh();}});
