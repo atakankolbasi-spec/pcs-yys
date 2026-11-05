@@ -3540,3 +3540,59 @@ test('NCTS: sütunlar kurulu değilse (SQL çalıştırılmamış) uyarı verili
   await expect(card.locator('.guard-ncts')).toContainText('Mühür İG01362070');
   expect(problems).toEqual([]);
 });
+
+// Klasör izleme: gerçek bir FileSystemDirectoryHandle gerekir; tarayıcının kendi dosya sistemi (OPFS) kullanılır, seçiciyi test taklit eder.
+async function opfsWrite(page, name, text) {
+  await page.evaluate(async ([n, t]) => {
+    const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('ncts', { create: true });
+    const w = await (await dir.getFileHandle(n, { create: true })).createWritable();
+    await w.write(t); await w.close();
+  }, [name, text]);
+}
+const opfsPicker = () => { window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('ncts', { create: true }); };
+
+test('NCTS klasörü: seçilen klasördeki yeni belgeler kendiliğinden okunur, bir kez okunur, T1 olmayanlar yok sayılır; sormadan yazma seçeneği', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const T = (mrn, plates, seals) => ({ mrn, lrn: '26LR000000000009', plates, seals, seal_count: seals.length, model: 'm' });
+  const problems = await openApp(page, { data: nctsData(), transit: [T('26TR000000000000B2', ['CB1234AB'], ['İG01362070']), T('26TR000000000000C3', ['B123XYZ'], ['İG01362099']), { mrn: '', lrn: '', plates: [], seals: [], seal_count: 0, model: 'm' }] });
+  await page.addInitScript(opfsPicker);
+  await page.goto('/');
+  await expect(page.locator('#app')).toContainText('34 ABC 123');
+  await opfsWrite(page, 'T1-1.pdf', '%PDF-1.4 birinci');
+  await opfsWrite(page, 'notlar.txt', 'bu dosya okunmaz');
+  await page.evaluate(() => document.querySelector('[data-action="ncts-open"]').click());
+  await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
+  await page.locator('[data-action="ncw-pick"]').click();
+  const rows = page.locator('.nc-table tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('26TR000000000000B2');
+  await expect(rows.first()).toContainText('CB 1234 AB');
+  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
+  // onaylanmadan hiçbir şey yazılmaz; düğmede hazır sayısı görünür
+  expect(await page.evaluate(() => window.__db.visits.filter(v => v.mrn).length)).toBe(0);
+  await expect(page.locator('[data-action="ncts-open"] .nc-badge').first()).toHaveText('1');
+  // .txt okunmadı; aynı dosya ikinci taramada yeniden okunmaz
+  await page.locator('[data-action="ncw-scan"]').click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(1);
+  await page.locator('[data-action="nc-apply"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v6').seal_no)).toBe('İG01362070');
+  // yeni belge düşer (ikincisi T1 değil); "sormadan yaz" açıkken kendiliğinden okunur ve yazılır
+  await opfsWrite(page, 'T1-2.pdf', '%PDF-1.4 ikinci belge');
+  await opfsWrite(page, 'baska.pdf', '%PDF-1.4 T1 değil');
+  await expect(page.locator('#ncw-box')).toContainText('İzlenen klasör: ncts');
+  await page.locator('#ncw-auto').check();
+  await page.locator('[data-action="ncw-scan"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.visits.find(v => v.id === 'v7').mrn)).toBe('26TR000000000000C3');
+  expect(await page.evaluate(() => window.__db.visits.length)).toBe(7);                 // yeni araç eklenmedi
+  // T1 olmayan belge (MRN yok) yok sayıldı ve bir daha gönderilmedi
+  const before = await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length);
+  await page.locator('[data-action="ncw-scan"]').click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__calls.filter(c => c.fn === 'ruhsat-oku').length)).toBe(before);
+  // klasör bırakılınca unutulur
+  await page.locator('[data-action="ncw-off"]').click();
+  await expect(page.locator('#ncw-box')).toContainText('Klasör seçilmedi');
+  expect(problems).toEqual([]);
+});

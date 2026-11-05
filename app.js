@@ -76,7 +76,7 @@ function render(){
  const focus=document.activeElement?.id;const sel=document.activeElement?.selectionStart;
  const pages={pano:['Pano','Ara\u00e7 operasyon panosu','Geli\u015fleri, evraklar\u0131 ve i\u015flem durumlar\u0131n\u0131 birlikte takip edin.'],pending:['Bekleyenler','Bekleyen araçlar','Tüm günlerden, henüz işlemleri bitmemiş araçlar; en uzun bekleyen en üstte.'],registry:['Plaka Kay\u0131tlar\u0131','Plaka kay\u0131tlar\u0131','Bir kez kaydedin; sonraki geli\u015flerde plaka ile bilgileri getirin.'],reports:['Raporlar','Operasyon raporlar\u0131','G\u00fcn\u00fcn ve haftan\u0131n operasyonunu say\u0131larla g\u00f6r\u00fcn.'],data:['Veri ve Yedek','Verileriniz, sizin kontrol\u00fcn\u00fczde','Ortak verileri ve yedek kopyalarını yönetin.'],settings:['Ayarlar','Ayarlar','Müşteri renklerini ve pano sıralamasını buradan yönetin.']};const p=pages[ui.page];const pendingCount=state.visits.filter(v=>!v.done).length;
  const nav=[['pano','grid','Pano'],['pending','clock','Bekleyenler'],['registry','registry','Plaka Kay\u0131tlar\u0131'],['reports','chart','Raporlar'],['data','database','Veri ve Yedek'],['settings','settings','Ayarlar']].filter(([k])=>!VIEW_TOKEN||!['registry','data','settings'].includes(k));if(VIEW_TOKEN&&['registry','data','settings'].includes(ui.page))ui.page='pano';
- const titleActions=ui.page==='pano'?button('export','Excel\u2019e aktar','download')+button('ruhsat-open','Ruhsattan ekle','doc')+(role==='editor'&&!VIEW_TOKEN?button('ncts-open','NCTS\u2019den al','doc'):'')+button('add-visit','Ara\u00e7 ekle','plus','primary'):ui.page==='registry'?button('import-reg','Excel\u2019den al','upload')+button('add-reg','Yeni plaka kayd\u0131','plus','primary'):ui.page==='pending'||ui.page==='settings'?'':ui.page==='reports'?button('print','Yazd\u0131r','print')+button('export','Excel\u2019e aktar','download','primary'):button('backup','T\u00fcm verileri yedekle','download','primary');
+ const titleActions=ui.page==='pano'?button('export','Excel\u2019e aktar','download')+button('ruhsat-open','Ruhsattan ekle','doc')+(role==='editor'&&!VIEW_TOKEN?button('ncts-open','NCTS\u2019den al'+ncBadge(),'doc'):'')+button('add-visit','Ara\u00e7 ekle','plus','primary'):ui.page==='registry'?button('import-reg','Excel\u2019den al','upload')+button('add-reg','Yeni plaka kayd\u0131','plus','primary'):ui.page==='pending'||ui.page==='settings'?'':ui.page==='reports'?button('print','Yazd\u0131r','print')+button('export','Excel\u2019e aktar','download','primary'):button('backup','T\u00fcm verileri yedekle','download','primary');
  const K=isKule();
  document.getElementById('app').innerHTML=`<aside class="sidebar"><div class="brand">${K?'<div class="brand-mark k-mark" aria-hidden="true">PCS</div>':'<div class="brand-mark"><img src="logo.svg" alt=""></div>'}<div class="brand-text"><div class="brand-name">PCS TRANS\u0130T</div><div class="brand-sub">YYS OPERASYON</div></div></div>${K?kPinButton():''}<div class="nav-label">\u00c7ALI\u015eMA ALANI</div><nav aria-label="Ana gezinme">${nav.map(([key,i,label])=>`<button type="button" title="${label}" data-action="nav" data-page="${key}" class="nav-item ${ui.page===key?'active':''}" ${ui.page===key?'aria-current="page"':''}>${icon(i)}<span class="nav-text">${label}</span>${key==='registry'?`<span class="nav-count">${state.registry.length}</span>`:key==='pending'&&pendingCount?`<span class="nav-count">${pendingCount}</span>`:''}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="sidebar-user"><div class="avatar">OP</div><span>Operasyon masan\u0131z<small>Yetkili tesis y\u00f6netimi</small></span></div></div></aside><div class="shell"><header class="topbar"><div class="breadcrumb">${icon('building')}<span>Yetkili Tesis</span>${icon('chevron')}<strong>${p[0]}</strong></div>${K?kSearchButton():''}<div class="topbar-right"><span class="date-label">${fmt(TODAY,{day:'numeric',month:'long',year:'numeric'})}</span><span class="save-status"><i class="local-dot"></i>${ui.demo?'\u00d6rnek g\u00f6r\u00fcn\u00fcm':storageError?'Kay\u0131t uyar\u0131s\u0131':state.updatedAt?'Yerel kay\u0131t g\u00fcncel':'Yerel kay\u0131t'}</span><button type="button" class="demo-pill" data-action="toggle-demo">${ui.demo?'Ger\u00e7ek kay\u0131tlara d\u00f6n':'\u00d6rnek g\u00f6r\u00fcn\u00fcm'}</button></div></header><main id="main">${K?kHeading(p,titleActions):`<div class="heading"><div><div class="eyebrow">TES\u0130S OPERASYON Y\u00d6NET\u0130M\u0130</div><h1>${p[1]}</h1><p>${p[2]}</p></div><div class="actions">${titleActions}</div></div>`}${ui.demo?`<div class="demo-banner"><span><strong>\u00d6RNEK VER\u0130</strong>G\u00f6rd\u00fc\u011f\u00fcn\u00fcz m\u00fc\u015fteriler ve geli\u015fler kurgusald\u0131r. Ger\u00e7ek kay\u0131tlar\u0131n\u0131z etkilenmez.</span>${button('toggle-demo','\u00d6rnekten \u00e7\u0131k','','small')}</div>`:''}${storageError&&!ui.demo?`<div class="warning-banner">${esc(storageError)}</div>`:''}${!ui.demo?backupReminder():''}${ui.page==='pano'?panoView():ui.page==='pending'?pendingView():ui.page==='registry'?registryView():ui.page==='reports'?reportsView():ui.page==='settings'?settingsView():dataView()}${footer()}</main></div>`;
  onlineUI();sahaKonum();
@@ -369,7 +369,7 @@ async function syncData(opts={}){
  if(!VIEW_TOKEN)saveCache();
  render();
  }catch(e){syncPrint=null;if(stamp===generation){if(!VIEW_TOKEN&&isNetErr(e)&&!realState.visits.length&&!realState.registry.length&&loadCache()){render();return;}storageError=VIEW_TOKEN&&(e.code==='42501'||e.code==='PGRST202')?'Bu görüntüleme linki geçersiz ya da kapatılmış. Yeni linki yöneticiden isteyin.':'Veriler yenilenemedi. Son görülen kayıtlar gösteriliyor. '+friendly(e);render();}}
- finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor'){maybeCarry();waTick();feeProbe();ncProbe();}}
+ finally{if(run!==syncRun)return;loading=false;if(account)onlineUI();if(resync){resync=false;syncData();}else if(account&&role==='editor'){maybeCarry();waTick();feeProbe();ncProbe();ncwInit();}}
 }
 /* Supabase giriş hataları: İngilizce ham mesaj yerine ne yapılacağını söyleyen Türkçe metin */
 function authMsg(e){const c=e?.code||'',m=String(e?.message||'');
@@ -2313,25 +2313,29 @@ function ncResultHTML(){if(nc.busy)return `<p class="help-note">${esc(nc.note||'
   <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-apply" ${canApply?'':'disabled'}>${icon('check')}Seçilenleri araç kaydına yaz</button></div>${wa?`<h3 class="nc-h">WhatsApp mesajı</h3>${wa}`:''}`;}
 let ncGroups=[];
 const ncRefresh=()=>{const o=document.getElementById('nc-out');if(o)o.innerHTML=ncResultHTML();};
-function openNcts(){if(!canEdit())return;nc.recs=[];nc.note='';nc.busy=false;
+function openNcts(){if(!canEdit())return;nc.recs=nc.recs.filter(r=>!r.applied);nc.note='';nc.busy=false;
  openModal(`${modalHeader('NCTS’den MRN ve mühür al','BİLGE Gümrük Platformu · Hareket Gümrük İdaresi')}<div class="modal-body"><p class="help-note">NCTS listesini (MRN ve plaka sütunları) kopyalayıp yapıştırın ya da <b>Tümünü Dışa Aktar</b> dosyasını (Excel / CSV) seçin. Mühür numarası için <b>Beyanname Detay › Yazdır › Beyanname</b> çıktısını (PDF ya da fotoğraf) seçin. Plakaya göre panodaki araçlarla eşleşir; <b>siz onaylamadan hiçbir şey yazılmaz</b>, yeni araç eklenmez.</p>
  <div class="field full"><label for="nc-text">Yapıştırın</label><textarea id="nc-text" rows="5" placeholder="26LR…  26TR…  GUA_INV  …  A6301EM, A4627HM" spellcheck="false"></textarea></div>
  <div class="field full"><label for="nc-file">Dosya <span class="optional">(Excel, CSV, PDF, fotoğraf · birden fazla seçilebilir)</span></label><input id="nc-file" type="file" accept=".xlsx,.csv,.tsv,.pdf,image/*" multiple></div>
- <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-read">Oku</button></div><div id="nc-out"></div></div>`);}
+ <div class="rs-acts"><button type="button" class="btn primary" data-action="nc-read">Oku</button></div><div id="nc-out">${ncResultHTML()}</div>
+ <div id="ncw-box">${ncwHTML()}</div></div>`);}
+/* tek dosyadan kayıtlar: Excel / CSV listesi ya da PDF / fotoğraf (yapay zekâ, transit modu) */
+async function ncFileRecs(f,onNote=()=>{}){
+ if(/\.(xlsx|csv|tsv)$/i.test(f.name)){if(!window.PCSXLSX?.readRows)throw new Error('Excel bileşeni yüklenemedi.');return ncFromRows(await PCSXLSX.readRows(f));}
+ if(/\.pdf$/i.test(f.name)||/^image\//.test(f.type)||/\.pdf$/i.test(f.type)){const r=await wmAi(f,onNote,false,'transit');
+  if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err);const d=r.data;
+  return [{lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true}];}
+ throw new Error('Desteklenmeyen dosya türü.');}
+/* aynı MRN iki kez gelirse (liste + belge) birleştirilir: mühür belgeden, plaka ikisinden */
+function ncMerge(all){const by=new Map();for(const r of all){const key=r.mrn||'~'+by.size;const o=by.get(key);if(!o)by.set(key,{...r});else{o.plates=[...new Set([...o.plates,...r.plates])];o.seals=[...new Set([...o.seals,...r.seals])];o.lrn=o.lrn||r.lrn;o.status=o.status||r.status;}}
+ return [...by.values()].filter(r=>r.mrn||r.plates.length);}
 async function ncRead(btn){const text=document.getElementById('nc-text')?.value||'',files=[...(document.getElementById('nc-file')?.files||[])];if(nc.busy)return;
  if(!text.trim()&&!files.length){toast('Önce listeyi yapıştırın ya da bir dosya seçin.',true);return;}
  nc.busy=true;nc.recs=[];nc.note='Okunuyor…';if(btn)btn.disabled=true;ncRefresh();const errs=[];let all=[];
  try{if(text.trim())all.push(...ncFromText(text));
   let k=0;for(const f of files){k++;nc.note=`Okunuyor… ${k}/${files.length} · ${f.name}`;ncRefresh();
-   try{if(/\.(xlsx|csv|tsv)$/i.test(f.name)){if(!window.PCSXLSX?.readRows)throw new Error('Excel bileşeni yüklenemedi.');all.push(...ncFromRows(await PCSXLSX.readRows(f)));}
-    else if(/\.pdf$/i.test(f.name)||/^image\//.test(f.type)||/\.pdf$/i.test(f.type)){const r=await wmAi(f,t=>{nc.note=t;ncRefresh();},false,'transit');
-     if(r.none)throw new Error('Yapay zekâ kurulu değil (supabase/GEMINI.md).');if(r.err)throw new Error(r.err);const d=r.data;
-     all.push({lrn:d.lrn||'',mrn:d.mrn||'',status:'',plates:(d.plates||[]).map(compactPlate).filter(Boolean),seals:d.seals||[],doc:true});}
-    else throw new Error('Desteklenmeyen dosya türü.');}
-   catch(e){errs.push(`${f.name}: ${e.message||e}`);}}
-  /* aynı MRN iki kez gelirse (liste + belge) birleştirilir: mühür belgeden, plaka ikisinden */
-  const by=new Map();for(const r of all){const key=r.mrn||'~'+by.size;const o=by.get(key);if(!o)by.set(key,{...r});else{o.plates=[...new Set([...o.plates,...r.plates])];o.seals=[...new Set([...o.seals,...r.seals])];o.lrn=o.lrn||r.lrn;o.status=o.status||r.status;}}
-  nc.recs=[...by.values()].filter(r=>r.mrn||r.plates.length);
+   try{all.push(...await ncFileRecs(f,t=>{nc.note=t;ncRefresh();}));}catch(e){errs.push(`${f.name}: ${e.message||e}`);}}
+  nc.recs=ncMerge(all);
   nc.note=errs.length?errs.join(' · '):nc.recs.length?'':'Okunabilen kayıt bulunamadı. MRN ve plaka sütunlarıyla birlikte yapıştırın.';}
  catch(e){nc.note='Okunamadı: '+(e.message||e);}
  finally{nc.busy=false;if(btn)btn.disabled=false;ncRefresh();}}
@@ -2339,13 +2343,66 @@ async function ncApply(btn){if(!ncCol||!canEdit()||nc.busy)return;const todo=ncR
  nc.busy=true;nc.note='Yazılıyor…';if(btn)btn.disabled=true;ncRefresh();let ok=0,fail=0;
  for(const {r,v} of todo){const done=await mutate(s=>{const x=s.visits.find(y=>y.id===v.id);if(!x)return;if(r.mrn)x.mrn=r.mrn;if(ncSealText(r))x.seal_no=ncSealText(r);});if(done){r.applied=true;justChangedMap.set(v.id,Date.now());ok++;}else fail++;}
  nc.busy=false;nc.note='';ncRefresh();toast(fail?`${ok} araç güncellendi, ${fail} araç yazılamadı.`:`${ok} araca MRN / mühür yazıldı.`,!!fail);}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="nc-"],[data-action="ncts-open"],[data-action="wa-mrn"]');if(!b)return;const a=b.dataset.action;
- if(a==='ncts-open')return openNcts();
+/* İndirilenlerden otomatik okuma: tarayıcı İndirilenler klasörünün kendisini seçtirmez; bunun içinde açılan bir klasör (ör. NCTS) bir kez seçilir.
+   Klasör (izin) tarayıcıda saklanır; yeni düşen dosyalar okunur, MRN içermeyenler yok sayılır, yalnızca seçilen klasöre bakılır. */
+const NCW_EXT=/\.(pdf|jpe?g|png|webp|xlsx|csv|tsv)$/i,NCW_AUTO_KEY='pcs.nctsAuto';
+const ncw={sup:typeof window.showDirectoryPicker==='function',h:null,perm:'',since:0,seen:{},fails:{},busy:false,last:0,msg:'',ready:false,auto:false};
+try{ncw.auto=localStorage.getItem(NCW_AUTO_KEY)==='1';}catch(_){}
+const ncwDb=()=>new Promise((res,rej)=>{const q=indexedDB.open('pcs-ncts',1);q.onupgradeneeded=()=>q.result.createObjectStore('kv');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});
+async function ncwGet(k){try{const db=await ncwDb();return await new Promise(res=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(undefined);});}catch(_){return undefined;}}
+async function ncwSet(k,v){try{const db=await ncwDb();await new Promise((res,rej)=>{const t=db.transaction('kv','readwrite'),o=t.objectStore('kv');if(v===undefined)o.delete(k);else o.put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);});return true;}catch(_){return false;}}
+async function ncwPerm(ask){if(!ncw.h)return '';try{let p=await ncw.h.queryPermission({mode:'read'});if(p!=='granted'&&ask)p=await ncw.h.requestPermission({mode:'read'});return p;}catch(_){return 'denied';}}
+let ncwSig='';
+const ncwRender=()=>{const g=ncBadge();if(g!==ncwSig){ncwSig=g;render();}};   // bant yalnızca düğme rozeti değişince yeniden çizilir (yazarken bozulmasın)
+const ncPending=()=>ncRows().filter(({r,v})=>v&&ncMrnOk(r)&&ncChange(r,v)&&!r.applied).length;
+function ncBadge(){const n=ncPending();return n?` <span class="nc-badge" title="Okunan belgelerden ${n} araç için MRN / mühür hazır">${n}</span>`:(ncw.h&&ncw.perm!=='granted'?' <span class="nc-badge off" title="NCTS klasörü için izin gerekiyor">!</span>':'');}
+function ncwHTML(){
+ if(!ncw.sup)return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">Bu tarayıcı klasör izlemeyi desteklemiyor. Bilgisayarda Chrome ya da Edge kullanın.</p></div>`;
+ const st=ncw.h?(ncw.perm==='granted'?`İzlenen klasör: <b>${esc(ncw.h.name)}</b>${ncw.busy?' · taranıyor…':''}`:`Klasör: <b>${esc(ncw.h.name)}</b> · izin gerekiyor (“Şimdi tara”ya basın)`):'Klasör seçilmedi';
+ return `<div class="nc-folder"><b>Klasörden otomatik oku</b><p class="help-note">İndirdiğiniz belgelerin düştüğü klasörü bir kez seçin. Tarayıcı <b>İndirilenler</b> klasörünün kendisini seçtirmez; onun içinde yeni bir klasör açın (ör. <b>İndirilenler › NCTS</b>) ve belgeleri oraya kaydedin. Site o klasöre yeni düşen PDF / fotoğraf / Excel dosyalarını kendisi okur; yalnızca MRN içeren belgeler kullanılır, başka klasöre bakılmaz.</p>
+ <div class="nc-folder-st">${st}${ncw.msg?`<small>${esc(ncw.msg)}</small>`:''}</div>
+ <div class="rs-acts"><button type="button" class="btn small" data-action="ncw-pick">${ncw.h?'Klasörü değiştir':'Klasör seç'}</button>${ncw.h?'<button type="button" class="btn small" data-action="ncw-scan">Şimdi tara</button><button type="button" class="btn small" data-action="ncw-off">Bırak</button>':''}</div>
+ <label class="ncw-auto"><input type="checkbox" id="ncw-auto" ${ncw.auto?'checked':''}> Eşleşenleri sormadan araç kaydına yaz <span class="optional">(Geri al ile döner)</span></label></div>`;}
+const ncwRefresh=()=>{const o=document.getElementById('ncw-box');if(o)o.innerHTML=ncwHTML();};
+async function ncwInit(){if(ncw.ready||!ncw.sup||VIEW_TOKEN)return;ncw.ready=true;ncw.h=(await ncwGet('dir'))||null;ncw.since=(await ncwGet('since'))||0;ncw.seen=(await ncwGet('seen'))||{};
+ if(!ncw.h)return;ncw.perm=await ncwPerm(false);ncwRender();ncwTimers();if(ncw.perm==='granted')ncwScan(true);}
+let ncwTimed=false;
+function ncwTimers(){if(ncwTimed)return;ncwTimed=true;setInterval(()=>{if(!document.hidden)ncwScan();},60000);
+ addEventListener('focus',()=>ncwScan());document.addEventListener('visibilitychange',()=>{if(!document.hidden)ncwScan();});}
+async function ncwScan(force){if(!ncw.h||ncw.busy||nc.busy||!canEdit()||ncw.perm!=='granted'||(!force&&Date.now()-ncw.last<15000))return;
+ ncw.busy=true;ncw.last=Date.now();ncw.msg='';ncwRefresh();const fresh=[];let seenDirty=false;
+ try{const cand=[];
+  for await(const [name,h] of ncw.h.entries()){if(h.kind!=='file'||!NCW_EXT.test(name))continue;const f=await h.getFile(),key=`${name}|${f.size}|${f.lastModified}`;
+   if(ncw.seen[key]||f.lastModified<ncw.since||!f.size||f.size>10e6||(ncw.fails[key]||0)>=3)continue;
+   const age=Date.now()-f.lastModified;if(age>=0&&age<3000)continue;   // hâlâ yazılıyor olabilir: sonraki taramada
+   cand.push({f,key});}
+  cand.sort((a,b)=>a.f.lastModified-b.f.lastModified);
+  for(const {f,key} of cand.slice(0,5)){ncw.msg=`Okunuyor… ${f.name}`;ncwRefresh();
+   try{const recs=await ncFileRecs(f,t=>{ncw.msg=t;ncwRefresh();});ncw.msg='';
+    fresh.push(...recs.filter(r=>r.mrn||!r.doc&&r.plates.length).map(r=>({...r,src:f.name})));ncw.seen[key]=Date.now();seenDirty=true;}
+   catch(e){ncw.fails[key]=(ncw.fails[key]||0)+1;ncw.msg=`${f.name}: ${e.message||e}`;}}
+  if(seenDirty){const lim=Date.now()-30*864e5;for(const k of Object.keys(ncw.seen))if(ncw.seen[k]<lim)delete ncw.seen[k];await ncwSet('seen',ncw.seen);}}
+ catch(e){ncw.msg=e?.name==='NotFoundError'?'Klasör bulunamadı; yeniden seçin.':'Klasör okunamadı: '+(e.message||e);if(e?.name==='NotFoundError'||e?.name==='NotAllowedError')ncw.perm='prompt';}
+ ncw.busy=false;
+ if(fresh.length){nc.recs=ncMerge([...nc.recs.filter(r=>!r.applied),...fresh]);ncRefresh();
+  if(ncw.auto&&ncCol&&canEdit())await ncApply();
+  else{const n=ncPending();toast(n?`NCTS belgesi okundu: ${n} araç için MRN / mühür hazır. “NCTS’den al” düğmesinden onaylayın.`:'NCTS belgesi okundu, panoda eşleşen yeni araç yok.');}}
+ ncwRefresh();ncwRender();}
+async function ncwPick(){let h;try{h=await window.showDirectoryPicker({id:'pcs-ncts',mode:'read'});}catch(e){if(e?.name!=='AbortError')toast('Bu klasör seçilemedi. İndirilenler’in kendisi seçilemez; içinde yeni bir klasör (ör. NCTS) açıp onu seçin.',true);return;}
+ ncw.h=h;ncw.perm='granted';ncw.since=Date.now()-864e5;ncw.seen={};ncw.fails={};ncw.msg='';
+ const ok=await ncwSet('dir',h);await ncwSet('since',ncw.since);await ncwSet('seen',{});if(!ok)toast('Klasör bu oturum için seçildi; tarayıcı kalıcı saklayamadı.',true);
+ ncw.ready=true;ncwTimers();ncwRefresh();ncwScan(true);}
+async function ncwOff(){ncw.h=null;ncw.perm='';ncw.seen={};await ncwSet('dir');await ncwSet('seen');await ncwSet('since');ncwRefresh();ncwRender();}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action^="nc-"],[data-action^="ncw-"],[data-action="ncts-open"],[data-action="wa-mrn"]');if(!b)return;const a=b.dataset.action;
+ if(a==='ncts-open'){const ask=ncw.h&&ncw.perm!=='granted'?ncwPerm(true):null;openNcts();if(ask)ask.then(p=>{ncw.perm=p;ncwRefresh();ncwRender();ncwScan(true);});else if(ncw.h)ncwScan(true);return;}
+ if(a==='ncw-pick')return ncwPick();
+ if(a==='ncw-scan'){ncwPerm(true).then(p=>{ncw.perm=p;ncwRefresh();ncwScan(true);});return;}
+ if(a==='ncw-off')return ncwOff();
  if(a==='nc-read')return ncRead(b);
  if(a==='nc-apply')return ncApply(b);
  if(a==='nc-wa'){const l=ncGroups[+b.dataset.g];if(l)sendMrn(l);return;}
  if(a==='wa-mrn'){const v=state.visits.find(x=>x.id===b.dataset.id);if(v)sendMrn([v]);}});
-document.addEventListener('change',e=>{const t=e.target;if(!t.classList?.contains('nc-inc'))return;const r=nc.recs[+t.dataset.i];if(r){r.inc=t.checked;ncRefresh();}});
+document.addEventListener('change',e=>{const t=e.target;if(t.id==='ncw-auto'){ncw.auto=t.checked;try{localStorage.setItem(NCW_AUTO_KEY,t.checked?'1':'0');}catch(_){}if(t.checked)ncwScan(true);return;}if(!t.classList?.contains('nc-inc'))return;const r=nc.recs[+t.dataset.i];if(r){r.inc=t.checked;ncRefresh();}});
 /* Güvenlik ekranı (?guvenlik=ANAHTAR, kurulum: supabase/guvenlik-kurulumu.sql).
    Giriş yapmadan açılır; güvenlik yalnızca plaka, müşteri, ruhsat (kilo) ve saatleri görür, yalnızca iki şey yapabilir:
      GİRİŞ -> araç TESİSTE olur, giriş saati yazılır

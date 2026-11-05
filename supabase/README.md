@@ -149,7 +149,12 @@ bilgisi kaydedilemez. İzleme linkinde bu düğme yoktur.
 düğmesi BİLGE (NCTS) ekranındaki bilgiyi plakaya göre araçlara eşler: listeyi yapıştırın, **Tümünü Dışa Aktar** dosyasını (Excel / CSV)
 seçin ya da Transit Refakat Belgesi'ni (PDF / fotoğraf) yükleyin; mühür numarası yalnızca belgeden (yapay zekâ ile) gelir ya da elle
 yazılır. Önizlemede neyin hangi araca yazılacağını görür, onaylarsanız yazılır; yeni araç eklenmez. Her araç için **çekici plakası /
-MRN / mühür** şeklinde üç satırlık WhatsApp mesajı hazırlanır (gönder düğmesine siz basarsınız). Siteye NCTS şifresi **girilmez**,
+MRN / mühür** şeklinde üç satırlık WhatsApp mesajı hazırlanır (gönder düğmesine siz basarsınız). **Klasörden otomatik okuma:** tarayıcı İndirilenler klasörünün kendisini seçtirmez; İndirilenler içinde bir klasör açın (ör. **NCTS**),
+belgeleri (T1 PDF'i, fotoğraf, Excel) oraya kaydedin ve NCTS penceresindeki **Klasör seç** ile bir kez seçin (Chrome / Edge, bilgisayarda).
+Site klasöre yeni düşen dosyaları kendisi okur (yalnızca seçilen klasör; son 24 saat; MRN içermeyenler yok sayılır, her dosya bir kez okunur),
+plakaya göre eşler ve **NCTS'den al** düğmesinde hazır sayısını gösterir; onaylayınca yazılır. **Eşleşenleri sormadan yaz** işaretlenirse
+onay beklenmeden yazılır (işlem geçmişinden geri alınır). Tarayıcı kapanıp açılınca bir kez izin sorar (düğmede turuncu **!** görünür).
+Her kullanıcı kendi bilgisayarında kendi klasörünü seçer; kayıtlar ortaktır. Siteye NCTS şifresi **girilmez**,
 site NCTS'ye kendiliğinden bağlanmaz. Bu özellik için `guvenlik-kurulumu.sql` dosyasının yeni halinin tamamı bir kez çalıştırılmalıdır
 (`mrn` ve `seal_no` sütunları); belge okuma için `ruhsat-oku` fonksiyonu yeniden yüklenmelidir.
 
