@@ -160,7 +160,7 @@ Her kullanıcı kendi bilgisayarında kendi klasörünü seçer; kayıtlar ortak
 site NCTS'ye kendiliğinden bağlanmaz. Bu özellik için `guvenlik-kurulumu.sql` dosyasının yeni halinin tamamı bir kez çalıştırılmalıdır
 (`mrn` ve `seal_no` sütunları). `ruhsat-oku` fonksiyonuna gerek yoktur.
 
-**Geç çıkanlar:** **Raporlar → Giriş – çıkış raporu**nda **Durum** listesinden *Ertesi gün 10:00’dan sonra çıkanlar* seçilir, **Bu ay** düğmesi aralığı ayın tamamına alır. Liste, işlemleri bittikten sonra, bitiş gününü izleyen günün 10:00’undan (İstanbul) sonra güvenlik çıkışı yapan araçları (plaka, müşteri, bitiş ve çıkış saati, 10:00’dan sonra ne kadar geç) gösterir; aralık çıkış gününe göredir; güvenlik çıkışı işlenmemiş araçlar sayılmaz. **Kopyala** / **WhatsApp’ta paylaş** düğmeleri bu listeyle çalışır.
+**Geç çıkanlar:** **Raporlar → Giriş – çıkış raporu**nda **Durum** listesinden *Bittiden sonra ertesi gün 10:00’dan sonra çıkanlar* seçilir (*ertesi gün 10:00’dan sonra ve daha geç çıkanlar* da vardır), **Bu ay** düğmesi aralığı ayın tamamına alır. Liste, **İşlemler bitti** işaretlendikten sonra, bitiş gününü izleyen günün 10:00’undan (İstanbul) sonra güvenlik çıkışı yapılan araçları (plaka, müşteri, bitiş ve çıkış saati, 10:00’dan sonra ne kadar geç) gösterir; aralık çıkış gününe göredir; güvenlik çıkışı işlenmemiş araçlar sayılmaz. **Kopyala** / **WhatsApp’ta paylaş** düğmeleri bu listeyle çalışır.
 
 **Ayarlar → Güvenlik ekranı izleme linki** aynı ekranı yalnızca görüntüleme için açar (`?guvenlik-izle=…`):
 açan kişi listeleri ve raporu görür, GİRİŞ / ÇIKIŞ yapamaz (sunucu da reddeder). Anahtarı güvenlik linkinden

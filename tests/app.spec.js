@@ -3743,32 +3743,35 @@ test('genel bakış: NCTS WhatsApp kartı her aracı ayrı satırda gösterir; h
   expect(problems).toEqual([]);
 });
 
-test('giriş-çıkış raporu: işlemi bitip ertesi gün 10:00\'dan sonra çıkan araçlar süzülür; aralık çıkış gününe göre, "Bu ay" düğmesi', async ({ page }) => {
+test('giriş-çıkış raporu: bitti işaretlendikten sonra ertesi gün 10:00\'dan sonra çıkan araçlar süzülür; daha geç çıkanlar ayrı seçenek; aralık çıkış gününe göre, "Bu ay" düğmesi', async ({ page }) => {
   test.setTimeout(60000);
   const data = sampleData();
   const t = (i, done_at, exit_at) => Object.assign(data.visits[i], { done: true, done_at, exit_at });
   // saatler UTC (İstanbul = +3)
-  t(0, '2026-09-21T12:00:00Z', '2026-09-22T08:30:00Z');   // 21'inde 15:00 bitti, 22'sinde 11:30 çıktı -> geç (1 sa 30 dk)
-  t(1, '2026-09-21T12:00:00Z', '2026-09-22T06:00:00Z');   // ertesi gün 09:00 çıktı -> geç değil
-  t(2, '2026-09-20T12:00:00Z', '2026-09-23T05:00:00Z');   // 20'sinde bitti, 23'ünde 08:00 çıktı -> geç (46 sa)
-  t(3, '2026-09-22T06:00:00Z', '2026-09-22T09:00:00Z');   // aynı gün çıktı -> geç değil
+  t(0, '2026-09-21T12:00:00Z', '2026-09-22T08:30:00Z');   // 21'inde 15:00 bitti, 22'sinde 11:30 çıktı -> ertesi gün 10:00'dan sonra (1 sa 30 dk)
+  t(1, '2026-09-21T12:00:00Z', '2026-09-22T06:00:00Z');   // ertesi gün 09:00 çıktı -> hiçbirinde yok
+  t(2, '2026-09-20T12:00:00Z', '2026-09-23T05:00:00Z');   // 20'sinde bitti, 23'ünde 08:00 çıktı -> yalnız "daha geç çıkanlar" (46 sa)
+  t(3, '2026-09-22T06:00:00Z', '2026-09-22T09:00:00Z');   // aynı gün çıktı -> hiçbirinde yok
   Object.assign(data.visits[4], { done: true, done_at: '2026-09-21T12:00:00Z', exit_at: null });   // güvenlik çıkışı yok -> sayılmaz
-  t(5, '2026-08-10T12:00:00Z', '2026-08-11T09:00:00Z');   // geç ama ağustosta -> bu ay değil
+  t(5, '2026-08-10T12:00:00Z', '2026-08-11T09:00:00Z');   // ağustosta -> bu ay değil
   await page.setViewportSize({ width: 1600, height: 1000 });
   const problems = await openApp(page, { data });
   await page.locator('.nav-item[data-page="reports"]').click();
-  await page.locator('#gate-st').selectOption('late');
-  // varsayılan aralık yalnızca bugün (23'ü): 23'ünde çıkan geç araç
-  await expect(page.locator('#gate-report .gate-table tbody tr')).toHaveCount(1);
-  await page.locator('[data-action="gate-month"]').click();
   const rows = page.locator('#gate-report .gate-table tbody tr');
-  await expect(rows).toHaveCount(2);
+  await page.locator('#gate-st').selectOption('late');
+  // varsayılan aralık yalnızca bugün (23'ü): o gün çıkan tek araç ertesi gün değil, 3. gün çıkmış
+  await expect(rows).toHaveCount(0);
+  await page.locator('[data-action="gate-month"]').click();
+  await expect(rows).toHaveCount(1);
   await expect(page.locator('#gate-report')).toContainText('10:00’DAN SONRA');
   await expect(rows.nth(0)).toContainText('34 ABC 123');
   await expect(rows.nth(0)).toContainText('1 sa 30 dk');
-  await expect(rows.nth(1)).toContainText('46 sa 00 dk');
   await expect(page.locator('#gate-report')).not.toContainText('CB 1234 AB');                 // 09:00'da çıkan
-  await expect(page.locator('#gate-report .gate-summary')).toContainText('2 araç');
+  await expect(page.locator('#gate-report .gate-summary')).toContainText('1 araç');
+  // daha geç çıkanlar da: 3. gün çıkan araç eklenir
+  await page.locator('#gate-st').selectOption('late2');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(1)).toContainText('46 sa 00 dk');
   // süzgeç kapanınca eski liste (ek sütun yok)
   await page.locator('#gate-st').selectOption('');
   await expect(page.locator('#gate-report')).not.toContainText('10:00’DAN SONRA');
