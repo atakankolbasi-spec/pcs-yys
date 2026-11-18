@@ -20,11 +20,16 @@
     visits: (cfg.data && cfg.data.visits) || [],
     app_settings: (cfg.data && cfg.data.app_settings) || [],
     incoming_ruhsat: (cfg.data && cfg.data.incoming_ruhsat) || [],
-    incoming_messages: (cfg.data && cfg.data.incoming_messages) || []
+    incoming_messages: (cfg.data && cfg.data.incoming_messages) || [],
+    // Nakliye programı (supabase/nakliye-kurulumu.sql)
+    shp_customers: (cfg.data && cfg.data.shp_customers) || [],
+    shp_trips: (cfg.data && cfg.data.shp_trips) || [],
+    shp_loads: (cfg.data && cfg.data.shp_loads) || []
   });
   const netError = () => ({ data: null, count: null, error: { message: 'TypeError: Failed to fetch', code: '' } });
   const clone = v => JSON.parse(JSON.stringify(v));
   const now = () => new Date().toISOString();
+  let shpSeq = 0;
 
   // PostgREST mantık filtresi: "status.eq.yeni,and(status.eq.okunuyor,claimed_at.lt.\"2026-...\")"
   function splitTop(s) { const out = []; let depth = 0, cur = ''; for (const ch of s) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out; }
@@ -70,7 +75,12 @@
         const plate = r => String(r.plate || '').replace(/\s/g, '').toUpperCase();
         if (table === 'registry' && st.rows.some(r => t.some(x => plate(x) === plate(r))))
           return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } };
-        const added = st.rows.map(r => ({ ...r, created_at: now(), updated_at: now() }));
+        const shpDefaults = {
+          shp_customers: { active: true, carrier: '', cmr_notes: '', loading_place: 'İSTANBUL - Turkey', logo: '' },
+          shp_loads: { status: 'bekliyor', trip_id: null, arrived_at: null, arrived_by: '', note: '' }
+        }[table];
+        if (table === 'shp_customers' && st.rows.some(r => t.some(x => x.name === r.name))) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "shp_customers_name_key"' } };
+        const added = st.rows.map(r => ({ ...(shpDefaults || {}), ...(table.startsWith('shp_') ? { id: 'shp' + (++shpSeq) } : {}), ...r, created_at: now(), updated_at: now() }));
         t.push(...added);
         return { data: clone(added.map(withFee)), error: null };
       }
@@ -257,6 +267,36 @@
         else return guardErr('22023', 'Geçersiz işlem');
         v.updated_at = now();
         return { data: { id: v.id, onsite: v.onsite, onsite_at: v.onsite_at, exit_at: v.exit_at }, error: null };
+      }
+      // Nakliye programı: araca atama (supabase/nakliye-kurulumu.sql'deki shp_assign'ın sade karşılığı)
+      if (name === 'shp_assign') {
+        const ids = [...new Set(params.p_load_ids || [])];
+        if (!ids.length) return guardErr('22023', 'Önce yük seçin');
+        if (!String(params.p_tractor || '').trim()) return guardErr('22023', 'Çekici plakası gerekli');
+        const ls = ids.map(id => db.shp_loads.find(l => l.id === id));
+        if (ls.some(l => !l || l.status !== 'depoda' || l.trip_id || l.customer_id !== params.p_customer))
+          return guardErr('22023', 'Seçilen yüklerden bazıları artık boşta değil ya da başka müşteriye ait; listeyi yenileyip tekrar seçin');
+        const yy = String(new Date().getFullYear() % 100).padStart(2, '0');
+        cfg.pozSeq = cfg.pozSeq || {}; cfg.pozSeq[yy] = (cfg.pozSeq[yy] || 0) + 1;
+        const trip = { id: 'shpt' + (++shpSeq), poz_no: `PCS-${yy}-${String(cfg.pozSeq[yy]).padStart(4, '0')}`, customer_id: params.p_customer,
+          tractor: String(params.p_tractor).trim().toUpperCase(), trailer: String(params.p_trailer || '').trim().toUpperCase(), depart_date: params.p_depart || now().slice(0, 10),
+          subject: params.p_subject || '', status: 'hazirlaniyor', created_by: 'test@ornek.com', created_at: now(), updated_at: now() };
+        db.shp_trips.push(trip);
+        ls.forEach(l => Object.assign(l, { status: 'aracta', trip_id: trip.id, updated_at: now() }));
+        return { data: { trip: clone(trip) }, error: null };
+      }
+      if (name === 'shp_unassign') {
+        const l = db.shp_loads.find(x => x.id === params.p_load_id && x.status === 'aracta');
+        if (!l) return guardErr('22023', 'Yük bir araçta değil');
+        const tid = l.trip_id; Object.assign(l, { status: 'depoda', trip_id: null, updated_at: now() });
+        const gone = !db.shp_loads.some(x => x.trip_id === tid);
+        if (gone) db.shp_trips = db.shp_trips.filter(x => x.id !== tid);
+        return { data: { trip_deleted: gone }, error: null };
+      }
+      if (name === 'shp_delete_trip') {
+        db.shp_loads.filter(l => l.trip_id === params.p_trip).forEach(l => Object.assign(l, { status: 'depoda', trip_id: null, updated_at: now() }));
+        db.shp_trips = db.shp_trips.filter(x => x.id !== params.p_trip);
+        return { data: null, error: null };
       }
       if (name === 'current_app_role') return { data: cfg.role || 'editor', error: null };
       // Görünüm vb. ortak ayarlar (ayar-kaydetme-kurulumu.sql'in sade karşılığı)
