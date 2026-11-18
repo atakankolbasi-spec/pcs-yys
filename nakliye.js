@@ -123,9 +123,9 @@
 
   const custSelect = () => `<select id="nk-cust" data-nk-in="cust" aria-label="Müşteri süz"><option value="">Tüm müşteriler</option>${S.customers.map(c => `<option value="${c.id}" ${S.cust === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`;
   const searchBox = (id, key, val) => `<label class="nk-search">${ic('search')}<input id="${id}" data-nk-in="${key}" type="search" value="${esc(val)}" placeholder="Ara: gönderici, alıcı, mal, plaka…" autocomplete="off" aria-label="Ara"></label>`;
-  const hit = (l, q) => !q || [l.sender, l.consignee, l.goods, l.dest_customs, l.broker, l.note, (cust(l.customer_id) || {}).name, (byId(S.trips, l.trip_id) || {}).poz_no, B.plates(byId(S.trips, l.trip_id))].some(x => tr(x).includes(tr(q)));
+  const hit = (l, q) => !q || [l.sender, l.consignee, l.goods, l.dest_customs, l.broker, l.note, l.inbound_plate, (cust(l.customer_id) || {}).name, (byId(S.trips, l.trip_id) || {}).poz_no, B.plates(byId(S.trips, l.trip_id))].some(x => tr(x).includes(tr(q)));
 
-  const loadCells = l => `<td>${pill(l.customer_id)}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small></td><td>${esc(l.goods) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>`;
+  const loadCells = l => `<td>${pill(l.customer_id)}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small>${l.inbound_plate ? `<small>Getirecek araç: <span class="nk-pl">${esc(l.inbound_plate)}</span></small>` : ''}</td><td>${esc(l.goods) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>`;
 
   function idleView() {
     const sc = selCust();
@@ -175,8 +175,8 @@
         `<td><span class="nk-pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="nk-pl alt">${esc(t.trailer)}</span>` : ''}</td><td>${pill(t.customer_id)}</td><td>${esc(dmy(t.depart_date))}</td><td class="r">${ls.length}</td><td class="r">${kg(sum(ls, 'weight'))} kg</td>` +
         `<td class="r"><button type="button" class="btn small" data-nk="doc" data-kind="lade" data-id="${t.id}">Lade Liste</button> <button type="button" class="btn small" data-nk="doc" data-kind="cmr" data-id="${t.id}">CMR</button></td></tr>`;
       if (!open) return head;
-      const sub = ls.map((l, i) => `<tr><td>${esc(B.pozOf(t, i))}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small></td><td>${esc(l.goods) || '—'}</td><td>${esc(l.dest_customs) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>` +
-        `<td>${l.arrived_at ? `<span class="nk-ch g">Depoda</span><small>${esc(stamp(l.arrived_at))}</small>` : `<span class="nk-ch a">Depoya gelmedi</span> <button type="button" class="nk-lnk" data-nk="arrive-trip" data-id="${l.id}">Geldi</button>`}</td><td class="r"><button type="button" class="nk-lnk" data-nk="doc" data-kind="cmr" data-id="${t.id}" data-load="${l.id}">CMR</button> <button type="button" class="nk-lnk" data-nk="unassign" data-id="${l.id}">Araçtan çıkar</button></td></tr>`).join('');
+      const sub = ls.map((l, i) => `<tr><td>${esc(B.pozOf(t, i))}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small>${l.inbound_plate ? `<small>Getirecek araç: <span class="nk-pl">${esc(l.inbound_plate)}</span></small>` : ''}</td><td>${esc(l.goods) || '—'}</td><td>${esc(l.dest_customs) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>` +
+        `<td>${l.arrived_at ? `<span class="nk-ch g">Depoda</span><small>${esc(stamp(l.arrived_at))}</small>` : `<span class="nk-ch a">Depoya gelmedi</span> <button type="button" class="nk-lnk" data-nk="arrive-trip" data-id="${l.id}">Geldi</button>`}</td><td class="r"><button type="button" class="nk-lnk" data-nk="doc" data-kind="cmr" data-id="${t.id}" data-load="${l.id}">CMR</button> <button type="button" class="nk-lnk" data-nk="edit-load" data-id="${l.id}">Düzenle</button> <button type="button" class="nk-lnk" data-nk="unassign" data-id="${l.id}">Araçtan çıkar</button></td></tr>`).join('');
       const del = S.confirm === 'trip:' + t.id
         ? `<button type="button" class="btn small danger" data-nk="del-trip" data-id="${t.id}">Evet, seferi sil</button>` : `<button type="button" class="btn small" data-nk="del-trip" data-id="${t.id}">Seferi sil (yükler boşa döner)</button>`;
       const lock = t.status === 'hazirlaniyor' ? `<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="yolda">Yola çıktı (müşteri değiştiremesin)</button>` : `<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="hazirlaniyor">Kilidi aç (müşteri değiştirebilsin)</button>`;
@@ -197,7 +197,7 @@
   function allView() {
     const rows = S.loads.filter(l => hit(l, S.q) && (!S.cust || l.customer_id === S.cust)).slice(0, 400);
     const chip = l => l.status === 'aracta' ? `<span class="nk-ch b">${esc((byId(S.trips, l.trip_id) || {}).poz_no || 'Araçta')}</span>` : l.status === 'depoda' ? '<span class="nk-ch g">Boşta</span>' : '<span class="nk-ch a">Bekliyor</span>';
-    const body = rows.map(l => { const t = byId(S.trips, l.trip_id); return `<tr>${loadCells(l)}<td>${chip(l)}${t ? `<small>${esc(B.plates(t))}</small>` : ''}</td><td class="r">${l.status === 'aracta' ? '' : `<button type="button" class="nk-lnk" data-nk="edit-load" data-id="${l.id}">Düzenle</button>`}</td></tr>`; }).join('');
+    const body = rows.map(l => { const t = byId(S.trips, l.trip_id); return `<tr>${loadCells(l)}<td>${chip(l)}${t ? `<small>${esc(B.plates(t))}</small>` : ''}</td><td class="r"><button type="button" class="nk-lnk" data-nk="edit-load" data-id="${l.id}">Düzenle</button></td></tr>`; }).join('');
     return `<section class="nk-pn"><div class="nk-bar"><h2>Tüm yükler <span>${rows.length}</span></h2><div class="nk-bar-r">${custSelect()}${searchBox('nk-q', 'q', S.q)}</div></div>` +
       (rows.length ? `<div class="nk-scroll"><table class="nk-t"><thead><tr><th>Müşteri</th><th>Gönderici → Alıcı</th><th>Mal</th><th class="r">Kap</th><th class="r">Kilo</th><th>Durum</th><th></th></tr></thead><tbody>${body}</tbody></table></div>` : '<div class="nk-empty">Kayıt yok.</div>') + '</section>';
   }
@@ -341,7 +341,7 @@
   const head = (title, sub) => `<div class="modal-header"><div><h2 id="modal-title">${esc(title)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}</div><button type="button" class="icon-btn" data-action="close-modal" aria-label="Kapat">${ic('close')}</button></div>`;
 
   function loadForm(id) {
-    const l = id ? loadOf(id) : { customer_id: S.cust || selCust() || (S.customers.find(c => c.active) || {}).id || '', sender: '', sender_addr: '', consignee: '', consignee_addr: '', notify: '', pieces: '', packing: 'KAP', goods: '', weight: '', volume: '', country: '', code: '', dest_customs: '', broker: '', expected_date: '', note: '', status: 'bekliyor' };
+    const l = id ? loadOf(id) : { customer_id: S.cust || selCust() || (S.customers.find(c => c.active) || {}).id || '', sender: '', sender_addr: '', consignee: '', consignee_addr: '', notify: '', pieces: '', packing: 'KAP', goods: '', weight: '', volume: '', country: '', code: '', dest_customs: '', broker: '', expected_date: '', inbound_plate: '', note: '', status: 'bekliyor' };
     if (!l) return;
     if (!S.customers.length) { X.toast('Önce Müşteriler bölümünden bir müşteri ekleyin', true); customersModal(); return; }
     const num = v => v == null || v === '' ? '' : String(v);
@@ -355,10 +355,11 @@ ${fld('goods', 'Mal cinsi', l.goods, { full: true })}
 ${fld('weight', 'Brüt kilo (kg)', num(l.weight), { inputmode: 'decimal' })}${fld('volume', 'Hacim (m³)', num(l.volume), { inputmode: 'decimal', opt: true })}
 ${fld('country', 'Ülke', l.country, { max: 60 })}${fld('dest_customs', 'Varış gümrük', l.dest_customs, { max: 80 })}
 ${fld('code', 'Gümrük kodu', l.code, { max: 40, opt: true })}${fld('broker', 'Gümrükçü', l.broker, { max: 120, opt: true })}
-${fld('expected_date', 'Beklenen tarih', l.expected_date || '', { type: 'date', opt: true })}${fld('note', 'Not', l.note, { max: 500, opt: true })}
+${fld('expected_date', 'Beklenen tarih', l.expected_date || '', { type: 'date', opt: true })}${fld('inbound_plate', 'Yükü getirecek kamyon plakası', l.inbound_plate || '', { max: 40, opt: true })}
+${fld('note', 'Not', l.note, { max: 500, opt: true, full: true })}
 </div><datalist id="nk-packs"><option>KAP</option><option>PALET</option><option>KOLİ</option><option>RULO</option><option>BIG BAG</option><option>DÖKME</option></datalist>
 ${id ? '' : '<label class="form-chip nk-arr"><input type="checkbox" name="arrived" class="check"><span>Yük zaten depoda (boşta listesine ekle)</span></label>'}
-<div id="nk-ferr" class="nk-ferr" hidden></div></div><div class="modal-footer">${id ? `<button type="button" class="btn danger" data-nk="del-load" data-id="${esc(id)}">Sil</button>` : ''}<span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Vazgeç</button><button type="submit" class="btn primary">${ic('check')}Kaydet</button></div></form>`);
+<div id="nk-ferr" class="nk-ferr" hidden></div></div><div class="modal-footer">${id && l.status !== 'aracta' ? `<button type="button" class="btn danger" data-nk="del-load" data-id="${esc(id)}">Sil</button>` : ''}${id && l.status === 'aracta' ? '<small class="nk-hint2">Araçtaki yük silinemez; önce araçtan çıkarın.</small>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Vazgeç</button><button type="submit" class="btn primary">${ic('check')}Kaydet</button></div></form>`);
   }
 
   async function removeLoad(btn) {
@@ -376,7 +377,7 @@ ${id ? '' : '<label class="form-chip nk-arr"><input type="checkbox" name="arrive
     const row = {
       customer_id: g('customer_id'), sender: g('sender'), sender_addr: String(fd.get('sender_addr') || '').trim(), consignee: g('consignee'), consignee_addr: String(fd.get('consignee_addr') || '').trim(),
       notify: String(fd.get('notify') || '').trim(), pieces: pc || 0, packing: g('packing') || 'KAP', goods: g('goods'), weight: w || 0, volume: v == null ? null : v, country: g('country'),
-      code: g('code'), dest_customs: g('dest_customs'), broker: g('broker'), expected_date: g('expected_date') || null, note: g('note')
+      code: g('code'), dest_customs: g('dest_customs'), broker: g('broker'), expected_date: g('expected_date') || null, inbound_plate: g('inbound_plate').toUpperCase(), note: g('note')
     };
     const id = form.dataset.lid;
     let r;

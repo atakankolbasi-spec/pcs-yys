@@ -25,24 +25,159 @@
 
   const wrap = (title, css, body) => `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${body}</body></html>`;
 
-  // ------------------------------------------------------------------ Lade Liste (A4 yatay)
-  const ladeCss = `
-@page{size:A4 landscape;margin:10mm}
+  // =========================================================================================================
+  // Belgeler PLASTNAK örnek taslağının (Lade Liste ve CMR PDF'leri) birebir kopyasıdır: çizgiler, yazı yerleri ve
+  // yazı boyları örnekten ölçülerek (milimetre) aktarıldı. Her müşteri kendi logosunu, nakliyeci bilgisini ve
+  // şartlarını kullanır; kutuların yerleri, sıra ve etiket metinleri hep aynıdır.
+  // =========================================================================================================
+  const FONT = '"Microsoft Sans Serif",Arial,Helvetica,"Liberation Sans",sans-serif';
+  const px = n => `${n}mm`;
+  const LH = 1.117;                                  // örnekteki yazı tipinin satır kutusu / yazı boyu oranı
+  // sabit yazı: (x, y, satır yüksekliği mm, metin, sınıf)
+  const T = (x, y, h, txt, cls = '') => `<i class="t ${cls}" style="left:${px(x)};top:${px(y)};font-size:${(h / LH).toFixed(3)}mm;line-height:${px(h)}">${txt}</i>`;
+  const HL = (y, x1, x2, t = 0.53) => `<b class="l" style="left:${px(x1)};top:${px((y - t / 2).toFixed(3))};width:${px((x2 - x1).toFixed(2))};height:${t}mm"></b>`;
+  const VL = (x, y1, y2, t = 0.53) => `<b class="l" style="left:${px((x - t / 2).toFixed(3))};top:${px(y1)};width:${t}mm;height:${px((y2 - y1).toFixed(2))}"></b>`;
+  // alan: sığması için kaydırılan serbest metin kutusu
+  const BOX = (x, y, w, h, txt, size, cls = '', lh) => `<div class="t blk ${cls}" style="left:${px(x)};top:${px(y)};width:${px(w)};font-size:${size}mm;line-height:${px(lh || +(size * 1.3).toFixed(2))};${h ? `max-height:${px(h)};overflow:hidden;` : ''}">${txt}</div>`;
+  const lines = s => String(s || '').split(/\r?\n/);
+  const para = s => lines(s).map(x => `<div>${esc(x) || '&nbsp;'}</div>`).join('');
+  const UP = s => esc(tr(s));
+
+  const cmrCss = `
+@page{size:A4;margin:0}
 *{box-sizing:border-box}
-body{margin:0;font:9.5pt/1.35 Arial,Helvetica,sans-serif;color:#111}
-@media screen{body{background:#e6eaee;padding:12px 0}.pg{background:#fff;width:297mm;min-height:200mm;margin:0 auto;padding:10mm;box-shadow:0 2px 14px #0003}}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
-.info{border-collapse:collapse;font-size:10pt}.info td{padding:2px 14px 2px 0;vertical-align:top}.info td:first-child{font-weight:700;white-space:nowrap}
-.ttl{font-size:20pt;font-weight:800;letter-spacing:.5px;text-align:right}.logo{max-height:18mm;max-width:60mm;display:block;margin-left:auto;margin-bottom:4px}
-table.t{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px}
-.t th{background:#e8edf1;border:1px solid #333;padding:4px 5px;font-size:8pt;text-align:left;overflow-wrap:anywhere}
-.t td{border:1px solid #777;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere}
-.t .n{text-align:right;white-space:nowrap}.t .c{text-align:center;white-space:nowrap}
-.t tr{page-break-inside:avoid}
-.grp td{background:#f4f6f8;font-weight:800;border-color:#333}
-.sum td{font-weight:800;background:#fafbfc}
-.tot td{font-weight:800;background:#e8edf1;border-color:#111}
-.foot{margin-top:10px;font-size:8pt;color:#555}`;
+html,body{margin:0;padding:0}
+body{font-family:${FONT};color:#000}
+.pg{position:relative;width:210mm;height:297mm;overflow:hidden;background:#fff;page-break-after:always;break-after:page}
+.pg:last-child{page-break-after:auto;break-after:auto}
+.l{position:absolute;background:#000;display:block}
+.t{position:absolute;white-space:nowrap;font-style:normal;margin:0}
+.blk{white-space:normal;word-break:normal;overflow-wrap:anywhere}
+.n{font-weight:700}
+.bd{font-weight:700}
+.it{font-style:italic}
+.c{text-align:center}.r{text-align:right}
+@media screen{body{background:#e6eaee;padding:14px 0}.pg{margin:0 auto 14px;box-shadow:0 2px 14px #0003}}
+@media print{body{background:#fff;padding:0}}`;
+
+  const SZ = { lab: 1.88, val: 2.15, ttl: 2.5, big: 3.76 };      // etiket, değer, başlık ve kutu numarası yazı boyları (mm)
+
+  function cmrPage(trip, customer, l, i) {
+    const place = (customer && customer.loading_place) || 'İSTANBUL - Turkey';
+    const city = place.split(' - ')[0];
+    const dest = [l.dest_customs, l.country ? tr(l.country) : ''].filter(Boolean).join('-');
+    const notify = l.notify || [l.consignee, l.consignee_addr].filter(Boolean).join('\n');
+    const notesRaw = ((customer && customer.cmr_notes) || '').trim();
+    const std = 'This carriage is subject, notwithstanding any clause to the convention on the contract for the International carriage of goods by road (CMR)';
+    const noteLines = notesRaw ? lines(notesRaw) : [];
+    if (!noteLines.length || !/^this carriage/i.test(noteLines[0])) noteLines.unshift(std);
+    const logo = logoImg(customer, 'cl');
+    const carrier = lines(customer && customer.carrier).filter(x => x.trim());
+    const out = [];
+    // --- çizgiler (örnek PDF'ten)
+    for (const [y, a, b] of [[7.2, 15.3, 197.3], [14.4, 15.3, 197.3], [31.8, 15.3, 197.3], [39.2, 15.3, 197.3], [59.9, 15.3, 197.3], [66.5, 15.3, 197.3], [83.6, 15.3, 101.6], [90.7, 15.3, 197.3],
+      [97.8, 101.6, 197.3], [104.6, 15.3, 101.6], [111.5, 15.3, 101.6], [128.9, 15.3, 197.3], [136.2, 15.3, 197.3], [173.9, 15.3, 197.3], [181.5, 15.3, 197.3], [201.4, 15.3, 197.3],
+      [209.1, 15.3, 197.3], [216.7, 15.3, 197.3], [224.8, 15.3, 197.3], [234.4, 15.3, 142.3], [261.0, 15.3, 197.3], [269.4, 15.3, 197.3]]) out.push(HL(y, a, b));
+    for (const [x, a, b] of [[15.3, 7.2, 269.4], [197.3, 7.2, 269.4], [101.6, 7.2, 128.9], [109.0, 173.9, 224.8], [142.3, 224.8, 261.0], [75.4, 234.4, 261.0]]) out.push(VL(x, a, b));
+    // --- kutu numaraları
+    for (const [t, x, y, h] of [['1', 16.9, 9.1], ['2', 16.9, 33.5], ['3', 16.9, 61.0], ['4', 16.9, 85.1], ['5', 16.9, 106.2], ['6', 16.9, 130.0], ['7', 40.6, 130.3], ['8', 67.6, 130.3], ['9', 95.9, 130.3],
+      ['10', 118.4, 130.6], ['11', 147.3, 130.3], ['12', 175.4, 130.0], ['13', 16.9, 175.5], ['14', 16.9, 202.9], ['15', 16.9, 210.6], ['16', 106.8, 33.5], ['17', 107.1, 61.0], ['18', 107.1, 91.9],
+      ['19/20', 111.2, 175.1], ['21', 16.9, 226.9], ['22', 16.9, 235.9], ['23', 76.2, 235.6], ['24', 145.3, 228.0], ['25', 16.9, 262.3]]) out.push(T(x, y, 4.2, t, 'n'));
+    // --- sabit etiketler (örnekteki yazımlarıyla)
+    for (const [x, y, t] of [
+      [22.0, 8.9, 'Gönderen (isim,adres,memleket)'], [22.0, 11.4, 'Sender (name,address,country)'],
+      [22.0, 33.1, 'Alıcı (isim,adres,memleket)'], [22.0, 35.6, 'Consignee (name,address,country)'],
+      [113.2, 33.1, 'Nakliyeci (isim,adres,memleket)'], [113.2, 35.6, 'Carrier (name,address,country)'],
+      [22.0, 61.2, 'Malların gönderildiği yer'], [22.0, 63.6, 'Place of delivery of the goods'],
+      [22.0, 72.3, 'Şehir/Place'], [22.0, 74.7, 'Memleket/Country'],
+      [113.2, 61.0, 'Diğer nakliyeciler'], [113.2, 63.4, 'Successive carries'],
+      [22.0, 84.8, 'Malların teslim alındığı yer ve gün'], [22.0, 87.2, 'Place and dateof taking of the goods'],
+      [22.0, 93.1, 'Şehir/Place'], [22.0, 95.6, 'Memleket/Country'], [22.0, 98.0, 'Tarih/Date'],
+      [113.2, 91.9, 'Nakliyecinin şart ve mulahazaları'], [113.2, 94.6, 'Carries reservation and observation'],
+      [22.0, 105.9, 'Ekli Dökümanlar'], [22.0, 108.3, 'Documents attached'],
+      [20.0, 130.0, 'Marka ve numara'], [20.0, 132.4, 'Marks and No'],
+      [44.4, 130.0, 'Parça adedi'], [44.4, 132.4, 'Number of packing'],
+      [70.9, 130.0, 'Ambalaj nevi'], [70.9, 132.4, 'Method of the goods'],
+      [98.8, 130.0, 'Malın cinsi'], [98.8, 132.4, 'Nature of goods'],
+      [124.6, 130.0, 'Statistik No'], [124.6, 132.4, 'Statistical Number'],
+      [152.0, 130.0, 'Brüt kg.'], [152.0, 132.4, 'Gross weight in kg'],
+      [180.6, 130.0, 'Hacim m3'], [180.6, 132.4, 'Volume in m3'],
+      [22.0, 175.5, 'Gönderenin talimatı ( Gümrük ve diğer formaliteler)'], [22.0, 178.0, 'Sender\'s instructions ( Customs and formalities)'],
+      [126.4, 175.2, 'Hususi şartlar'], [126.4, 177.7, 'Special agreements'],
+      [22.0, 201.8, 'İade'], [22.0, 204.3, 'Return to'],
+      [22.0, 210.6, 'Navlunun ödenmesi için talimatlar'], [22.0, 213.0, 'Directions as of freight payment'],
+      [59.2, 218.1, 'Serbest / Free'], [59.2, 220.6, 'Serbest Değil / Unfree'],
+      [22.0, 226.4, 'Tanzim Yeri'], [22.0, 228.9, 'Established in'],
+      [104.5, 226.4, 'Tarih'], [104.5, 228.9, 'on'],
+      [151.3, 227.0, 'Mallar teslim alındı'], [151.3, 229.5, 'Goods received'],
+      [182.5, 227.0, 'Tarih'], [182.5, 229.4, 'Date'],
+      [22.0, 253.2, 'Malı gönderenin imzası ve kaşesi'], [22.0, 255.6, 'Signatuer and stamp of the sender'],
+      [76.1, 253.4, 'Nakliyeci ve kaşesi'], [76.1, 255.9, 'Stamp of the carrier and carrier'],
+      [156.1, 253.5, 'Alıcının imzası ve kaşesi'], [147.9, 256.5, 'Signatuer and stamp of the consignee'],
+      [22.0, 262.3, 'Plaka No.'], [22.0, 264.8, 'Vehicle No.']]) out.push(T(x, y, 2.1, esc(t)));
+    // --- başlık, Poz ve CMR yazısı
+    out.push(T(102.9, 9.0, 2.8, 'INTERNATIONAL CONSIGMENT  NOTE / HAMULE SENEDI', 'bd'));
+    out.push(T(106.3, 15.9, 3.2, 'Poz:', 'bd'), T(114.7, 15.9, 3.2, esc(pozOf(trip, i)), 'bd'));
+    out.push(`<i class="t it" style="left:133.5mm;top:21.1mm;font-size:8.32mm;line-height:9.3mm;letter-spacing:.35mm">C M R</i>`);
+    // --- 1 gönderen, 2 alıcı
+    out.push(BOX(16.4, 15.8, 84, 15, `<div>${esc(l.sender)}</div><div style="margin-top:1.1mm">${para(l.sender_addr)}</div>`, SZ.val, '', 2.85));
+    out.push(BOX(16.4, 40.5, 84, 19, `<div>${esc(l.consignee)}</div><div style="margin-top:2.4mm">${para(l.consignee_addr)}</div>`, SZ.val, '', 2.85));
+    // --- 3 varış, 4 yükleme yeri ve tarihi
+    out.push(T(47.6, 73.8, 2.8, UP(dest)), T(47.6, 92.9, 2.4, esc(place)), T(48.7, 95.7, 2.4, esc(dmy(trip.depart_date))));
+    // --- 16 nakliyeci: logo ve bilgi satırları ortalı
+    if (logo) out.push(`<div class="t" style="left:131.6mm;top:40.2mm;width:35.8mm;height:8.6mm">${logo}</div>`);
+    carrier.forEach((ln, k) => out.push(`<i class="t c" style="left:102.5mm;width:94mm;top:${px((logo ? 50.0 : 43.5) + 3.25 * k)};font-size:2.5mm;line-height:2.8mm">${esc(ln)}</i>`));
+    // --- 18 nakliyecinin şart ve mulahazaları
+    out.push(BOX(103.1, 99.2, 79, 29, noteLines.map((x, k) => `<div${k === 0 ? ' style="margin-bottom:4.8mm"' : ''}>${esc(x) || '&nbsp;'}</div>`).join(''), SZ.lab, 'bd', 2.45));
+    // --- 6-12 mal bilgisi (örnekteki yerlerinde)
+    out.push(T(26.5, 138.3, 3.2, esc(`${l.pieces} ${l.packing}`)));
+    out.push(BOX(70.9, 138.0, 46, 34, esc(l.goods), 2.86, '', 3.3));
+    out.push(`<i class="t r" style="left:130mm;width:40.9mm;top:138.0mm;font-size:2.86mm;line-height:3.2mm">${num(l.weight)}</i>`);
+    if (l.volume != null) out.push(`<i class="t r" style="left:170mm;width:24mm;top:138.0mm;font-size:2.86mm;line-height:3.2mm">${num(l.volume, 3)}</i>`);
+    // --- 13 talimat: NOTIFY
+    out.push(T(16.4, 183.1, 2.4, 'NOTIFY'));
+    out.push(BOX(16.4, 187.8, 90, 13, `<div>${esc(notify.split(/\r?\n/)[0])}</div><div style="margin-top:1.5mm">${para(notify.split(/\r?\n/).slice(1).join('\n'))}</div>`, SZ.val, '', 2.85));
+    // --- 21, 22, 25
+    out.push(T(59.2, 228.0, 2.4, esc(city)), T(117.0, 228.0, 2.4, esc(dmy(trip.depart_date))));
+    out.push(BOX(17.4, 241.6, 52, 9, esc(l.sender), SZ.val, '', 2.8));
+    out.push(T(59.2, 262.0, 2.4, esc(plates(trip))));
+    return `<div class="pg">${out.join('')}</div>`;
+  }
+  // only: yalnızca bu yükün CMR'ı (sıra numarası, tüm sefere göre belirlenir)
+  function cmr({ trip, customer, loads, only }) {
+    const list = order(loads);
+    const pages = list.map((l, i) => ({ l, i })).filter(x => !only || x.l.id === only);
+    return wrap(`CMR ${trip.poz_no}`, cmrCss + '.cl{width:35.8mm;height:8.6mm;object-fit:contain;display:block}', pages.map(x => cmrPage(trip, customer, x.l, x.i)).join(''));
+  }
+
+  // ------------------------------------------------------------------ Lade Liste (A4 yatay, örnek taslağın kopyası)
+  const ladeCss = `
+@page{size:A4 landscape;margin:0}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}
+.pg{position:relative;width:297mm;height:210mm;overflow:hidden;background:#fff;page-break-after:always;break-after:page}
+.pg:last-child{page-break-after:auto;break-after:auto}
+.l{position:absolute;background:#000;display:block}
+.t{position:absolute;white-space:nowrap;font-style:normal;margin:0}
+.bd{font-weight:700}
+.lg{position:absolute;left:202.5mm;top:11.8mm;width:87.3mm;height:20.9mm;object-fit:contain}
+.tb{position:absolute;left:6.5mm;width:285.5mm;font-size:2.5mm}
+.row{display:grid;grid-template-columns:6.6mm 38.2mm 44.5mm 17.9mm 34.4mm 21.8mm 27.3mm 20.0mm 30.8mm 44.0mm;white-space:nowrap}
+.row>div{overflow:hidden;height:5mm;line-height:5mm;border-left:0.18mm solid #000;border-bottom:0.18mm solid #000}
+.row>div:last-child{border-right:0.18mm solid #000}
+.row.f>div{height:5.8mm;line-height:6.4mm}
+.row.h{height:8.3mm;border-top:0.18mm solid #000}.row.h>div{height:8.3mm;line-height:8.3mm}
+.grp{height:6mm;line-height:4.7mm;padding-left:7.5mm;font-weight:700;border-bottom:0.18mm solid #000;border-left:0.18mm solid #000;border-right:0.18mm solid #000;font-size:2.5mm}
+.tot{display:grid;grid-template-columns:89.3mm 17.9mm 34.4mm 21.8mm 1fr;height:5mm;line-height:4.7mm;font-weight:700}
+.tot.bx{border-left:0.18mm solid #000;border-right:0.18mm solid #000;border-bottom:0.18mm solid #000}
+.tot .a{text-align:right;padding-right:1.1mm}.tot .k{padding-left:2mm}.tot .w{padding-left:1.6mm}
+.gap{height:2.7mm}
+.pn{position:absolute;right:15.5mm;bottom:8mm;font-weight:700;font-size:3.04mm}
+@media screen{body{background:#e6eaee;padding:14px 0}.pg{margin:0 auto 14px;box-shadow:0 2px 14px #0003}}
+@media print{body{background:#fff;padding:0}}`;
+  const PADH = [0.9, 2.4, 1.4, 1.3, 0.9, 0.9, 0.8, 0.6, 0.7, 1.5];     // başlık hücreleri: soldan boşluk (mm)
+  const PADD = [0.9, 1.1, 0.7, 2.0, 0.9, 1.6, 0.8, 0.6, 0.7, 1.5];     // veri hücreleri
 
   function lade({ trip, customer, loads }) {
     const list = order(loads);
@@ -53,113 +188,40 @@ table.t{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px}
       if (!g || g.k !== k) { g = { k, rows: [] }; groups.push(g); }
       g.rows.push({ l, i });
     });
-    const cols = ['<col style="width:4%">', '<col style="width:19%">', '<col style="width:17%">', '<col style="width:5%">', '<col style="width:14%">', '<col style="width:8%">',
-      '<col style="width:8%">', '<col style="width:8%">', '<col style="width:9%">', '<col style="width:8%">'].join('');
-    let totPc = 0, totKg = 0, body = '';
+    // satırlar (mm yükseklikleriyle) sayfalara bölünür
+    const items = [];
+    let totPc = 0, totKg = 0;
     for (const g of groups) {
       let pc = 0, kg = 0;
-      body += `<tr class="grp"><td colspan="10">${esc(g.k)}</td></tr>`;
+      items.push({ h: 6, html: `<div class="grp">${esc(g.k)}</div>` });
       for (const { l, i } of g.rows) {
         pc += Number(l.pieces) || 0; kg += Number(l.weight) || 0;
-        body += `<tr><td class="c">${i + 1}</td><td>${esc(l.sender)}</td><td>${esc(l.consignee)}</td><td class="n">${esc(l.pieces)}</td><td>${esc(l.goods)}</td>` +
-          `<td class="n">${num(l.weight)}</td><td>${esc(tr(l.country))}</td><td>${esc(l.code)}</td><td>${esc(l.dest_customs)}</td><td>${esc(l.broker)}</td></tr>`;
+        const cells = [i + 1, l.sender, l.consignee, l.pieces, l.goods, num(l.weight), tr(l.country), l.code, l.dest_customs, l.broker];
+        items.push({ h: i === 0 ? 5.8 : 5, html: `<div class="row${i === 0 ? ' f' : ''}">${cells.map((c, k) => `<div style="padding-left:${PADD[k]}mm" title="${esc(c)}">${esc(c)}</div>`).join('')}</div>` });
       }
       totPc += pc; totKg += kg;
-      body += `<tr class="sum"><td colspan="3" class="n">TOPLAM:</td><td class="n">${pc}</td><td></td><td class="n">${num(kg)}</td><td colspan="4"></td></tr>`;
+      items.push({ h: 5, html: `<div class="tot bx"><div class="a">TOPLAM:</div><div class="k">${pc}</div><div></div><div class="w">${num(kg)}</div><div></div></div>` });
     }
-    body += `<tr class="tot"><td colspan="3" class="n">GENEL TOPLAM:</td><td class="n">${totPc}</td><td></td><td class="n">${num(totKg)}</td><td colspan="4"></td></tr>`;
-    const html = `<div class="pg"><div class="top"><table class="info">
-<tr><td>Plaka No</td><td>${esc(plates(trip))}</td></tr><tr><td>Poz No</td><td>${esc(trip.poz_no)}</td></tr>
-<tr><td>Konu</td><td>${esc(trip.subject)}</td></tr><tr><td>Çıkış Tarihi</td><td>${esc(dmy(trip.depart_date))}</td></tr></table>
-<div>${logoImg(customer)}<div class="ttl">LADE LİSTE</div></div></div>
-<table class="t"><colgroup>${cols}</colgroup><thead><tr><th>No</th><th>GÖNDERİCİ</th><th>ALICI</th><th>KAP</th><th>MAL CİNSİ</th><th>KİLO</th><th>ÜLKE</th><th>KODU</th><th>VARIŞ GÜMRÜK</th><th>GÜMRÜKÇÜ</th></tr></thead>
-<tbody>${body}</tbody></table>
-<div class="foot">${esc(customer && customer.name)} · ${esc(trip.poz_no)}</div></div>`;
+    items.push({ h: 2.7, html: '<div class="gap"></div>' });
+    items.push({ h: 5, html: `<div class="tot"><div class="a">GENEL TOPLAM:</div><div class="k">${totPc}</div><div></div><div class="w">${num(totKg)}</div><div></div></div>` });
+    const head = `<div class="row h">${['No', 'GÖNDERİCİ', 'ALICI', 'KAP', 'MAL CİNSİ', 'KİLO', 'ÜLKE', 'KODU', 'VARIŞ GÜMRÜK', 'GÜMRÜKÇÜ'].map((c, k) => `<div style="padding-left:${PADH[k]}mm">${c}</div>`).join('')}</div>`;
+    const pages = [[]];
+    let y = 51.0;
+    for (const it of items) {
+      if (y + it.h > 190 && pages[pages.length - 1].length) { pages.push([]); y = 20.3; }   // devam sayfalarında başlık satırı üstte yeniden yazılır
+      pages[pages.length - 1].push(it.html); y += it.h;
+    }
+    const logo = logoImg(customer, 'lg');
+    const top =
+      [11.3, 17.7, 23.5, 29.3, 35.5].map(v => HL(v, 6.5, 120.1, 0.18)).join('') + VL(6.5, 11.3, 35.5, 0.18) + VL(120.1, 11.3, 35.5, 0.18) + VL(39.8, 11.3, 35.5, 0.18) +
+      [[13.0, 'Plaka No'], [19.0, 'Poz No'], [24.8, 'Konu'], [30.5, 'Çıkış Tarihi']].map(([yy, t]) => T(7.1, yy, 3.1, t, 'bd')).join('') +
+      T(41.5, 12.5, 3.2, esc(trip.tractor)) + (trip.trailer ? T(66.9, 12.5, 3.2, esc(trip.trailer)) : '') + T(41.5, 18.5, 3.2, esc(trip.poz_no)) + T(41.5, 24.3, 3.2, esc(trip.subject)) + T(41.5, 30.1, 3.2, esc(dmy(trip.depart_date))) +
+      `<i class="t bd" style="left:130.6mm;top:20.8mm;font-size:5.64mm;line-height:6.3mm">L A D E&nbsp; L İ S T E</i>` + logo;
+    const html = pages.map((rows, pi) => {
+      const first = pi === 0;
+      return `<div class="pg">${first ? top : ''}<div class="tb" style="top:${first ? 42.7 : 12}mm">${head}${rows.join('')}</div><span class="pn">${pi + 1}</span></div>`;
+    }).join('');
     return wrap(`Lade Liste ${trip.poz_no}`, ladeCss, html);
-  }
-
-  // ------------------------------------------------------------------ CMR (A4 dikey, her yük için bir sayfa)
-  const cmrCss = `
-@page{size:A4;margin:8mm}
-*{box-sizing:border-box}
-body{margin:0;font:8.5pt/1.3 Arial,Helvetica,sans-serif;color:#111}
-@media screen{body{background:#e6eaee;padding:12px 0}.pg{background:#fff;width:210mm;height:281mm;margin:0 auto 14px;box-shadow:0 2px 14px #0003}}
-@media print{.pg{height:281mm;page-break-after:always}.pg:last-child{page-break-after:auto}}
-.pg{padding:0;position:relative}
-.cm{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid #111;border-bottom:0}
-.cm.one{grid-template-columns:1fr}
-.col>.b{border-bottom:1.5px solid #111}.col:first-child{border-right:1.5px solid #111}
-.b{position:relative;padding:3px 6px 3px 28px;overflow:hidden}
-.b>i{position:absolute;left:5px;top:2px;font:800 13pt/1 Arial,sans-serif;font-style:normal}
-.b.w46{padding-left:46px}.b.w46>i{font-size:11pt}.b>s{display:block;text-decoration:none;font-size:6.6pt;line-height:1.15;color:#222;margin-bottom:2px}
-.b .v{font-size:8.6pt;line-height:1.3}
-.h24{height:24mm}.h26{height:26mm}.h22{height:22mm}.h46{height:46mm}.h28{height:28mm}.h9{height:9mm}.h15{height:15mm}.h12{height:12mm}.h30{height:30mm}.h32{height:32mm}
-.title{padding:3px 8px;text-align:left}
-.title b{font-size:8.4pt}.poz{margin-top:2px;font-size:9.6pt}.big{font:italic 800 22pt/1 Arial,sans-serif;letter-spacing:3px;text-align:center;margin-top:2px}
-.logo{max-height:14mm;max-width:55mm;display:block;margin:0 auto 2px}
-.carrier{text-align:center;font-size:8pt;line-height:1.3}
-.goods{display:grid;grid-template-columns:20% 11% 13% 23% 10% 12% 11%;border:1.5px solid #111;border-bottom:0}
-.goods>div{padding:3px 6px 3px 28px;position:relative;border-right:1.5px solid #111}.goods>div:last-child{border-right:0}
-.goods .hd{height:9mm;border-bottom:1.5px solid #111}.goods .bd{height:48mm;padding-left:8px}
-.goods .hd i{position:absolute;left:5px;top:2px;font:800 13pt/1 Arial,sans-serif;font-style:normal}.goods .hd s{text-decoration:none;font-size:6.4pt;line-height:1.1;display:block}
-.r{text-align:right}
-.note{font-size:7.6pt}.note p{margin:0 0 3px}
-.sig{display:grid;grid-template-columns:1fr 1fr 1fr;border:1.5px solid #111;border-bottom:0}
-.sig>div{height:26mm;border-right:1.5px solid #111;padding:3px 6px 3px 28px;position:relative}.sig>div:last-child{border-right:0}
-.sig>div>i{position:absolute;left:5px;top:2px;font:800 13pt/1 Arial,sans-serif;font-style:normal}
-.sig s{position:absolute;left:28px;right:6px;bottom:3px;text-decoration:none;font-size:6.6pt;color:#222}
-.two{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid #111;border-bottom:0}
-.two>div:first-child{border-right:1.5px solid #111}
-.two2{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid #111;border-bottom:0}
-.two2>div{border-right:1.5px solid #111}.two2>div:last-child{border-right:0}
-.last{border:1.5px solid #111}`;
-
-  const DEFAULT_NOTES = '* Aracınıza yüklenen mallar ambalaj ve yükleme hatalarından dolayı meydana gelecek hasarlardan firmamız sorumlu değildir.\n* Malın sigortasından firmamız sorumlu değildir.\n* Kaza anında firmamız hiçbir mesuliyet kabul etmez.\n* Bu hamule senedi gönderenin beyanına göre tanzim edilmiştir. Gönderenin beyan dışındaki fazla veya eksik ve kanun dışı yüklenen mallardan firmamız sorumlu değildir.';
-
-  const box = (n, tr1, en1, inner, cls = '') => `<div class="b ${cls}"><i>${n}</i><s>${tr1}<br>${en1}</s>${inner}</div>`;
-
-  function cmrPage(trip, customer, l, i) {
-    const dest = [l.dest_customs, l.country ? tr(l.country) : ''].filter(Boolean).join('-');
-    const place = (customer && customer.loading_place) || 'İSTANBUL - Turkey';
-    const city = place.split(' - ')[0];
-    const notify = l.notify || [l.consignee, l.consignee_addr].filter(Boolean).join('\n');
-    const notes = (customer && customer.cmr_notes) || '';
-    const noteHtml = `<p><b>This carriage is subject, notwithstanding any clause to the convention on the contract for the International carriage of goods by road (CMR)</b></p>` +
-      (notes ? notes.split(/\r?\n/).filter(Boolean).map(x => `<p>${esc(x)}</p>`).join('') : '');
-    const left = [
-      box(1, 'Gönderen (isim,adres,memleket)', 'Sender (name,address,country)', `<div class="v"><b>${esc(l.sender)}</b><br>${nl(l.sender_addr)}</div>`, 'h24'),
-      box(2, 'Alıcı (isim,adres,memleket)', 'Consignee (name,address,country)', `<div class="v"><b>${esc(l.consignee)}</b><br>${nl(l.consignee_addr)}</div>`, 'h26'),
-      box(3, 'Malların gönderildiği yer', 'Place of delivery of the goods', `<div class="v">Şehir/Place · Memleket/Country<br><b>${esc(dest)}</b></div>`, 'h22'),
-      box(4, 'Malların teslim alındığı yer ve gün', 'Place and date of taking of the goods', `<div class="v">Şehir/Place · Memleket/Country<br><b>${esc(place)}</b><br>Tarih/Date: <b>${esc(dmy(trip.depart_date))}</b></div>`, 'h24'),
-      box(5, 'Ekli Dökümanlar', 'Documents attached', '', 'h22')
-    ].join('');
-    const right = [
-      `<div class="b title h24"><b>INTERNATIONAL CONSIGNMENT NOTE / HAMULE SENEDİ</b><div class="poz">Poz: <b>${esc(pozOf(trip, i))}</b></div><div class="big">CMR</div></div>`,
-      box(16, 'Nakliyeci (isim,adres,memleket)', 'Carrier (name,address,country)', `${logoImg(customer)}<div class="carrier">${nl(customer && customer.carrier)}</div>`, 'h26'),
-      box(17, 'Diğer nakliyeciler', 'Successive carriers', '', 'h22'),
-      box(18, 'Nakliyecinin şart ve mülahazaları', 'Carrier\'s reservations and observations', `<div class="note">${noteHtml}</div>`, 'h46')
-    ].join('');
-    const goods = `<div class="goods"><div class="hd"><i>6</i><s>Marka ve numara<br>Marks and No</s></div><div class="hd"><i>7</i><s>Parça adedi<br>Number of packages</s></div><div class="hd"><i>8</i><s>Ambalaj nevi<br>Method of packing</s></div>` +
-      `<div class="hd"><i>9</i><s>Malın cinsi<br>Nature of goods</s></div><div class="hd"><i>10</i><s>Statistik No<br>Stat. number</s></div><div class="hd"><i>11</i><s>Brüt kg.<br>Gross kg</s></div><div class="hd"><i>12</i><s>Hacim m³<br>Volume m³</s></div>` +
-      `<div class="bd"></div><div class="bd"><b>${esc(l.pieces)}</b></div><div class="bd"><b>${esc(l.packing)}</b></div><div class="bd"><b>${esc(l.goods)}</b></div><div class="bd"></div><div class="bd r"><b>${num(l.weight)}</b></div><div class="bd r">${l.volume == null ? '' : `<b>${num(l.volume, 3)}</b>`}</div></div>`;
-    const mid = `<div class="two"><div>${[
-      box(13, 'Gönderenin talimatı (Gümrük ve diğer formaliteler)', 'Sender\'s instructions (Customs and formalities)', `<div class="v"><b>NOTIFY</b><br>${nl(notify)}</div>`, 'h30'),
-      box(14, 'İade', 'Return to', '', 'h9'),
-      box(15, 'Navlunun ödenmesi için talimatlar', 'Directions as of freight payment', '<div class="v r">Serbest / Free<br>Serbest Değil / Unfree</div>', 'h15')].map((x, k) => k < 2 ? x.replace('class="b ', 'class="b bb ') : x).join('')}</div><div>${box('19/20', 'Hususi şartlar', 'Special agreements', '', 'h32 w46')}</div></div>`;
-    const est = `<div class="two2"><div class="b h12"><i>21</i><s>Tanzim Yeri · Established in</s><div class="v"><b>${esc(city)}</b></div></div><div class="b h12"><s>Tarih · on</s><div class="v"><b>${esc(dmy(trip.depart_date))}</b></div></div></div>`;
-    const sig = `<div class="sig"><div><i>22</i><div class="v"><b>${esc(l.sender)}</b></div><s>Malı gönderenin imzası ve kaşesi · Signature and stamp of the sender</s></div>` +
-      `<div><i>23</i><s>Nakliyecinin imzası ve kaşesi · Signature and stamp of the carrier</s></div>` +
-      `<div><i>24</i><div class="v">Mallar teslim alındı · Goods received<br>Tarih / Date:</div><s>Alıcının imzası ve kaşesi · Signature and stamp of the consignee</s></div></div>`;
-    const plate = `<div class="last"><div class="b h9"><i>25</i><s>Plaka No. · Vehicle No.</s><div class="v" style="position:absolute;left:150px;top:6px"><b>${esc(plates(trip))}</b></div></div></div>`;
-    return `<div class="pg"><div class="cm"><div class="col">${left}</div><div class="col">${right}</div></div>${goods}${mid}${est}${sig}${plate}</div>`;
-  }
-
-  // only: yalnızca bu yükün CMR'ı (sıra numarası, tüm sefere göre belirlenir)
-  function cmr({ trip, customer, loads, only }) {
-    const list = order(loads);
-    const pages = list.map((l, i) => ({ l, i })).filter(x => !only || x.l.id === only);
-    const css = cmrCss + '.bb{border-bottom:1.5px solid #111}';
-    return wrap(`CMR ${trip.poz_no}`, css, pages.map(x => cmrPage(trip, customer, x.l, x.i)).join(''));
   }
 
   // ------------------------------------------------------------------ önizleme penceresi
@@ -200,6 +262,8 @@ body{margin:0;font:8.5pt/1.3 Arial,Helvetica,sans-serif;color:#111}
     draw();
     if (!dlg.open) dlg.showModal();
   }
+
+  const DEFAULT_NOTES = '* Aracınıza yüklenen mallar ambalaj ve yükleme hatalarından dolayı meydana gelecek hasarlardan firmamız sorumlu değildir.\n* Malın sigortasından firmamız sorumlu değildir.\n* Kaza anında firmamız hiçbir mesuliyet kabul etmez.\n* Bu hamule senedi gönderenin beyanına göre tanzim edilmiştir. Gönderenin beyan dışındaki fazla veya eksik ve kanun dışı yüklenen mallardan firmamız sorumlu değildir.';
 
   window.PCSNKB = { lade, cmr, show, order, esc, num, dmy, plates, pozOf, DEFAULT_NOTES };
 })();

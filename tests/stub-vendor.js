@@ -300,7 +300,7 @@
       }
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark)$/.test(name)) {
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
         const T = (cfg.shpTokens = cfg.shpTokens || {});
         const bad = () => guardErr('42501', 'Bağlantı geçersiz ya da kapatılmış');
@@ -365,18 +365,18 @@
             const { created_by, ...pub } = t; return { data: clone(pub), error: null };
           }
           if (name === 'shp_portal_delete') {
-            const i = db.shp_loads.findIndex(l => l.id === params.p_id && l.customer_id === k.customer && l.status === 'bekliyor');
-            if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da depoya geldiği için silinemez');
+            const i = db.shp_loads.findIndex(l => l.id === params.p_id && l.customer_id === k.customer && ['bekliyor', 'depoda'].includes(l.status) && !l.trip_id);
+            if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarın');
             db.shp_loads.splice(i, 1); return { data: null, error: null };
           }
           const p = params.p_load || {};
           if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');
           const row = { sender: p.sender, sender_addr: p.sender_addr || '', consignee: p.consignee, consignee_addr: p.consignee_addr || '', notify: p.notify || '', pieces: p.pieces || 0, packing: p.packing || 'KAP',
             goods: p.goods || '', weight: p.weight || 0, volume: p.volume == null ? null : p.volume, country: p.country || '', code: p.code || '', dest_customs: p.dest_customs || '', broker: p.broker || '',
-            expected_date: p.expected_date || null, note: p.note || '' };
+            expected_date: p.expected_date || null, inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '' };
           if (p.id) {
-            const l = db.shp_loads.find(x => x.id === p.id && x.customer_id === k.customer && x.status === 'bekliyor');
-            if (!l) return guardErr('22023', 'Yük bulunamadı ya da depoya geldiği için artık değiştirilemez');
+            const l = db.shp_loads.find(x => x.id === p.id && x.customer_id === k.customer && ((['bekliyor', 'depoda'].includes(x.status) && !x.trip_id) || (x.status === 'aracta' && (db.shp_trips.find(t => t.id === x.trip_id) || {}).status === 'hazirlaniyor')));
+            if (!l) return guardErr('22023', 'Yük bulunamadı ya da araç yola çıktığı için değiştirilemez');
             Object.assign(l, row, { updated_at: now() }); return { data: loadJson(l), error: null };
           }
           const l = { id: 'shp' + (++shpSeq), customer_id: k.customer, ...row, status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, created_by: 'Müşteri', created_at: now(), updated_at: now() };
@@ -384,6 +384,21 @@
         }
         if (!k || k.kind !== 'depo' || !k.active) return bad();
         if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(t => clone(t)) }, error: null };
+        if (name === 'shp_depot_save') {
+          const p = params.p_load || {};
+          if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');
+          const l = db.shp_loads.find(x => x.id === p.id);
+          if (!l) return guardErr('22023', 'Yük bulunamadı');
+          Object.assign(l, { sender: p.sender, consignee: p.consignee, sender_addr: p.sender_addr || '', consignee_addr: p.consignee_addr || '', notify: p.notify || '', pieces: p.pieces || 0, packing: p.packing || 'KAP',
+            goods: p.goods || '', weight: p.weight || 0, volume: p.volume == null ? null : p.volume, country: p.country || '', code: p.code || '', dest_customs: p.dest_customs || '', broker: p.broker || '',
+            expected_date: p.expected_date || null, inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '', updated_at: now() });
+          return { data: loadJson(l), error: null };
+        }
+        if (name === 'shp_depot_delete') {
+          const i = db.shp_loads.findIndex(x => x.id === params.p_id && ['bekliyor', 'depoda'].includes(x.status) && !x.trip_id);
+          if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarılmalı');
+          db.shp_loads.splice(i, 1); return { data: null, error: null };
+        }
         const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? ['depoda', 'aracta'].includes(x.status) && x.arrived_at : ['bekliyor', 'depoda', 'aracta'].includes(x.status)));
         if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
         if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now() });
