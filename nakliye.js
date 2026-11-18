@@ -10,7 +10,7 @@
   const CAP = 24000;                    // araç kapasitesi (kg): doluluk çubuğu için
   const esc = B.esc;
   const S = {
-    ready: false, loading: false, err: '', missing: false, customers: [], loads: [], trips: [],
+    ready: false, loading: false, err: '', missing: false, customers: [], loads: [], trips: [], log: [], logMiss: false,
     tab: 'idle', syncing: false, tried: new Set(), sel: new Set(), cust: '', q: '', tq: '', open: new Set(), busy: false, confirm: '', rt: null,
     form: { tractor: '', trailer: '', date: '', subject: '', lade: true, cmr: true }
   };
@@ -50,10 +50,11 @@
     if (!quiet) { S.err = ''; redraw(); }
     try {
       const c = X.client;
-      const [a, t, l] = await Promise.all([
+      const [a, t, l, g] = await Promise.all([
         c.from('shp_customers').select('*').order('name'),
         c.from('shp_trips').select('*').order('created_at', { ascending: false }).limit(500),
-        c.from('shp_loads').select('*').order('created_at', { ascending: false }).limit(3000)
+        c.from('shp_loads').select('*').order('created_at', { ascending: false }).limit(3000),
+        c.rpc('shp_log_list', { p_customer: null, p_limit: 400 })
       ]);
       const e = a.error || t.error || l.error;
       if (e) {
@@ -61,6 +62,7 @@
         S.err = S.missing ? '' : `Yüklenemedi: ${e.message || 'bilinmeyen hata'}`;
       } else {
         S.customers = a.data || []; S.trips = t.data || []; S.loads = l.data || [];
+        S.log = g && !g.error && Array.isArray(g.data) ? g.data : []; S.logMiss = !!(g && g.error);
         S.err = ''; S.missing = false; S.ready = true;
         for (const id of [...S.sel]) { const x = loadOf(id); if (!x || x.status !== 'depoda') S.sel.delete(id); }
       }
@@ -117,7 +119,7 @@
   }
 
   function tabs() {
-    const t = [['idle', 'Boşta yükler', idleLoads().length], ['trips', 'Araçlar', S.trips.length], ['wait', 'Bekleyenler', waitLoads().length], ['all', 'Tüm yükler', S.loads.length]];
+    const t = [['idle', 'Boşta yükler', idleLoads().length], ['trips', 'Araçlar', S.trips.length], ['wait', 'Bekleyenler', waitLoads().length], ['all', 'Tüm yükler', S.loads.length], ['log', 'Hareketler', S.log.length]];
     return `<div class="nk-tabs" role="tablist">${t.map(([k, l, n]) => `<button type="button" role="tab" class="${S.tab === k ? 'on' : ''}" aria-selected="${S.tab === k}" data-nk="tab" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>`;
   }
 
@@ -202,6 +204,15 @@
       (rows.length ? `<div class="nk-scroll"><table class="nk-t"><thead><tr><th>Müşteri</th><th>Gönderici → Alıcı</th><th>Mal</th><th class="r">Kap</th><th class="r">Kilo</th><th>Durum</th><th></th></tr></thead><tbody>${body}</tbody></table></div>` : '<div class="nk-empty">Kayıt yok.</div>') + '</section>';
   }
 
+  const ROLE = { musteri: ['Müşteri', 'b'], depo: ['Depo', 'g'], operator: ['Ofis', 'a'] };
+  function logView() {
+    if (S.logMiss) return notice('Hareket kaydı kurulmamış', 'Kim neyi yaptı kaydı için <b>supabase/nakliye-kurulumu.sql</b> dosyasının son halini Supabase SQL Editor\'de çalıştırın, sonra Yenile\'ye basın.', true);
+    const rows = S.log.filter(x => (!S.cust || x.customer_id === S.cust) && (!S.q || [x.actor, x.action, x.summary, x.customer].some(v => tr(v).includes(tr(S.q)))));
+    const body = rows.map(x => { const [rl, rc] = ROLE[x.role] || ROLE.operator; return `<tr><td class="nk-nowrap">${esc(stamp(x.at))}</td><td>${esc(x.customer || '—')}</td><td><span class="nk-ch ${rc}">${rl}</span> ${esc(x.actor)}</td><td><b>${esc(x.action)}</b></td><td>${esc(x.summary)}</td></tr>`; }).join('');
+    return `<section class="nk-pn"><div class="nk-bar"><h2>Hareketler <span>${rows.length}</span></h2><div class="nk-bar-r">${custSelect()}<label class="nk-search">${ic('search')}<input id="nk-q" data-nk-in="q" type="search" value="${esc(S.q)}" placeholder="Ara: kullanıcı, işlem, yük…" autocomplete="off" aria-label="Ara"></label></div></div>` +
+      (rows.length ? `<div class="nk-scroll"><table class="nk-t"><thead><tr><th>Zaman</th><th>Müşteri</th><th>Kim</th><th>İşlem</th><th>Ayrıntı</th></tr></thead><tbody>${body}</tbody></table></div>` : '<div class="nk-empty">Henüz hareket yok. Müşteri, depo ya da ofis bir işlem yaptıkça burada görünür.</div>') + '</section>';
+  }
+
   function notice(title, text, retry) {
     return `<div class="nk-pn nk-note"><h2>${esc(title)}</h2><p>${text}</p>${retry ? '<button type="button" class="btn primary" data-nk="refresh">Yenile</button>' : ''}</div>`;
   }
@@ -211,7 +222,7 @@
     if (S.err && !S.ready) return notice('Nakliye açılamadı', esc(S.err), true);
     if (!S.ready) return '<div class="nk-pn nk-note"><p>Yükleniyor…</p></div>';
     const err = S.err ? `<div class="nk-warn">${esc(S.err)}</div>` : '';
-    return err + kpis() + tabs() + (S.tab === 'trips' ? tripsView() : S.tab === 'wait' ? waitView() : S.tab === 'all' ? allView() : idleView());
+    return err + kpis() + tabs() + (S.tab === 'trips' ? tripsView() : S.tab === 'wait' ? waitView() : S.tab === 'all' ? allView() : S.tab === 'log' ? logView() : idleView());
   }
 
   function redraw() {
@@ -318,6 +329,19 @@
     if (a.startsWith('lk-')) { await linkAction(a, t); return; }
     if (a === 'edit-cust') { customerForm(id); return; }
     if (a === 'back-cust') { customersModal(); return; }
+    if (a === 'users') { await usersModal(id); return; }
+    if (a === 'users-back') { drawUsers(); return; }
+    if (a === 'edit-user') { userForm(id); return; }
+    if (a === 'del-user') {
+      if (S.confirm !== 'usr:' + id) { S.confirm = 'usr:' + id; drawUsers(); return; }
+      S.confirm = '';
+      const r = await X.client.rpc('shp_user_delete', { p_id: id });
+      if (r.error) { X.toast(r.error.message || 'Silinemedi', true); drawUsers(); return; }
+      UL.list = UL.list.filter(u => u.id !== id); X.toast('Kullanıcı silindi'); drawUsers(); load(true); return;
+    }
+    if (a === 'user-copy') { X.toast(await copyText(loginUrl()) ? 'Giriş adresi kopyalandı' : 'Kopyalanamadı; kutudan elle kopyalayın', false); return; }
+    if (a === 'user-wa') { X.wa('', `${(cust(UL.cid) || {}).name || ''} nakliye programı giriş adresi: ${loginUrl()} (kullanıcı adı ve şifreyi ayrıca ileteceğiz)`); return; }
+    if (a === 'pw-gen') { const el = document.getElementById('nkf-password'); if (el) { el.value = rndPw(); el.focus(); } return; }
     if (a === 'del-load') { await removeLoad(t); return; }
   }
 
@@ -393,7 +417,7 @@ ${id ? '' : '<label class="form-chip nk-arr"><input type="checkbox" name="arrive
 
   // ------------------------------------------------------------------ müşteriler
   function customersModal() {
-    const rows = S.customers.map(c => `<li><span>${pill(c.id)}${c.active ? '' : ' <em>(kapalı)</em>'}<small>${esc((c.carrier || '').split('\n')[0] || 'Nakliyeci bilgisi yok')}</small></span><button type="button" class="btn small" data-nk="edit-cust" data-id="${c.id}">Düzenle</button></li>`).join('');
+    const rows = S.customers.map(c => `<li><span>${pill(c.id)}${c.active ? '' : ' <em>(kapalı)</em>'}<small>${esc((c.carrier || '').split('\n')[0] || 'Nakliyeci bilgisi yok')}</small></span><span class="nk-ua"><button type="button" class="btn small" data-nk="users" data-id="${c.id}">Kullanıcılar</button><button type="button" class="btn small" data-nk="edit-cust" data-id="${c.id}">Düzenle</button></span></li>`).join('');
     X.openModal(`${head('Müşteriler', 'Panodaki müşteriler buraya kendiliğinden eklenir. Her müşterinin belgelerinde kendi logosu ve nakliyeci bilgisi çıkar.')}<div class="modal-body"><ul class="nk-cl">${rows || '<li><span>Henüz müşteri yok.</span></li>'}</ul></div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button><button type="button" class="btn primary" data-nk="edit-cust" data-id="">${ic('plus')}Yeni müşteri</button></div>`);
   }
 
@@ -436,6 +460,56 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
     customersModal();
   }
 
+  // ------------------------------------------------------------------ müşteri kullanıcıları (kullanıcı adı ve şifre)
+  // Müşteriye kullanıcı eklenince müşteri sayfası yalnızca bu kullanıcılarla açılır; her işlem kullanıcının adıyla kaydedilir (Hareketler).
+  const UL = { cid: '', list: [] };
+  const loginUrl = () => new URL('nakliye.html', location.href).href;
+  const rndPw = () => { const al = 'abcdefghjkmnpqrstuvwxyz23456789', b = new Uint32Array(8); crypto.getRandomValues(b); return [...b].map(n => al[n % al.length]).join(''); };
+  async function usersModal(cid) {
+    const c = cust(cid); if (!c) return;
+    UL.cid = cid; S.confirm = '';
+    X.openModal(`${head(`${c.name} · Kullanıcılar`, '')}<div class="modal-body"><p>Yükleniyor…</p></div>`);
+    const r = await X.client.rpc('shp_users_list', { p_customer: cid });
+    if (r.error) {
+      const miss = /PGRST202|42883|schema cache|Could not find the function/.test(`${r.error.code} ${r.error.message}`);
+      X.openModal(`${head(`${c.name} · Kullanıcılar`, '')}<div class="modal-body"><p>${miss ? 'Kullanıcılar için nakliye-kurulumu.sql\'in son hali çalıştırılmamış.' : esc(r.error.message || 'Yüklenemedi')}</p></div><div class="modal-footer"><button type="button" class="btn" data-nk="back-cust">Geri</button></div>`);
+      return;
+    }
+    UL.list = r.data || []; drawUsers();
+  }
+  function drawUsers() {
+    const c = cust(UL.cid); if (!c) return;
+    const rows = UL.list.map(u => `<li class="${u.active ? '' : 'off'}"><span><b>${esc(u.display_name || u.username)}</b>${u.active ? '' : ' <em>(pasif)</em>'}<small>Kullanıcı adı: <code>${esc(u.username)}</code> · ${u.last_login_at ? `Son giriş ${esc(stamp(u.last_login_at))}` : 'Henüz giriş yapmadı'}</small></span><span class="nk-ua"><button type="button" class="btn small" data-nk="edit-user" data-id="${esc(u.id)}">Düzenle</button><button type="button" class="btn small ${S.confirm === 'usr:' + u.id ? 'danger' : ''}" data-nk="del-user" data-id="${esc(u.id)}">${S.confirm === 'usr:' + u.id ? 'Evet, sil' : 'Sil'}</button></span></li>`).join('');
+    X.openModal(`${head(`${c.name} · Kullanıcılar`, 'Kullanıcı adlarını ve şifreleri siz belirlersiniz. Müşterinin yaptığı her işlem kullanıcının adıyla kaydedilir (Hareketler sekmesi).')}<div class="modal-body">
+<div class="nk-info"><b>Giriş adresi</b><input type="text" readonly value="${esc(loginUrl())}" aria-label="Giriş adresi" onfocus="this.select()"><div class="nk-lk-a"><button type="button" class="btn small" data-nk="user-copy">Kopyala</button><button type="button" class="btn small" data-nk="user-wa">WhatsApp</button></div>
+<small>${UL.list.length ? 'Bu müşteriye kullanıcı tanımlı olduğu için müşteri bağlantısı (?m=…) tek başına çalışmaz; kullanıcı adı ve şifre sorulur.' : 'Henüz kullanıcı yok: müşteri bağlantısı şifresiz açılır. İlk kullanıcıyı ekleyince giriş zorunlu olur.'}</small></div>
+<ul class="nk-cl">${rows || '<li><span>Henüz kullanıcı yok.</span></li>'}</ul></div><div class="modal-footer"><button type="button" class="btn" data-nk="back-cust">Geri</button><span style="flex:1"></span><button type="button" class="btn primary" data-nk="edit-user" data-id="">${ic('plus')}Yeni kullanıcı</button></div>`);
+  }
+  function userForm(uid) {
+    const u = uid ? UL.list.find(x => x.id === uid) : { username: '', display_name: '', active: true };
+    if (!u) return;
+    X.openModal(`${head(uid ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı', 'Şifreyi müşteriye siz iletirsiniz. Şifre yalnızca sunucuda şifreli saklanır; sonradan görülemez, yalnızca yenisi verilebilir.')}<form data-nk-form="user" data-uid="${esc(uid)}" autocomplete="off"><div class="modal-body"><div class="form-grid">
+${fld('username', 'Kullanıcı adı <span class="optional">(küçük harf, rakam, nokta, tire, alt çizgi; 3-40 karakter)</span>', u.username, { req: true, full: true, max: 40 })}
+${fld('display_name', 'Görünen ad <span class="optional">(işlem kayıtlarında bu ad çıkar)</span>', u.display_name, { full: true, max: 80, opt: true })}
+<div class="field full"><label for="nkf-password">Şifre${uid ? ' <span class="optional">(boş bırakırsanız değişmez)</span>' : ''}</label><div class="nk-pw"><input id="nkf-password" name="password" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" ${uid ? '' : 'required'} placeholder="En az 6 karakter"><button type="button" class="btn small" data-nk="pw-gen">Şifre öner</button></div></div>
+${uid ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" class="check" ${u.active ? 'checked' : ''}><span>Kullanıcı açık (kapatılırsa giriş yapamaz)</span></label>` : ''}
+</div><div id="nk-ferr" class="nk-ferr" hidden></div></div><div class="modal-footer"><button type="button" class="btn" data-nk="users-back">Geri</button><span style="flex:1"></span><button type="submit" class="btn primary">${ic('check')}Kaydet</button></div></form>`);
+    setTimeout(() => document.getElementById('nkf-username')?.focus(), 30);
+  }
+  async function saveUser(form) {
+    const fd = new FormData(form), uid = form.dataset.uid;
+    const err = m => { const el = document.getElementById('nk-ferr'); if (el) { el.textContent = m; el.hidden = false; } };
+    const un = String(fd.get('username') || '').trim().toLowerCase(), pw = String(fd.get('password') || '');
+    if (!/^[a-z0-9._-]{3,40}$/.test(un)) return err('Kullanıcı adı 3-40 karakter olmalı; yalnızca küçük harf, rakam, nokta, tire ya da alt çizgi kullanın.');
+    if (!uid && pw.length < 6) return err('Şifre en az 6 karakter olmalı.');
+    if (uid && pw && pw.length < 6) return err('Şifre en az 6 karakter olmalı.');
+    const r = await X.client.rpc('shp_user_save', { p_id: uid || null, p_customer: UL.cid, p_username: un, p_name: String(fd.get('display_name') || '').trim(), p_password: pw, p_active: uid ? !!fd.get('active') : true });
+    if (r.error) return err(r.error.message || 'Kaydedilemedi');
+    X.toast(uid ? (pw ? 'Kullanıcı güncellendi, yeni şifre geçerli' : 'Kullanıcı güncellendi') : 'Kullanıcı eklendi');
+    await usersModal(UL.cid);
+    load(true);
+  }
+
   // ------------------------------------------------------------------ bağlantılar (müşteri ve depo sayfaları)
   let LK = null;
   const linkUrl = (kind, token) => new URL(`nakliye.html?${kind}=${encodeURIComponent(token)}`, location.href).href;
@@ -457,7 +531,7 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
       LK.customers.map(c => row(c.customer_id, 'm', c.name, 'Bu müşteri yalnızca kendi yüklerini yazar ve görür', c)).join('') + '</ul>';
   }
   function drawLinks() {
-    X.openModal(`${head('Bağlantılar', 'Giriş şifresi yoktur; bağlantıyı yalnızca ilgili kişiye verin. Yanlış ellere geçerse "Yenile" deyin, eski bağlantı çalışmaz olur.')}<div class="modal-body">${linksHtml()}</div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button></div>`);
+    X.openModal(`${head('Bağlantılar', 'Depo bağlantısı şifresizdir; müşteri bağlantısı, müşteriye kullanıcı tanımlamadıkça şifresiz açılır (kullanıcı tanımlarsanız kullanıcı adı ve şifre sorulur). Bağlantıyı yalnızca ilgili kişiye verin. Yanlış ellere geçerse "Yenile" deyin, eski bağlantı çalışmaz olur.')}<div class="modal-body">${linksHtml()}</div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button></div>`);
   }
   async function linksModal() {
     X.openModal(`${head('Bağlantılar', '')}<div class="modal-body"><p>Yükleniyor…</p></div>`);
@@ -511,7 +585,7 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
     document.addEventListener('submit', e => {
       const f = e.target.closest && e.target.closest('form[data-nk-form]'); if (!f) return;
       e.preventDefault();
-      (f.dataset.nkForm === 'load' ? saveLoad(f) : saveCustomer(f)).catch(() => X.toast('Kaydedilemedi', true));
+      (f.dataset.nkForm === 'load' ? saveLoad(f) : f.dataset.nkForm === 'user' ? saveUser(f) : saveCustomer(f)).catch(() => X.toast('Kaydedilemedi', true));
     });
   }
 

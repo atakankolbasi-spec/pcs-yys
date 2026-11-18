@@ -300,31 +300,117 @@
       }
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete)$/.test(name)) {
+      // data.shp_users: [{ id, customer_id, username, display_name, active, pw }]; kullanıcısı olan müşterinin bağlantısı giriş ister
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|login|logout|stamp|users_list|user_save|user_delete|log_list)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
+        if (name === 'shp_stamp' && (cfg.missing || []).includes('shp-stamp')) return guardErr('PGRST202', 'Could not find the function public.shp_stamp');
+        if (cfg.offline && /^shp_(portal|depot|stamp|login)/.test(name)) return netError();
         const T = (cfg.shpTokens = cfg.shpTokens || {});
         const bad = () => guardErr('42501', 'Bağlantı geçersiz ya da kapatılmış');
         const mk = () => 'k' + Math.random().toString(36).slice(2, 10);
-        const loadJson = l => { const { created_by, updated_at, ...x } = l; return clone(x); };
+        const loadJson = l => { const { created_by, updated_by, updated_at, ...x } = l; return clone(x); };
+        const tripJson = t => { const { created_by, updated_by, ...x } = t; return clone(x); };
+        const isEditor = !!session;
+        const SS = (cfg.shpSessions = cfg.shpSessions || {});
+        db.shp_users = db.shp_users || (cfg.data && cfg.data.shp_users) || [];
+        db.shp_log = db.shp_log || (cfg.data && cfg.data.shp_log) || []; db.shp_contacts = db.shp_contacts || (cfg.data && cfg.data.shp_contacts) || []; db.shp_vehicles = db.shp_vehicles || (cfg.data && cfg.data.shp_vehicles) || [];
+        const roleOf = a => /^Müşteri/.test(a) ? 'musteri' : /^Depo/.test(a) ? 'depo' : 'operator';
+        const log = (cust, actor, action, summary = '') => db.shp_log.push({ id: db.shp_log.length + 1, at: now(), customer_id: cust, actor, role: roleOf(actor), action, summary });
+        const lsum = l => `${l.sender} → ${l.consignee} · ${l.weight} kg`;
+        const remember = (cid, l) => {
+          const up = (kind, name, extra) => { if (!String(name).trim()) return; const k = db.shp_contacts.find(c => c.customer_id === cid && c.kind === kind && c.name.toUpperCase() === String(name).toUpperCase());
+            if (k) Object.entries(extra).forEach(([a, b]) => { if (b) k[a] = b; }); else db.shp_contacts.push({ customer_id: cid, kind, name, addr: '', notify: '', country: '', dest_customs: '', code: '', broker: '', ...extra }); };
+          up('sender', l.sender, { addr: l.sender_addr });
+          up('consignee', l.consignee, { addr: l.consignee_addr, notify: l.notify, country: l.country, dest_customs: l.dest_customs, code: l.code, broker: l.broker });
+        };
+        const rememberVeh = (cid, t) => { if (t.tractor && !db.shp_vehicles.some(v => v.customer_id === cid && v.tractor === t.tractor && v.trailer === t.trailer)) db.shp_vehicles.unshift({ customer_id: cid, tractor: t.tractor, trailer: t.trailer || '' }); };
+        const cAuth = tok => {   // müşteri sayfası yetkisi: oturum anahtarı ya da (kullanıcısı olmayan müşteri için) bağlantı
+          const sid = SS[tok];
+          if (sid) { const u = db.shp_users.find(x => x.id === sid && x.active); if (u && db.shp_customers.some(c => c.id === u.customer_id && c.active !== false)) return { customer: u.customer_id, user: u, actor: 'Müşteri · ' + (u.display_name || u.username) }; return { res: bad() }; }
+          const kt = T[tok];
+          if (!kt || kt.kind !== 'musteri' || !kt.active) return { res: bad() };
+          if (db.shp_users.some(u => u.customer_id === kt.customer)) return { res: guardErr('28000', 'Bu sayfa için kullanıcı girişi gerekli') };
+          return { customer: kt.customer, user: null, actor: 'Müşteri (bağlantı)' };
+        };
+        const editorOnly = () => (isEditor ? null : guardErr('42501', 'Bu işlem için düzenleyici yetkisi gerekli'));
+        if (name === 'shp_login') {
+          const un = String(params.p_username || '').trim().toLowerCase();
+          const F = (cfg.shpFails = cfg.shpFails || {}); const f = F[un] || { n: 0 };
+          if (f.n >= 5) return { data: { ok: false, message: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' }, error: null };
+          const u = db.shp_users.find(x => x.username === un && x.active);
+          if (!u || u.pw !== params.p_password) { f.n++; F[un] = f; return { data: { ok: false, message: 'Kullanıcı adı ya da şifre hatalı.' }, error: null }; }
+          delete F[un];
+          const tok = 'oturum' + Math.random().toString(36).slice(2, 10); SS[tok] = u.id; u.last_login_at = now();
+          log(u.customer_id, 'Müşteri · ' + (u.display_name || u.username), 'Giriş yaptı');
+          return { data: { ok: true, token: tok, name: u.display_name || u.username, username: u.username }, error: null };
+        }
+        if (name === 'shp_logout') { delete SS[params.p_token]; return { data: null, error: null }; }
+        if (name === 'shp_users_list') {
+          const e = editorOnly(); if (e) return e;
+          return { data: db.shp_users.filter(u => !params.p_customer || u.customer_id === params.p_customer).map(u => ({ id: u.id, customer_id: u.customer_id, customer: (db.shp_customers.find(c => c.id === u.customer_id) || {}).name, username: u.username, display_name: u.display_name, active: u.active, last_login_at: u.last_login_at || null })), error: null };
+        }
+        if (name === 'shp_user_save') {
+          const e = editorOnly(); if (e) return e;
+          const un = String(params.p_username || '').trim().toLowerCase(), pw = String(params.p_password || '');
+          if (!/^[a-z0-9._-]{3,40}$/.test(un)) return guardErr('22023', 'Kullanıcı adı 3-40 karakter olmalı; küçük harf, rakam, nokta, tire ya da alt çizgi kullanın');
+          if (db.shp_users.some(u => u.username === un && u.id !== params.p_id)) return guardErr('22023', 'Bu kullanıcı adı başka biri tarafından kullanılıyor');
+          let u;
+          if (!params.p_id) {
+            if (pw.length < 6) return guardErr('22023', 'Şifre en az 6 karakter olmalı');
+            u = { id: 'su' + (++shpSeq), customer_id: params.p_customer, username: un, display_name: String(params.p_name || '').trim(), active: params.p_active !== false, last_login_at: null, pw }; db.shp_users.push(u);
+            log(u.customer_id, 'ofis@ornek.com', 'Kullanıcı eklendi', un);
+          } else {
+            u = db.shp_users.find(x => x.id === params.p_id); if (!u) return guardErr('22023', 'Kullanıcı bulunamadı');
+            if (pw && pw.length < 6) return guardErr('22023', 'Şifre en az 6 karakter olmalı');
+            Object.assign(u, { username: un, display_name: String(params.p_name || '').trim(), active: params.p_active !== false }); if (pw) u.pw = pw;
+            if (pw || !u.active) Object.keys(SS).forEach(k => { if (SS[k] === u.id) delete SS[k]; });
+            log(u.customer_id, 'ofis@ornek.com', pw ? 'Kullanıcı şifresi değiştirildi' : 'Kullanıcı güncellendi', un);
+          }
+          return { data: { id: u.id, username: u.username, display_name: u.display_name, active: u.active }, error: null };
+        }
+        if (name === 'shp_user_delete') {
+          const e = editorOnly(); if (e) return e;
+          const i = db.shp_users.findIndex(u => u.id === params.p_id);
+          if (i >= 0) { const [u] = db.shp_users.splice(i, 1); Object.keys(SS).forEach(k => { if (SS[k] === u.id) delete SS[k]; }); log(u.customer_id, 'ofis@ornek.com', 'Kullanıcı silindi', u.username); }
+          return { data: null, error: null };
+        }
+        if (name === 'shp_log_list') {
+          const e = editorOnly(); if (e) return e;
+          return { data: db.shp_log.filter(x => !params.p_customer || x.customer_id === params.p_customer).slice().reverse().slice(0, params.p_limit || 200).map(x => ({ ...x, customer: (db.shp_customers.find(c => c.id === x.customer_id) || {}).name || '' })), error: null };
+        }
         if (name === 'shp_links') {
+          const e = editorOnly(); if (e) return e;
           db.shp_customers.forEach(c => { if (!Object.values(T).some(v => v.customer === c.id)) T[mk()] = { kind: 'musteri', customer: c.id, active: true }; });
           if (!Object.values(T).some(v => v.kind === 'depo')) T[mk()] = { kind: 'depo', active: true };
           const dep = Object.entries(T).find(([, v]) => v.kind === 'depo');
           return { data: { depot: { token: dep[0], active: dep[1].active },
-            customers: db.shp_customers.map(c => { const e = Object.entries(T).find(([, v]) => v.customer === c.id); return { customer_id: c.id, name: c.name, token: e[0], active: e[1].active }; }) }, error: null };
+            customers: db.shp_customers.map(c => { const e2 = Object.entries(T).find(([, v]) => v.customer === c.id); return { customer_id: c.id, name: c.name, token: e2[0], active: e2[1].active }; }) }, error: null };
         }
         if (name === 'shp_rotate_link' || name === 'shp_set_link') {
-          const e = Object.entries(T).find(([, v]) => params.p_customer ? v.customer === params.p_customer : v.kind === 'depo');
-          if (!e) return guardErr('22023', 'Bağlantı yok');
-          if (name === 'shp_set_link') { e[1].active = params.p_active !== false; return { data: null, error: null }; }
-          delete T[e[0]]; const t = mk(); T[t] = e[1]; e[1].active = true; return { data: t, error: null };
+          const e = editorOnly(); if (e) return e;
+          const e2 = Object.entries(T).find(([, v]) => params.p_customer ? v.customer === params.p_customer : v.kind === 'depo');
+          if (!e2) return guardErr('22023', 'Bağlantı yok');
+          if (name === 'shp_set_link') { e2[1].active = params.p_active !== false; return { data: null, error: null }; }
+          delete T[e2[0]]; const t = mk(); T[t] = e2[1]; e2[1].active = true; return { data: t, error: null };
         }
-        const k = T[params.p_token];
+        let k = T[params.p_token], actor = '';
+        if (name === 'shp_stamp') {
+          let ls, ts;
+          const dk = T[params.p_token];
+          if (dk && dk.kind === 'depo' && dk.active) { ls = db.shp_loads; ts = db.shp_trips; }
+          else { const ca = cAuth(params.p_token); if (ca.res) return ca.res; ls = db.shp_loads.filter(l => l.customer_id === ca.customer); ts = db.shp_trips.filter(t => t.customer_id === ca.customer); }
+          const s = JSON.stringify([ls, ts]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+          return { data: `${ls.length}/${ts.length}/${s.length}/${h}`, error: null };
+        }
         if (name.startsWith('shp_portal')) {
-          if (!k || k.kind !== 'musteri' || !k.active) return bad();
+          const ca = cAuth(params.p_token); if (ca.res) return ca.res;
+          k = { customer: ca.customer }; actor = ca.actor;
           if (name === 'shp_portal') {
             const c = db.shp_customers.find(x => x.id === k.customer);
-            return { data: { now: now(), customer: clone(c), loads: db.shp_loads.filter(l => l.customer_id === k.customer).map(loadJson), trips: db.shp_trips.filter(t => t.customer_id === k.customer).map(t => clone(t)) }, error: null };
+            return { data: { now: now(), customer: clone(c), user: ca.user ? { username: ca.user.username, name: ca.user.display_name || ca.user.username } : null,
+              loads: db.shp_loads.filter(l => l.customer_id === k.customer).map(loadJson), trips: db.shp_trips.filter(t => t.customer_id === k.customer).map(tripJson),
+              contacts: clone(db.shp_contacts.filter(x => x.customer_id === k.customer).slice().reverse()), vehicles: clone(db.shp_vehicles.filter(v => v.customer_id === k.customer)),
+              log: db.shp_log.filter(x => x.customer_id === k.customer).slice().reverse().slice(0, 60).map(x => ({ at: x.at, actor: x.role === 'operator' ? 'Ofis' : x.role === 'depo' ? 'Depo' : x.actor, action: x.action, summary: x.summary })) }, error: null };
           }
           if (name === 'shp_portal_assign') {
             const ids = [...new Set(params.p_load_ids || [])];
@@ -342,19 +428,19 @@
               const yy = String(new Date().getFullYear() % 100).padStart(2, '0');
               cfg.pozSeq = cfg.pozSeq || {}; cfg.pozSeq[yy] = (cfg.pozSeq[yy] || 0) + 1;
               trip = { id: 'shpt' + (++shpSeq), poz_no: `PCS-${yy}-${String(cfg.pozSeq[yy]).padStart(4, '0')}`, customer_id: k.customer, tractor: String(params.p_tractor).trim().toUpperCase(),
-                trailer: String(params.p_trailer || '').trim().toUpperCase(), depart_date: params.p_depart || now().slice(0, 10), subject: params.p_subject || '', status: 'hazirlaniyor', created_by: 'Müşteri', created_at: now(), updated_at: now() };
-              db.shp_trips.push(trip);
+                trailer: String(params.p_trailer || '').trim().toUpperCase(), depart_date: params.p_depart || now().slice(0, 10), subject: params.p_subject || '', status: 'hazirlaniyor', created_by: actor, created_at: now(), updated_at: now() };
+              db.shp_trips.push(trip); rememberVeh(k.customer, trip); log(k.customer, actor, 'Sefer oluşturuldu', `${trip.poz_no} · ${trip.tractor}`);
             }
-            ls.forEach(l => Object.assign(l, { status: 'aracta', trip_id: trip.id, updated_at: now() }));
-            const { created_by, ...pub } = trip; return { data: { trip: clone(pub) }, error: null };
+            ls.forEach(l => { Object.assign(l, { status: 'aracta', trip_id: trip.id, updated_at: now(), updated_by: actor }); log(k.customer, actor, 'Araca konuldu: ' + trip.poz_no + ' · ' + trip.tractor, lsum(l)); });
+            return { data: { trip: tripJson(trip) }, error: null };
           }
           if (name === 'shp_portal_unassign') {
             const l = db.shp_loads.find(x => x.id === params.p_load_id && x.customer_id === k.customer && x.status === 'aracta');
             const t = l && db.shp_trips.find(x => x.id === l.trip_id);
             if (!l || !t || t.status !== 'hazirlaniyor') return guardErr('22023', 'Yük bir araçta değil ya da araç yola çıktığı için değiştirilemez');
-            Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, updated_at: now() });
+            Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, updated_at: now(), updated_by: actor }); log(k.customer, actor, 'Araçtan çıkarıldı', lsum(l));
             const gone = !db.shp_loads.some(x => x.trip_id === t.id);
-            if (gone) db.shp_trips = db.shp_trips.filter(x => x.id !== t.id);
+            if (gone) { db.shp_trips = db.shp_trips.filter(x => x.id !== t.id); log(k.customer, actor, 'Sefer silindi', t.poz_no); }
             return { data: { trip_deleted: gone }, error: null };
           }
           if (name === 'shp_portal_trip_update') {
@@ -362,12 +448,13 @@
             if (!t) return guardErr('22023', 'Araç bulunamadı ya da yola çıktığı için değiştirilemez');
             if (!String(params.p_tractor || '').trim()) return guardErr('22023', 'Çekici plakası gerekli');
             Object.assign(t, { tractor: String(params.p_tractor).trim().toUpperCase(), trailer: String(params.p_trailer || '').trim().toUpperCase(), depart_date: params.p_depart || t.depart_date, subject: params.p_subject || '', updated_at: now() });
-            const { created_by, ...pub } = t; return { data: clone(pub), error: null };
+            rememberVeh(k.customer, t); log(k.customer, actor, 'Araç bilgisi değiştirildi', `${t.poz_no} · ${t.tractor}`);
+            return { data: tripJson(t), error: null };
           }
           if (name === 'shp_portal_delete') {
             const i = db.shp_loads.findIndex(l => l.id === params.p_id && l.customer_id === k.customer && ['bekliyor', 'depoda'].includes(l.status) && !l.trip_id);
             if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarın');
-            db.shp_loads.splice(i, 1); return { data: null, error: null };
+            log(k.customer, actor, 'Yük silindi', lsum(db.shp_loads[i])); db.shp_loads.splice(i, 1); return { data: null, error: null };
           }
           const p = params.p_load || {};
           if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');
@@ -377,13 +464,14 @@
           if (p.id) {
             const l = db.shp_loads.find(x => x.id === p.id && x.customer_id === k.customer && ((['bekliyor', 'depoda'].includes(x.status) && !x.trip_id) || (x.status === 'aracta' && (db.shp_trips.find(t => t.id === x.trip_id) || {}).status === 'hazirlaniyor')));
             if (!l) return guardErr('22023', 'Yük bulunamadı ya da araç yola çıktığı için değiştirilemez');
-            Object.assign(l, row, { updated_at: now() }); return { data: loadJson(l), error: null };
+            Object.assign(l, row, { updated_at: now(), updated_by: actor }); remember(k.customer, l); log(k.customer, actor, 'Yük düzenlendi', lsum(l)); return { data: loadJson(l), error: null };
           }
-          const l = { id: 'shp' + (++shpSeq), customer_id: k.customer, ...row, status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, created_by: 'Müşteri', created_at: now(), updated_at: now() };
-          db.shp_loads.push(l); return { data: loadJson(l), error: null };
+          const l = { id: 'shp' + (++shpSeq), customer_id: k.customer, ...row, status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, created_by: actor, created_at: now(), updated_at: now() };
+          db.shp_loads.push(l); remember(k.customer, l); log(k.customer, actor, 'Yük eklendi', lsum(l)); return { data: loadJson(l), error: null };
         }
         if (!k || k.kind !== 'depo' || !k.active) return bad();
-        if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(t => clone(t)) }, error: null };
+        actor = 'Depo · ' + (String(params.p_name || '').trim() || 'adı yazılmamış');
+        if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(tripJson) }, error: null };
         if (name === 'shp_depot_save') {
           const p = params.p_load || {};
           if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');
@@ -391,18 +479,20 @@
           if (!l) return guardErr('22023', 'Yük bulunamadı');
           Object.assign(l, { sender: p.sender, consignee: p.consignee, sender_addr: p.sender_addr || '', consignee_addr: p.consignee_addr || '', notify: p.notify || '', pieces: p.pieces || 0, packing: p.packing || 'KAP',
             goods: p.goods || '', weight: p.weight || 0, volume: p.volume == null ? null : p.volume, country: p.country || '', code: p.code || '', dest_customs: p.dest_customs || '', broker: p.broker || '',
-            expected_date: p.expected_date || null, inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '', updated_at: now() });
+            expected_date: p.expected_date || null, inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '', updated_at: now(), updated_by: actor });
+          log(l.customer_id, actor, 'Yük düzenlendi', lsum(l));
           return { data: loadJson(l), error: null };
         }
         if (name === 'shp_depot_delete') {
           const i = db.shp_loads.findIndex(x => x.id === params.p_id && ['bekliyor', 'depoda'].includes(x.status) && !x.trip_id);
           if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarılmalı');
-          db.shp_loads.splice(i, 1); return { data: null, error: null };
+          log(db.shp_loads[i].customer_id, actor, 'Yük silindi', lsum(db.shp_loads[i])); db.shp_loads.splice(i, 1); return { data: null, error: null };
         }
         const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? ['depoda', 'aracta'].includes(x.status) && x.arrived_at : ['bekliyor', 'depoda', 'aracta'].includes(x.status)));
         if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
-        if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now() });
-        else Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now() });
+        if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now(), updated_by: actor });
+        else Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now(), updated_by: actor });
+        log(l.customer_id, actor, params.p_arrived === false ? 'Geldi işareti geri alındı' : 'Depoya geldi olarak işaretlendi', lsum(l));
         return { data: loadJson(l), error: null };
       }
       if (name === 'current_app_role') return { data: cfg.role || 'editor', error: null };
