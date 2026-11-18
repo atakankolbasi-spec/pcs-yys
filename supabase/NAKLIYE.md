@@ -8,7 +8,7 @@ sitede hazırlayın.
 1. Supabase > **SQL Editor**'de `nakliye-kurulumu.sql` dosyasının **tamamını** çalıştırın. En altta dört satır "tamam" görünmelidir.
 2. Sitede soldaki menüden **Nakliye**'yi açın. (Yalnızca düzenleyici hesaplarda görünür.)
 
-`nakliye-kurulumu.sql` güncellendiğinde (örneğin müşteri araç planı eklenince) dosyanın **tamamını yeniden çalıştırın**; mevcut kayıtlar korunur, en altta beş satır "tamam" görünür.
+`nakliye-kurulumu.sql` güncellendiğinde (örneğin müşteri araç planı eklenince) dosyanın **tamamını yeniden çalıştırın**; mevcut kayıtlar korunur, en altta yedi satır "tamam" görünür.
 
 Çalıştırılmadan Nakliye sayfası açılırsa sayfada "bir kerelik kurulum gerekli" uyarısı çıkar; başka bir yer etkilenmez.
 
@@ -42,6 +42,21 @@ Giriş şifresi yoktur; bağlantıyı yalnızca ilgili kişiye verin.
   **Geldi** denir, yük araçta kalır. **Araçlar** sekmesinde plaka bazında seferleri ve belgeleri görürler. Ekran 30 saniyede bir kendiliğinden yenilenir.
 - **Yenile** yeni bir bağlantı üretir; eskisi o an çalışmaz olur. **Kapat** bağlantıyı silmeden durdurur.
 - Bağlantı sayfaları herkese açıktır ama yalnızca bağlantıdaki anahtarla çalışır; anahtarlar tahmin edilemez uzunluktadır ve tablolara doğrudan erişim yoktur.
+
+## Müşteri ve depo sayfaları: yük düzenleme, silme, getirecek kamyon
+
+- Her yükte **Yükü getirecek kamyon plakası** alanı vardır (müşteri yazar; depo ve siz görürsünüz, plakayla arama yapılır).
+- **Müşteri** yüklerini kendi sayfasında **Düzenle** ve **Sil** düğmeleriyle yönetir: araca konmamış yük (bekleyen ya da depoda) düzenlenir ve silinir;
+  araçtaki yük düzenlenir (silmek için önce "Araçtan çıkar"); sefer **Yola çıktı** diye kilitlenince hiçbiri değişmez.
+- **Depo** yük bilgisini (gerçek kap, kilo, plaka) **Düzenle** ile düzeltir; araca konmamış yükü **Sil** ile siler.
+- Siz Nakliye sayfasında her yükü düzenleyebilirsiniz (araçtaki yük silinmez, önce araçtan çıkarılır).
+
+## PLASTNAK taslağı
+
+Lade Liste ve CMR çıktıları, gönderdiğiniz PLASTNAK örnek PDF'lerinin milimetre ölçülü kopyasıdır (çizgiler, yazı yerleri, etiket yazımları örnektekiyle aynı; örnekteki
+yazım hataları da dahil, ör. "CONSIGMENT"). `nakliye-kurulumu.sql` PLASTNAK müşterisine örnekteki logoyu, nakliyeci bilgisini (telefon, mail, web) ve
+şart metnini yazar; panoda adında PLASTNAK geçen müşteri varsa onu doldurur, yoksa ekler. Elle yazdığınız bilgilerin üzerine yazılmaz.
+Diğer müşteriler aynı taslağı kendi logosu, nakliyeci bilgisi ve şartlarıyla kullanır. Poz No **PCS-26-0001** biçiminde kalır.
 
 Belgeler açılan pencerede önizlenir; **Yazdır / PDF olarak kaydet** ile çıktı alınır (tarayıcının yazdırma penceresinde "PDF olarak kaydet" seçilebilir).
 Belgeler tarayıcıda hazırlanır; sunucuya ya da başka bir siteye gönderilmez.
