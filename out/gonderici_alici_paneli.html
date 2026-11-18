@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gönderici / Alıcı Bilgileri</title>
+<style>
+body{margin:0;background:#1a120b;color:#f1e6d0;font-family:Segoe UI,Arial,sans-serif;padding:24px}
+h1{color:#ffc933;text-align:center;letter-spacing:2px;font-size:26px}
+.card{max-width:900px;margin:12px auto;background:#261a10;border:1px solid #6b4a1f;border-radius:10px;overflow:hidden}
+.head{padding:14px 18px;cursor:pointer;color:#ffc933;font-weight:700;display:flex;justify-content:space-between}
+.body{display:none;padding:6px 18px 14px;border-top:1px solid #6b4a1f}
+.card.open .body{display:block}.card.open .arrow{transform:rotate(90deg)}
+.arrow{transition:.2s}
+.row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #3a2a18}
+.row:last-child{border:0}
+.lbl{width:170px;flex:none;color:#d9a21b;font-size:12px;font-weight:700}
+.val{flex:1;word-break:break-word}
+button{background:#ffc933;color:#1a120b;border:0;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer}
+.total{max-width:900px;margin:24px auto;background:#33220f;border:2px solid #ffc933;border-radius:12px;text-align:center;padding:22px}
+.total h2{margin:0 0 8px;color:#ffc933;font-size:16px;letter-spacing:1px}
+.total div{font-size:34px;font-weight:800}
+</style></head><body>
+<h1>GÖNDERİCİ / ALICI BİLGİLERİ</h1>
+<div class="card"><div class="head"><span>CAVO OTOMOTİV TİC. VE SAN. A.Ş. — 26341300EX00798186</span><span class="arrow">▶</span></div>
+<div class="body">
+<div class="row"><div class="lbl">GÖNDERİCİ VKN</div><div class="val">2030025031</div><button>Kopyala</button></div>
+<div class="row"><div class="lbl">GÖNDERİCİ ÜNVAN</div><div class="val">CAVO OTOMOTİV TİC. VE SAN. A.Ş.</div><button>Kopyala</button></div>
+<div class="row"><div class="lbl">GÖNDERİCİ ADRES</div><div class="val">TOSB OTOMOTİV OSB MAH. 15.SK. NO:3/2 ÇAYIROVA</div><button>Kopyala</button></div>
+<div class="row"><div class="lbl">ALICI ÜNVAN</div><div class="val">CAVO OTOMOTIV DOO</div><button>Kopyala</button></div>
+<div class="row"><div class="lbl">ALICI ADRES</div><div class="val">Technological Industrial Development Zone Tetovo St. No. 6</div><button class="addr">Kopyala</button></div>
+</div></div>
+<div class="total"><h2>TOPLAM KAP / TOPLAM KİLO (BRÜT)</h2><div>1 KAP / 145.00 KG</div></div>
+<script>
+document.querySelectorAll('.card').forEach(c=>{
+ c.querySelector('.head').onclick=()=>{const o=c.classList.contains('open');document.querySelectorAll('.card.open').forEach(x=>x.classList.remove('open'));if(!o)c.classList.add('open')};
+ c.querySelectorAll('.row').forEach(r=>{const b=r.querySelector('button'),v=r.querySelector('.val').textContent;
+  b.onclick=async()=>{try{await navigator.clipboard.writeText(v)}catch(e){const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}
+   const old=b.textContent;b.textContent='Kopyalandı';setTimeout(()=>b.textContent=old,1200);
+   if(b.classList.contains('addr'))setTimeout(()=>c.classList.remove('open'),300)}})});
+</script></body></html>
