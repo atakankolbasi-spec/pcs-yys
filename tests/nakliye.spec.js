@@ -292,3 +292,158 @@ test('belgeler: her müşterinin kendi logosu ve nakliyeci bilgisi; metinler gü
   expect(out.la).toContain('ARAD');
   expect(out.la.indexOf('ARAD')).toBeLessThan(out.la.indexOf('BUCUREŞTI')); // varışa göre gruplu
 });
+
+// ---------------------------------------------------------------------------------------------- müşteri ve depo sayfaları
+const tokens = () => ({ tokC1: { kind: 'musteri', customer: 'c1', active: true }, tokC2: { kind: 'musteri', customer: 'c2', active: true }, tokD: { kind: 'depo', active: true } });
+async function openPortal(page, query, cfg = {}) {
+  const problems = [];
+  page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
+  page.on('console', m => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
+  page.on('response', r => { if (r.status() >= 400) problems.push(`HTTP ${r.status()} ${r.url()}`); });
+  await page.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
+  await page.addInitScript(c => { window.__PCS_STUB = c; }, { session: false, data: { shp_customers: customers(), shp_loads: loads(), shp_trips: [] }, shpTokens: tokens(), ...cfg });
+  await page.clock.install({ time: NOW });
+  await page.goto('/nakliye.html' + query);
+  return problems;
+}
+
+test('müşteri sayfası: yalnızca kendi yüklerini görür; yeni yük yazar, düzenler, siler', async ({ page }) => {
+  const problems = await openPortal(page, '?m=tokC1');
+  await expect(page.locator('h1')).toContainText('ÖRNEK NAKLİYAT');
+  await expect(page.locator('#p')).toContainText('BEKLEYEN GÖNDERİCİ');             // l5: bekliyor
+  await expect(page.locator('#p')).not.toContainText('DENEME GÖNDERİCİ');            // başka müşteri
+  await expect(page.locator('.sum')).toContainText('Bekleyen');
+  // yeni yük
+  const f = page.locator('form[data-f="load"]');
+  await f.locator('[name="sender"]').fill('PORTAL GÖNDERİCİ');
+  await f.locator('[name="consignee"]').fill('PORTAL ALICI SRL');
+  await f.locator('[name="pieces"]').fill('12');
+  await f.locator('[name="weight"]').fill('1.250,5');
+  await f.locator('[name="dest_customs"]').fill('SIBIU');
+  await f.locator('button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('Yük eklendi');
+  await expect(page.locator('#p')).toContainText('PORTAL GÖNDERİCİ');
+  const saved = await page.evaluate(() => window.__db.shp_loads.find(l => l.sender === 'PORTAL GÖNDERİCİ'));
+  expect(saved).toMatchObject({ customer_id: 'c1', status: 'bekliyor', weight: 1250.5, pieces: 12, dest_customs: 'SIBIU', created_by: 'Müşteri' });
+  await expect(page.locator('form[data-f="load"] [name="sender"]')).toHaveValue('');   // form boşaldı
+  // düzenle
+  await page.locator('[data-a="edit"]', { has: page.locator('xpath=self::*') }).first().click();
+  await expect(page.locator('#form-card h2')).toContainText('düzenle');
+  await page.locator('form[data-f="load"] [name="goods"]').fill('YENİ MAL');
+  await page.locator('form[data-f="load"] button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('güncellendi');
+  expect(await page.evaluate(() => window.__db.shp_loads.filter(l => l.goods === 'YENİ MAL').length)).toBe(1);
+  // sil: iki adım
+  const n0 = await page.evaluate(() => window.__db.shp_loads.length);
+  await page.locator('[data-a="del"]').first().click();
+  expect(await page.evaluate(() => window.__db.shp_loads.length)).toBe(n0);
+  await page.locator('[data-a="del"]').first().click();
+  await expect(page.locator('#toast')).toContainText('Yük silindi');
+  expect(await page.evaluate(() => window.__db.shp_loads.length)).toBe(n0 - 1);
+  expect(problems).toEqual([]);
+});
+
+test('müşteri sayfası: depoya gelen yük değiştirilemez ve silinemez (düğme yok); yalnızca bekleyende var', async ({ page }) => {
+  await openPortal(page, '?m=tokC1');
+  await page.locator('[data-a="tab"][data-v="depoda"]').click();
+  await expect(page.locator('#p')).toContainText('ÖRNEK GÖNDERİCİ BİR');
+  await expect(page.locator('[data-a="edit"]')).toHaveCount(0);
+  await expect(page.locator('[data-a="del"]')).toHaveCount(0);
+});
+
+test('geçersiz ya da kapatılmış bağlantı anlaşılır uyarı verir; bağlantı yoksa genel uyarı', async ({ page }) => {
+  await openPortal(page, '?m=yanlis');
+  await expect(page.locator('#p')).toContainText('geçersiz ya da kapatılmış');
+  const page2 = await page.context().newPage();
+  await page2.route('**/vendor.js', route => route.fulfill({ body: STUB, contentType: 'text/javascript' }));
+  await page2.goto('/nakliye.html');
+  await expect(page2.locator('#p')).toContainText('özel bağlantıyla açılır');
+});
+
+test('kapatılmış müşteri bağlantısı çalışmaz', async ({ page }) => {
+  const t = tokens(); t.tokC1.active = false;
+  await openPortal(page, '?m=tokC1', { shpTokens: t });
+  await expect(page.locator('#p')).toContainText('geçersiz ya da kapatılmış');
+});
+
+test('depo sayfası: Geldi işaretler (adıyla), Geri al ile döner; müşteriye göre gruplar', async ({ page }) => {
+  const problems = await openPortal(page, '?d=tokD');
+  await expect(page.locator('h1')).toContainText('Depo');
+  await expect(page.locator('#p .card h2').filter({ hasText: 'ÖRNEK NAKLİYAT' })).toBeVisible();
+  await expect(page.locator('[data-a="arrive"]')).toHaveCount(1);                    // yalnızca l5 bekliyor
+  await page.locator('#nm').fill('Ahmet');
+  await page.locator('[data-a="arrive"]').click();
+  await expect(page.locator('#toast')).toContainText('geldi olarak işaretlendi');
+  const l5 = await page.evaluate(() => window.__db.shp_loads.find(l => l.id === 'l5'));
+  expect(l5).toMatchObject({ status: 'depoda', arrived_by: 'Ahmet' });
+  await page.locator('[data-a="tab"][data-v="depoda"]').click();
+  await expect(page.locator('#p')).toContainText('BEKLEYEN GÖNDERİCİ');
+  await page.locator('[data-a="undo"]').filter({ has: page.locator('xpath=self::*') }).first().click();
+  await expect(page.locator('#toast')).toContainText('geri alındı');
+  expect(problems).toEqual([]);
+});
+
+test('depo sayfası: plaka bazında araçlar ve belgeler; araca verilen yük bekleyen/depoda listelerinden çıkar', async ({ page }) => {
+  const trip = { id: 'tt1', poz_no: 'PCS-26-0001', customer_id: 'c1', tractor: '34 ABC 123', trailer: '34 DEF 456', depart_date: '2026-09-23', subject: '', status: 'hazirlaniyor', created_at: '2026-09-23T07:00:00Z' };
+  const ls = loads().map(l => l.id === 'l1' || l.id === 'l2' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  await openPortal(page, '?d=tokD', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [trip] } });
+  await page.locator('[data-a="tab"][data-v="depoda"]').click();
+  await expect(page.locator('#p')).not.toContainText('ÖRNEK GÖNDERİCİ BİR');         // araçta: depoda listesinde yok
+  await page.locator('[data-a="tab"][data-v="araclar"]').click();
+  await expect(page.locator('#p .pl').first()).toContainText('34 ABC 123');
+  await expect(page.locator('#p')).toContainText('ÖRNEK GÖNDERİCİ BİR');
+  await page.locator('[data-a="doc"][data-kind="cmr"]').click();
+  const cmr = await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc);
+  expect(cmr).toContain('PCS-26-0001/01');
+  expect(cmr).toContain('ÖRNEK NAKLİYAT LTD');
+});
+
+test('müşteri sayfası: araca atanan yükler "Araçta" görünür ve sefer belgeleri alınır', async ({ page }) => {
+  const trip = { id: 'tt1', poz_no: 'PCS-26-0001', customer_id: 'c1', tractor: '34 ABC 123', trailer: '', depart_date: '2026-09-23', subject: '', status: 'hazirlaniyor', created_at: '2026-09-23T07:00:00Z' };
+  const ls = loads().map(l => l.id === 'l1' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  await openPortal(page, '?m=tokC1', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [trip] } });
+  await page.locator('[data-a="tab"][data-v="aracta"]').click();
+  await expect(page.locator('#p .row').first()).toContainText('PCS-26-0001');
+  await page.locator('section', { hasText: 'Seferlerim' }).locator('[data-a="doc"][data-kind="lade"]').click();
+  expect(await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc)).toContain('LADE LİSTE');
+});
+
+test('depo sayfası: açık ekran kendiliğinden yenilenir (yeni yük görünür)', async ({ page }) => {
+  await openPortal(page, '?d=tokD');
+  await expect(page.locator('[data-a="arrive"]')).toHaveCount(1);
+  await page.evaluate(() => window.__db.shp_loads.push({ id: 'lz', customer_id: 'c2', sender: 'SONRADAN GELEN', consignee: 'X', consignee_addr: '', sender_addr: '', notify: '', pieces: 1, packing: 'KAP', goods: '', weight: 1, volume: null, country: '', code: '', dest_customs: '', broker: '', expected_date: null, status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, note: '', created_at: '2026-09-23T07:00:00Z' }));
+  await page.clock.runFor(31000);
+  await expect(page.locator('#p')).toContainText('SONRADAN GELEN');
+});
+
+test('kurulum yapılmamışsa müşteri sayfası bunu söyler', async ({ page }) => {
+  await openPortal(page, '?m=tokC1', { missing: ['shp-rpc'] });
+  await expect(page.locator('#p')).toContainText('henüz kurulmamış');
+});
+
+test('operatör: Bağlantılar penceresi; kopyala, yenile (eskisi çalışmaz), kapat', async ({ page, context }) => {
+  const problems = await openNakliye(page, { shpTokens: tokens() });
+  await page.evaluate(() => { window.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } }, configurable: true }); });
+  await page.locator('.heading [data-nk="links"]').click();
+  const li = page.locator('.nk-lk li');
+  await expect(li).toHaveCount(3);                                                   // depo + 2 müşteri
+  await expect(li.nth(0)).toContainText('Depo ekranı');
+  await expect(li.nth(0).locator('input')).toHaveValue(/nakliye\.html\?d=tokD$/);
+  await li.nth(1).locator('[data-nk="lk-copy"]').click();
+  await expect(page.locator('#toast')).toContainText('kopyalandı');
+  expect((await page.evaluate(() => window.__copied))[0]).toMatch(/nakliye\.html\?m=tokC/);
+  // yenile: iki adım, yeni anahtar
+  const old = await li.nth(0).locator('input').inputValue();
+  await li.nth(0).locator('[data-nk="lk-rot"]').click();
+  await expect(li.nth(0).locator('[data-nk="lk-rot"]')).toContainText('Evet');
+  await li.nth(0).locator('[data-nk="lk-rot"]').click();
+  await expect(page.locator('#toast')).toContainText('eskisi artık çalışmaz');
+  expect(await li.nth(0).locator('input').inputValue()).not.toBe(old);
+  // eski depo anahtarı artık geçersiz
+  const r = await page.evaluate(() => window.__calls.filter(c => c.rpc === 'shp_rotate_link').length);
+  expect(r).toBe(1);
+  // müşteri bağlantısını kapat
+  await li.nth(1).locator('[data-nk="lk-toggle"]').click();
+  await expect(li.nth(1)).toContainText('(kapalı)');
+  expect(problems).toEqual([]);
+});

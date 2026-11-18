@@ -90,6 +90,12 @@
 .nk-arr{display:flex;align-items:center;gap:8px;margin-top:14px}
 .modal-footer{display:flex;align-items:center;gap:10px}
 dialog:has(form[data-nk-form="load"]),dialog:has(form[data-nk-form="customer"]){width:min(760px,calc(100% - 28px))}
+.nk-lk{list-style:none;margin:0;padding:0}
+.nk-lk li{padding:14px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.nk-lk li:last-child{border-bottom:0}.nk-lk li.off .nk-lk-t b{opacity:.6}
+.nk-lk-t input{display:block;width:100%;margin-top:6px;min-height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:12px;background:var(--bg);color:var(--ink)}
+.nk-lk-a{display:flex;gap:8px;flex-wrap:wrap}.nk-lk-a .btn{text-decoration:none}
+dialog:has(.nk-lk){width:min(860px,calc(100% - 28px))}
 @media(max-width:1500px){.nk-cols{grid-template-columns:minmax(0,1fr) 360px}.nk-kpis{gap:10px}}
 @media(max-width:1180px){.nk-cols{grid-template-columns:1fr}.nk-side{position:static}.nk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.nk-search input{width:100%}}
 html[data-theme="dark"] .nk-warn,html[data-theme="dark"] .nk-ferr{background:#4a1d1a;color:#ffd6d2;border-color:#7a2f2a}
