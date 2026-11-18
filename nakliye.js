@@ -171,15 +171,16 @@
     const trips = S.trips.filter(t => !S.tq || [t.poz_no, t.tractor, t.trailer, (cust(t.customer_id) || {}).name, t.subject].some(x => tr(x).includes(tr(S.tq))));
     const body = trips.map(t => {
       const ls = tripLoads(t), open = S.open.has(t.id);
-      const head = `<tr class="nk-trip ${open ? 'open' : ''}"><td><button type="button" class="nk-exp" data-nk="toggle-trip" data-id="${t.id}" aria-expanded="${open}" aria-label="Yükleri göster">${open ? '▾' : '▸'}</button></td><td><b class="nk-poz">${esc(t.poz_no)}</b></td>` +
+      const head = `<tr class="nk-trip ${open ? 'open' : ''}"><td><button type="button" class="nk-exp" data-nk="toggle-trip" data-id="${t.id}" aria-expanded="${open}" aria-label="Yükleri göster">${open ? '▾' : '▸'}</button></td><td><b class="nk-poz">${esc(t.poz_no)}</b>${t.created_by === 'Müşteri' ? '<small>Müşteri planladı</small>' : ''}${t.status !== 'hazirlaniyor' ? ' <span class="nk-ch b">Yolda · kilitli</span>' : ''}${ls.some(l => !l.arrived_at) ? ` <span class="nk-ch a">${ls.filter(l => !l.arrived_at).length} yük depoya gelmedi</span>` : ''}</td>` +
         `<td><span class="nk-pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="nk-pl alt">${esc(t.trailer)}</span>` : ''}</td><td>${pill(t.customer_id)}</td><td>${esc(dmy(t.depart_date))}</td><td class="r">${ls.length}</td><td class="r">${kg(sum(ls, 'weight'))} kg</td>` +
         `<td class="r"><button type="button" class="btn small" data-nk="doc" data-kind="lade" data-id="${t.id}">Lade Liste</button> <button type="button" class="btn small" data-nk="doc" data-kind="cmr" data-id="${t.id}">CMR</button></td></tr>`;
       if (!open) return head;
       const sub = ls.map((l, i) => `<tr><td>${esc(B.pozOf(t, i))}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small></td><td>${esc(l.goods) || '—'}</td><td>${esc(l.dest_customs) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>` +
-        `<td class="r"><button type="button" class="nk-lnk" data-nk="doc" data-kind="cmr" data-id="${t.id}" data-load="${l.id}">CMR</button> <button type="button" class="nk-lnk" data-nk="unassign" data-id="${l.id}">Araçtan çıkar</button></td></tr>`).join('');
+        `<td>${l.arrived_at ? `<span class="nk-ch g">Depoda</span><small>${esc(stamp(l.arrived_at))}</small>` : `<span class="nk-ch a">Depoya gelmedi</span> <button type="button" class="nk-lnk" data-nk="arrive-trip" data-id="${l.id}">Geldi</button>`}</td><td class="r"><button type="button" class="nk-lnk" data-nk="doc" data-kind="cmr" data-id="${t.id}" data-load="${l.id}">CMR</button> <button type="button" class="nk-lnk" data-nk="unassign" data-id="${l.id}">Araçtan çıkar</button></td></tr>`).join('');
       const del = S.confirm === 'trip:' + t.id
         ? `<button type="button" class="btn small danger" data-nk="del-trip" data-id="${t.id}">Evet, seferi sil</button>` : `<button type="button" class="btn small" data-nk="del-trip" data-id="${t.id}">Seferi sil (yükler boşa döner)</button>`;
-      return head + `<tr class="nk-sub"><td></td><td colspan="7"><table class="nk-t inner"><thead><tr><th>CMR No</th><th>Gönderici → Alıcı</th><th>Mal</th><th>Varış</th><th class="r">Kap</th><th class="r">Kilo</th><th></th></tr></thead><tbody>${sub}</tbody></table><div class="nk-subact">${del}</div></td></tr>`;
+      const lock = t.status === 'hazirlaniyor' ? `<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="yolda">Yola çıktı (müşteri değiştiremesin)</button>` : `<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="hazirlaniyor">Kilidi aç (müşteri değiştirebilsin)</button>`;
+      return head + `<tr class="nk-sub"><td></td><td colspan="7"><table class="nk-t inner"><thead><tr><th>CMR No</th><th>Gönderici → Alıcı</th><th>Mal</th><th>Varış</th><th class="r">Kap</th><th class="r">Kilo</th><th>Depo</th><th></th></tr></thead><tbody>${sub}</tbody></table><div class="nk-subact">${lock}${del}</div></td></tr>`;
     }).join('');
     return `<section class="nk-pn"><div class="nk-bar"><h2>Araçlar ve seferler <span>${trips.length}</span></h2><div class="nk-bar-r">${searchBox('nk-tq', 'tq', S.tq)}</div></div>` +
       (trips.length ? `<div class="nk-scroll"><table class="nk-t"><thead><tr><th></th><th>Poz No</th><th>Plaka</th><th>Müşteri</th><th>Çıkış</th><th class="r">Yük</th><th class="r">Toplam</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`
@@ -308,6 +309,8 @@
       return;
     }
     if (a === 'arrive') { if (await db(X.client.from('shp_loads').update({ status: 'depoda', arrived_at: new Date().toISOString(), arrived_by: 'Operatör' }).eq('id', id), 'Yük boşta listesine alındı')) await load(true); return; }
+    if (a === 'arrive-trip') { if (await db(X.client.from('shp_loads').update({ arrived_at: new Date().toISOString(), arrived_by: 'Operatör' }).eq('id', id), 'Yük depoya geldi olarak işaretlendi')) await load(true); return; }
+    if (a === 'lock-trip') { if (await db(X.client.from('shp_trips').update({ status: t.dataset.v }).eq('id', id), t.dataset.v === 'yolda' ? 'Sefer kilitlendi; müşteri artık değiştiremez' : 'Kilit açıldı; müşteri değiştirebilir')) await load(true); return; }
     if (a === 'add-load') { loadForm(''); return; }
     if (a === 'edit-load') { loadForm(id); return; }
     if (a === 'customers') { customersModal(); return; }

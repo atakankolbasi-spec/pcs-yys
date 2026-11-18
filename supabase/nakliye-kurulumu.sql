@@ -5,12 +5,15 @@
 --   * Bir araç (sefer) yalnızca tek bir müşterinin yüklerini taşır. Her sefere otomatik Poz No verilir: PCS-26-0001, PCS-26-0002 ...
 --     (yıl değişince PCS-27-0001'den yeniden başlar). CMR numaraları Poz No'ya /01, /02 ... eklenerek yazılır.
 --   * Araca atanan yük "boşta" listesinden çıkar, plakanın altında durur; yanlış atanan yük araçtan çıkarılabilir.
+--   * Müşteri de kendi sayfasında yüklerini araçlara yerleştirebilir (depoya henüz gelmemiş yük de olur); bu atama kesindir ve
+--     Poz No otomatik verilir. Sefer "yola çıktı" diye kilitlenirse müşteri artık değiştiremez. Yükün depoya gelip gelmediği
+--     (arrived_at) araca atanınca da korunur; depo araçtaki yüke de "Geldi" der.
 --   * Müşteri bağlantısı yalnızca o müşterinin yüklerini, depo bağlantısı bekleyen ve boştaki yükleri ile plaka bazında seferleri gösterir.
 --     Bağlantılar giriş şifresi istemez; sitedeki Nakliye > Bağlantılar penceresinden
 --     yenilenir ya da kapatılır (eski bağlantı çalışmaz).
 --
 -- Önce whatsapp-kurulumu.sql (private.is_editor() için) çalıştırılmış olmalı.
--- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
+-- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır (dosya güncellenince yeniden çalıştırılır; kayıtlar korunur).
 
 create schema if not exists private;
 
@@ -69,6 +72,8 @@ create table if not exists public.shp_loads (
   updated_at timestamptz not null default now(),
   check ((status = 'aracta') = (trip_id is not null))
 );
+
+update public.shp_loads set arrived_at = coalesce(arrived_at, updated_at) where status in ('depoda', 'aracta') and arrived_at is null;
 
 create index if not exists shp_loads_durum on public.shp_loads (status, customer_id);
 create index if not exists shp_loads_sefer on public.shp_loads (trip_id);
@@ -192,7 +197,7 @@ begin
   end if;
   select l.trip_id into tid from public.shp_loads l where l.id = p_load_id and l.status = 'aracta' for update;
   if tid is null then raise exception 'Yük bir araçta değil' using errcode = '22023'; end if;
-  update public.shp_loads set status = 'depoda', trip_id = null where id = p_load_id;
+  update public.shp_loads set status = case when arrived_at is null then 'bekliyor' else 'depoda' end, trip_id = null where id = p_load_id;
   if not exists (select 1 from public.shp_loads l where l.trip_id = tid) then
     delete from public.shp_trips where id = tid;
     gone := true;
@@ -206,7 +211,7 @@ begin
   if not coalesce((select private.is_editor()), false) then
     raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501';
   end if;
-  update public.shp_loads set status = 'depoda', trip_id = null where trip_id = p_trip;
+  update public.shp_loads set status = case when arrived_at is null then 'bekliyor' else 'depoda' end, trip_id = null where trip_id = p_trip;
   delete from public.shp_trips where id = p_trip;
 end $$;
 
@@ -395,30 +400,111 @@ declare
 begin
   select * into k from private.shp_links where token = p_token and kind = 'depo' and active;
   if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  -- Araçtaki yük de işaretlenir: durumu "aracta" kalır, yalnızca geliş saati yazılır / silinir
   if coalesce(p_arrived, true) then
-    update public.shp_loads set status = 'depoda', arrived_at = now(), arrived_by = left(btrim(coalesce(p_name, '')), 120)
-    where id = p_id and status in ('bekliyor', 'depoda') returning * into l;
+    update public.shp_loads set status = case when status = 'aracta' then 'aracta' else 'depoda' end,
+      arrived_at = now(), arrived_by = left(btrim(coalesce(p_name, '')), 120)
+    where id = p_id and status in ('bekliyor', 'depoda', 'aracta') returning * into l;
   else
-    update public.shp_loads set status = 'bekliyor', arrived_at = null, arrived_by = ''
-    where id = p_id and status = 'depoda' returning * into l;
+    update public.shp_loads set status = case when status = 'aracta' then 'aracta' else 'bekliyor' end, arrived_at = null, arrived_by = ''
+    where id = p_id and status in ('depoda', 'aracta') and arrived_at is not null returning * into l;
   end if;
-  if not found then raise exception 'Yük bulunamadı ya da araca verildiği için değiştirilemez' using errcode = '22023'; end if;
+  if not found then raise exception 'Yük bulunamadı ya da bu işlem artık yapılamaz' using errcode = '22023'; end if;
   return private.shp_load_json(l);
+end $$;
+
+-- ---------------------------------------------------------------- müşteri: yüklerini araçlara yerleştirir
+-- p_trip boşsa yeni sefer açılır (çekici plaka gerekli, Poz No otomatik); doluysa müşterinin kendi seferine eklenir.
+create or replace function public.shp_portal_assign(p_token text, p_load_ids uuid[], p_trip uuid default null, p_tractor text default '',
+                                                     p_trailer text default '', p_depart date default null, p_subject text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k private.shp_links;
+  t public.shp_trips;
+  n int;
+begin
+  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
+  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  if p_load_ids is null or coalesce(array_length(p_load_ids, 1), 0) = 0 then
+    raise exception 'Önce yük seçin' using errcode = '22023';
+  end if;
+  if array_length(p_load_ids, 1) > 300 then raise exception 'Bir seferde en fazla 300 yük' using errcode = '22023'; end if;
+  select count(*) into n from (
+    select l.id from public.shp_loads l
+    where l.id = any (p_load_ids) and l.customer_id = k.customer_id and l.status in ('bekliyor', 'depoda') and l.trip_id is null
+    for update
+  ) x;
+  if n <> (select count(distinct i) from unnest(p_load_ids) i) then
+    raise exception 'Seçilen yüklerden bazıları artık araca konamaz (başka araçta ya da silinmiş); listeyi yenileyip tekrar seçin' using errcode = '22023';
+  end if;
+  if p_trip is not null then
+    select * into t from public.shp_trips where id = p_trip and customer_id = k.customer_id for update;
+    if not found then raise exception 'Araç bulunamadı' using errcode = '22023'; end if;
+    if t.status <> 'hazirlaniyor' then raise exception 'Bu araç yola çıktı, değişiklik için ofisle görüşün' using errcode = '22023'; end if;
+  else
+    if btrim(coalesce(p_tractor, '')) = '' then raise exception 'Çekici plakası gerekli' using errcode = '22023'; end if;
+    insert into public.shp_trips (poz_no, customer_id, tractor, trailer, depart_date, subject, created_by)
+    values (private.shp_next_poz(), k.customer_id, upper(left(btrim(p_tractor), 30)), upper(left(btrim(coalesce(p_trailer, '')), 30)),
+            coalesce(p_depart, (now() at time zone 'Europe/Istanbul')::date), left(btrim(coalesce(p_subject, '')), 200), 'Müşteri')
+    returning * into t;
+  end if;
+  update public.shp_loads set status = 'aracta', trip_id = t.id where id = any (p_load_ids);
+  return jsonb_build_object('trip', to_jsonb(t) - 'created_by');
+end $$;
+
+create or replace function public.shp_portal_unassign(p_token text, p_load_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k private.shp_links;
+  tid uuid;
+  gone boolean := false;
+begin
+  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
+  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select l.trip_id into tid from public.shp_loads l
+  join public.shp_trips t on t.id = l.trip_id
+  where l.id = p_load_id and l.customer_id = k.customer_id and l.status = 'aracta' and t.status = 'hazirlaniyor' for update of l;
+  if tid is null then raise exception 'Yük bir araçta değil ya da araç yola çıktığı için değiştirilemez' using errcode = '22023'; end if;
+  update public.shp_loads set status = case when arrived_at is null then 'bekliyor' else 'depoda' end, trip_id = null where id = p_load_id;
+  if not exists (select 1 from public.shp_loads l where l.trip_id = tid) then
+    delete from public.shp_trips where id = tid;
+    gone := true;
+  end if;
+  return jsonb_build_object('trip_deleted', gone);
+end $$;
+
+create or replace function public.shp_portal_trip_update(p_token text, p_trip uuid, p_tractor text, p_trailer text default '',
+                                                          p_depart date default null, p_subject text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k private.shp_links;
+  t public.shp_trips;
+begin
+  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
+  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  if btrim(coalesce(p_tractor, '')) = '' then raise exception 'Çekici plakası gerekli' using errcode = '22023'; end if;
+  update public.shp_trips set tractor = upper(left(btrim(p_tractor), 30)), trailer = upper(left(btrim(coalesce(p_trailer, '')), 30)),
+    depart_date = coalesce(p_depart, depart_date), subject = left(btrim(coalesce(p_subject, '')), 200)
+  where id = p_trip and customer_id = k.customer_id and status = 'hazirlaniyor' returning * into t;
+  if not found then raise exception 'Araç bulunamadı ya da yola çıktığı için değiştirilemez' using errcode = '22023'; end if;
+  return to_jsonb(t) - 'created_by';
 end $$;
 
 -- ---------------------------------------------------------------- yetkiler
 revoke all on function public.shp_assign(uuid, uuid[], text, text, date, text), public.shp_unassign(uuid), public.shp_delete_trip(uuid),
   public.shp_links(), public.shp_rotate_link(uuid), public.shp_set_link(uuid, boolean),
   public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid),
-  public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text) from public;
+  public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text),
+  public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid),
+  public.shp_portal_trip_update(text, uuid, text, text, date, text) from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     execute 'revoke all on function public.shp_assign(uuid, uuid[], text, text, date, text), public.shp_unassign(uuid), public.shp_delete_trip(uuid), public.shp_links(), public.shp_rotate_link(uuid), public.shp_set_link(uuid, boolean) from anon';
-    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text) to anon';
+    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text), public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid), public.shp_portal_trip_update(text, uuid, text, text, date, text) to anon';
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     execute 'grant execute on function public.shp_assign(uuid, uuid[], text, text, date, text), public.shp_unassign(uuid), public.shp_delete_trip(uuid), public.shp_links(), public.shp_rotate_link(uuid), public.shp_set_link(uuid, boolean) to authenticated';
-    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text) to authenticated';
+    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text), public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid), public.shp_portal_trip_update(text, uuid, text, text, date, text) to authenticated';
   end if;
 end $$;
 
@@ -431,7 +517,7 @@ do $$ declare t text; begin
   end loop;
 end $$;
 
--- ---------------------------------------------------------------- kontrol: dört satır da "tamam" olmalı
+-- ---------------------------------------------------------------- kontrol: beş satır da "tamam" olmalı
 select 'tablolar (müşteri, sefer, yük)' as kontrol,
        case when to_regclass('public.shp_customers') is not null and to_regclass('public.shp_trips') is not null
                  and to_regclass('public.shp_loads') is not null then 'tamam' else 'EKSİK' end as durum
@@ -447,4 +533,9 @@ select 'araca atama ve Poz No',
 union all
 select 'müşteri ve depo bağlantıları',
        case when to_regprocedure('public.shp_portal(text)') is not null and to_regprocedure('public.shp_depot(text)') is not null
-                 and to_regprocedure('public.shp_links()') is not null then 'tamam' else 'EKSİK' end;
+                 and to_regprocedure('public.shp_links()') is not null then 'tamam' else 'EKSİK' end
+union all
+select 'müşteri araç planı',
+       case when to_regprocedure('public.shp_portal_assign(text, uuid[], uuid, text, text, date, text)') is not null
+                 and to_regprocedure('public.shp_portal_unassign(text, uuid)') is not null
+                 and to_regprocedure('public.shp_portal_trip_update(text, uuid, text, text, date, text)') is not null then 'tamam' else 'EKSİK' end;

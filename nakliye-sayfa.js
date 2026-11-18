@@ -13,7 +13,8 @@
   const root = document.getElementById('p');
   const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co', 'sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
   const NAME_KEY = 'pcs-nakliye-depo-ad';
-  const P = { data: null, err: '', loading: false, tab: MODE === 'm' ? 'bekliyor' : 'bekliyor', q: '', form: null, confirm: '', name: '', busy: '' };
+  const P = { data: null, err: '', loading: false, tab: 'bekliyor', q: '', form: null, confirm: '', name: '', busy: '',
+    sel: new Set(), target: '', nv: { tractor: '', trailer: '', date: '', subject: '' }, editTrip: '', te: { tractor: '', trailer: '', date: '', subject: '' } };
   try { P.name = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* kayıt yoksa boş kalır */ }
 
   const tr = s => String(s || '').toLocaleUpperCase('tr-TR');
@@ -41,12 +42,17 @@
     try { r = await client.rpc(MODE === 'm' ? 'shp_portal' : 'shp_depot', { p_token: TOKEN }); } catch (_) { r = { error: { message: 'Failed to fetch' } }; }
     P.loading = false;
     if (r.error) { if (!quiet || !P.data) P.err = explain(r.error); else toast(explain(r.error), true); }
-    else { P.data = r.data; P.err = ''; }
+    else {
+      P.data = r.data; P.err = '';
+      for (const id of [...P.sel]) { const l = (P.data.loads || []).find(x => x.id === id); if (!l || (l.status !== 'bekliyor' && l.status !== 'depoda')) P.sel.delete(id); }
+    }
     draw();
   }
 
   // ------------------------------------------------------------------ ortak parçalar
-  const chip = l => l.status === 'aracta' ? `<span class="ch b">Araçta</span>` : l.status === 'depoda' ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Bekliyor</span>';
+  const chip = l => l.status === 'aracta' ? `<span class="ch b">Araçta</span> ${l.arrived_at ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Depoya gelmedi</span>'}` : l.status === 'depoda' ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Bekliyor</span>';
+  const locked = t => t.status !== 'hazirlaniyor';
+  const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
   function docButtons(trip) {
     return `<button type="button" class="btn sm" data-a="doc" data-kind="lade" data-id="${esc(trip.id)}">Lade Liste</button> <button type="button" class="btn sm" data-a="doc" data-kind="cmr" data-id="${esc(trip.id)}">CMR</button>`;
   }
@@ -89,36 +95,55 @@
     const cnt = s => all.filter(l => l.status === s).length;
     const tabs = [['bekliyor', 'Bekleyen', cnt('bekliyor')], ['depoda', 'Depoda', cnt('depoda')], ['aracta', 'Araçta', cnt('aracta')], ['hepsi', 'Tümü', all.length]];
     const rows = all.filter(l => (P.tab === 'hepsi' || l.status === P.tab) && hit(l));
-    const list = rows.length ? `<div class="rows">${rows.map(l => { const t = tripOf(l.trip_id); return `<article class="row">
+    const free = l => l.status === 'bekliyor' || l.status === 'depoda';
+    const list = rows.length ? `<div class="rows">${rows.map(l => { const t = tripOf(l.trip_id); return `<article class="row ${P.sel.has(l.id) ? 'sel' : ''}">
+${free(l) ? `<label class="pk"><input type="checkbox" data-a="pick" data-id="${esc(l.id)}" ${P.sel.has(l.id) ? 'checked' : ''} aria-label="Yükü araca koymak için seç: ${esc(l.sender)}"></label>` : ''}
 <div class="main">${loadLine(l)}<div class="meta">${meta(l)}${l.expected_date ? ` · beklenen ${esc(B.dmy(l.expected_date))}` : ''}</div></div>
 <div class="side">${chip(l)}${t ? `<small>${esc(t.poz_no)} · ${esc(B.plates(t))}</small>` : l.arrived_at ? `<small>${esc(stamp(l.arrived_at))}</small>` : ''}
-${l.status === 'bekliyor' ? `<div class="acts"><button type="button" class="lnk" data-a="edit" data-id="${esc(l.id)}">Düzenle</button><button type="button" class="lnk bad" data-a="del" data-id="${esc(l.id)}">${P.confirm === l.id ? 'Evet, sil' : 'Sil'}</button></div>` : ''}</div></article>`; }).join('')}</div>` : '<div class="empty">Bu bölümde yük yok.</div>';
-    const trips = (d.trips || []).map(t => { const n = all.filter(l => l.trip_id === t.id); return `<article class="row"><div class="main"><b>${esc(t.poz_no)}</b> <span class="pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="pl alt">${esc(t.trailer)}</span>` : ''}<div class="meta">${esc(B.dmy(t.depart_date))} · ${n.length} yük · ${kg(sum(n, 'weight'))} kg</div></div><div class="side">${docButtons(t)}</div></article>`; }).join('');
-    return `<header class="top">${c.logo ? `<img class="lg" src="${esc(c.logo)}" alt="">` : ''}<div><h1>${esc(c.name)}</h1><p>Nakliye programı · gelecek yüklerinizi yazın, durumlarını izleyin</p></div><button type="button" class="btn" data-a="refresh">Yenile</button></header>
+<div class="acts">${l.status === 'bekliyor' ? `<button type="button" class="lnk" data-a="edit" data-id="${esc(l.id)}">Düzenle</button><button type="button" class="lnk bad" data-a="del" data-id="${esc(l.id)}">${P.confirm === l.id ? 'Evet, sil' : 'Sil'}</button>` : ''}${l.status === 'aracta' && t && !locked(t) ? `<button type="button" class="lnk" data-a="unassign" data-id="${esc(l.id)}">Araçtan çıkar</button>` : ''}</div></div></article>`; }).join('')}</div>` : '<div class="empty">Bu bölümde yük yok.</div>';
+    // seçili yükleri araca koyma çubuğu
+    const sl = [...P.sel].map(id => all.find(l => l.id === id)).filter(Boolean);
+    const open = (d.trips || []).filter(t => !locked(t));
+    const nv = P.nv;
+    const bar = sl.length ? `<div class="sbar" id="sbar"><div class="sb-t"><b>${sl.length} yük seçili</b> · ${kg(sum(sl, 'weight'))} kg</div>
+<label class="fld"><span>Hangi araca?</span><select id="tg" data-i="target"><option value="">Araç seçin…</option>${open.map(t => `<option value="${esc(t.id)}" ${P.target === t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(B.plates(t))}</option>`).join('')}<option value="new" ${P.target === 'new' ? 'selected' : ''}>+ Yeni araç</option></select></label>
+${P.target === 'new' ? `<div class="grid sb-g"><label class="fld"><span>Çekici plaka</span><input id="nv-tractor" data-i="nv-tractor" value="${esc(nv.tractor)}" maxlength="30" placeholder="Örn. 34 ABC 123" autocomplete="off"></label><label class="fld"><span>Dorse plaka</span><input id="nv-trailer" data-i="nv-trailer" value="${esc(nv.trailer)}" maxlength="30" placeholder="Örn. 34 DEF 456" autocomplete="off"></label><label class="fld"><span>Çıkış tarihi</span><input id="nv-date" data-i="nv-date" type="date" value="${esc(nv.date || today())}"></label></div>` : ''}
+<div class="acts"><button type="button" class="btn pri" data-a="assign" ${P.busy === 'assign' ? 'disabled' : ''}>${P.busy === 'assign' ? 'Koyuluyor…' : 'Araca koy'}</button><button type="button" class="lnk" data-a="clear">Seçimi bırak</button></div></div>` : '';
+    const trips = (d.trips || []).map(t => {
+      const n = all.filter(l => l.trip_id === t.id), lk = locked(t), editing = P.editTrip === t.id, te = P.te;
+      const gel = n.filter(l => !l.arrived_at).length;
+      const head = editing ? `<div class="grid"><label class="fld"><span>Çekici plaka</span><input id="te-tractor" data-i="te-tractor" value="${esc(te.tractor)}" maxlength="30" autocomplete="off"></label><label class="fld"><span>Dorse plaka</span><input id="te-trailer" data-i="te-trailer" value="${esc(te.trailer)}" maxlength="30" autocomplete="off"></label><label class="fld"><span>Çıkış tarihi</span><input id="te-date" data-i="te-date" type="date" value="${esc(te.date)}"></label><label class="fld"><span>Konu (isteğe bağlı)</span><input id="te-subject" data-i="te-subject" value="${esc(te.subject)}" maxlength="200" autocomplete="off"></label></div><div class="acts"><button type="button" class="btn pri sm" data-a="trip-save" data-id="${esc(t.id)}">Kaydet</button><button type="button" class="btn sm" data-a="trip-cancel">Vazgeç</button></div>`
+        : `<div class="th"><div><b>${esc(t.poz_no)}</b> <span class="pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="pl alt">${esc(t.trailer)}</span>` : ''}<div class="meta">${esc(B.dmy(t.depart_date))} · ${n.length} yük · ${kg(sum(n, 'weight'))} kg${gel ? ` · ${gel} yük depoya gelmedi` : ''}${lk ? ' · <b>yola çıktı, kilitli</b>' : ''}</div></div><div class="acts">${docButtons(t)}${lk ? '' : ` <button type="button" class="btn sm" data-a="trip-edit" data-id="${esc(t.id)}">Plakayı değiştir</button>`}</div></div>`;
+      return `<article class="tc">${head}<div class="rows">${B.order(n).map(l => `<div class="row sm"><div class="main">${loadLine(l)}<div class="meta">${meta(l)}</div></div><div class="side">${l.arrived_at ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Depoya gelmedi</span>'}${lk ? '' : `<div class="acts"><button type="button" class="lnk" data-a="unassign" data-id="${esc(l.id)}">Araçtan çıkar</button></div>`}</div></div>`).join('')}</div></article>`;
+    }).join('');
+    return `<header class="top">${c.logo ? `<img class="lg" src="${esc(c.logo)}" alt="">` : ''}<div><h1>${esc(c.name)}</h1><p>Nakliye programı · yüklerinizi yazın, hangi araca ne yükleneceğini ayarlayın</p></div><button type="button" class="btn" data-a="refresh">Yenile</button></header>
 <div class="sum"><div><b>${cnt('bekliyor')}</b><span>Bekleyen</span></div><div><b>${cnt('depoda')}</b><span>Depoda</span></div><div><b>${cnt('aracta')}</b><span>Araçta</span></div></div>
 ${formCard()}
-<section class="card"><div class="bar"><h2>Yüklerim</h2>${searchBar('Ara: gönderici, alıcı, mal…')}</div><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>${list}</section>
-${trips ? `<section class="card"><h2>Seferlerim</h2><p class="hint">Araca atanan yüklerin Lade Liste ve CMR belgelerini buradan açabilirsiniz.</p><div class="rows">${trips}</div></section>` : ''}`;
+<section class="card"><div class="bar"><h2>Yüklerim</h2>${searchBar('Ara: gönderici, alıcı, mal…')}</div><p class="hint">Bir araca koymak için yükleri işaretleyin (depoya henüz gelmemiş yük de olur). Depodaki arkadaşlar yük gelince işaretler.</p><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>${list}</section>
+${trips ? `<section class="card"><h2>Araçlarım</h2><p class="hint">Hangi araçta hangi yük var. Lade Liste ve CMR belgelerini buradan alabilirsiniz. Araç yola çıkınca ofis kilitler; sonrasında değişiklik için ofisle görüşün.</p>${trips}</section>` : ''}
+${bar}`;
   }
 
   // ------------------------------------------------------------------ depo sayfası
   function depotView() {
     const d = P.data, all = d.loads;
     const cu = id => (custOf(id) || {}).name || '?';
-    const wait = all.filter(l => l.status === 'bekliyor'), idle = all.filter(l => l.status === 'depoda');
+    const wait = all.filter(l => !l.arrived_at && (l.status === 'bekliyor' || l.status === 'aracta')), idle = all.filter(l => l.status === 'depoda');
     const trips = (d.trips || []).filter(t => all.some(l => l.trip_id === t.id));
     const tabs = [['bekliyor', 'Bekleyenler', wait.length], ['depoda', 'Depoda', idle.length], ['araclar', 'Araçlar', trips.length]];
+    const goBtn = l => `<button type="button" class="btn go" data-a="arrive" data-id="${esc(l.id)}" ${P.busy === l.id ? 'disabled' : ''}>Geldi</button>`;
+    const undoBtn = l => `<button type="button" class="btn undo" data-a="undo" data-id="${esc(l.id)}" ${P.busy === l.id ? 'disabled' : ''}>Geri al</button>`;
     const group = (rows, btn) => {
       const by = {}; rows.filter(hit).forEach(l => { (by[l.customer_id] = by[l.customer_id] || []).push(l); });
       const ids = Object.keys(by).sort((a, b) => tr(cu(a)).localeCompare(tr(cu(b)), 'tr'));
-      return ids.length ? ids.map(id => `<section class="card"><h2>${esc(cu(id))} <span class="cnt">${by[id].length}</span></h2><div class="rows">${by[id].map(l => `<article class="row big"><div class="main">${loadLine(l)}<div class="meta">${meta(l)}</div>${l.expected_date && l.status === 'bekliyor' ? `<div class="meta">Beklenen: ${esc(B.dmy(l.expected_date))}</div>` : ''}${l.arrived_at && l.status === 'depoda' ? `<div class="meta">Geldi: ${esc(stamp(l.arrived_at))}${l.arrived_by ? ` · ${esc(l.arrived_by)}` : ''}</div>` : ''}</div><div class="side">${btn(l)}</div></article>`).join('')}</div></section>`).join('') : '<div class="empty">Burada yük yok.</div>';
+      return ids.length ? ids.map(id => `<section class="card"><h2>${esc(cu(id))} <span class="cnt">${by[id].length}</span></h2><div class="rows">${by[id].map(l => { const t = tripOf(l.trip_id); return `<article class="row big"><div class="main">${loadLine(l)}<div class="meta">${meta(l)}</div>${t ? `<div class="meta">Araç: <span class="pl">${esc(t.tractor)}</span> ${esc(t.poz_no)}</div>` : ''}${l.expected_date && !l.arrived_at ? `<div class="meta">Beklenen: ${esc(B.dmy(l.expected_date))}</div>` : ''}${l.arrived_at ? `<div class="meta">Geldi: ${esc(stamp(l.arrived_at))}${l.arrived_by ? ` · ${esc(l.arrived_by)}` : ''}</div>` : ''}</div><div class="side">${btn(l)}</div></article>`; }).join('')}</div></section>`).join('') : '<div class="empty">Burada yük yok.</div>';
     };
     let body;
-    if (P.tab === 'bekliyor') body = group(wait, l => `<button type="button" class="btn go" data-a="arrive" data-id="${esc(l.id)}" ${P.busy === l.id ? 'disabled' : ''}>Geldi</button>`);
-    else if (P.tab === 'depoda') body = group(idle, l => `<button type="button" class="btn undo" data-a="undo" data-id="${esc(l.id)}" ${P.busy === l.id ? 'disabled' : ''}>Geri al</button>`);
+    if (P.tab === 'bekliyor') body = group(wait, goBtn);
+    else if (P.tab === 'depoda') body = group(idle, undoBtn);
     else body = trips.length ? trips.filter(t => !P.q || [t.poz_no, t.tractor, t.trailer, cu(t.customer_id)].some(x => tr(x).includes(tr(P.q)))).map(t => {
       const n = all.filter(l => l.trip_id === t.id);
-      return `<section class="card"><div class="bar"><h2><span class="pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="pl alt">${esc(t.trailer)}</span>` : ''} <small>${esc(t.poz_no)} · ${esc(cu(t.customer_id))} · ${esc(B.dmy(t.depart_date))}</small></h2><div>${docButtons(t)}</div></div><div class="rows">${B.order(n).map(l => `<article class="row"><div class="main">${loadLine(l)}<div class="meta">${meta(l)}</div></div></article>`).join('')}</div></section>`;
+      return `<section class="card"><div class="bar"><h2><span class="pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="pl alt">${esc(t.trailer)}</span>` : ''} <small>${esc(t.poz_no)} · ${esc(cu(t.customer_id))} · ${esc(B.dmy(t.depart_date))}</small></h2><div>${docButtons(t)}</div></div><div class="rows">${B.order(n).map(l => `<article class="row big"><div class="main">${loadLine(l)}<div class="meta">${meta(l)}</div>${l.arrived_at ? `<div class="meta">Geldi: ${esc(stamp(l.arrived_at))}${l.arrived_by ? ` · ${esc(l.arrived_by)}` : ''}</div>` : ''}</div><div class="side">${l.arrived_at ? undoBtn(l) : goBtn(l)}</div></article>`).join('')}</div></section>`;
     }).join('') : '<div class="empty">Araca atanmış yük yok.</div>';
     return `<header class="top"><div><h1>Depo · Nakliye</h1><p>Yük gelince <b>Geldi</b>'ye basın. Yanlışlıkla basarsanız <b>Geri al</b> deyin.</p></div><button type="button" class="btn" data-a="refresh">Yenile</button></header>
 <section class="card"><label class="fld"><span>Adınız <small>(işaretlemeyi kimin yaptığı görünsün)</small></span><input id="nm" data-i="name" value="${esc(P.name)}" maxlength="60" autocomplete="off" placeholder="Örn. Ahmet"></label></section>
@@ -159,6 +184,25 @@ ${trips ? `<section class="card"><h2>Seferlerim</h2><p class="hint">Araca atanan
     await load0();
   }
   const load0 = () => load(true);
+  // Seçili yükleri araca koyar (yeni araç ya da kendi mevcut aracı); atama kesindir, Poz No yeni araçta otomatik verilir
+  async function assign() {
+    if (P.busy) return;
+    const ids = [...P.sel];
+    if (!ids.length) return;
+    const isNew = P.target === 'new';
+    if (!P.target) { toast('Hangi araca koyacağınızı seçin', true); document.getElementById('tg')?.focus(); return; }
+    if (isNew && !P.nv.tractor.trim()) { toast('Çekici plakasını yazın', true); document.getElementById('nv-tractor')?.focus(); return; }
+    P.busy = 'assign'; draw();
+    const { data, error } = await client.rpc('shp_portal_assign', { p_token: TOKEN, p_load_ids: ids, p_trip: isNew ? null : P.target, p_tractor: isNew ? P.nv.tractor.trim() : '', p_trailer: isNew ? P.nv.trailer.trim() : '',
+      p_depart: isNew ? (P.nv.date || today()) : null, p_subject: '' });
+    P.busy = '';
+    if (error) { toast(explain(error), true); await load0(); return; }
+    const t = data && data.trip;
+    toast(t ? `${ids.length} yük ${t.poz_no} · ${B.plates(t)} aracına konuldu` : 'Yükler araca konuldu');
+    P.sel.clear(); P.target = ''; P.nv = { tractor: '', trailer: '', date: '', subject: '' };
+    P.tab = 'aracta';
+    await load0();
+  }
   const setForm = v => { P.form = v; P.noCap = true; };   // ekrandaki form değerleri bir sonraki çizimde bunun üzerine yazılmasın
 
   async function onClick(e) {
@@ -169,6 +213,23 @@ ${trips ? `<section class="card"><h2>Seferlerim</h2><p class="hint">Araca atanan
     if (a === 'doc') { showDocs(id, t.dataset.kind); return; }
     if (a === 'edit') { const l = P.data.loads.find(x => x.id === id); if (l) { setForm({ ...blank(), ...Object.fromEntries(Object.entries(l).map(([k, v]) => [k, v == null ? '' : v])) }); draw(); document.getElementById('form-card')?.scrollIntoView({ block: 'start' }); } return; }
     if (a === 'cancel') { setForm(null); draw(); return; }
+    if (a === 'pick') { P.sel.has(id) ? P.sel.delete(id) : P.sel.add(id); draw(); return; }
+    if (a === 'clear') { P.sel.clear(); draw(); return; }
+    if (a === 'assign') { await assign(); return; }
+    if (a === 'unassign') {
+      const { error } = await client.rpc('shp_portal_unassign', { p_token: TOKEN, p_load_id: id });
+      if (error) toast(explain(error), true); else toast('Yük araçtan çıkarıldı');
+      await load0(); return;
+    }
+    if (a === 'trip-edit') { const tp = tripOf(id); if (tp) { P.editTrip = id; P.te = { tractor: tp.tractor || '', trailer: tp.trailer || '', date: tp.depart_date || '', subject: tp.subject || '' }; draw(); } return; }
+    if (a === 'trip-cancel') { P.editTrip = ''; draw(); return; }
+    if (a === 'trip-save') {
+      const te = P.te;
+      if (!te.tractor.trim()) { toast('Çekici plakasını yazın', true); return; }
+      const { error } = await client.rpc('shp_portal_trip_update', { p_token: TOKEN, p_trip: id, p_tractor: te.tractor.trim(), p_trailer: te.trailer.trim(), p_depart: te.date || null, p_subject: te.subject.trim() });
+      if (error) { toast(explain(error), true); return; }
+      toast('Araç bilgisi güncellendi'); P.editTrip = ''; await load0(); return;
+    }
     if (a === 'del') {
       if (P.confirm !== id) { P.confirm = id; draw(); return; }
       P.confirm = '';
@@ -190,8 +251,12 @@ ${trips ? `<section class="card"><h2>Seferlerim</h2><p class="hint">Araca atanan
     document.addEventListener('click', e => { onClick(e).catch(() => toast('İşlem yapılamadı', true)); });
     document.addEventListener('input', e => {
       const t = e.target.closest('[data-i]'); if (!t) return;
-      if (t.dataset.i === 'q') { P.q = t.value; draw(); }
-      else if (t.dataset.i === 'name') { P.name = t.value; try { localStorage.setItem(NAME_KEY, P.name); } catch (_) { /* kaydedilemezse oturumda kalır */ } }
+      const k = t.dataset.i;
+      if (k === 'q') { P.q = t.value; draw(); }
+      else if (k === 'target') { P.target = t.value; draw(); }
+      else if (k.startsWith('nv-')) P.nv[{ 'nv-tractor': 'tractor', 'nv-trailer': 'trailer', 'nv-date': 'date' }[k]] = t.value;
+      else if (k.startsWith('te-')) P.te[{ 'te-tractor': 'tractor', 'te-trailer': 'trailer', 'te-date': 'date', 'te-subject': 'subject' }[k]] = t.value;
+      else if (k === 'name') { P.name = t.value; try { localStorage.setItem(NAME_KEY, P.name); } catch (_) { /* kaydedilemezse oturumda kalır */ } }
     });
     document.addEventListener('submit', e => { const f = e.target.closest('form[data-f="load"]'); if (f) { e.preventDefault(); save(f).catch(() => toast('Kaydedilemedi', true)); } });
     // Açık ekran kendiliğinden tazelenir (depodaki ekran yeni yükleri görsün); yazarken ya da pencere açıkken dokunmaz
