@@ -288,19 +288,19 @@
       if (name === 'shp_unassign') {
         const l = db.shp_loads.find(x => x.id === params.p_load_id && x.status === 'aracta');
         if (!l) return guardErr('22023', 'Yük bir araçta değil');
-        const tid = l.trip_id; Object.assign(l, { status: 'depoda', trip_id: null, updated_at: now() });
+        const tid = l.trip_id; Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, updated_at: now() });
         const gone = !db.shp_loads.some(x => x.trip_id === tid);
         if (gone) db.shp_trips = db.shp_trips.filter(x => x.id !== tid);
         return { data: { trip_deleted: gone }, error: null };
       }
       if (name === 'shp_delete_trip') {
-        db.shp_loads.filter(l => l.trip_id === params.p_trip).forEach(l => Object.assign(l, { status: 'depoda', trip_id: null, updated_at: now() }));
+        db.shp_loads.filter(l => l.trip_id === params.p_trip).forEach(l => Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, updated_at: now() }));
         db.shp_trips = db.shp_trips.filter(x => x.id !== params.p_trip);
         return { data: null, error: null };
       }
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|depot|depot_mark)$/.test(name)) {
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
         const T = (cfg.shpTokens = cfg.shpTokens || {});
         const bad = () => guardErr('42501', 'Bağlantı geçersiz ya da kapatılmış');
@@ -326,6 +326,44 @@
             const c = db.shp_customers.find(x => x.id === k.customer);
             return { data: { now: now(), customer: clone(c), loads: db.shp_loads.filter(l => l.customer_id === k.customer).map(loadJson), trips: db.shp_trips.filter(t => t.customer_id === k.customer).map(t => clone(t)) }, error: null };
           }
+          if (name === 'shp_portal_assign') {
+            const ids = [...new Set(params.p_load_ids || [])];
+            if (!ids.length) return guardErr('22023', 'Önce yük seçin');
+            const ls = ids.map(id => db.shp_loads.find(l => l.id === id));
+            if (ls.some(l => !l || l.customer_id !== k.customer || !['bekliyor', 'depoda'].includes(l.status) || l.trip_id))
+              return guardErr('22023', 'Seçilen yüklerden bazıları artık araca konamaz (başka araçta ya da silinmiş); listeyi yenileyip tekrar seçin');
+            let trip;
+            if (params.p_trip) {
+              trip = db.shp_trips.find(t => t.id === params.p_trip && t.customer_id === k.customer);
+              if (!trip) return guardErr('22023', 'Araç bulunamadı');
+              if (trip.status !== 'hazirlaniyor') return guardErr('22023', 'Bu araç yola çıktı, değişiklik için ofisle görüşün');
+            } else {
+              if (!String(params.p_tractor || '').trim()) return guardErr('22023', 'Çekici plakası gerekli');
+              const yy = String(new Date().getFullYear() % 100).padStart(2, '0');
+              cfg.pozSeq = cfg.pozSeq || {}; cfg.pozSeq[yy] = (cfg.pozSeq[yy] || 0) + 1;
+              trip = { id: 'shpt' + (++shpSeq), poz_no: `PCS-${yy}-${String(cfg.pozSeq[yy]).padStart(4, '0')}`, customer_id: k.customer, tractor: String(params.p_tractor).trim().toUpperCase(),
+                trailer: String(params.p_trailer || '').trim().toUpperCase(), depart_date: params.p_depart || now().slice(0, 10), subject: params.p_subject || '', status: 'hazirlaniyor', created_by: 'Müşteri', created_at: now(), updated_at: now() };
+              db.shp_trips.push(trip);
+            }
+            ls.forEach(l => Object.assign(l, { status: 'aracta', trip_id: trip.id, updated_at: now() }));
+            const { created_by, ...pub } = trip; return { data: { trip: clone(pub) }, error: null };
+          }
+          if (name === 'shp_portal_unassign') {
+            const l = db.shp_loads.find(x => x.id === params.p_load_id && x.customer_id === k.customer && x.status === 'aracta');
+            const t = l && db.shp_trips.find(x => x.id === l.trip_id);
+            if (!l || !t || t.status !== 'hazirlaniyor') return guardErr('22023', 'Yük bir araçta değil ya da araç yola çıktığı için değiştirilemez');
+            Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, updated_at: now() });
+            const gone = !db.shp_loads.some(x => x.trip_id === t.id);
+            if (gone) db.shp_trips = db.shp_trips.filter(x => x.id !== t.id);
+            return { data: { trip_deleted: gone }, error: null };
+          }
+          if (name === 'shp_portal_trip_update') {
+            const t = db.shp_trips.find(x => x.id === params.p_trip && x.customer_id === k.customer && x.status === 'hazirlaniyor');
+            if (!t) return guardErr('22023', 'Araç bulunamadı ya da yola çıktığı için değiştirilemez');
+            if (!String(params.p_tractor || '').trim()) return guardErr('22023', 'Çekici plakası gerekli');
+            Object.assign(t, { tractor: String(params.p_tractor).trim().toUpperCase(), trailer: String(params.p_trailer || '').trim().toUpperCase(), depart_date: params.p_depart || t.depart_date, subject: params.p_subject || '', updated_at: now() });
+            const { created_by, ...pub } = t; return { data: clone(pub), error: null };
+          }
           if (name === 'shp_portal_delete') {
             const i = db.shp_loads.findIndex(l => l.id === params.p_id && l.customer_id === k.customer && l.status === 'bekliyor');
             if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da depoya geldiği için silinemez');
@@ -346,10 +384,10 @@
         }
         if (!k || k.kind !== 'depo' || !k.active) return bad();
         if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(t => clone(t)) }, error: null };
-        const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? x.status === 'depoda' : ['bekliyor', 'depoda'].includes(x.status)));
-        if (!l) return guardErr('22023', 'Yük bulunamadı ya da araca verildiği için değiştirilemez');
-        if (params.p_arrived === false) Object.assign(l, { status: 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now() });
-        else Object.assign(l, { status: 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now() });
+        const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? ['depoda', 'aracta'].includes(x.status) && x.arrived_at : ['bekliyor', 'depoda', 'aracta'].includes(x.status)));
+        if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
+        if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now() });
+        else Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now() });
         return { data: loadJson(l), error: null };
       }
       if (name === 'current_app_role') return { data: cfg.role || 'editor', error: null };

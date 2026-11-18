@@ -8,6 +8,8 @@ sitede hazırlayın.
 1. Supabase > **SQL Editor**'de `nakliye-kurulumu.sql` dosyasının **tamamını** çalıştırın. En altta dört satır "tamam" görünmelidir.
 2. Sitede soldaki menüden **Nakliye**'yi açın. (Yalnızca düzenleyici hesaplarda görünür.)
 
+`nakliye-kurulumu.sql` güncellendiğinde (örneğin müşteri araç planı eklenince) dosyanın **tamamını yeniden çalıştırın**; mevcut kayıtlar korunur, en altta beş satır "tamam" görünür.
+
 Çalıştırılmadan Nakliye sayfası açılırsa sayfada "bir kerelik kurulum gerekli" uyarısı çıkar; başka bir yer etkilenmez.
 
 ## Kullanım
@@ -29,9 +31,15 @@ sitede hazırlayın.
 Giriş şifresi yoktur; bağlantıyı yalnızca ilgili kişiye verin.
 
 - **Müşteri bağlantısı**: müşteri yalnızca kendi yüklerini görür; yeni yük yazar, depoya gelmeden önce düzenler ya da siler.
-  Araca atanan yüklerin Lade Liste ve CMR belgelerini kendi sayfasından alır.
+  **Hangi araca ne yükleneceğini kendisi ayarlar**: yüklerini işaretleyip "Araca koy" der (yeni araç için çekici ve dorse plakası yazar ya da
+  kendi mevcut aracını seçer). Depoya henüz gelmemiş yük de araca konabilir. Bu atama kesindir: Poz No otomatik verilir, yük sizin
+  *Boşta yükler* listenizden çıkar ve *Araçlar* sekmesinde plakanın altında "Müşteri planladı" ile görünür. Müşteri aracındaki yükü
+  çıkarabilir, plakayı düzeltebilir, Lade Liste ve CMR belgelerini kendi sayfasından alır.
+  Araç yola çıkınca **Araçlar** sekmesinde **Yola çıktı (müşteri değiştiremesin)** deyin; müşteri o araçta artık değişiklik yapamaz
+  (**Kilidi aç** ile geri açılır).
 - **Depo bağlantısı**: depodaki arkadaşlar adlarını yazıp yük gelince **Geldi**'ye basar (yanlışsa **Geri al**). Geldi denen yük sizin
-  **Boşta yükler** listenize düşer. **Araçlar** sekmesinde plaka bazında seferleri ve belgeleri görürler. Ekran 30 saniyede bir kendiliğinden yenilenir.
+  **Boşta yükler** listenize düşer. Müşterinin araca koyduğu ama depoya henüz gelmemiş yükler de **Bekleyenler**'de plakasıyla görünür; gelince
+  **Geldi** denir, yük araçta kalır. **Araçlar** sekmesinde plaka bazında seferleri ve belgeleri görürler. Ekran 30 saniyede bir kendiliğinden yenilenir.
 - **Yenile** yeni bir bağlantı üretir; eskisi o an çalışmaz olur. **Kapat** bağlantıyı silmeden durdurur.
 - Bağlantı sayfaları herkese açıktır ama yalnızca bağlantıdaki anahtarla çalışır; anahtarlar tahmin edilemez uzunluktadır ve tablolara doğrudan erişim yoktur.
 

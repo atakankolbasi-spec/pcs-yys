@@ -404,7 +404,7 @@ test('müşteri sayfası: araca atanan yükler "Araçta" görünür ve sefer bel
   await openPortal(page, '?m=tokC1', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [trip] } });
   await page.locator('[data-a="tab"][data-v="aracta"]').click();
   await expect(page.locator('#p .row').first()).toContainText('PCS-26-0001');
-  await page.locator('section', { hasText: 'Seferlerim' }).locator('[data-a="doc"][data-kind="lade"]').click();
+  await page.locator('section', { hasText: 'Araçlarım' }).locator('[data-a="doc"][data-kind="lade"]').first().click();
   expect(await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc)).toContain('LADE LİSTE');
 });
 
@@ -469,4 +469,132 @@ test('Nakliye müşterileri panodaki müşterilerden kendiliğinden eklenir (tek
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__db.shp_customers.length)).toBe(4);
   expect(problems).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------------------------- müşteri yüklerini kendi sayfasında araçlara yerleştirir
+const planTrip = (extra = {}) => ({ id: 'tt1', poz_no: 'PCS-26-0001', customer_id: 'c1', tractor: '34 ABC 123', trailer: '', depart_date: '2026-09-23', subject: '', status: 'hazirlaniyor', created_by: 'Müşteri', created_at: '2026-09-23T07:00:00Z', ...extra });
+const pickP = (page, id) => page.locator(`[data-a="pick"][data-id="${id}"]`);
+
+test('müşteri: yüklerini yeni araca koyar (depoya gelmemiş yük de); Poz No otomatik; atama kesindir', async ({ page }) => {
+  const problems = await openPortal(page, '?m=tokC1');
+  await page.locator('[data-a="tab"][data-v="hepsi"]').click();
+  await pickP(page, 'l1').check();                                                   // depoda
+  await pickP(page, 'l5').check();                                                   // depoya henüz gelmemiş
+  await expect(page.locator('#sbar')).toContainText('2 yük seçili');
+  await page.locator('#sbar [data-a="assign"]').click();
+  await expect(page.locator('#toast')).toContainText('Hangi araca');
+  await page.locator('#tg').selectOption('new');
+  await page.locator('#sbar [data-a="assign"]').click();
+  await expect(page.locator('#toast')).toContainText('Çekici plakasını yazın');
+  await page.locator('#nv-tractor').fill('34 abc 123');
+  await page.locator('#nv-trailer').fill('34 def 456');
+  await page.locator('#sbar [data-a="assign"]').click();
+  await expect(page.locator('#toast')).toContainText('PCS-26-0001');
+  await expect(page.locator('#sbar')).toHaveCount(0);
+  // Araçlarım: plaka altında, depoya gelmeyen yük işaretli
+  const card = page.locator('.tc');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('34 ABC 123');
+  await expect(card).toContainText('34 DEF 456');
+  await expect(card).toContainText('1 yük depoya gelmedi');
+  await expect(card.locator('.row.sm')).toHaveCount(2);
+  const calls = await page.evaluate(() => window.__calls.filter(c => c.rpc === 'shp_portal_assign').map(c => c.params));
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toMatchObject({ p_token: 'tokC1', p_tractor: '34 abc 123', p_trailer: '34 def 456', p_trip: null });
+  expect(calls[0].p_load_ids.sort()).toEqual(['l1', 'l5']);
+  const db = await page.evaluate(() => ({ trip: window.__db.shp_trips[0], l1: window.__db.shp_loads.find(l => l.id === 'l1'), l5: window.__db.shp_loads.find(l => l.id === 'l5') }));
+  expect(db.trip).toMatchObject({ poz_no: 'PCS-26-0001', created_by: 'Müşteri', status: 'hazirlaniyor', tractor: '34 ABC 123' });
+  expect(db.l1).toMatchObject({ status: 'aracta', trip_id: db.trip.id });
+  expect(db.l5).toMatchObject({ status: 'aracta', trip_id: db.trip.id, arrived_at: null });
+  // Lade Liste bu yükleri içerir
+  await card.locator('[data-a="doc"][data-kind="lade"]').click();
+  const lade = await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc);
+  expect(lade).toContain('34 ABC 123 - 34 DEF 456');
+  expect(lade).toContain('BEKLEYEN GÖNDERİCİ');
+  expect(problems).toEqual([]);
+});
+
+test('müşteri: mevcut aracına yük ekler, araçtan çıkarır (gelmemiş yük bekleyene, gelmiş yük depoya döner), plakayı düzeltir', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l1' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l.id === 'l5' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  await openPortal(page, '?m=tokC1', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [planTrip()] } });
+  await page.locator('[data-a="tab"][data-v="depoda"]').click();
+  await pickP(page, 'l2').check();
+  await page.locator('#tg').selectOption('tt1');
+  await page.locator('#sbar [data-a="assign"]').click();
+  await expect(page.locator('#toast')).toContainText('PCS-26-0001');
+  await expect(page.locator('.tc .row.sm')).toHaveCount(3);
+  // çıkar: l5 hiç gelmemişti -> bekliyor; l1 gelmişti -> depoda
+  await page.locator('.tc .row.sm', { hasText: 'BEKLEYEN GÖNDERİCİ' }).locator('[data-a="unassign"]').click();
+  await page.locator('.tc .row.sm', { hasText: 'ÖRNEK GÖNDERİCİ BİR' }).locator('[data-a="unassign"]').click();
+  const st = await page.evaluate(() => Object.fromEntries(window.__db.shp_loads.map(l => [l.id, l.status + (l.trip_id ? '*' : '')])));
+  expect(st).toMatchObject({ l5: 'bekliyor', l1: 'depoda', l2: 'aracta*' });
+  // plakayı düzelt
+  await page.locator('[data-a="trip-edit"]').click();
+  await page.locator('#te-tractor').fill('06 zz 999');
+  await page.locator('[data-a="trip-save"]').click();
+  await expect(page.locator('#toast')).toContainText('güncellendi');
+  await expect(page.locator('.tc')).toContainText('06 ZZ 999');
+  // son yükü de çıkarınca araç kalkar
+  await page.locator('.tc [data-a="unassign"]').click();
+  await expect(page.locator('.tc')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__db.shp_trips.length)).toBe(0);
+});
+
+test('müşteri: yola çıkıp kilitlenen araçta değişiklik yapamaz', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l1' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  await openPortal(page, '?m=tokC1', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [planTrip({ status: 'yolda' })] } });
+  await expect(page.locator('.tc')).toContainText('kilitli');
+  await expect(page.locator('.tc [data-a="unassign"]')).toHaveCount(0);
+  await expect(page.locator('[data-a="trip-edit"]')).toHaveCount(0);
+  await expect(page.locator('.tc [data-a="doc"]')).toHaveCount(2);                   // belgeler yine alınır
+  await page.locator('[data-a="tab"][data-v="depoda"]').click();
+  await pickP(page, 'l2').check();
+  await expect(page.locator('#tg option[value="tt1"]')).toHaveCount(0);              // kilitli araç listede yok
+});
+
+test('depo: araca konmuş ama gelmemiş yük Bekleyenler\'de plakasıyla görünür; Geldi araçta kalır, Araçlar sekmesinde Geri al çıkar', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l5' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l.id === 'l1' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  await openPortal(page, '?d=tokD', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [planTrip()] } });
+  await expect(page.locator('[data-a="arrive"]')).toHaveCount(1);
+  await expect(page.locator('#p .row.big', { hasText: 'BEKLEYEN GÖNDERİCİ' })).toContainText('34 ABC 123');
+  await page.locator('#nm').fill('Ahmet');
+  await page.locator('[data-a="arrive"]').click();
+  await expect(page.locator('#toast')).toContainText('geldi olarak işaretlendi');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(l => l.id === 'l5'))).toMatchObject({ status: 'aracta', trip_id: 'tt1', arrived_by: 'Ahmet' });
+  await page.locator('[data-a="tab"][data-v="araclar"]').click();
+  await expect(page.locator('#p [data-a="undo"]')).toHaveCount(2);                   // l1 ve l5 artık gelmiş
+  await page.locator('#p .row.big', { hasText: 'BEKLEYEN GÖNDERİCİ' }).locator('[data-a="undo"]').click();
+  expect(await page.evaluate(() => window.__db.shp_loads.find(l => l.id === 'l5'))).toMatchObject({ status: 'aracta', arrived_at: null });
+});
+
+test('operatör: müşterinin planladığı araç Araçlar sekmesinde; gelmeyen yük işaretli, Geldi denebilir; sefer kilitlenir', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l5' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l.id === 'l1' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  const problems = await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: ls, shp_trips: [planTrip()] } });
+  await page.locator('[data-nk="tab"][data-v="trips"]').click();
+  const trip = page.locator('.nk-trip');
+  await expect(trip).toContainText('Müşteri planladı');
+  await expect(trip).toContainText('1 yük depoya gelmedi');
+  await trip.locator('[data-nk="toggle-trip"]').click();
+  await page.locator('.nk-sub [data-nk="arrive-trip"]').click();
+  await expect(page.locator('#toast')).toContainText('geldi olarak işaretlendi');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(l => l.id === 'l5'))).toMatchObject({ status: 'aracta', arrived_by: 'Operatör' });
+  await expect(trip).not.toContainText('depoya gelmedi');
+  await page.locator('[data-nk="lock-trip"]').click();
+  await expect(page.locator('#toast')).toContainText('kilitlendi');
+  expect(await page.evaluate(() => window.__db.shp_trips[0].status)).toBe('yolda');
+  await expect(trip).toContainText('kilitli');
+  await page.locator('[data-nk="lock-trip"]').click();
+  expect(await page.evaluate(() => window.__db.shp_trips[0].status)).toBe('hazirlaniyor');
+  expect(problems).toEqual([]);
+});
+
+test('operatör: depoya gelmemiş yükü araçtan çıkarınca "Bekleyenler"e döner', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l5' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: ls, shp_trips: [planTrip()] } });
+  await page.locator('[data-nk="tab"][data-v="trips"]').click();
+  await page.locator('[data-nk="toggle-trip"]').click();
+  await page.locator('[data-nk="unassign"]').click();
+  expect(await page.evaluate(() => window.__db.shp_loads.find(l => l.id === 'l5').status)).toBe('bekliyor');
+  await page.locator('[data-nk="tab"][data-v="wait"]').click();
+  await expect(page.locator('#nk-root')).toContainText('BEKLEYEN GÖNDERİCİ');
 });
