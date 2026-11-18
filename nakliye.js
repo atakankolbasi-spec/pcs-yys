@@ -11,7 +11,7 @@
   const esc = B.esc;
   const S = {
     ready: false, loading: false, err: '', missing: false, customers: [], loads: [], trips: [],
-    tab: 'idle', sel: new Set(), cust: '', q: '', tq: '', open: new Set(), busy: false, confirm: '', rt: null,
+    tab: 'idle', syncing: false, tried: new Set(), sel: new Set(), cust: '', q: '', tq: '', open: new Set(), busy: false, confirm: '', rt: null,
     form: { tractor: '', trailer: '', date: '', subject: '', lade: true, cmr: true }
   };
 
@@ -69,6 +69,26 @@
     }
     S.loading = false;
     redraw();
+    syncPano();
+  }
+
+  // Panodaki müşteriler (Plaka kayıtları ve araç geliş kayıtları) Nakliye müşterisi olarak kendiliğinden eklenir.
+  // Ad büyük / küçük harf ve fazla boşluk farkına bakmadan karşılaştırılır; kapatılmış müşteri yeniden eklenmez.
+  const nameKey = n => tr(String(n || '').replace(/\s+/g, ' ').trim());
+  async function syncPano() {
+    if (!X || !X.panoCustomers || !S.ready || S.syncing) return;
+    const have = new Set(S.customers.map(c => nameKey(c.name))), add = new Map();
+    for (const raw of X.panoCustomers()) {
+      const name = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 120), k = nameKey(name);
+      if (k && !have.has(k) && !add.has(k) && !S.tried.has(k)) add.set(k, name);
+    }
+    if (!add.size) return;
+    S.syncing = true; add.forEach((_, k) => S.tried.add(k));
+    const { error } = await X.client.from('shp_customers').insert([...add.values()].map(name => ({ name, carrier: '', cmr_notes: B.DEFAULT_NOTES, loading_place: 'İSTANBUL - Turkey', logo: '' })));
+    S.syncing = false;
+    if (!error) X.toast(`${add.size} müşteri panodan eklendi`);
+    else if (!/23505|duplicate/.test(`${error.code} ${error.message}`)) X.toast('Panodaki müşteriler Nakliye\'ye eklenemedi', true);
+    await load(true);
   }
 
   function listen() {
@@ -211,6 +231,7 @@
 
   function view() {
     if (!S.ready && !S.loading && !S.err && !S.missing) setTimeout(() => load(), 0);
+    else if (S.ready) setTimeout(syncPano, 0);
     listen();
     return `<div id="nk-root" class="nk">${inner()}</div>`;
   }
@@ -369,7 +390,7 @@ ${id ? '' : '<label class="form-chip nk-arr"><input type="checkbox" name="arrive
   // ------------------------------------------------------------------ müşteriler
   function customersModal() {
     const rows = S.customers.map(c => `<li><span>${pill(c.id)}${c.active ? '' : ' <em>(kapalı)</em>'}<small>${esc((c.carrier || '').split('\n')[0] || 'Nakliyeci bilgisi yok')}</small></span><button type="button" class="btn small" data-nk="edit-cust" data-id="${c.id}">Düzenle</button></li>`).join('');
-    X.openModal(`${head('Müşteriler', 'Her müşterinin belgelerinde kendi logosu ve nakliyeci bilgisi çıkar.')}<div class="modal-body"><ul class="nk-cl">${rows || '<li><span>Henüz müşteri yok.</span></li>'}</ul></div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button><button type="button" class="btn primary" data-nk="edit-cust" data-id="">${ic('plus')}Yeni müşteri</button></div>`);
+    X.openModal(`${head('Müşteriler', 'Panodaki müşteriler buraya kendiliğinden eklenir. Her müşterinin belgelerinde kendi logosu ve nakliyeci bilgisi çıkar.')}<div class="modal-body"><ul class="nk-cl">${rows || '<li><span>Henüz müşteri yok.</span></li>'}</ul></div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button><button type="button" class="btn primary" data-nk="edit-cust" data-id="">${ic('plus')}Yeni müşteri</button></div>`);
   }
 
   function customerForm(id) {

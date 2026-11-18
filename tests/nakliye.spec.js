@@ -447,3 +447,26 @@ test('operatör: Bağlantılar penceresi; kopyala, yenile (eskisi çalışmaz), 
   await expect(li.nth(1)).toContainText('(kapalı)');
   expect(problems).toEqual([]);
 });
+
+test('Nakliye müşterileri panodaki müşterilerden kendiliğinden eklenir (tekrar yok, harf farkı yok, kapalı olan yeniden eklenmez)', async ({ page }) => {
+  const reg = (id, plate, customer) => ({ id, plate, customer, declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
+  const visit = (id, customer) => ({ id, plate: 'X ' + id, customer, declaration: '', carrier: '', registration: '', visit_date: '2026-09-23', visit_time: '09:00', note: '', onsite: false, t1: false, done: false, created_at: '2026-09-23T05:00:00Z', updated_at: '2026-09-23T06:00:00Z', onsite_at: null, done_at: null, sort_order: null });
+  const cs = customers(); cs[1].active = false;                                  // DENEME LOJİSTİK kapalı
+  const problems = await openNakliye(page, {
+    data: { registry: [reg('r1', '34 ABC 123', 'BULTRANS'), reg('r2', '06 KL 4567', 'örnek nakliyat'), reg('r3', 'B 1 X', '  deneme   lojistik ')],
+      visits: [visit('v1', 'TORNADO'), visit('v2', 'Tornado'), visit('v3', ''), visit('v4', 'BULTRANS')], app_settings: [], shp_customers: cs, shp_loads: loads(), shp_trips: [] }
+  });
+  await expect(page.locator('#toast')).toContainText('2 müşteri panodan eklendi');
+  const names = await page.evaluate(() => window.__db.shp_customers.map(c => c.name).sort());
+  expect(names).toEqual(['BULTRANS', 'DENEME LOJİSTİK', 'TORNADO', 'ÖRNEK NAKLİYAT'].sort());
+  expect(await page.evaluate(() => window.__db.shp_customers.find(c => c.name === 'BULTRANS').cmr_notes)).toContain('sorumlu değildir');
+  await page.locator('.heading [data-nk="customers"]').click();
+  await expect(page.locator('.nk-cl')).toContainText('BULTRANS');
+  await expect(page.locator('.nk-cl')).toContainText('TORNADO');
+  // sayfa yeniden çizilince aynı müşteriler tekrar eklenmez
+  await page.locator('[data-action="close-modal"]').first().click();
+  await page.locator('.heading [data-nk="refresh"]').click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__db.shp_customers.length)).toBe(4);
+  expect(problems).toEqual([]);
+});
