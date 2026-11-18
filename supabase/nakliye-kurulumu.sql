@@ -9,8 +9,11 @@
 --     Poz No otomatik verilir. Sefer "yola çıktı" diye kilitlenirse müşteri artık değiştiremez. Yükün depoya gelip gelmediği
 --     (arrived_at) araca atanınca da korunur; depo araçtaki yüke de "Geldi" der.
 --   * Müşteri bağlantısı yalnızca o müşterinin yüklerini, depo bağlantısı bekleyen ve boştaki yükleri ile plaka bazında seferleri gösterir.
---     Bağlantılar giriş şifresi istemez; sitedeki Nakliye > Bağlantılar penceresinden
+--     Depo bağlantısı şifre istemez. Müşteri bağlantısı, müşteriye kullanıcı tanımlanmadıkça şifre istemez; kullanıcı tanımlanınca
+--     kullanıcı adı ve şifreyle girilir (Nakliye > Müşteriler > Kullanıcılar). Bağlantılar Nakliye > Bağlantılar penceresinden
 --     yenilenir ya da kapatılır (eski bağlantı çalışmaz).
+--   * Müşteri ve depo ekranları 5 saniyede bir kendiliğinden yenilenir; müşterinin yazdığı firma ve araç bilgileri kayıt altına alınır.
+--   * Kimin neyi yaptığı shp_log tablosuna yazılır (Nakliye > Hareketler).
 --
 -- Önce whatsapp-kurulumu.sql (private.is_editor() için) çalıştırılmış olmalı.
 -- Supabase > SQL Editor'de bir kez çalıştırın. Tekrar çalıştırmak zararsızdır (dosya güncellenince yeniden çalıştırılır; kayıtlar korunur).
@@ -291,11 +294,10 @@ $$;
 create or replace function public.shp_portal(p_token text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   c public.shp_customers;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_cust_auth(p_token);
   select * into c from public.shp_customers where id = k.customer_id and active;
   if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
   return jsonb_build_object(
@@ -305,8 +307,16 @@ begin
                        from public.shp_loads l
                        where l.customer_id = c.id
                          and (l.status <> 'aracta' or l.updated_at > now() - interval '120 days')), '[]'::jsonb),
-    'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' order by t.created_at desc)
-                       from public.shp_trips t where t.customer_id = c.id and t.created_at > now() - interval '120 days'), '[]'::jsonb));
+    'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' - 'updated_by' order by t.created_at desc)
+                       from public.shp_trips t where t.customer_id = c.id and t.created_at > now() - interval '120 days'), '[]'::jsonb),
+    'user', case when k.user_id is null then null else (select jsonb_build_object('username', u.username, 'name', coalesce(nullif(u.display_name, ''), u.username)) from public.shp_users u where u.id = k.user_id) end,
+    'contacts', coalesce((select jsonb_agg(jsonb_build_object('kind', x.kind, 'name', x.name, 'addr', x.addr, 'notify', x.notify, 'country', x.country,
+                                                             'dest_customs', x.dest_customs, 'code', x.code, 'broker', x.broker) order by x.used_at desc)
+                          from (select * from public.shp_contacts where customer_id = c.id order by used_at desc limit 300) x), '[]'::jsonb),
+    'vehicles', coalesce((select jsonb_agg(jsonb_build_object('tractor', x.tractor, 'trailer', x.trailer) order by x.used_at desc)
+                          from (select * from public.shp_vehicles where customer_id = c.id order by used_at desc limit 100) x), '[]'::jsonb),
+    'log', coalesce((select jsonb_agg(jsonb_build_object('at', y.at, 'actor', case y.role when 'operator' then 'Ofis' when 'depo' then 'Depo' else y.actor end, 'action', y.action, 'summary', y.summary) order by y.at desc, y.id desc)
+                     from (select * from public.shp_log where customer_id = c.id order by at desc, id desc limit 60) y), '[]'::jsonb));
 end $$;
 
 -- Metni temizle: boşlukları düzelt, uzunluğu sınırla (shp_ml: satır sonları korunur; adresler için)
@@ -359,13 +369,12 @@ end $$;
 create or replace function public.shp_portal_save(p_token text, p_load jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   l public.shp_loads;
   c public.shp_loads;
   pid uuid := nullif(p_load ->> 'id', '')::uuid;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_cust_auth(p_token);
   c := private.shp_clean_load(p_load);
   if pid is null then
     if (select count(*) from public.shp_loads x where x.customer_id = k.customer_id and x.status <> 'aracta') >= 2000 then
@@ -392,10 +401,9 @@ end $$;
 -- Müşteri: yük siler (araca konmamış olmalı; araçtaki yükü önce araçtan çıkarır)
 create or replace function public.shp_portal_delete(p_token text, p_id uuid) returns void
 language plpgsql security definer set search_path = '' as $$
-declare k private.shp_links;
+declare k record;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_cust_auth(p_token);
   delete from public.shp_loads where id = p_id and customer_id = k.customer_id and status in ('bekliyor', 'depoda') and trip_id is null;
   if not found then raise exception 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarın' using errcode = '22023'; end if;
 end $$;
@@ -413,18 +421,17 @@ begin
     'loads', coalesce((select jsonb_agg(private.shp_load_json(l) order by l.created_at desc)
                        from public.shp_loads l
                        where l.status <> 'aracta' or l.updated_at > now() - interval '30 days'), '[]'::jsonb),
-    'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' order by t.created_at desc)
+    'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' - 'updated_by' order by t.created_at desc)
                        from public.shp_trips t where t.created_at > now() - interval '30 days'), '[]'::jsonb));
 end $$;
 
 create or replace function public.shp_depot_mark(p_token text, p_id uuid, p_arrived boolean, p_name text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   l public.shp_loads;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'depo' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_depot_auth(p_token, p_name);
   -- Araçtaki yük de işaretlenir: durumu "aracta" kalır, yalnızca geliş saati yazılır / silinir
   if coalesce(p_arrived, true) then
     update public.shp_loads set status = case when status = 'aracta' then 'aracta' else 'depoda' end,
@@ -438,17 +445,18 @@ begin
   return private.shp_load_json(l);
 end $$;
 
--- Depo: yükün bilgisini düzeltir (gerçek kap / kilo gibi) ya da siler (araca konmamış olmalı)
-create or replace function public.shp_depot_save(p_token text, p_load jsonb) returns jsonb
+-- Depo: yükün bilgisini düzeltir (gerçek kap / kilo gibi) ya da siler (araca konmamış olmalı); işlemi yapanın adı kayda geçer
+drop function if exists public.shp_depot_save(text, jsonb);
+drop function if exists public.shp_depot_delete(text, uuid);
+create or replace function public.shp_depot_save(p_token text, p_load jsonb, p_name text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   l public.shp_loads;
   c public.shp_loads;
   pid uuid := nullif(p_load ->> 'id', '')::uuid;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'depo' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_depot_auth(p_token, p_name);
   if pid is null then raise exception 'Yük bulunamadı' using errcode = '22023'; end if;
   c := private.shp_clean_load(p_load);
   update public.shp_loads x set sender = c.sender, sender_addr = c.sender_addr, consignee = c.consignee, consignee_addr = c.consignee_addr,
@@ -459,12 +467,11 @@ begin
   return private.shp_load_json(l);
 end $$;
 
-create or replace function public.shp_depot_delete(p_token text, p_id uuid) returns void
+create or replace function public.shp_depot_delete(p_token text, p_id uuid, p_name text default '') returns void
 language plpgsql security definer set search_path = '' as $$
-declare k private.shp_links;
+declare k record;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'depo' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_depot_auth(p_token, p_name);
   delete from public.shp_loads where id = p_id and status in ('bekliyor', 'depoda') and trip_id is null;
   if not found then raise exception 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarılmalı' using errcode = '22023'; end if;
 end $$;
@@ -475,12 +482,11 @@ create or replace function public.shp_portal_assign(p_token text, p_load_ids uui
                                                      p_trailer text default '', p_depart date default null, p_subject text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   t public.shp_trips;
   n int;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_cust_auth(p_token);
   if p_load_ids is null or coalesce(array_length(p_load_ids, 1), 0) = 0 then
     raise exception 'Önce yük seçin' using errcode = '22023';
   end if;
@@ -505,18 +511,17 @@ begin
     returning * into t;
   end if;
   update public.shp_loads set status = 'aracta', trip_id = t.id where id = any (p_load_ids);
-  return jsonb_build_object('trip', to_jsonb(t) - 'created_by');
+  return jsonb_build_object('trip', to_jsonb(t) - 'created_by' - 'updated_by');
 end $$;
 
 create or replace function public.shp_portal_unassign(p_token text, p_load_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   tid uuid;
   gone boolean := false;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_cust_auth(p_token);
   select l.trip_id into tid from public.shp_loads l
   join public.shp_trips t on t.id = l.trip_id
   where l.id = p_load_id and l.customer_id = k.customer_id and l.status = 'aracta' and t.status = 'hazirlaniyor' for update of l;
@@ -533,17 +538,401 @@ create or replace function public.shp_portal_trip_update(p_token text, p_trip uu
                                                           p_depart date default null, p_subject text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  k private.shp_links;
+  k record;
   t public.shp_trips;
 begin
-  select * into k from private.shp_links where token = p_token and kind = 'musteri' and active;
-  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  select * into k from private.shp_cust_auth(p_token);
   if btrim(coalesce(p_tractor, '')) = '' then raise exception 'Çekici plakası gerekli' using errcode = '22023'; end if;
   update public.shp_trips set tractor = upper(left(btrim(p_tractor), 30)), trailer = upper(left(btrim(coalesce(p_trailer, '')), 30)),
     depart_date = coalesce(p_depart, depart_date), subject = left(btrim(coalesce(p_subject, '')), 200)
   where id = p_trip and customer_id = k.customer_id and status = 'hazirlaniyor' returning * into t;
   if not found then raise exception 'Araç bulunamadı ya da yola çıktığı için değiştirilemez' using errcode = '22023'; end if;
-  return to_jsonb(t) - 'created_by';
+  return to_jsonb(t) - 'created_by' - 'updated_by';
+end $$;
+
+-- ---------------------------------------------------------------- kullanıcılar, giriş, işlem geçmişi, kayıtlı firma ve araçlar
+-- Müşteri tarafı kullanıcı adı ve şifreyle giriş: kullanıcıları ve şifreleri siz belirlersiniz (Nakliye > Müşteriler > Kullanıcılar).
+-- Bir müşteriye kullanıcı eklediğiniz anda o müşterinin sayfası yalnızca kullanıcı girişiyle açılır (bağlantı tek başına yetmez;
+-- kullanıcılar pasif olsa bile bağlantı açılmaz, ancak tüm kullanıcılar silinirse bağlantıyla girişe dönülür).
+-- Her yük ve sefer işlemi (kim, ne zaman, ne yaptı) shp_log tablosuna yazılır; Nakliye > Hareketler'de görürsünüz.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
+alter table public.shp_loads add column if not exists updated_by text not null default '' check (length(updated_by) <= 120);
+alter table public.shp_trips add column if not exists updated_by text not null default '' check (length(updated_by) <= 120);
+
+create table if not exists public.shp_users (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.shp_customers (id) on delete cascade,
+  username text not null check (username ~ '^[a-z0-9._-]{3,40}$'),
+  display_name text not null default '' check (length(display_name) <= 80),
+  active boolean not null default true,
+  last_login_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists shp_users_username on public.shp_users (username);
+create table if not exists private.shp_user_pw (user_id uuid primary key references public.shp_users (id) on delete cascade, pass_hash text not null);
+create table if not exists private.shp_sessions (
+  token text primary key, user_id uuid not null references public.shp_users (id) on delete cascade,
+  created_at timestamptz not null default now(), expires_at timestamptz not null
+);
+create table if not exists private.shp_attempts (username text primary key, fails int not null default 0, locked_until timestamptz, updated_at timestamptz not null default now());
+
+create table if not exists public.shp_log (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  customer_id uuid,
+  actor text not null default '',
+  role text not null default '',
+  action text not null,
+  summary text not null default ''
+);
+create index if not exists shp_log_at on public.shp_log (at desc);
+create index if not exists shp_log_musteri on public.shp_log (customer_id, at desc);
+
+-- Müşterinin bir kez yazdığı firma (gönderici / alıcı) ve araç bilgileri kendiliğinden saklanır; sonraki yüklerde tekrar yazılmaz
+create table if not exists public.shp_contacts (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.shp_customers (id) on delete cascade,
+  kind text not null check (kind in ('sender', 'consignee')),
+  name text not null,
+  addr text not null default '',
+  notify text not null default '',
+  country text not null default '',
+  dest_customs text not null default '',
+  code text not null default '',
+  broker text not null default '',
+  used_at timestamptz not null default now()
+);
+create unique index if not exists shp_contacts_tek on public.shp_contacts (customer_id, kind, upper(name));
+create table if not exists public.shp_vehicles (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.shp_customers (id) on delete cascade,
+  tractor text not null,
+  trailer text not null default '',
+  used_at timestamptz not null default now()
+);
+create unique index if not exists shp_vehicles_tek on public.shp_vehicles (customer_id, tractor, trailer);
+
+alter table public.shp_users enable row level security;
+alter table public.shp_log enable row level security;
+alter table public.shp_contacts enable row level security;
+alter table public.shp_vehicles enable row level security;
+revoke all on public.shp_users, public.shp_log, public.shp_contacts, public.shp_vehicles from anon;
+revoke all on private.shp_user_pw, private.shp_sessions, private.shp_attempts from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on public.shp_users, public.shp_log, public.shp_contacts, public.shp_vehicles from authenticated';
+    execute 'revoke all on private.shp_user_pw, private.shp_sessions, private.shp_attempts from authenticated';
+    execute 'grant select on public.shp_log to authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'anon') then execute 'revoke all on private.shp_user_pw, private.shp_sessions, private.shp_attempts from anon'; end if;
+end $$;
+-- işlem geçmişini yalnızca düzenleyiciler okur
+drop policy if exists shp_log_editor on public.shp_log;
+create policy shp_log_editor on public.shp_log for select to authenticated using ((select private.is_editor()));
+
+-- şifre özeti (bcrypt) ve doğrulama; pgcrypto hangi şemada kuruluysa orayı kullanır
+create or replace function private.shp_hash(pw text) returns text
+language plpgsql set search_path = '' as $$
+declare sch text; r text;
+begin
+  select n.nspname into sch from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pgcrypto';
+  if sch is null then raise exception 'pgcrypto kurulu değil' using errcode = '55000'; end if;
+  execute format('select %1$I.crypt($1, %1$I.gen_salt(''bf'', 10))', sch) into r using pw;
+  return r;
+end $$;
+create or replace function private.shp_check(pw text, h text) returns boolean
+language plpgsql set search_path = '' as $$
+declare sch text; ok boolean;
+begin
+  select n.nspname into sch from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pgcrypto';
+  if sch is null then raise exception 'pgcrypto kurulu değil' using errcode = '55000'; end if;
+  execute format('select %I.crypt($1, $2) = $2', sch) into ok using pw, h;
+  return coalesce(ok, false);
+end $$;
+
+-- işlemi yapan: müşteri / depo işlevleri adı "pcs.actor" ayarına yazar; yoksa oturum açan düzenleyicinin e-postası
+create or replace function private.shp_actor() returns text
+language sql stable security definer set search_path = '' as $$
+  select coalesce(nullif(current_setting('pcs.actor', true), ''), nullif(btrim(coalesce(auth.jwt() ->> 'email', '')), ''), 'Operatör')
+$$;
+create or replace function private.shp_role_of(a text) returns text
+language sql immutable set search_path = '' as $$ select case when a like 'Müşteri%' then 'musteri' when a like 'Depo%' then 'depo' else 'operator' end $$;
+
+-- müşteri sayfası yetkisi: oturum anahtarı (kullanıcı girişi) ya da müşteri bağlantısı (müşteriye kullanıcı tanımlıysa giriş zorunlu)
+create or replace function private.shp_cust_auth(p_token text) returns table (customer_id uuid, user_id uuid, actor text)
+language plpgsql security definer set search_path = '' as $$
+declare u record; k private.shp_links; a text;
+begin
+  select us.id as uid, us.customer_id as cid, us.username as un, us.display_name as dn into u
+  from private.shp_sessions s join public.shp_users us on us.id = s.user_id join public.shp_customers c on c.id = us.customer_id
+  where s.token = p_token and s.expires_at > now() and us.active and c.active;
+  if found then
+    a := 'Müşteri · ' || coalesce(nullif(u.dn, ''), u.un);
+    perform set_config('pcs.actor', a, true);
+    return query select u.cid, u.uid, a;
+    return;
+  end if;
+  select * into k from private.shp_links l where l.token = p_token and l.kind = 'musteri' and l.active;
+  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  if exists (select 1 from public.shp_users su where su.customer_id = k.customer_id) then
+    raise exception 'Bu sayfa için kullanıcı girişi gerekli' using errcode = '28000';
+  end if;
+  perform set_config('pcs.actor', 'Müşteri (bağlantı)', true);
+  return query select k.customer_id, null::uuid, 'Müşteri (bağlantı)'::text;
+end $$;
+
+create or replace function private.shp_depot_auth(p_token text, p_name text default '') returns table (actor text)
+language plpgsql security definer set search_path = '' as $$
+declare k private.shp_links; a text;
+begin
+  select * into k from private.shp_links l where l.token = p_token and l.kind = 'depo' and l.active;
+  if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+  a := 'Depo · ' || coalesce(nullif(left(btrim(coalesce(p_name, '')), 60), ''), 'adı yazılmamış');
+  perform set_config('pcs.actor', a, true);
+  return query select a;
+end $$;
+
+-- yük ve seferlerde kim oluşturdu / son kim değiştirdi
+create or replace function private.shp_stamp_actor() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then new.created_by := left(private.shp_actor(), 120); end if;
+  new.updated_by := left(private.shp_actor(), 120);
+  return new;
+end $$;
+drop trigger if exists shp_loads_actor on public.shp_loads;
+create trigger shp_loads_actor before insert or update on public.shp_loads for each row execute function private.shp_stamp_actor();
+drop trigger if exists shp_trips_actor on public.shp_trips;
+create trigger shp_trips_actor before insert or update on public.shp_trips for each row execute function private.shp_stamp_actor();
+
+-- işlem geçmişi: yük
+create or replace function private.shp_log_load() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare a text := private.shp_actor(); act text; r public.shp_loads;
+begin
+  if tg_op = 'DELETE' then r := old; act := 'Yük silindi';
+  elsif tg_op = 'INSERT' then r := new; act := 'Yük eklendi';
+  else
+    r := new;
+    if old.arrived_at is null and new.arrived_at is not null then act := 'Depoya geldi olarak işaretlendi';
+    elsif old.arrived_at is not null and new.arrived_at is null then act := 'Geldi işareti geri alındı';
+    elsif old.trip_id is distinct from new.trip_id then
+      if new.trip_id is null then act := 'Araçtan çıkarıldı';
+      else act := 'Araca konuldu: ' || coalesce((select t.poz_no || ' · ' || t.tractor from public.shp_trips t where t.id = new.trip_id), ''); end if;
+    elsif (old.sender, old.consignee, old.sender_addr, old.consignee_addr, old.notify, old.pieces, old.packing, old.goods, old.weight, old.volume,
+           old.country, old.code, old.dest_customs, old.broker, old.expected_date, old.inbound_plate, old.note)
+          is distinct from
+          (new.sender, new.consignee, new.sender_addr, new.consignee_addr, new.notify, new.pieces, new.packing, new.goods, new.weight, new.volume,
+           new.country, new.code, new.dest_customs, new.broker, new.expected_date, new.inbound_plate, new.note)
+    then act := 'Yük düzenlendi';
+    else return null; end if;
+  end if;
+  insert into public.shp_log (customer_id, actor, role, action, summary)
+  values (r.customer_id, a, private.shp_role_of(a), act, r.sender || ' → ' || r.consignee || ' · ' || r.weight || ' kg');
+  return null;
+end $$;
+drop trigger if exists shp_loads_log on public.shp_loads;
+create trigger shp_loads_log after insert or update or delete on public.shp_loads for each row execute function private.shp_log_load();
+
+-- işlem geçmişi: sefer
+create or replace function private.shp_log_trip() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare a text := private.shp_actor(); act text; r public.shp_trips;
+begin
+  if tg_op = 'DELETE' then r := old; act := 'Sefer silindi';
+  elsif tg_op = 'INSERT' then r := new; act := 'Sefer oluşturuldu';
+  else
+    r := new;
+    if old.status is distinct from new.status then act := case when new.status = 'hazirlaniyor' then 'Sefer kilidi açıldı' else 'Sefer kilitlendi (yola çıktı)' end;
+    elsif (old.tractor, old.trailer, old.depart_date, old.subject) is distinct from (new.tractor, new.trailer, new.depart_date, new.subject) then act := 'Araç bilgisi değiştirildi';
+    else return null; end if;
+  end if;
+  insert into public.shp_log (customer_id, actor, role, action, summary)
+  values (r.customer_id, a, private.shp_role_of(a), act, r.poz_no || ' · ' || r.tractor || case when r.trailer <> '' then ' / ' || r.trailer else '' end);
+  return null;
+end $$;
+drop trigger if exists shp_trips_log on public.shp_trips;
+create trigger shp_trips_log after insert or update or delete on public.shp_trips for each row execute function private.shp_log_trip();
+
+-- firma ve araç bilgisini kendiliğinden sakla
+create or replace function private.shp_remember_load() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if btrim(new.sender) <> '' then
+    insert into public.shp_contacts (customer_id, kind, name, addr, used_at) values (new.customer_id, 'sender', new.sender, new.sender_addr, now())
+    on conflict (customer_id, kind, (upper(name))) do update set addr = case when excluded.addr <> '' then excluded.addr else public.shp_contacts.addr end, used_at = now();
+  end if;
+  if btrim(new.consignee) <> '' then
+    insert into public.shp_contacts (customer_id, kind, name, addr, notify, country, dest_customs, code, broker, used_at)
+    values (new.customer_id, 'consignee', new.consignee, new.consignee_addr, new.notify, new.country, new.dest_customs, new.code, new.broker, now())
+    on conflict (customer_id, kind, (upper(name))) do update set
+      addr = case when excluded.addr <> '' then excluded.addr else public.shp_contacts.addr end,
+      notify = case when excluded.notify <> '' then excluded.notify else public.shp_contacts.notify end,
+      country = case when excluded.country <> '' then excluded.country else public.shp_contacts.country end,
+      dest_customs = case when excluded.dest_customs <> '' then excluded.dest_customs else public.shp_contacts.dest_customs end,
+      code = case when excluded.code <> '' then excluded.code else public.shp_contacts.code end,
+      broker = case when excluded.broker <> '' then excluded.broker else public.shp_contacts.broker end,
+      used_at = now();
+  end if;
+  return null;
+end $$;
+drop trigger if exists shp_loads_remember on public.shp_loads;
+create trigger shp_loads_remember after insert or update of sender, consignee, sender_addr, consignee_addr, notify, country, dest_customs, code, broker on public.shp_loads
+  for each row execute function private.shp_remember_load();
+create or replace function private.shp_remember_trip() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if btrim(new.tractor) <> '' then
+    insert into public.shp_vehicles (customer_id, tractor, trailer, used_at) values (new.customer_id, new.tractor, new.trailer, now())
+    on conflict (customer_id, tractor, trailer) do update set used_at = now();
+  end if;
+  return null;
+end $$;
+drop trigger if exists shp_trips_remember on public.shp_trips;
+create trigger shp_trips_remember after insert or update of tractor, trailer on public.shp_trips for each row execute function private.shp_remember_trip();
+
+-- şimdiye kadarki kayıtlardan rehberi doldur (tekrar çalıştırmak zararsızdır)
+insert into public.shp_contacts (customer_id, kind, name, addr, used_at)
+select distinct on (l.customer_id, upper(l.sender)) l.customer_id, 'sender', l.sender, l.sender_addr, l.created_at
+from public.shp_loads l where btrim(l.sender) <> '' order by l.customer_id, upper(l.sender), (l.sender_addr <> '') desc, l.created_at desc
+on conflict do nothing;
+insert into public.shp_contacts (customer_id, kind, name, addr, notify, country, dest_customs, code, broker, used_at)
+select distinct on (l.customer_id, upper(l.consignee)) l.customer_id, 'consignee', l.consignee, l.consignee_addr, l.notify, l.country, l.dest_customs, l.code, l.broker, l.created_at
+from public.shp_loads l where btrim(l.consignee) <> '' order by l.customer_id, upper(l.consignee), (l.consignee_addr <> '') desc, l.created_at desc
+on conflict do nothing;
+insert into public.shp_vehicles (customer_id, tractor, trailer, used_at)
+select distinct on (t.customer_id, t.tractor, t.trailer) t.customer_id, t.tractor, t.trailer, t.created_at
+from public.shp_trips t where btrim(t.tractor) <> '' order by t.customer_id, t.tractor, t.trailer, t.created_at desc
+on conflict do nothing;
+
+-- kullanıcı girişi: 5 yanlış denemede 15 dakika kilit. Hata fırlatmaz, {ok:false} döner; böylece deneme sayacı geri alınmaz.
+create or replace function public.shp_login(p_username text, p_password text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  un text := lower(btrim(coalesce(p_username, '')));
+  at private.shp_attempts;
+  u record;
+  ok boolean := false;
+  found_user boolean := false;
+  tok text;
+  nm text;
+  nf int;
+begin
+  select * into at from private.shp_attempts a where a.username = left(un, 60);
+  if found and at.locked_until is not null and at.locked_until > now() then
+    return jsonb_build_object('ok', false, 'message', 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.');
+  end if;
+  select us.id as uid, us.customer_id as cid, us.username as uname, us.display_name as dn, h.pass_hash as hash into u
+  from public.shp_users us join private.shp_user_pw h on h.user_id = us.id join public.shp_customers c on c.id = us.customer_id
+  where us.username = un and us.active and c.active;
+  found_user := found;
+  if found_user then ok := private.shp_check(coalesce(p_password, ''), u.hash);
+  else perform private.shp_hash(coalesce(p_password, 'x')); end if;   -- kullanıcı yokken de aynı sürede cevap ver
+  if not ok then
+    nf := case when at.updated_at is not null and at.updated_at < now() - interval '15 minutes' then 1 else coalesce(at.fails, 0) + 1 end;
+    insert into private.shp_attempts (username, fails, locked_until, updated_at) values (left(un, 60), nf, case when nf >= 5 then now() + interval '15 minutes' end, now())
+    on conflict (username) do update set fails = excluded.fails, locked_until = excluded.locked_until, updated_at = now();
+    return jsonb_build_object('ok', false, 'message', 'Kullanıcı adı ya da şifre hatalı.');
+  end if;
+  delete from private.shp_attempts a where a.username = left(un, 60);
+  delete from private.shp_sessions s where s.expires_at < now();
+  delete from private.shp_attempts a where a.updated_at < now() - interval '1 day';
+  delete from public.shp_log g where g.at < now() - interval '400 days';
+  tok := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
+  insert into private.shp_sessions (token, user_id, expires_at) values (tok, u.uid, now() + interval '30 days');
+  update public.shp_users set last_login_at = now() where id = u.uid;
+  nm := coalesce(nullif(u.dn, ''), u.uname);
+  insert into public.shp_log (customer_id, actor, role, action) values (u.cid, 'Müşteri · ' || nm, 'musteri', 'Giriş yaptı');
+  return jsonb_build_object('ok', true, 'token', tok, 'name', nm, 'username', u.uname);
+end $$;
+
+create or replace function public.shp_logout(p_token text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from private.shp_sessions where token = p_token;
+end $$;
+
+-- hafif değişiklik damgası: açık ekranlar 5 saniyede bir bunu sorar, değiştiyse tam veriyi çeker
+create or replace function public.shp_stamp(p_token text) returns text
+language plpgsql security definer set search_path = '' as $$
+declare k record; cid uuid; isdepot boolean := false; r text;
+begin
+  begin
+    select * into k from private.shp_cust_auth(p_token);
+    cid := k.customer_id;
+  exception when sqlstate '28000' then
+    raise;
+  when others then
+    perform 1 from private.shp_links l where l.token = p_token and l.kind = 'depo' and l.active;
+    if not found then raise exception 'Bağlantı geçersiz ya da kapatılmış' using errcode = '42501'; end if;
+    isdepot := true;
+  end;
+  select (select count(*)::text || '/' || coalesce(max(l.updated_at)::text, '') from public.shp_loads l where isdepot or l.customer_id = cid) || '|' ||
+         (select count(*)::text || '/' || coalesce(max(t.updated_at)::text, '') from public.shp_trips t where isdepot or t.customer_id = cid) into r;
+  return r;
+end $$;
+
+-- düzenleyici: kullanıcı yönetimi
+create or replace function public.shp_users_list(p_customer uuid default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not coalesce((select private.is_editor()), false) then raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', u.id, 'customer_id', u.customer_id, 'customer', c.name, 'username', u.username, 'display_name', u.display_name,
+                                                     'active', u.active, 'last_login_at', u.last_login_at) order by c.name, u.username)
+                   from public.shp_users u join public.shp_customers c on c.id = u.customer_id where p_customer is null or u.customer_id = p_customer), '[]'::jsonb);
+end $$;
+
+create or replace function public.shp_user_save(p_id uuid, p_customer uuid, p_username text, p_name text, p_password text, p_active boolean default true) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  un text := lower(btrim(coalesce(p_username, '')));
+  pw text := coalesce(p_password, '');
+  r public.shp_users;
+begin
+  if not coalesce((select private.is_editor()), false) then raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501'; end if;
+  if un !~ '^[a-z0-9._-]{3,40}$' then raise exception 'Kullanıcı adı 3-40 karakter olmalı; küçük harf, rakam, nokta, tire ya da alt çizgi kullanın' using errcode = '22023'; end if;
+  if p_id is null then
+    if length(pw) < 6 then raise exception 'Şifre en az 6 karakter olmalı' using errcode = '22023'; end if;
+    insert into public.shp_users (customer_id, username, display_name, active) values (p_customer, un, left(btrim(coalesce(p_name, '')), 80), coalesce(p_active, true)) returning * into r;
+    insert into private.shp_user_pw (user_id, pass_hash) values (r.id, private.shp_hash(pw));
+    insert into public.shp_log (customer_id, actor, role, action, summary) values (r.customer_id, private.shp_actor(), 'operator', 'Kullanıcı eklendi', un);
+  else
+    if pw <> '' and length(pw) < 6 then raise exception 'Şifre en az 6 karakter olmalı' using errcode = '22023'; end if;
+    update public.shp_users set username = un, display_name = left(btrim(coalesce(p_name, '')), 80), active = coalesce(p_active, true), updated_at = now()
+    where id = p_id returning * into r;
+    if not found then raise exception 'Kullanıcı bulunamadı' using errcode = '22023'; end if;
+    if pw <> '' then
+      insert into private.shp_user_pw (user_id, pass_hash) values (r.id, private.shp_hash(pw)) on conflict (user_id) do update set pass_hash = excluded.pass_hash;
+    end if;
+    if pw <> '' or not r.active then delete from private.shp_sessions where user_id = r.id; end if;
+    insert into public.shp_log (customer_id, actor, role, action, summary)
+    values (r.customer_id, private.shp_actor(), 'operator', case when pw <> '' then 'Kullanıcı şifresi değiştirildi' else 'Kullanıcı güncellendi' end, un);
+  end if;
+  return jsonb_build_object('id', r.id, 'username', r.username, 'display_name', r.display_name, 'active', r.active);
+exception when unique_violation then
+  raise exception 'Bu kullanıcı adı başka biri tarafından kullanılıyor' using errcode = '22023';
+end $$;
+
+create or replace function public.shp_user_delete(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.shp_users;
+begin
+  if not coalesce((select private.is_editor()), false) then raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501'; end if;
+  delete from public.shp_users where id = p_id returning * into r;
+  if found then insert into public.shp_log (customer_id, actor, role, action, summary) values (r.customer_id, private.shp_actor(), 'operator', 'Kullanıcı silindi', r.username); end if;
+end $$;
+
+-- düzenleyici: işlem geçmişi (müşteriye göre süzülebilir)
+create or replace function public.shp_log_list(p_customer uuid default null, p_limit int default 200) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not coalesce((select private.is_editor()), false) then raise exception 'Bu işlem için düzenleyici yetkisi gerekli' using errcode = '42501'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('at', y.at, 'customer_id', y.customer_id, 'customer', c.name, 'actor', y.actor, 'role', y.role, 'action', y.action, 'summary', y.summary) order by y.at desc, y.id desc)
+                   from (select * from public.shp_log g where p_customer is null or g.customer_id = p_customer order by g.at desc, g.id desc limit least(greatest(coalesce(p_limit, 200), 1), 500)) y
+                   left join public.shp_customers c on c.id = y.customer_id), '[]'::jsonb);
 end $$;
 
 -- ---------------------------------------------------------------- yetkiler
@@ -552,15 +941,32 @@ revoke all on function public.shp_assign(uuid, uuid[], text, text, date, text), 
   public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid),
   public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text),
   public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid),
-  public.shp_portal_trip_update(text, uuid, text, text, date, text), public.shp_depot_save(text, jsonb), public.shp_depot_delete(text, uuid) from public;
+  public.shp_portal_trip_update(text, uuid, text, text, date, text), public.shp_depot_save(text, jsonb, text), public.shp_depot_delete(text, uuid, text) from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     execute 'revoke all on function public.shp_assign(uuid, uuid[], text, text, date, text), public.shp_unassign(uuid), public.shp_delete_trip(uuid), public.shp_links(), public.shp_rotate_link(uuid), public.shp_set_link(uuid, boolean) from anon';
-    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text), public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid), public.shp_portal_trip_update(text, uuid, text, text, date, text), public.shp_depot_save(text, jsonb), public.shp_depot_delete(text, uuid) to anon';
+    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text), public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid), public.shp_portal_trip_update(text, uuid, text, text, date, text), public.shp_depot_save(text, jsonb, text), public.shp_depot_delete(text, uuid, text) to anon';
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     execute 'grant execute on function public.shp_assign(uuid, uuid[], text, text, date, text), public.shp_unassign(uuid), public.shp_delete_trip(uuid), public.shp_links(), public.shp_rotate_link(uuid), public.shp_set_link(uuid, boolean) to authenticated';
-    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text), public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid), public.shp_portal_trip_update(text, uuid, text, text, date, text), public.shp_depot_save(text, jsonb), public.shp_depot_delete(text, uuid) to authenticated';
+    execute 'grant execute on function public.shp_portal(text), public.shp_portal_save(text, jsonb), public.shp_portal_delete(text, uuid), public.shp_depot(text), public.shp_depot_mark(text, uuid, boolean, text), public.shp_portal_assign(text, uuid[], uuid, text, text, date, text), public.shp_portal_unassign(text, uuid), public.shp_portal_trip_update(text, uuid, text, text, date, text), public.shp_depot_save(text, jsonb, text), public.shp_depot_delete(text, uuid, text) to authenticated';
+  end if;
+end $$;
+
+-- yeni işlevlerin yetkileri: giriş / çıkış / değişiklik damgası herkese açık (anahtar ister); kullanıcı ve geçmiş yönetimi yalnızca düzenleyicilere
+revoke all on function public.shp_login(text, text), public.shp_logout(text), public.shp_stamp(text),
+  public.shp_users_list(uuid), public.shp_user_save(uuid, uuid, text, text, text, boolean), public.shp_user_delete(uuid),
+  public.shp_log_list(uuid, int) from public;
+revoke all on function private.shp_hash(text), private.shp_check(text, text), private.shp_actor(), private.shp_role_of(text),
+  private.shp_cust_auth(text), private.shp_depot_auth(text, text), private.shp_stamp_actor(), private.shp_log_load(), private.shp_log_trip(),
+  private.shp_remember_load(), private.shp_remember_trip() from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on function public.shp_users_list(uuid), public.shp_user_save(uuid, uuid, text, text, text, boolean), public.shp_user_delete(uuid), public.shp_log_list(uuid, int) from anon';
+    execute 'grant execute on function public.shp_login(text, text), public.shp_logout(text), public.shp_stamp(text) to anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'grant execute on function public.shp_login(text, text), public.shp_logout(text), public.shp_stamp(text), public.shp_users_list(uuid), public.shp_user_save(uuid, uuid, text, text, text, boolean), public.shp_user_delete(uuid), public.shp_log_list(uuid, int) to authenticated';
   end if;
 end $$;
 
@@ -595,7 +1001,7 @@ begin
   end if;
 end $plastnak$;
 
--- ---------------------------------------------------------------- kontrol: yedi satır da "tamam" olmalı
+-- ---------------------------------------------------------------- kontrol: on satır da "tamam" olmalı
 select 'tablolar (müşteri, sefer, yük)' as kontrol,
        case when to_regclass('public.shp_customers') is not null and to_regclass('public.shp_trips') is not null
                  and to_regclass('public.shp_loads') is not null then 'tamam' else 'EKSİK' end as durum
@@ -619,9 +1025,24 @@ select 'müşteri araç planı',
                  and to_regprocedure('public.shp_portal_trip_update(text, uuid, text, text, date, text)') is not null then 'tamam' else 'EKSİK' end
 union all
 select 'yük düzenleme, silme ve getirecek kamyon plakası',
-       case when to_regprocedure('public.shp_depot_save(text, jsonb)') is not null and to_regprocedure('public.shp_depot_delete(text, uuid)') is not null
+       case when to_regprocedure('public.shp_depot_save(text, jsonb, text)') is not null and to_regprocedure('public.shp_depot_delete(text, uuid, text)') is not null
                  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'inbound_plate')
             then 'tamam' else 'EKSİK' end
 union all
 select 'PLASTNAK taslağı (logo, nakliyeci bilgisi)',
-       case when exists (select 1 from public.shp_customers where upper(name) like '%PLASTNAK%' and logo <> '') then 'tamam' else 'EKSİK' end;
+       case when exists (select 1 from public.shp_customers where upper(name) like '%PLASTNAK%' and logo <> '') then 'tamam' else 'EKSİK' end
+union all
+select 'müşteri kullanıcı girişi (kullanıcı adı ve şifre)',
+       case when to_regclass('public.shp_users') is not null and to_regclass('private.shp_user_pw') is not null
+                 and to_regprocedure('public.shp_login(text, text)') is not null and to_regprocedure('public.shp_user_save(uuid, uuid, text, text, text, boolean)') is not null
+                 and exists (select 1 from pg_extension where extname = 'pgcrypto') then 'tamam' else 'EKSİK' end
+union all
+select 'işlem geçmişi (kim ne yaptı)',
+       case when to_regclass('public.shp_log') is not null and to_regprocedure('public.shp_log_list(uuid, int)') is not null
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_loads'::regclass and tgname = 'shp_loads_log')
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_trips'::regclass and tgname = 'shp_trips_log') then 'tamam' else 'EKSİK' end
+union all
+select 'firma ve araç bilgisi kendiliğinden kaydı, 5 sn yenileme',
+       case when to_regclass('public.shp_contacts') is not null and to_regclass('public.shp_vehicles') is not null
+                 and to_regprocedure('public.shp_stamp(text)') is not null
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_loads'::regclass and tgname = 'shp_loads_remember') then 'tamam' else 'EKSİK' end;
