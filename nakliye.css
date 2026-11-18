@@ -100,3 +100,11 @@ dialog:has(.nk-lk){width:min(860px,calc(100% - 28px))}
 @media(max-width:1180px){.nk-cols{grid-template-columns:1fr}.nk-side{position:static}.nk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.nk-search input{width:100%}}
 html[data-theme="dark"] .nk-warn,html[data-theme="dark"] .nk-ferr{background:#4a1d1a;color:#ffd6d2;border-color:#7a2f2a}
 html[data-theme="dark"] .nk-ch.a{background:#4a3a14;color:#ffd98a}html[data-theme="dark"] .nk-ch.g{background:#173d2b;color:#9be3bf}html[data-theme="dark"] .nk-ch.b{background:#1c2f52;color:#a9c8ff}
+/* müşteri kullanıcıları ve hareketler */
+.nk-nowrap{white-space:nowrap}
+.nk-ua{display:flex;gap:8px;flex:none}
+.nk-cl li.off b{opacity:.6}.nk-cl code{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:12px}
+.nk-info{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px}
+.nk-info input{display:block;width:100%;margin:6px 0 8px;min-height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:12.5px;background:#fff;color:var(--ink)}
+.nk-info small{display:block;margin-top:8px;color:var(--muted)}
+.nk-pw{display:flex;gap:8px}.nk-pw input{flex:1}
