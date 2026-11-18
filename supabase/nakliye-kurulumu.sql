@@ -6,7 +6,7 @@
 --     (yıl değişince PCS-27-0001'den yeniden başlar). CMR numaraları Poz No'ya /01, /02 ... eklenerek yazılır.
 --   * Araca atanan yük "boşta" listesinden çıkar, plakanın altında durur; yanlış atanan yük araçtan çıkarılabilir.
 --   * Müşteri bağlantısı yalnızca o müşterinin yüklerini, depo bağlantısı bekleyen ve boştaki yükleri ile plaka bazında seferleri gösterir.
---     Bağlantılar giriş şifresi istemez; Ayarlar'dan değil, sitedeki Nakliye > Müşteriler ve bağlantılar penceresinden
+--     Bağlantılar giriş şifresi istemez; sitedeki Nakliye > Bağlantılar penceresinden
 --     yenilenir ya da kapatılır (eski bağlantı çalışmaz).
 --
 -- Önce whatsapp-kurulumu.sql (private.is_editor() için) çalıştırılmış olmalı.

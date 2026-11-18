@@ -214,7 +214,7 @@
     listen();
     return `<div id="nk-root" class="nk">${inner()}</div>`;
   }
-  const actions = () => `<button type="button" class="btn" data-nk="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn" data-nk="customers">${ic('building')}Müşteriler</button><button type="button" class="btn primary" data-nk="add-load">${ic('plus')}Yük ekle</button>`;
+  const actions = () => `<button type="button" class="btn" data-nk="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn" data-nk="customers">${ic('building')}Müşteriler</button><button type="button" class="btn" data-nk="links">${ic('doc')}Bağlantılar</button><button type="button" class="btn primary" data-nk="add-load">${ic('plus')}Yük ekle</button>`;
 
   // ------------------------------------------------------------------ belgeler
   function showDocs(trip, loads, which) {
@@ -290,6 +290,8 @@
     if (a === 'add-load') { loadForm(''); return; }
     if (a === 'edit-load') { loadForm(id); return; }
     if (a === 'customers') { customersModal(); return; }
+    if (a === 'links') { await linksModal(); return; }
+    if (a.startsWith('lk-')) { await linkAction(a, t); return; }
     if (a === 'edit-cust') { customerForm(id); return; }
     if (a === 'back-cust') { customersModal(); return; }
     if (a === 'del-load') { await removeLoad(t); return; }
@@ -407,6 +409,60 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
     X.toast(id ? 'Müşteri güncellendi' : 'Müşteri eklendi');
     await load(true);
     customersModal();
+  }
+
+  // ------------------------------------------------------------------ bağlantılar (müşteri ve depo sayfaları)
+  let LK = null;
+  const linkUrl = (kind, token) => new URL(`nakliye.html?${kind}=${encodeURIComponent(token)}`, location.href).href;
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (_) {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (_) { /* kopyalanamadı */ } ta.remove(); return ok;
+    }
+  }
+  function linksHtml() {
+    const row = (key, kind, title, sub, l) => `<li class="${l.active ? '' : 'off'}"><div class="nk-lk-t"><b>${esc(title)}</b>${l.active ? '' : ' <em>(kapalı)</em>'}<small>${esc(sub)}</small>` +
+      `<input type="text" readonly value="${esc(linkUrl(kind, l.token))}" aria-label="${esc(title)} bağlantısı" onfocus="this.select()"></div><div class="nk-lk-a">` +
+      `<button type="button" class="btn small" data-nk="lk-copy" data-key="${key}" data-kind="${kind}">Kopyala</button>` +
+      `<button type="button" class="btn small" data-nk="lk-wa" data-key="${key}" data-kind="${kind}">WhatsApp</button>` +
+      `<a class="btn small" href="${esc(linkUrl(kind, l.token))}" target="_blank" rel="noopener">Aç</a>` +
+      `<button type="button" class="btn small" data-nk="lk-toggle" data-key="${key}" data-kind="${kind}">${l.active ? 'Kapat' : 'Aç (etkinleştir)'}</button>` +
+      `<button type="button" class="btn small ${S.confirm === 'rot:' + key ? 'danger' : ''}" data-nk="lk-rot" data-key="${key}" data-kind="${kind}">${S.confirm === 'rot:' + key ? 'Evet, yenile (eskisi çalışmaz)' : 'Yenile'}</button></div></li>`;
+    return `<ul class="nk-lk">${row('depo', 'd', 'Depo ekranı', 'Depodaki arkadaşlar yük gelince "Geldi" der; plaka bazında seferleri ve belgeleri görür', LK.depot)}` +
+      LK.customers.map(c => row(c.customer_id, 'm', c.name, 'Bu müşteri yalnızca kendi yüklerini yazar ve görür', c)).join('') + '</ul>';
+  }
+  function drawLinks() {
+    X.openModal(`${head('Bağlantılar', 'Giriş şifresi yoktur; bağlantıyı yalnızca ilgili kişiye verin. Yanlış ellere geçerse "Yenile" deyin, eski bağlantı çalışmaz olur.')}<div class="modal-body">${linksHtml()}</div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button></div>`);
+  }
+  async function linksModal() {
+    X.openModal(`${head('Bağlantılar', '')}<div class="modal-body"><p>Yükleniyor…</p></div>`);
+    const r = await X.client.rpc('shp_links');
+    if (r.error) {
+      const miss = /PGRST202|42883|schema cache|Could not find the function/.test(`${r.error.code} ${r.error.message}`);
+      X.openModal(`${head('Bağlantılar', '')}<div class="modal-body"><p>${miss ? 'Bağlantılar için nakliye-kurulumu.sql çalıştırılmamış.' : esc(r.error.message || 'Yüklenemedi')}</p></div><div class="modal-footer"><span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Kapat</button></div>`);
+      return;
+    }
+    LK = r.data; S.confirm = ''; drawLinks();
+  }
+  async function linkAction(a, t) {
+    if (!LK) return;
+    const key = t.dataset.key, kind = t.dataset.kind, isDepot = key === 'depo';
+    const item = isDepot ? LK.depot : LK.customers.find(c => c.customer_id === key); if (!item) return;
+    const name = isDepot ? 'Depo' : item.name;
+    if (a === 'lk-copy') { X.toast(await copyText(linkUrl(kind, item.token)) ? 'Bağlantı kopyalandı' : 'Kopyalanamadı; kutudan elle kopyalayın', false); return; }
+    if (a === 'lk-wa') { X.wa('', isDepot ? `PCS TRANSİT depo nakliye ekranı: ${linkUrl(kind, item.token)}` : `${name} yükleri için PCS TRANSİT nakliye programı bağlantınız: ${linkUrl(kind, item.token)}`); return; }
+    if (a === 'lk-toggle') {
+      const r = await X.client.rpc('shp_set_link', { p_customer: isDepot ? null : key, p_active: !item.active });
+      if (r.error) { X.toast(r.error.message || 'İşlem yapılamadı', true); return; }
+      item.active = !item.active; X.toast(item.active ? 'Bağlantı açıldı' : 'Bağlantı kapatıldı'); drawLinks(); return;
+    }
+    if (a === 'lk-rot') {
+      if (S.confirm !== 'rot:' + key) { S.confirm = 'rot:' + key; drawLinks(); return; }
+      S.confirm = '';
+      const r = await X.client.rpc('shp_rotate_link', { p_customer: isDepot ? null : key });
+      if (r.error) { X.toast(r.error.message || 'Yenilenemedi', true); drawLinks(); return; }
+      item.token = r.data; item.active = true; X.toast('Yeni bağlantı oluşturuldu; eskisi artık çalışmaz'); drawLinks();
+    }
   }
 
   // ------------------------------------------------------------------ kurulum

@@ -23,5 +23,17 @@ sitede hazırlayın.
 5. Atanan yükler boşta listesinden çıkar ve **Araçlar** sekmesinde plakanın altında durur. Oradan Lade Liste ve CMR yeniden açılır;
    yanlış atanan yük **Araçtan çıkar** ile boşa döner, **Seferi sil** tüm yükleri boşa döndürür.
 
+## Müşteri ve depo bağlantıları
+
+**Bağlantılar** düğmesinde her müşteriye ve depoya ayrı bir bağlantı çıkar (Kopyala, WhatsApp, Aç, Kapat, Yenile).
+Giriş şifresi yoktur; bağlantıyı yalnızca ilgili kişiye verin.
+
+- **Müşteri bağlantısı**: müşteri yalnızca kendi yüklerini görür; yeni yük yazar, depoya gelmeden önce düzenler ya da siler.
+  Araca atanan yüklerin Lade Liste ve CMR belgelerini kendi sayfasından alır.
+- **Depo bağlantısı**: depodaki arkadaşlar adlarını yazıp yük gelince **Geldi**'ye basar (yanlışsa **Geri al**). Geldi denen yük sizin
+  **Boşta yükler** listenize düşer. **Araçlar** sekmesinde plaka bazında seferleri ve belgeleri görürler. Ekran 30 saniyede bir kendiliğinden yenilenir.
+- **Yenile** yeni bir bağlantı üretir; eskisi o an çalışmaz olur. **Kapat** bağlantıyı silmeden durdurur.
+- Bağlantı sayfaları herkese açıktır ama yalnızca bağlantıdaki anahtarla çalışır; anahtarlar tahmin edilemez uzunluktadır ve tablolara doğrudan erişim yoktur.
+
 Belgeler açılan pencerede önizlenir; **Yazdır / PDF olarak kaydet** ile çıktı alınır (tarayıcının yazdırma penceresinde "PDF olarak kaydet" seçilebilir).
 Belgeler tarayıcıda hazırlanır; sunucuya ya da başka bir siteye gönderilmez.

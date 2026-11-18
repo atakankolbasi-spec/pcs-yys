@@ -16,6 +16,7 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 | `kule.css` | "Kontrol Kulesi" tasarımı: yüzen koyu yan menü, cam üst çubuk, renkli çerçeveli karşılama bandı (aşağı inince kısa hali üstte sabit kalır), genel bakış kartları, hızlı arama (Ctrl+K). Varsayılan budur; Ayarlar > Tasarım ve hazır temalar > Klasik ile önceki görünüme dönülür. Güvenlik ve saha ekranını değiştirmez |
 | `app.js` | Uygulamanın kendisi (pano, raporlar, saha modu, senkron) |
 | `nakliye.js`, `nakliye.css` | Nakliye programı (operatör ekranı): müşteri yükleri, boşta yükler, araca atama, seferler. Kurulum ve kullanım: `supabase/NAKLIYE.md` |
+| `nakliye.html`, `nakliye-sayfa.js`, `nakliye-sayfa.css` | Nakliye müşteri sayfası (`?m=anahtar`) ve depo sayfası (`?d=anahtar`): giriş şifresiz, anahtar sunucuda doğrulanır |
 | `nakliye-belge.js` | Lade Liste ve CMR belgelerini tarayıcıda A4 olarak hazırlar (önizleme, yazdır / PDF) |
 | `xlsx.js` | Excel içe / dışa aktarma |
 | `xlsx-templates.js` | Excel şablonları (openpyxl ile üretildi) |
