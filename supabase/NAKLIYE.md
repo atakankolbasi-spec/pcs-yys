@@ -96,7 +96,7 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 - **Okut** sekmesi: telefonun kamerasıyla etiketteki QR kodu okutun; **yük kendiliğinden GELDİ olur** (ekranda büyük yeşil kutu, kısa ses ve titreşim; sonraki kutuya geçilir). Arka arkaya okutulan kutular sırayla işlenir.
   Aynı kutu ikinci kez okutulursa turuncu "ZATEN GELMİŞ" uyarısı çıkar ve bir şey değişmez; bilinmeyen kod kırmızı uyarı verir. İsterseniz önce **raf** seçin, okutulan yüklere yazılır. Yanlış okutulanı **Geri al** ile geri alırsınız (kutuda ve "Bu oturumda gelenler" listesinde).
   Kamera izni bir kez verilince sekme açılınca kamera kendiliğinden açılır. **Okutunca otomatik GELDİ** anahtarı kapatılırsa eski düzen gelir (yük açılır, raf seçilir, GELDİ'ye elle basılır). Seçimler cihazda hatırlanır.
-  **Zebra el terminali ya da USB / Bluetooth okuyucu** için **Okuyucu modu**'nu açın: kod kutusu hep seçili bekler, ekran klavyesi açılmaz, okuyucu kodu klavyeden yazılmış gibi gönderir ve yük kendiliğinden gelir (Zebra'da DataWedge'de çıktı "klavye / keystroke" olmalı; sonuna Enter eklenmesi gerekmez, tam kod gelince işlenir).
+  **Zebra el terminali ya da USB / Bluetooth okuyucu**: okuyucu kodu klavyeden yazılmış gibi gönderir; **hangi sekmede olursanız olun** (Okut ekranını açmadan) okutunca yük kendiliğinden gelir. Başlıktaki **Okuyucu** düğmesi ve Okut'taki **Okuyucu modu** görünmez bir kutuyu seçili tutarak ekran klavyesi göndermeyen okuyucuları da çalıştırır (Zebra'da DataWedge'de çıktı "klavye / keystroke" olmalı; sonuna Enter eklenmesi gerekmez, tam kod gelince işlenir).
 - **Program** sekmesi: bugün gelmesi beklenen yükler müşteri ve araca göre gruplanır (geçti / şimdi / bekliyor / tamam). Araç depoya gelince **Araç geldi** ile o aracın yükleri topluca işaretlenir.
   **Araçlar** sekmesinde yükleme kontrolü vardır: araçtaki yüklerin kaçı depoya geldi, doluluk (24 ton kamyon esas alınır). Geri kalan yük varsa **Yola çıktı** düğmesi uyarır ve yola çıkarmaz; hepsi gelince basılır.
 
@@ -104,11 +104,13 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 
 **TC21 (el terminali, Android)**
 1. TC21'de Chrome ile depo bağlantısını (`nakliye.html?d=…`) açın; Chrome menüsünden **Ana ekrana ekle** deyin.
-2. **Okut** sekmesinde **Okuyucu modu**'nu açın (bir kez, hatırlanır). Kod kutusu hazır bekler, ekran klavyesi açılmaz.
-3. Etikete bakıp cihazın yanındaki **tarama tuşuna** basın: kod kendiliğinden yazılır ve yük **GELDİ** olur. Tuşu bırakmadan sıradaki kutuya geçebilirsiniz.
-4. Çalışmazsa **DataWedge** uygulamasında (Zebra'nın kendi uygulaması) **Profile0** ya da Chrome'a bağlı bir profilde şunlar açık olmalı: *Barcode input*, *Keystroke output*, kod türlerinde **QR Code**.
+2. **Okut ekranını açmanıza gerek yok.** Sayfa açıkken (Bekleyenler, Depoda, Araçlar, hangi sekmede olursanız olun) etikete bakıp cihazın yanındaki **tarama tuşuna** basın: yük kendiliğinden **GELDİ** olur,
+   ekranın üstünde birkaç saniye büyük bir kutu çıkar (yeşil geldi, turuncu zaten gelmiş, kırmızı kod yok; **Geri al** düğmesi kutuda). Ad ya da arama kutusu seçiliyse de çalışır, kod oradan silinir.
+3. Tarama tuşuna bastığınızda hiçbir şey olmuyorsa başlıktaki **Okuyucu kapalı** düğmesine basıp **Okuyucu açık** yapın (bir kez, hatırlanır): sayfa görünmez bir kutuyu seçili tutar ve tarama tuşunun gönderdiği yazı oraya düşer.
+4. Hâlâ olmuyorsa **DataWedge** uygulamasında (Zebra'nın kendi uygulaması) **Profile0** ya da Chrome'a bağlı bir profilde şunlar açık olmalı: *Barcode input*, *Keystroke output*, kod türlerinde **QR Code**.
    Çıktının sonuna Enter eklemek gerekmez; tam kod gelince yük kendiliğinden işlenir.
-5. Kamerayla okutmak da mümkündür (**Kamerayı aç**), ama tarama tuşu daha hızlı ve karanlıkta da çalışır.
+5. Kamerayla okutmak da mümkündür (**Okut** sekmesi > **Kamerayı aç**), ama tarama tuşu daha hızlı ve karanlıkta da çalışır.
+6. Etiket penceresi ya da düzenleme çekmecesi açıkken okuma yok sayılır (yanlışlıkla başka yük gelmesin diye). **Okutunca otomatik GELDİ** kapalıysa okuma Okut sekmesini açar, GELDİ'ye elle basılır.
 
 **ZD230 (masaüstü etiket yazıcısı, 203 dpi)**
 1. Etiketi basacağınız bilgisayara Zebra'nın yazıcı sürücüsünü kurun ("ZDesigner ZD230"; zebra.com, Zebra Setup Utilities) ve USB ile bağlayın. Sürücü tercihlerinde **kağıt boyutu** rulonuzla aynı olsun (ör. 100×150 mm).

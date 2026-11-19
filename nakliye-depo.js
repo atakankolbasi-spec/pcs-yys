@@ -215,18 +215,21 @@ ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b
     S.working = true;
     try { while (S.q.length) await autoOne(S.q.shift()); } finally { S.working = false; }
   }
+  // sonuç kutusu Okut sekmesi dışında kısa süre üstte görünür, sonra kendiliğinden kapanır
+  let flashTimer = null;
+  const flashed = () => { D.sc.flashAt = Date.now(); clearTimeout(flashTimer); flashTimer = setTimeout(() => X.draw(), 5200); };
   async function autoOne(code) {
     const S = D.sc, l = findByCode(code);
     S.code = ''; S.err = ''; S.done = ''; S.load = null;
-    if (!l) { S.flash = { kind: 'bad', title: 'KOD BULUNAMADI', text: code }; feedback('bad'); X.draw(); return; }
-    if (l.arrived_at) { S.flash = { kind: 'warn', title: 'ZATEN GELMİŞ', text: `${l.sender} → ${l.consignee}`, sub: `${hm(l.arrived_at)}${l.arrived_by ? ' · ' + l.arrived_by : ''} · yeniden işaretlenmedi` }; feedback('bad'); X.draw(); return; }
+    if (!l) { S.flash = { kind: 'bad', title: 'KOD BULUNAMADI', text: code }; flashed(); feedback('bad'); X.draw(); return; }
+    if (l.arrived_at) { S.flash = { kind: 'warn', title: 'ZATEN GELMİŞ', text: `${l.sender} → ${l.consignee}`, sub: `${hm(l.arrived_at)}${l.arrived_by ? ' · ' + l.arrived_by : ''} · yeniden işaretlenmedi` }; flashed(); feedback('bad'); X.draw(); return; }
     const r = await X.rpc('shp_depot_receive', { p_id: l.id, p_counted_pieces: null, p_counted_weight: null, p_condition: 'saglam', p_note: '', p_location: S.loc.trim(), ...nameArg() });
-    if (r.error) { S.flash = { kind: 'bad', title: 'İŞARETLENEMEDİ', text: `${l.sender} → ${l.consignee}`, sub: X.explain(r.error) }; feedback('bad'); X.draw(); return; }
+    if (r.error) { S.flash = { kind: 'bad', title: 'İŞARETLENEMEDİ', text: `${l.sender} → ${l.consignee}`, sub: X.explain(r.error) }; flashed(); feedback('bad'); X.draw(); return; }
     l.arrived_at = new Date().toISOString(); l.arrived_by = X.name(); if (l.status === 'bekliyor') l.status = 'depoda'; if (S.loc.trim()) l.location = S.loc.trim();   // aynı kutu hemen yeniden okutulursa ikinci kez işlenmesin
     const c = X.custOf(l.customer_id) || {}, more = sameTruck(l);
     S.flash = { kind: 'ok', title: 'GELDİ', id: l.id, text: `${l.sender} → ${l.consignee}`, sub: `${c.name ? c.name + ' · ' : ''}${l.pieces} kap · ${kg(l.weight)} kg${l.inbound_plate ? ' · ' + l.inbound_plate : ''}${S.loc.trim() ? ' · ' + S.loc.trim() : ''}`, more };
     S.list.unshift({ id: l.id, label: `${l.sender} → ${l.consignee}`, at: new Date().toISOString() }); S.list.length = Math.min(S.list.length, 10);
-    feedback('ok'); X.draw();
+    flashed(); feedback('ok'); X.draw();
     X.load0();
   }
   function onCode(code) {
@@ -251,11 +254,68 @@ ${flash}<div class="camwrap">${cam ? '<div id="scan-slot" class="scan-slot"></di
 ${locs}${S.err ? `<div class="ferr" role="alert">${esc(S.err)}</div>` : ''}${S.done ? `<div class="okb" role="status">${ic('check')}${esc(S.done)}</div>` : ''}<small>${S.auto ? 'Etiketteki QR kodu çerçeveye alın: okununca yük kendiliğinden <b>geldi</b> olur. Yanlış okuttuysanız <b>Geri al</b>.' : 'Etiketteki QR kodu çerçeveye alın; okununca yük açılır, GELDİ\'ye basın.'} Etiketsiz yükte <b>Bekleyenler</b> sekmesinden plaka ya da firma adıyla bulun.</small></section>
 ${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
   };
+  // ---------------- Genel okuma: Okut ekranını açmaya gerek yok.
+  // Sayfa açıkken (hangi sekmede olursa olsun) okuyucu / Zebra tarama tuşu kodu klavyeden yazılmış gibi gönderir; "PCS:" ile başlayan tam kod
+  // hızlı bir dizi olarak gelince yük kendiliğinden GELDİ olur (otomatik kapalıysa Okut sekmesi açılır). Elle yazı yavaş olduğu için karışmaz.
+  const TAIL = /PCS[:\-\s]?([A-Z0-9]{10})$/i;
+  const G = { buf: '', last: 0, code: '', at: 0 };
+  function scanAnywhere(code) {
+    const S = D.sc, now = Date.now();
+    if (code === G.code && now - G.at < 1500) return;                          // aynı kod iki yoldan gelirse bir kez işlenir
+    G.code = code; G.at = now;
+    if (S.auto) { onCode(code); return; }
+    P.tab = 'okut'; manualFind(code);
+  }
+  document.addEventListener('keydown', e => {
+    if (!P.data || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    const t = e.target, tag = t && t.tagName, sink = t && t.id === 'scan-sink';
+    if (t && t.id === 'sc-code') return;                                       // Okut kutusunun kendi işleyicisi var
+    if (t && !sink && (t.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT')) return;
+    if (document.querySelector('dialog[open]') || P.drawer) return;
+    if (e.timeStamp - G.last > 60) G.buf = '';                                  // insan yazışı yavaştır; okuyucu milisaniyelerle yazar
+    G.last = e.timeStamp;
+    if (e.key === 'Enter') { const m = G.buf.length >= 10 && /([A-Z0-9]{10})$/i.exec(G.buf); G.buf = ''; if (m) { if (sink && t.value) t.value = ''; scanAnywhere(m[1].toUpperCase()); } return; }
+    if (e.key.length !== 1) return;
+    G.buf = (G.buf + e.key).slice(-40);
+    const m = TAIL.exec(G.buf);
+    if (!m) return;
+    const raw = m[0], code = m[1].toUpperCase();
+    G.buf = '';
+    if (t && tag === 'INPUT' && !sink) {                                        // kod yanlışlıkla bir kutuya (ad, arama) yazıldıysa oradan silinir; yük ancak ad temizlenince işlenir (işlem kaydına kod karışmasın)
+      const clean = n => {                                                       // son karakter henüz yazılmamış olabilir; ekran yenilenmişse kutu yenisidir: kısa aralıklarla, güncel kutuya bakılır
+        const el = (t.id && document.getElementById(t.id)) || t;
+        if (el.value.toUpperCase().endsWith(raw.toUpperCase())) { el.value = el.value.slice(0, -raw.length); el.dispatchEvent(new Event('input', { bubbles: true })); scanAnywhere(code); }
+        else if (n < 12) setTimeout(() => clean(n + 1), 15);
+        else scanAnywhere(code);
+      };
+      setTimeout(() => clean(0), 0);
+      return;
+    }
+    if (sink) { const clr = n => { if (t.value) t.value = ''; if (n < 3) setTimeout(() => clr(n + 1), 20); }; setTimeout(() => clr(0), 0); }
+    scanAnywhere(code);
+  }, true);
+  // Okuyucu modu açıkken her sekmede görünmez bir kutu seçili kalır: ekran klavyesi gibi "metin yazan" okuyucular da çalışsın
+  X.headTools.push(() => `<button type="button" class="btn ${D.sc.reader ? 'on' : ''}" data-a="reader-toggle" aria-pressed="${D.sc.reader}" title="Zebra / USB okuyucu: her sekmede okutunca yük kendiliğinden gelir">${ic('qr')}Okuyucu ${D.sc.reader ? 'açık' : 'kapalı'}</button>`);
+  X.act['reader-toggle'] = () => { D.sc.reader = !D.sc.reader; setPref('reader', D.sc.reader); X.draw(); };
+  X.floats.push(() => {
+    const S = D.sc, f = S.flash, parts = [];
+    if (S.reader && P.tab !== 'okut') parts.push('<input id="scan-sink" class="sink" data-i="sc-sink" inputmode="none" autocomplete="off" autocapitalize="characters" aria-hidden="true" tabindex="-1">');
+    if (f && P.tab !== 'okut' && S.flashAt && Date.now() - S.flashAt < 5000) {
+      parts.push(`<div class="scflash top ${f.kind}" role="status" aria-live="polite"><b>${ic(f.kind === 'ok' ? 'check' : 'warn')}${esc(f.title)}</b><span class="t">${esc(f.text)}</span>${f.sub ? `<span>${esc(f.sub)}</span>` : ''}${f.more ? `<span>Aynı araçtan ${f.more} yük daha var: okutmaya devam edin</span>` : ''}${f.id && loadOf(f.id) && loadOf(f.id).arrived_at ? `<button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(f.id)}">${ic('undo')}Geri al</button>` : ''}</div>`);
+    }
+    return parts.join('');
+  });
+  X.onDraw.push(() => {
+    if (!D.sc.reader || P.tab === 'okut' || document.querySelector('dialog[open]') || P.drawer) return;
+    const a = document.activeElement, el = document.getElementById('scan-sink');
+    if (el && a !== el && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) el.focus();
+  });
   // kutuya yazılan / okuyucudan gelen kod: "PCS:" ile başlayan tam kod (14 karakter) Enter beklemeden işlenir
   const FULL = /^PCS[:\-\s]*[A-Z0-9]{10}$/i;
   X.inp.push((t, k) => {
     const S = D.sc;
     if (k === 'sc-code') { S.code = t.value; clearTimeout(S.timer); if (FULL.test(t.value.trim())) S.timer = setTimeout(() => { if (FULL.test(String(S.code).trim())) X.submit.sccode(); }, 150); return true; }
+    if (k === 'sc-sink') { const m = TAIL.exec(t.value); if (m) { t.value = ''; scanAnywhere(m[1].toUpperCase()); } else if (t.value.length > 40) t.value = ''; return true; }
     if (k === 'sc-auto') { S.auto = t.checked; setPref('auto', S.auto); S.flash = null; X.draw(); return true; }
     if (k === 'sc-reader') { S.reader = t.checked; setPref('reader', S.reader); X.draw(); return true; }
     return false;

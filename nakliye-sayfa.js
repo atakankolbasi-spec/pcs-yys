@@ -27,7 +27,7 @@
     qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, page: 'plan', login: { u: '', p: '', err: '', busy: false } };
   try { P.name = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* kayıt yoksa boş kalır */ }
   // Ek ekranların (nakliye-musteri.js, nakliye-depo.js, nakliye-qr.js) bağlandığı yer
-  const X = window.PCSNKP = { views: {}, act: {}, inp: [], submit: {}, after: [], onDraw: [], enter: {}, floats: [], sideHtml: null, closeSide: null };
+  const X = window.PCSNKP = { views: {}, act: {}, inp: [], submit: {}, after: [], onDraw: [], enter: {}, floats: [], headTools: [], sideHtml: null, closeSide: null };
 
   // ------------------------------------------------------------------ küçük yardımcılar
   const I = {
@@ -385,7 +385,7 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     const ext = P.tab === 'program' || P.tab === 'okut';
     const side = P.drawer ? drawerHtml() : (X.sideHtml ? X.sideHtml() : '');
     return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>Depo ekranı</b><small>Nakliye portalı${P.name.trim() ? ` · ${esc(P.name.trim())}` : ''}</small></div></div><div class="who"><label class="nm ${P.name.trim() ? '' : 'need'}"><span>Adınız</span><input id="nm" data-i="name" value="${esc(P.name)}" maxlength="60" autocomplete="off" placeholder="İşlemler adınızla kaydedilir"></label>${liveHtml()}</div></div></header>
-<main class="dwrap">${heading('Depo portalı', 'Depo ekranı', `<button type="button" class="btn" data-a="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn" data-a="print">${ic('print')}Listeyi yazdır</button>`)}${ext ? '' : kpi5(S)}<div class="tools"><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}${n === '' ? '' : `<span>${n}</span>`}</button>`).join('')}</div>${ext ? '' : chips + searchBar('Plaka, firma, mal ara…')}</div>
+<main class="dwrap">${heading('Depo portalı', 'Depo ekranı', `<button type="button" class="btn" data-a="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn" data-a="print">${ic('print')}Listeyi yazdır</button>${X.headTools.map(f => { try { return f(); } catch (_) { return ''; } }).join('')}`)}${ext ? '' : kpi5(S)}<div class="tools"><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}${n === '' ? '' : `<span>${n}</span>`}</button>`).join('')}</div>${ext ? '' : chips + searchBar('Plaka, firma, mal ara…')}</div>
 ${ext ? (X.views['d-' + P.tab] ? X.views['d-' + P.tab](S) : '') + (side ? `<div class="dmain with side-only">${side}</div>` : '') : `<div class="dmain ${side ? 'with' : ''}"><div class="card flush scroll">${body}</div>${side}</div>`}</main>${ext ? '' : bulkBar()}${dl('dl-plate', uniq(S.all.map(l => l.inbound_plate)))}${floats()}`;
   }
   const tripsShown = S => S.trips.filter(t => !P.q || [t.poz_no, t.tractor, t.trailer, (custOf(t.customer_id) || {}).name].some(x => tr(x).includes(tr(P.q))));
