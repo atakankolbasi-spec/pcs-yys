@@ -85,7 +85,7 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 - **Excel'den ekle** (Yeni yük düğmesinin yanında): müşteri Excel ya da CSV dosyasını seçer ya da tabloyu yapıştırır; sütun başlıkları Türkçe/İngilizce tanınır.
   Önizlemede hatalı satırlar kırmızı görünür. Hepsi doğruysa toplu eklenir; tek satır hatalıysa hiçbiri eklenmez. En çok 200 satır. Örnek dosya sayfadan indirilir.
 - **Rapor ve arşiv** sekmesi: haftalık/aylık yük ve ton grafiği, en çok gönderilen alıcılar, geçmiş seferler (belgeleri yeniden açılır, bir ayın belgeleri birlikte açılıp yazdırılır) ve CSV olarak indirme.
-- **Ofisle yazışma** sekmesi: müşteri ofise yazar (isterse bir yüke bağlayarak). Siz Nakliye > **Mesajlar** sekmesinden yanıtlarsınız; okunmamış mesajlar rozetle görünür.
+- **Sohbet balonu** (sayfanın sağ altı, ana ekrandaki gibi): müşteri ofise yazar (isterse bir yüke ya da araca bağlayarak); Enter gönderir. Siz Nakliye > **Mesajlar** sekmesinden yanıtlarsınız; ofisin cevabı balonda kırmızı rozetle görünür.
 
 ## Depoda teslim alma, fotoğraf, QR etiket ve günün programı (depo sayfası)
 
@@ -96,19 +96,40 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 - **Program** sekmesi: bugün gelmesi beklenen yükler müşteri ve araca göre gruplanır (geçti / şimdi / bekliyor / tamam). Araç depoya gelince **Araç geldi** ile o aracın yükleri topluca işaretlenir.
   **Araçlar** sekmesinde yükleme kontrolü vardır: araçtaki yüklerin kaçı depoya geldi, doluluk (24 ton kamyon esas alınır). Geri kalan yük varsa **Yola çıktı** düğmesi uyarır ve yola çıkarmaz; hepsi gelince basılır.
 
-## Bildirimler (ofis)
+## Bildirimler (kendiliğinden WhatsApp'a, ofiste kontrol)
 
-Müşterinin seçtiği haberler (depoya geldi, yola çıktı, teslim edildi, sorun, ofis mesajı) Nakliye > **Bildirimler** sekmesinde müşteri bazında birikir.
-**WhatsApp'ta gönder** müşterinin numarasına hazır mesajı açar; gönderdikten sonra **Gönderildi say** denir (istenmeyen haber **Gönderme** ile geçilir). Araç **Yola çıktı** diye kilitlenince müşteriye "Lade Liste ve CMR belgeleriniz hazır" haberi çıkar.
-Yola çıkmış seferde **Teslim edildi (müşteriye bildirilir)** düğmesi vardır; teslim edilmemiş yük kalmışsa onay sorar.
+Müşterinin seçtiği haberler (depoya geldi, yola çıktı, teslim edildi, sorun, ofisin yazdığı mesaj) **olay olur olmaz** müşterinin yazdığı WhatsApp numarasına gider
+(aşağıdaki kurulum yapıldıysa): depoda **Geldi** denince "Yükünüz depoya geldi", araç **Yola çıktı** denince "Aracınız yola çıktı, Lade Liste ve CMR belgeleriniz hazır",
+sefer **Teslim edildi** olunca, depo eksik/hasar bildirince ve siz **Mesajlar**'dan cevap yazınca. Aynı anda gelen birkaç yük tek mesajda birleşir.
+Haber yalnızca müşterinin **bildirim telefonu** yazılıysa (siz Müşteriler'den ya da müşteri kendi sayfasında *Takip* sekmesinden yazar) ve o haberi kapatmadıysa gönderilir.
 
-### Otomatik bildirim (isteğe bağlı)
+Nakliye > **Bildirimler** sekmesi kontrol yeridir: yalnızca **henüz gönderilemeyen** haberler görünür. Otomatik gönderim kurulmadıysa hepsi burada bekler;
+gönderilemeyenlerin yanında nedeni yazar (ör. "onaylı şablon gerekir", "numara geçersiz"). **WhatsApp'ta gönder** mesajı hazır halde açar, gönderdikten sonra
+**Gönderildi say** denir; istenmeyen haber **Gönderme** ile geçilir. Gönderilen haberler listeden kendiliğinden kalkar.
 
-Haberlerin elle değil kendiliğinden gitmesini isterseniz (WhatsApp Business API gerekir): GitHub'da **Settings > Secrets and variables > Actions** altına şu gizli değerleri ekleyin:
-`WA_TOKEN` (Meta WhatsApp Cloud API erişim anahtarı), `WA_PHONE_ID` (WhatsApp telefon numarası kimliği) ve isteğe bağlı `WA_SABLON` (Meta'da onaylı şablon adı; tek gövde değişkeni almalı).
-`SUPABASE_URL` ve `SUPABASE_SERVICE_ROLE_KEY` mail okuma için zaten tanımlıdır. Gizli değerler tamamsa **Nakliye bildirimlerini WhatsApp'tan gönder** görevi 5 dakikada bir bekleyen haberleri toplayıp (aynı müşteri ve aynı tür tek mesaj) gönderir ve sonucu işaretler;
-başarısızlar Bildirimler sekmesinde "hata" ile kalır, oradan elle gönderilebilir. Gizli değerler yoksa görev hiçbir şey yapmaz.
-Not: Meta, müşteri sizinle son 24 saat içinde yazışmadıysa yalnızca onaylı **şablon** mesajına izin verir; bu yüzden pratikte bir şablon (`WA_SABLON`) gerekir. Elle denemek için Actions > Nakliye bildirimlerini WhatsApp'tan gönder > Run workflow.
+### Otomatik bildirim kurulumu (bir kez, yaklaşık 15 dakika)
+
+`WHATSAPP.md` kurulumunu zaten yaptıysanız `WA_TOKEN` hazırdır; kalan adımlar:
+
+1. **SQL**: `nakliye-kurulumu.sql` dosyasının tamamını yeniden çalıştırın (haber eklenince fonksiyonu çağıran tetikleyiciyi kurar). En altta 14 satır "tamam" çıkar.
+2. **Fonksiyon**: Supabase > **Edge Functions** > **Deploy a new function** > **Via Editor**. Adı tam olarak `nakliye-bildirim` yazın, örnek kodu silip
+   `supabase/functions/nakliye-bildirim/index.ts` dosyasının tamamını yapıştırın, **Deploy**. Sonra fonksiyonun ayarlarında **Verify JWT** seçeneğini **kapatın**
+   (veritabanı fonksiyonu giriş yapmadan çağırır; fonksiyon yalnızca kuyruktaki haberleri gönderir, dışarıdan veri kabul etmez).
+3. **Gizli ayarlar** (Edge Functions > Secrets): `WA_PHONE_ID` = Meta > WhatsApp > **API Setup** sayfasındaki **Phone number ID**. (`WA_TOKEN` zaten var.)
+4. **Şablon** (Meta kuralı): müşteri son 24 saat içinde numaranıza yazmadıysa WhatsApp yalnızca **onaylı şablon** mesajına izin verir. [business.facebook.com](https://business.facebook.com)
+   > WhatsApp Manager > **Message templates** > **Create template**: Kategori **Utility**, ad `nakliye_haber`, dil **Turkish**, gövde şu cümle olsun
+   (değişken başta ya da sonda olamaz):
+   `Merhaba, PCS Transit nakliye bildiriminiz: {{1}} İyi çalışmalar.`
+   Örnek değer olarak `Yükünüz depoya geldi | KAYA AMBALAJ → DORNA FOODS · 840 kap` yazın. Meta onaylayınca (dakikalar-saatler) Supabase Secrets'a
+   `WA_SABLON` = `nakliye_haber` ekleyin. Şablon yokken mesajlar yalnızca müşteri son 24 saatte yazdıysa gider; diğerleri "hata" olarak Bildirimler'de kalır.
+5. **Deneme**: bir müşteriye bildirim telefonu yazın (kendi numaranız olabilir), depoda bir yüke **Geldi** deyin; birkaç saniye içinde WhatsApp'a gelir.
+   Gelmezse Bildirimler sekmesinde nedeni yazar. Ayrıca `https://<proje>.supabase.co/functions/v1/nakliye-bildirim?bekle=0` adresini tarayıcıda açarsanız
+   fonksiyon beklemeden çalışır ve `{"sent":1,"failed":0}` gibi bir sonuç yazar (ayar eksikse `"ayar":"eksik"`).
+
+Notlar:
+- Meta, şablon (işletmenin başlattığı) mesajlar için küçük bir ücret alır; güncel fiyat için Meta'nın fiyat sayfasına bakın. Yalnızca müşterinin seçtiği haberler gönderilir.
+- Müşteri bu mesaja cevap yazarsa cevap `whatsapp-webhook` fonksiyonuna düşer (ruhsat/araç listesi okuyucusu); ofisle yazışma için müşteriye sayfadaki sohbet balonunu kullanmasını söyleyin.
+- Fonksiyon kurulmadıysa ya da gizli ayarlar eksikse hiçbir şey bozulmaz; haberler Bildirimler sekmesinde elle gönderilmeyi bekler.
 
 ## PLASTNAK taslağı
 

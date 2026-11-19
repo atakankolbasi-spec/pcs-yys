@@ -18,9 +18,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: tests/package-lock.json
-      - name: Bildirim göndericisi testi
-        run: node --test scripts/bildirim/gonder.test.mjs
-        working-directory: .
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test

@@ -56,7 +56,7 @@
         c.from('shp_loads').select('*').order('created_at', { ascending: false }).limit(3000),
         c.rpc('shp_log_list', { p_customer: null, p_limit: 400 }),
         c.from('shp_messages').select('*').order('id', { ascending: false }).limit(600),
-        c.from('shp_outbox').select('*').eq('status', 'bekliyor').order('id')
+        c.from('shp_outbox').select('*').in('status', ['bekliyor', 'hata']).order('id')
       ]);
       const e = a.error || t.error || l.error;
       if (e) {
@@ -242,17 +242,17 @@ ${cur ? `<form data-nk-form="reply" data-cid="${cur}" class="nk-reply"><textarea
   const EVT = { geldi: ['📦 Yükünüz depoya geldi', 'Depoya geldi'], yola: ['🚚 Aracınız yola çıktı', 'Yola çıktı'], teslim: ['✅ Yükünüz teslim edildi', 'Teslim'], sorun: ['⚠️ Yükünüzde sorun bildirildi', 'Sorun'], mesaj: ['💬 Ofisten yeni mesaj', 'Mesaj'] };
   function outGroups() {
     const m = new Map();
-    S.outbox.forEach(o => { const k = o.customer_id + '|' + o.event + '|' + o.phone; if (!m.has(k)) m.set(k, { key: k, customer_id: o.customer_id, event: o.event, phone: o.phone, items: [] }); m.get(k).items.push(o); });
+    S.outbox.forEach(o => { const k = o.customer_id + '|' + o.event + '|' + o.phone; if (!m.has(k)) m.set(k, { key: k, customer_id: o.customer_id, event: o.event, phone: o.phone, items: [], err: '' }); const g = m.get(k); g.items.push(o); if (o.status === 'hata' && o.error && !g.err) g.err = o.error; });
     return [...m.values()];
   }
   const outText = g => `${EVT[g.event][0]}\n${g.items.map(o => o.body).join('\n')}${g.event === 'yola' ? '\nLade Liste ve CMR belgeleriniz hazır.' : ''}`;
   function outView() {
     if (S.newMiss) return notice('Yazışma ve bildirimler kurulmamış', 'Bu bölüm için <b>supabase/nakliye-kurulumu.sql</b> dosyasının son halini Supabase SQL Editör\'de çalıştırın, sonra Yenile\'ye basın.', true);
     const gs = outGroups();
-    const rows = gs.map((g, i) => `<li><div><b>${esc((cust(g.customer_id) || {}).name || '?')}</b> <span class="nk-ch ${g.event === 'sorun' ? 'a' : 'b'}">${EVT[g.event][1]}</span><small>${esc(g.phone)} · ${g.items.length} haber · ${esc(dtm(g.items[0].created_at))}</small><pre class="nk-pre">${esc(outText(g))}</pre></div>
+    const rows = gs.map((g, i) => `<li><div><b>${esc((cust(g.customer_id) || {}).name || '?')}</b> <span class="nk-ch ${g.event === 'sorun' ? 'a' : 'b'}">${EVT[g.event][1]}</span>${g.err ? '<span class="nk-ch r">Gönderilemedi</span>' : ''}<small>${esc(g.phone)} · ${g.items.length} haber · ${esc(dtm(g.items[0].created_at))}</small>${g.err ? `<small class="nk-err">${esc(g.err)}</small>` : ''}<pre class="nk-pre">${esc(outText(g))}</pre></div>
 <div class="nk-lk-a"><button type="button" class="btn small primary" data-nk="out-send" data-i="${i}">${ic('send')}WhatsApp'ta gönder</button><button type="button" class="btn small" data-nk="out-done" data-i="${i}">Gönderildi say</button><button type="button" class="btn small" data-nk="out-skip" data-i="${i}">Gönderme</button></div></li>`).join('');
-    return `<section class="nk-pn"><div class="nk-bar"><h2>Bildirimler <span>${gs.length}</span></h2></div><div class="nk-note2">Müşterilerin seçtiği haberler (depoya geldi, yola çıktı, teslim, sorun, mesaj) burada birikir. <b>WhatsApp'ta gönder</b> mesajı hazır halde açar; gönderdikten sonra <b>Gönderildi say</b> deyin. İsterseniz bu işi sistem kendiliğinden yapar: <b>supabase/NAKLIYE.md</b> > "Otomatik bildirim".</div>
-${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderilecek bildirim yok. Müşteri bildirim numarasını yazınca ve depo yük teslim alınca burada görünür.</div>'}</section>`;
+    return `<section class="nk-pn"><div class="nk-bar"><h2>Bildirimler <span>${gs.length}</span></h2></div><div class="nk-note2">Müşterilerin seçtiği haberler (depoya geldi, yola çıktı, teslim, sorun, mesaj) <b>WhatsApp'tan kendiliğinden gider</b> (kurulum: <b>supabase/NAKLIYE.md</b> > "Otomatik bildirim"). Burada yalnızca henüz gönderilemeyenler görünür: kurulum yapılmadıysa hepsi, gönderilemeyenlerin nedeni yazar. <b>WhatsApp'ta gönder</b> mesajı hazır halde açar; gönderdikten sonra <b>Gönderildi say</b> deyin.</</div>
+${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderilecek bildirim yok. Haberler kendiliğinden gidiyorsa ya da müşteri bildirim numarasını yazmadıysa burası boş kalır.</div>'}</section>`;
   }
   const ROLE = { musteri: ['Müşteri', 'b'], depo: ['Depo', 'g'], operator: ['Ofis', 'a'] };
   function logView() {

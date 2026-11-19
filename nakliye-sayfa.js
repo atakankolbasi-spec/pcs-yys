@@ -27,7 +27,7 @@
     qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, page: 'plan', login: { u: '', p: '', err: '', busy: false } };
   try { P.name = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* kayıt yoksa boş kalır */ }
   // Ek ekranların (nakliye-musteri.js, nakliye-depo.js, nakliye-qr.js) bağlandığı yer
-  const X = window.PCSNKP = { views: {}, act: {}, inp: [], submit: {}, after: [], onDraw: [], enter: {}, sideHtml: null, closeSide: null };
+  const X = window.PCSNKP = { views: {}, act: {}, inp: [], submit: {}, after: [], onDraw: [], enter: {}, floats: [], sideHtml: null, closeSide: null };
 
   // ------------------------------------------------------------------ küçük yardımcılar
   const I = {
@@ -35,7 +35,7 @@
     edit: '<path d="M4 20h4l10-10-4-4L4 16v4zM13.5 6.5l4 4"/>', trash: '<path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12M10 11v5M14 11v5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', truck: '<path d="M3 6h11v11H3zM14 10h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
     undo: '<path d="M9 7L4 12l5 5M4 12h9a6 6 0 010 12"/>', doc: '<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>', search: '<circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/>',
-    box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>', clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>', close: '<path d="M6 6l12 12M6 18L18 6"/>',
+    box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>', clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>', close: '<path d="M6 6l12 12M6 18L18 6"/>', send: '<path d="M21 3L10 14M21 3l-7 18-4-8-8-4z"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>', out: '<path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/>', print: '<path d="M7 9V4h10v5M7 17H5v-6h14v6h-2M7 14h10v6H7z"/>',
     bell: '<path d="M6 17v-6a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', qr: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6h-6"/>', upload: '<path d="M12 16V5M7 9l5-5 5 5M4 19h16"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>', warn: '<path d="M12 4l9 16H3zM12 10v5M12 18h.01"/>', sheet: '<path d="M5 4h14v16H5zM5 10h14M5 15h14M11 4v16"/>', wa: '<path d="M4 20l1.3-4.2A8 8 0 1 1 8.4 18.8z"/><path d="M9 9c.3 2.5 2.5 4.7 5.5 5.5l1.3-1.3-2-1-1 .7c-.8-.4-1.6-1.2-2-2l.7-1-1-2z"/>', download: '<path d="M12 4v11M7 11l5 5 5-5M4 19h16"/>', pin: '<path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>', down: '<path d="M6 9l6 6 6-6"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'
   };
@@ -250,7 +250,8 @@
   };
   // Ofis Nakliye ekranıyla aynı tarz: renkli çerçeveli başlık kartı (üstte küçük yazı, büyük başlık, sağda düğmeler)
   const heading = (eyebrow, title, right) => `<section class="hd"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div><div class="hd-r">${right}</div></section>`;
-  const PAGE_TITLES = { plan: 'Yükler ve araçlar', takip: 'Yük takibi', rapor: 'Rapor ve arşiv', yazisma: 'Ofisle yazışma' };
+  const PAGE_TITLES = { plan: 'Yükler ve araçlar', takip: 'Yük takibi', rapor: 'Rapor ve arşiv' };
+  const floats = () => X.floats.map(f => { try { return f(); } catch (_) { return ''; } }).join('');
   const customerHead = () => {
     const u = P.data.user;
     return `${topCustomer()}<div class="sh">${heading('Müşteri portalı', PAGE_TITLES[P.page] || PAGE_TITLES.plan, `<button type="button" class="btn" data-a="refresh">${ic('refresh')}Yenile</button>${u ? `<button type="button" class="btn" data-a="logout">${ic('out')}Çıkış</button>` : ''}`)}${pageNav()}</div>`;
@@ -324,13 +325,13 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
   }
   const unread = () => ((P.data && P.data.messages) || []).filter(m => m.from_role === 'ofis' && !m.read_at).length;
   const pageNav = () => {
-    const un = unread(), pages = [['plan', 'Yükler ve araçlar', 'truck'], ['takip', 'Takip', 'clock'], ['rapor', 'Rapor ve arşiv', 'doc'], ['yazisma', 'Ofisle yazışma', 'chat']];
-    return `<nav class="pnav" aria-label="Sayfalar">${pages.map(([k, l, i]) => `<button type="button" class="${P.page === k ? 'on' : ''}" aria-current="${P.page === k}" data-a="page" data-v="${k}">${ic(i)}${l}${k === 'yazisma' && un ? `<span class="bdg">${un}</span>` : ''}</button>`).join('')}</nav>`;
+    const pages = [['plan', 'Yükler ve araçlar', 'truck'], ['takip', 'Takip', 'clock'], ['rapor', 'Rapor ve arşiv', 'doc']];
+    return `<nav class="pnav" aria-label="Sayfalar">${pages.map(([k, l, i]) => `<button type="button" class="${P.page === k ? 'on' : ''}" aria-current="${P.page === k}" data-a="page" data-v="${k}">${ic(i)}${l}</button>`).join('')}</nav>`;
   };
   function customerView() {
     const d = P.data, all = d.loads || [], free = all.filter(isFree), trips = sortedTrips();
-    if (P.page !== 'plan' && X.views[P.page]) return `${customerHead()}<main class="pg2">${X.views[P.page]()}</main>${datalists()}`;
-    return `${customerHead()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}`;
+    if (P.page !== 'plan' && X.views[P.page]) return `${customerHead()}<main class="pg2">${X.views[P.page]()}</main>${datalists()}${floats()}`;
+    return `${customerHead()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}${floats()}`;
   }
 
   // ------------------------------------------------------------------ depo sayfası (masa başı tablo)

@@ -190,20 +190,36 @@ ${shown.length ? `<div class="scroll"><table class="tbl2"><thead><tr><th>Poz No<
     M.reading = false;
     if (!r.error) { (P.data.messages || []).forEach(m => { if (m.from_role === 'ofis' && !m.read_at) m.read_at = new Date().toISOString(); }); X.draw(); }
   }
-  X.enter.yazisma = () => { M.stick = true; setTimeout(markRead, 50); };
-  X.after.push(() => { if (P.page === 'yazisma') { M.stick = true; setTimeout(markRead, 50); } });
+  // Sohbet balonu: sayfanın sağ altında, ana ekrandaki sohbet balonu gibi; tıklayınca ofisle yazışma paneli açılır
+  const CH = { open: false };
+  const openChat = () => { CH.open = true; CH.n = (P.data.messages || []).length; M.stick = true; X.draw(); setTimeout(() => { markRead(); const t = document.getElementById('msg-body'); if (t && !document.activeElement.matches('input,textarea,select')) t.focus(); }, 60); };
+  const closeChat = () => { CH.open = false; X.draw(); };
+  X.act['chat-toggle'] = () => { CH.open ? closeChat() : openChat(); };
+  X.act['chat-close'] = () => closeChat();
+  X.after.push(() => { if (CH.open) { const n = (P.data.messages || []).length; if (n !== CH.n) { CH.n = n; M.stick = true; } setTimeout(markRead, 50); } });
   X.onDraw.push(() => { const el = document.getElementById('msgs'); if (el && M.stick) { el.scrollTop = el.scrollHeight; M.stick = false; } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && CH.open && !document.querySelector('dialog[open]')) { CH.open = false; X.draw(); return; }
+    // Enter gönderir, Shift+Enter yeni satır
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target && e.target.id === 'msg-body') { e.preventDefault(); X.submit.msg().catch(() => {}); }
+  });
   const refLabel = m => { const l = m.load_id && (P.data.loads || []).find(x => x.id === m.load_id), t = m.trip_id && X.tripOf(m.trip_id);
     return l ? `${ic('box')}${esc(cut(l.sender + ' → ' + l.consignee, 40))}` : t ? `${ic('truck')}${esc(t.poz_no)} · ${esc(t.tractor)}` : ''; };
-  X.views.yazisma = () => {
-    const ms = P.data.messages || [], trips = X.sortedTrips().slice(0, 12), loads = (P.data.loads || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 25);
-    const bubble = m => `<div class="m ${m.from_role === 'musteri' ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${refLabel(m) ? `<span class="lk">${refLabel(m)}</span>` : ''}<small>${esc(dt(m.created_at))} · ${esc(m.from_role === 'ofis' ? 'Ofis' : m.author || 'Siz')}</small></div>`;
-    return `<section class="card chat"><h2>${ic('chat')} Ofisle yazışma</h2><small>Yükle ya da seferle ilgili not bırakın; ofis cevap yazınca bildirim gelir. Acil işler için ofisi arayın.</small>
+  function chatWidget() {
+    const un = X.unread(), ms = P.data.messages || [];
+    let panel = '';
+    if (CH.open) {
+      const trips = X.sortedTrips().slice(0, 12), loads = (P.data.loads || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 25);
+      const bubble = m => `<div class="m ${m.from_role === 'musteri' ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${refLabel(m) ? `<span class="lk">${refLabel(m)}</span>` : ''}<small>${esc(dt(m.created_at))} · ${esc(m.from_role === 'ofis' ? 'Ofis' : m.author || 'Siz')}</small></div>`;
+      panel = `<div class="cpanel" id="chat-panel" role="dialog" aria-label="Ofisle yazışma"><div class="chead"><span class="cava">PCS</span><div><b>Ofisle yazışma</b><small>Yükle ya da seferle ilgili yazın; cevap burada görünür</small></div><button type="button" class="cx" data-a="chat-close" aria-label="Sohbeti kapat">${ic('close')}</button></div>
 <div class="msgs" id="msgs">${ms.length ? ms.map(bubble).join('') : '<div class="empty">Henüz mesaj yok. Aşağıdan ofise yazabilirsiniz.</div>'}</div>
-<form data-f="msg" class="inp"><label class="fld"><span>Konu</span><select data-i="msg-ref" aria-label="Mesajın konusu"><option value="">Genel</option>${trips.length ? `<optgroup label="Araçlarım">${trips.map(t => `<option value="t:${esc(t.id)}" ${M.msg.ref === 't:' + t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(t.tractor)}</option>`).join('')}</optgroup>` : ''}${loads.length ? `<optgroup label="Yüklerim">${loads.map(l => `<option value="l:${esc(l.id)}" ${M.msg.ref === 'l:' + l.id ? 'selected' : ''}>${esc(cut(l.sender + ' → ' + l.consignee, 48))}</option>`).join('')}</optgroup>` : ''}</select></label>
-<label class="fld"><span>Mesajınız</span><textarea id="msg-body" data-i="msg-body" rows="2" maxlength="1000" placeholder="Mesajınızı yazın…">${esc(M.msg.body)}</textarea></label>
-<div id="msg-err" class="ferr" hidden role="alert"></div><button type="submit" class="btn pri">${ic('check')}Gönder</button></form></section>`;
-  };
+<form data-f="msg" class="cform"><select data-i="msg-ref" aria-label="Mesajın konusu"><option value="">Konu: genel</option>${trips.length ? `<optgroup label="Araçlarım">${trips.map(t => `<option value="t:${esc(t.id)}" ${M.msg.ref === 't:' + t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(t.tractor)}</option>`).join('')}</optgroup>` : ''}${loads.length ? `<optgroup label="Yüklerim">${loads.map(l => `<option value="l:${esc(l.id)}" ${M.msg.ref === 'l:' + l.id ? 'selected' : ''}>${esc(cut(l.sender + ' → ' + l.consignee, 48))}</option>`).join('')}</optgroup>` : ''}</select>
+<div class="crow"><textarea id="msg-body" data-i="msg-body" rows="2" maxlength="1000" placeholder="Mesajınızı yazın…" aria-label="Mesajınız">${esc(M.msg.body)}</textarea><button type="submit" class="csend" aria-label="Gönder">${ic('send')}</button></div>
+<div id="msg-err" class="ferr" hidden role="alert"></div></form></div>`;
+    }
+    return `<div class="cwrap">${panel}<button type="button" class="cfab ${CH.open ? 'open' : ''}" id="chat-fab" data-a="chat-toggle" aria-label="Ofisle yazışma" aria-expanded="${CH.open}">${ic(CH.open ? 'close' : 'chat')}${un && !CH.open ? `<span class="cdot" aria-label="${un} okunmamış mesaj">${un}</span>` : ''}</button></div>`;
+  }
+  X.floats.push(chatWidget);
   X.inp.push((t, k) => {
     if (k === 'msg-body') { M.msg.body = t.value; return true; }
     if (k === 'msg-ref') { M.msg.ref = t.value; return true; }

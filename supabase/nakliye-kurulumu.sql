@@ -1030,19 +1030,22 @@ create table if not exists public.shp_messages (
 );
 create index if not exists shp_messages_musteri on public.shp_messages (customer_id, id desc);
 
--- Bildirim kuyruğu: depoya geldi, yola çıktı, teslim, sorun, ofis mesajı. Gönderim: ofiste tek tıkla ya da isteğe bağlı otomatik (scripts/bildirim).
+-- Bildirim kuyruğu: depoya geldi, yola çıktı, teslim, sorun, ofis mesajı. Gönderim: sunucu fonksiyonu nakliye-bildirim (WhatsApp, kendiliğinden) ya da ofiste tek tıkla.
 create table if not exists public.shp_outbox (
   id bigint generated always as identity primary key,
   customer_id uuid not null references public.shp_customers (id) on delete cascade,
   event text not null check (event in ('geldi', 'yola', 'teslim', 'sorun', 'mesaj')),
   phone text not null,
   body text not null,
-  status text not null default 'bekliyor' check (status in ('bekliyor', 'gonderildi', 'hata', 'iptal')),
+  status text not null default 'bekliyor' check (status in ('bekliyor', 'gonderiliyor', 'gonderildi', 'hata', 'iptal')),
   error text not null default '',
   created_at timestamptz not null default now(),
   sent_at timestamptz
 );
 create index if not exists shp_outbox_durum on public.shp_outbox (status, created_at);
+-- Daha önce çalıştırılmış kurulumlarda durum denetimine 'gonderiliyor' eklenir
+alter table public.shp_outbox drop constraint if exists shp_outbox_status_check;
+alter table public.shp_outbox add constraint shp_outbox_status_check check (status in ('bekliyor', 'gonderiliyor', 'gonderildi', 'hata', 'iptal'));
 
 alter table public.shp_photos enable row level security;
 alter table public.shp_messages enable row level security;
@@ -1082,6 +1085,28 @@ begin
   if not found or btrim(c.notify_phone) = '' or coalesce(c.notify_events ->> p_event, 'true') <> 'true' then return; end if;
   insert into public.shp_outbox (customer_id, event, phone, body) values (p_customer, p_event, c.notify_phone, left(p_body, 500));
 end $$;
+
+-- Kuyruğa haber eklenince WhatsApp gönderen sunucu fonksiyonu (nakliye-bildirim) çağrılır; fonksiyon henüz kurulmadıysa ya da
+-- çağrı yapılamazsa hiçbir şey olmaz, haber ofisteki Bildirimler sekmesinde elle gönderilmeyi bekler. Asıl işlem (Geldi vb.) asla bozulmaz.
+do $$ begin
+  create extension if not exists pg_net;
+exception when others then
+  raise notice 'pg_net kurulamadı (%): bildirimler yalnızca ofisteki Bildirimler sekmesinden gönderilir.', sqlerrm;
+end $$;
+create or replace function private.shp_outbox_ping() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  begin
+    perform net.http_post(url := 'https://ollrccfqiqilbflanuik.supabase.co/functions/v1/nakliye-bildirim',
+                          headers := '{"Content-Type": "application/json"}'::jsonb, body := '{}'::jsonb, timeout_milliseconds := 5000);
+  exception when others then
+    null;
+  end;
+  return null;
+end $$;
+revoke all on function private.shp_outbox_ping() from public, anon, authenticated;
+drop trigger if exists shp_outbox_ping on public.shp_outbox;
+create trigger shp_outbox_ping after insert on public.shp_outbox for each statement execute function private.shp_outbox_ping();
 
 create or replace function private.shp_notify_load() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -1513,6 +1538,7 @@ union all
 select 'durum çizgisi ve bildirim kuyruğu',
        case when to_regclass('public.shp_outbox') is not null and to_regprocedure('public.shp_portal_notify_save(text, text, jsonb)') is not null
                  and exists (select 1 from pg_trigger where tgrelid = 'public.shp_trips'::regclass and tgname = 'shp_trips_notify')
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_outbox'::regclass and tgname = 'shp_outbox_ping')
                  and exists (select 1 from pg_trigger where tgrelid = 'public.shp_trips'::regclass and tgname = 'shp_trips_times')
                  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_trips' and column_name = 'delivered_at') then 'tamam' else 'EKSİK' end
 union all
