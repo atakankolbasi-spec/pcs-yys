@@ -82,7 +82,7 @@
         const shpDefaults = {
           shp_customers: { active: true, carrier: '', cmr_notes: '', loading_place: 'İSTANBUL - Turkey', logo: '', notify_phone: '', notify_events: { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true } },
           shp_loads: { status: 'bekliyor', trip_id: null, arrived_at: null, arrived_by: '', note: '' },
-          shp_messages: { read_at: null, author: 'Ofis' }
+          shp_messages: { read_at: null, author: 'Ofis', channel: 'musteri', customer_id: null }
         }[table];
         if (table === 'shp_customers' && st.rows.some(r => t.some(x => x.name === r.name))) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "shp_customers_name_key"' } };
         const added = st.rows.map(r => ({ ...(shpDefaults || {}), ...(table.startsWith('shp_') ? { id: 'shp' + (++shpSeq) } : {}), ...r, created_at: now(), updated_at: now() }));
@@ -313,7 +313,7 @@
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
       // data.shp_users: [{ id, customer_id, username, display_name, active, pw }]; kullanıcısı olan müşterinin bağlantısı giriş ister
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart)$/.test(name)) {
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|depot_message_send|depot_messages_read|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
         if (name === 'shp_stamp' && (cfg.missing || []).includes('shp-stamp')) return guardErr('PGRST202', 'Could not find the function public.shp_stamp');
         if (cfg.offline && /^shp_(portal|depot|stamp|login)/.test(name)) return netError();
@@ -414,7 +414,7 @@
           if (dk && dk.kind === 'depo' && dk.active) { ls = db.shp_loads; ts = db.shp_trips; }
           else { const ca = cAuth(params.p_token); if (ca.res) return ca.res; ls = db.shp_loads.filter(l => l.customer_id === ca.customer); ts = db.shp_trips.filter(t => t.customer_id === ca.customer); }
           const s = JSON.stringify([ls, ts]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-          const ms = dk && dk.kind === 'depo' ? '' : '/' + JSON.stringify(db.shp_messages.filter(m => m.customer_id === (T[params.p_token] ? T[params.p_token].customer : (SS[params.p_token] ? (db.shp_users.find(u => u.id === SS[params.p_token]) || {}).customer_id : null)))).length;
+          const ms = '/' + JSON.stringify(dk && dk.kind === 'depo' ? db.shp_messages.filter(m => m.channel === 'depo') : db.shp_messages.filter(m => m.customer_id === (T[params.p_token] ? T[params.p_token].customer : (SS[params.p_token] ? (db.shp_users.find(u => u.id === SS[params.p_token]) || {}).customer_id : null)))).length;
           return { data: `${ls.length}/${ts.length}/${s.length}/${h}${ms}`, error: null };
         }
         if (name.startsWith('shp_portal')) {
@@ -541,7 +541,15 @@
         if (!k || k.kind !== 'depo' || !k.active) return bad();
         actor = 'Depo · ' + (String(params.p_name || '').trim() || 'adı yazılmamış');
         if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(tripJson),
-          photo_counts: db.shp_photos.reduce((m, p) => ((m[p.load_id] = (m[p.load_id] || 0) + 1), m), {}) }, error: null };
+          photo_counts: db.shp_photos.reduce((m, p) => ((m[p.load_id] = (m[p.load_id] || 0) + 1), m), {}),
+          messages: db.shp_messages.filter(m => m.channel === 'depo').slice(-100).map(m => ({ id: m.id, from_role: m.from_role, author: m.from_role === 'ofis' ? 'Ofis' : m.author, body: m.body, load_id: null, trip_id: null, created_at: m.created_at, read_at: m.read_at })) }, error: null };
+        if (name === 'shp_depot_message_send') {
+          const b = String(params.p_body || '').replace(/\r/g, '').trim().slice(0, 1000);
+          if (!b) return guardErr('22023', 'Mesaj boş olamaz');
+          const m = { id: 'msg' + (++shpSeq), customer_id: null, channel: 'depo', from_role: 'depo', author: actor, body: b, load_id: null, trip_id: null, created_at: now(), read_at: null };
+          db.shp_messages.push(m); return { data: clone(m), error: null };
+        }
+        if (name === 'shp_depot_messages_read') { db.shp_messages.forEach(m => { if (m.channel === 'depo' && m.from_role === 'ofis' && !m.read_at) m.read_at = now(); }); return { data: null, error: null }; }
         const IMG = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
         if (name === 'shp_depot_photos') return { data: db.shp_photos.filter(p => p.load_id === params.p_load).map(p => ({ id: p.id, thumb: p.thumb, by: p.by_name, at: p.created_at })), error: null };
         if (name === 'shp_depot_photo') { const p = db.shp_photos.find(x => x.id === params.p_photo); return p ? { data: p.data, error: null } : guardErr('22023', 'Fotoğraf bulunamadı'); }

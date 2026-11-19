@@ -351,4 +351,4 @@ dialog#m:has(.imp){width:min(1180px,calc(100% - 20px))}
 .crow{display:flex;gap:8px;align-items:flex-end}
 .crow textarea{flex:1;min-height:44px;max-height:120px;resize:none;border:1px solid #d0d7e2;border-radius:14px;background:#fff;color:var(--ink);padding:10px 12px;font:14px/1.4 var(--ff);text-transform:none}
 .csend{flex:none;width:44px;height:44px;border:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#fff;background:#10a090;box-shadow:0 8px 18px -10px #10a090}.csend:hover{background:#0c8a7c}
-@media(max-width:700px){.cwrap{right:12px;bottom:12px}.cpanel{width:calc(100vw - 24px);height:min(560px,calc(100vh - 96px))}.cfab{width:54px;height:54px}}
+@media(max-width:700px){.cwrap{right:12px;bottom:12px}.bulk~.cwrap{bottom:84px}.cpanel{width:calc(100vw - 24px);height:min(560px,calc(100vh - 96px))}.cfab{width:54px;height:54px}}

@@ -49,6 +49,61 @@ ${l && (l.receive_note || l.condition) ? `<div class="ferr" style="background:#f
   X.act['ph-show'] = (t, e, id) => showPhoto(id);
   X.photoDialog = photoDialog;
 
+  // ------------------------------------------------------------------ sohbet balonu (müşteri: ofisle yazışma · depo: ofisle yazışma)
+  const CUST = X.MODE === 'm', MINE = CUST ? 'musteri' : 'depo';
+  async function markRead() {
+    if (M.reading || !X.unread()) return;
+    M.reading = true;
+    const r = await (CUST ? X.rpc('shp_portal_messages_read') : X.rpc('shp_depot_messages_read', { p_name: X.name() }));
+    M.reading = false;
+    if (!r.error) { (P.data.messages || []).forEach(m => { if (m.from_role === 'ofis' && !m.read_at) m.read_at = new Date().toISOString(); }); X.draw(); }
+  }
+  // Sohbet balonu: sayfanın sağ altında, ana ekrandaki sohbet balonu gibi; tıklayınca ofisle yazışma paneli açılır
+  const CH = { open: false };
+  const openChat = () => { CH.open = true; CH.n = (P.data.messages || []).length; M.stick = true; X.draw(); setTimeout(() => { markRead(); const t = document.getElementById('msg-body'); if (t && !document.activeElement.matches('input,textarea,select')) t.focus(); }, 60); };
+  const closeChat = () => { CH.open = false; X.draw(); };
+  X.act['chat-toggle'] = () => { CH.open ? closeChat() : openChat(); };
+  X.act['chat-close'] = () => closeChat();
+  X.after.push(() => { if (CH.open) { const n = (P.data.messages || []).length; if (n !== CH.n) { CH.n = n; M.stick = true; } setTimeout(markRead, 50); } });
+  X.onDraw.push(() => { const el = document.getElementById('msgs'); if (el && M.stick) { el.scrollTop = el.scrollHeight; M.stick = false; } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && CH.open && !document.querySelector('dialog[open]')) { CH.open = false; X.draw(); return; }
+    // Enter gönderir, Shift+Enter yeni satır
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target && e.target.id === 'msg-body') { e.preventDefault(); X.submit.msg().catch(() => {}); }
+  });
+  const refLabel = m => { const l = m.load_id && (P.data.loads || []).find(x => x.id === m.load_id), t = m.trip_id && X.tripOf(m.trip_id);
+    return l ? `${ic('box')}${esc(cut(l.sender + ' → ' + l.consignee, 40))}` : t ? `${ic('truck')}${esc(t.poz_no)} · ${esc(t.tractor)}` : ''; };
+  function chatWidget() {
+    const un = X.unread(), ms = P.data.messages || [];
+    let panel = '';
+    if (CH.open) {
+      const trips = CUST ? X.sortedTrips().slice(0, 12) : [], loads = CUST ?  (P.data.loads || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 25) : [];
+      const bubble = m => `<div class="m ${m.from_role === MINE ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${refLabel(m) ? `<span class="lk">${refLabel(m)}</span>` : ''}<small>${esc(dt(m.created_at))} · ${esc(m.from_role === 'ofis' ? 'Ofis' : m.author || (CUST ? 'Siz' : 'Depo'))}</small></div>`;
+      panel = `<div class="cpanel" id="chat-panel" role="dialog" aria-label="Ofisle yazışma"><div class="chead"><span class="cava">PCS</span><div><b>Ofisle yazışma</b><small>${CUST ? 'Yükle ya da seferle ilgili yazın; cevap burada görünür' : 'Depodan ofise yazın; cevap burada görünür'}</small></div><button type="button" class="cx" data-a="chat-close" aria-label="Sohbeti kapat">${ic('close')}</button></div>
+<div class="msgs" id="msgs">${ms.length ? ms.map(bubble).join('') : '<div class="empty">Henüz mesaj yok. Aşağıdan ofise yazabilirsiniz.</div>'}</div>
+<form data-f="msg" class="cform">${CUST ? `<select data-i="msg-ref" aria-label="Mesajın konusu"><option value="">Konu: genel</option>${trips.length ? `<optgroup label="Araçlarım">${trips.map(t => `<option value="t:${esc(t.id)}" ${M.msg.ref === 't:' + t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(t.tractor)}</option>`).join('')}</optgroup>` : ''}${loads.length ? `<optgroup label="Yüklerim">${loads.map(l => `<option value="l:${esc(l.id)}" ${M.msg.ref === 'l:' + l.id ? 'selected' : ''}>${esc(cut(l.sender + ' → ' + l.consignee, 48))}</option>`).join('')}</optgroup>` : ''}</select>` : ''}
+<div class="crow"><textarea id="msg-body" data-i="msg-body" rows="2" maxlength="1000" placeholder="Mesajınızı yazın…" aria-label="Mesajınız">${esc(M.msg.body)}</textarea><button type="submit" class="csend" aria-label="Gönder">${ic('send')}</button></div>
+<div id="msg-err" class="ferr" hidden role="alert"></div></form></div>`;
+    }
+    return `<div class="cwrap">${panel}<button type="button" class="cfab ${CH.open ? 'open' : ''}" id="chat-fab" data-a="chat-toggle" aria-label="Ofisle yazışma" aria-expanded="${CH.open}">${ic(CH.open ? 'close' : 'chat')}${un && !CH.open ? `<span class="cdot" aria-label="${un} okunmamış mesaj">${un}</span>` : ''}</button></div>`;
+  }
+  X.floats.push(chatWidget);
+  X.inp.push((t, k) => {
+    if (k === 'msg-body') { M.msg.body = t.value; return true; }
+    if (k === 'msg-ref') { M.msg.ref = t.value; return true; }
+    return false;
+  });
+  X.submit.msg = async () => {
+    const err = m => { const e = document.getElementById('msg-err'); if (e) { e.textContent = m; e.hidden = !m; } };
+    const body = M.msg.body.trim();
+    if (!body) return err('Mesaj yazın.');
+    const ref = M.msg.ref, r = CUST ? await X.rpc('shp_portal_message_send', { p_body: body, p_load: ref.startsWith('l:') ? ref.slice(2) : null, p_trip: ref.startsWith('t:') ? ref.slice(2) : null })
+      : await X.rpc('shp_depot_message_send', { p_name: X.name(), p_body: body });
+    if (r.error) { err(X.explain(r.error)); return; }
+    (P.data.messages = P.data.messages || []).push(r.data); M.msg.body = ''; M.stick = true; X.draw(); X.load0();
+  };
+
+
   if (X.MODE !== 'm') return;   // buradan sonrası yalnızca müşteri sayfası
 
   // ------------------------------------------------------------------ Takip: durum çizgisi
@@ -183,57 +238,6 @@ ${shown.length ? `<div class="scroll"><table class="tbl2"><thead><tr><th>Poz No<
   };
 
   // ------------------------------------------------------------------ Ofisle yazışma
-  async function markRead() {
-    if (M.reading || !X.unread()) return;
-    M.reading = true;
-    const r = await X.rpc('shp_portal_messages_read');
-    M.reading = false;
-    if (!r.error) { (P.data.messages || []).forEach(m => { if (m.from_role === 'ofis' && !m.read_at) m.read_at = new Date().toISOString(); }); X.draw(); }
-  }
-  // Sohbet balonu: sayfanın sağ altında, ana ekrandaki sohbet balonu gibi; tıklayınca ofisle yazışma paneli açılır
-  const CH = { open: false };
-  const openChat = () => { CH.open = true; CH.n = (P.data.messages || []).length; M.stick = true; X.draw(); setTimeout(() => { markRead(); const t = document.getElementById('msg-body'); if (t && !document.activeElement.matches('input,textarea,select')) t.focus(); }, 60); };
-  const closeChat = () => { CH.open = false; X.draw(); };
-  X.act['chat-toggle'] = () => { CH.open ? closeChat() : openChat(); };
-  X.act['chat-close'] = () => closeChat();
-  X.after.push(() => { if (CH.open) { const n = (P.data.messages || []).length; if (n !== CH.n) { CH.n = n; M.stick = true; } setTimeout(markRead, 50); } });
-  X.onDraw.push(() => { const el = document.getElementById('msgs'); if (el && M.stick) { el.scrollTop = el.scrollHeight; M.stick = false; } });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && CH.open && !document.querySelector('dialog[open]')) { CH.open = false; X.draw(); return; }
-    // Enter gönderir, Shift+Enter yeni satır
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target && e.target.id === 'msg-body') { e.preventDefault(); X.submit.msg().catch(() => {}); }
-  });
-  const refLabel = m => { const l = m.load_id && (P.data.loads || []).find(x => x.id === m.load_id), t = m.trip_id && X.tripOf(m.trip_id);
-    return l ? `${ic('box')}${esc(cut(l.sender + ' → ' + l.consignee, 40))}` : t ? `${ic('truck')}${esc(t.poz_no)} · ${esc(t.tractor)}` : ''; };
-  function chatWidget() {
-    const un = X.unread(), ms = P.data.messages || [];
-    let panel = '';
-    if (CH.open) {
-      const trips = X.sortedTrips().slice(0, 12), loads = (P.data.loads || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 25);
-      const bubble = m => `<div class="m ${m.from_role === 'musteri' ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${refLabel(m) ? `<span class="lk">${refLabel(m)}</span>` : ''}<small>${esc(dt(m.created_at))} · ${esc(m.from_role === 'ofis' ? 'Ofis' : m.author || 'Siz')}</small></div>`;
-      panel = `<div class="cpanel" id="chat-panel" role="dialog" aria-label="Ofisle yazışma"><div class="chead"><span class="cava">PCS</span><div><b>Ofisle yazışma</b><small>Yükle ya da seferle ilgili yazın; cevap burada görünür</small></div><button type="button" class="cx" data-a="chat-close" aria-label="Sohbeti kapat">${ic('close')}</button></div>
-<div class="msgs" id="msgs">${ms.length ? ms.map(bubble).join('') : '<div class="empty">Henüz mesaj yok. Aşağıdan ofise yazabilirsiniz.</div>'}</div>
-<form data-f="msg" class="cform"><select data-i="msg-ref" aria-label="Mesajın konusu"><option value="">Konu: genel</option>${trips.length ? `<optgroup label="Araçlarım">${trips.map(t => `<option value="t:${esc(t.id)}" ${M.msg.ref === 't:' + t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(t.tractor)}</option>`).join('')}</optgroup>` : ''}${loads.length ? `<optgroup label="Yüklerim">${loads.map(l => `<option value="l:${esc(l.id)}" ${M.msg.ref === 'l:' + l.id ? 'selected' : ''}>${esc(cut(l.sender + ' → ' + l.consignee, 48))}</option>`).join('')}</optgroup>` : ''}</select>
-<div class="crow"><textarea id="msg-body" data-i="msg-body" rows="2" maxlength="1000" placeholder="Mesajınızı yazın…" aria-label="Mesajınız">${esc(M.msg.body)}</textarea><button type="submit" class="csend" aria-label="Gönder">${ic('send')}</button></div>
-<div id="msg-err" class="ferr" hidden role="alert"></div></form></div>`;
-    }
-    return `<div class="cwrap">${panel}<button type="button" class="cfab ${CH.open ? 'open' : ''}" id="chat-fab" data-a="chat-toggle" aria-label="Ofisle yazışma" aria-expanded="${CH.open}">${ic(CH.open ? 'close' : 'chat')}${un && !CH.open ? `<span class="cdot" aria-label="${un} okunmamış mesaj">${un}</span>` : ''}</button></div>`;
-  }
-  X.floats.push(chatWidget);
-  X.inp.push((t, k) => {
-    if (k === 'msg-body') { M.msg.body = t.value; return true; }
-    if (k === 'msg-ref') { M.msg.ref = t.value; return true; }
-    return false;
-  });
-  X.submit.msg = async () => {
-    const err = m => { const e = document.getElementById('msg-err'); if (e) { e.textContent = m; e.hidden = !m; } };
-    const body = M.msg.body.trim();
-    if (!body) return err('Mesaj yazın.');
-    const ref = M.msg.ref, r = await X.rpc('shp_portal_message_send', { p_body: body, p_load: ref.startsWith('l:') ? ref.slice(2) : null, p_trip: ref.startsWith('t:') ? ref.slice(2) : null });
-    if (r.error) { err(X.explain(r.error)); return; }
-    (P.data.messages = P.data.messages || []).push(r.data); M.msg.body = ''; M.stick = true; X.draw(); X.load0();
-  };
-
   // ------------------------------------------------------------------ Excel'den (ya da yapıştırarak) toplu yük
   const norm = s => String(s == null ? '' : s).toLocaleUpperCase('tr-TR').replace(/İ/g, 'I').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
   const HEAD = { sender: ['GONDERICI', 'GONDEREN', 'GONDERENFIRMA'], consignee: ['ALICI', 'ALICIFIRMA', 'ALICIFIRMASI'], goods: ['MAL', 'MALCINSI', 'URUN', 'ACIKLAMA', 'MALINCINSI'],

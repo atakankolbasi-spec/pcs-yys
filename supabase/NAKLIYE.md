@@ -86,6 +86,7 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
   Önizlemede hatalı satırlar kırmızı görünür. Hepsi doğruysa toplu eklenir; tek satır hatalıysa hiçbiri eklenmez. En çok 200 satır. Örnek dosya sayfadan indirilir.
 - **Rapor ve arşiv** sekmesi: haftalık/aylık yük ve ton grafiği, en çok gönderilen alıcılar, geçmiş seferler (belgeleri yeniden açılır, bir ayın belgeleri birlikte açılıp yazdırılır) ve CSV olarak indirme.
 - **Sohbet balonu** (sayfanın sağ altı, ana ekrandaki gibi): müşteri ofise yazar (isterse bir yüke ya da araca bağlayarak); Enter gönderir. Siz Nakliye > **Mesajlar** sekmesinden yanıtlarsınız; ofisin cevabı balonda kırmızı rozetle görünür.
+  **Depo sayfasında da** aynı sohbet balonu vardır: depodaki arkadaş balona basıp ofise yazar (adıyla kaydolur), ofisin cevabı rozetle görünür. Depo yazışması müşterilerden ayrıdır; müşteriler görmez, müşteriye WhatsApp haberi gitmez.
 
 ## Depoda teslim alma, fotoğraf, QR etiket ve günün programı (depo sayfası)
 
@@ -95,6 +96,12 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 - **Okut** sekmesi: telefonla etiketi okutun (ya da kodu elle yazın, USB okuyucu da yazar gibi çalışır); yük açılır, tek dokunuşla **Geldi** denir. Kamera için tarayıcı izin ister; izin verilmezse kod elle yazılır.
 - **Program** sekmesi: bugün gelmesi beklenen yükler müşteri ve araca göre gruplanır (geçti / şimdi / bekliyor / tamam). Araç depoya gelince **Araç geldi** ile o aracın yükleri topluca işaretlenir.
   **Araçlar** sekmesinde yükleme kontrolü vardır: araçtaki yüklerin kaçı depoya geldi, doluluk (24 ton kamyon esas alınır). Geri kalan yük varsa **Yola çıktı** düğmesi uyarır ve yola çıkarmaz; hepsi gelince basılır.
+
+## Ofis: mesaj balonu ve Mesajlar sekmesi
+
+Nakliye sayfasının sağ altında, ana ekrandaki sohbet balonunun hemen üstünde **mesaj balonu** durur (okunmamış mesaj sayısı kırmızı rozetle görünür). Balona basınca
+konuşma listesinden **Depo** ya da bir müşteri seçilir, mesajlar görünür (açılınca okundu olur) ve cevap yazılır (Enter gönderir). **Mesajlar** sekmesi aynı yazışmaların
+tam sayfa halidir; Depo orada da bir konuşma olarak durur ve ofis ilk mesajı da yazabilir. Müşteriye yazdığınız cevap WhatsApp haberi olarak gider (aşağıda), depoya yazdığınız gitmez.
 
 ## Bildirimler (kendiliğinden WhatsApp'a, ofiste kontrol)
 
