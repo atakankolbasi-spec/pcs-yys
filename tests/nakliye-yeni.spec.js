@@ -277,7 +277,7 @@ test('etiket: QR kodlu A6 etiket açılır; kod yüklenir ve okuyucuyla geri oku
   await page.locator('li.lo', { hasText: 'ÇELİK PLASTİK' }).locator('[data-a="label"]').click();
   await expect(page.locator('#nkb-dlg')).toBeVisible();
   const html = await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc);
-  expect(html).toContain('A6 landscape');
+  expect(html).toContain('@page{size:148mm 105mm');                                    // ilk sekme A6
   expect(html).toContain('QRKODL5000');                                              // etiketteki okunur kod
   expect(html).toContain('ÇELİK PLASTİK LTD.');
   expect(html).toContain('16 DEF 456');
@@ -646,4 +646,26 @@ test('depo: Okut — okuyucu modu (Zebra / USB): kutu hep seçili, ekran klavyes
   await expect(page.locator('.sclist li')).toHaveCount(2);
   await page.locator('[data-i="sc-reader"]').uncheck();
   await expect(page.locator('#sc-code')).toHaveAttribute('inputmode', 'text');
+});
+
+test('etiket: yazıcıya göre boyut sekmeleri (A6, Zebra 100×150 / 100×100 / 100×70 / 100×50); her boyutta QR ve kod var; seçim hatırlanır', async ({ page }) => {
+  await depot(page, 'bekliyor');
+  const open = () => page.locator('tr.dr', { hasText: 'ÇELİK PLASTİK' }).locator('[data-a="label"]').click();
+  await open();
+  await expect(page.locator('#nkb-dlg [data-nkb-tab]')).toHaveText(['A6 (normal yazıcı)', 'Zebra 100×150', 'Zebra 100×100', 'Zebra 100×70', 'Zebra 100×50']);
+  const sizes = { 'Zebra 100×150': '100mm 150mm', 'Zebra 100×100': '100mm 100mm', 'Zebra 100×70': '100mm 70mm', 'Zebra 100×50': '100mm 50mm', 'A6 (normal yazıcı)': '148mm 105mm' };
+  for (const [name, mm] of Object.entries(sizes)) {
+    await page.locator('#nkb-dlg [data-nkb-tab]', { hasText: name }).click();
+    const html = await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc);
+    expect(html).toContain(`@page{size:${mm};margin:0}`);
+    expect(html).toContain('QRKODL5000');
+    expect(html).toContain('<svg');
+    expect(html).toContain('ÇELİK PLASTİK LTD.');
+  }
+  // seçilen boyut bir sonraki açılışta hazır gelir
+  await page.locator('#nkb-dlg [data-nkb-tab]', { hasText: 'Zebra 100×150' }).click();
+  await page.locator('#nkb-dlg [data-nkb="close"]').click();
+  await open();
+  await expect(page.locator('#nkb-dlg [data-nkb-tab].on')).toHaveText('Zebra 100×150');
+  expect(await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc)).toContain('@page{size:100mm 150mm;margin:0}');
 });
