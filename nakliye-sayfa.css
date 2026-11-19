@@ -276,6 +276,56 @@ dialog#m:has(.imp){width:min(1180px,calc(100% - 20px))}
   .slot{grid-template-columns:54px 1fr;gap:8px}.top5 span{width:100px}
 }
 @media print{
-  .top,.steps,.kp,.tools,.bulk,.drw,.pnav,#toast,.tbl .act,.tbl .ck,.tbl th:last-child,.tbl th.ck,.btn,.acts{display:none!important}
+  .top,.hd,.sh,.steps,.kp,.tools,.bulk,.drw,.pnav,#toast,.tbl .act,.tbl .ck,.tbl th:last-child,.tbl th.ck,.btn,.acts{display:none!important}
   body{background:#fff}.dwrap{padding:0}.card.flush{border:0;box-shadow:none}
+}
+
+/* ---- Ofis Nakliye ekranıyla aynı tarz: sıcak krem zemin, renkli çerçeveli üst şerit ve başlık kartı, sayı kutuları,
+   hap sekmeler, turkuaz ana düğme, büyük harfli başlık ve düğmeler. (Üstteki kuralların üzerine yazar.) */
+:root{--bg:#faf8f3;--teal:#10a090;--teal2:#0c8a7c;--tealbg:#e2f5f2;--sh:0 1px 3px #14243a0d,0 8px 20px -14px #14243a2e;
+  --frame:linear-gradient(125deg,#38bdf8 0%,#2dd4bf 22%,#a78bfa 50%,#f472b6 70%,#fb923c 88%,#fbbf24 100%);
+  --glow:0 14px 30px -18px #7c6cf5b3,0 8px 22px -16px #f59e0bb3,0 1px 2px #0b15300f}
+.top{background:linear-gradient(var(--bg) 80%,#faf8f300);border-bottom:0;padding:12px 0 6px}
+.top .in,.hd{border:2px solid transparent;background-image:linear-gradient(#fff,#fff),var(--frame);background-origin:border-box;background-clip:padding-box,border-box;box-shadow:var(--glow)}
+.top .in{width:min(1548px,calc(100% - 52px));max-width:none;margin:0 auto;padding:8px 18px;border-radius:16px}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 26px;margin:6px 0 14px;border-radius:18px}
+.hd .eyebrow{font-size:11px;font-weight:800;letter-spacing:.17em;text-transform:uppercase;color:var(--acc)}
+.hd h1{font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.01em;text-transform:uppercase;margin-top:5px}
+.hd-r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sh{max-width:1600px;margin:0 auto;padding:0 26px}
+.dwrap{padding-top:6px}
+/* sekmeler: sayılı hap düğmeler */
+.pnav{background:none;border:0;padding:0;margin:0 0 6px;position:static;overflow-x:auto}
+.tabs button,.pnav button{border:1px solid var(--line);background:#fff;border-radius:12px;min-height:44px;padding:0 17px;font:700 13.5px/1 var(--ff);letter-spacing:.01em;text-transform:uppercase;color:var(--ink)}
+.tabs button:hover,.pnav button:hover{border-color:var(--acc);color:var(--ink)}
+.tabs button.on,.pnav button.on{background:var(--acc);border-color:var(--acc);color:#fff;box-shadow:0 10px 20px -12px var(--acc)}
+.tabs button span{background:#e8edff;color:var(--acc);padding:2px 9px}.tabs button.on span{background:#ffffff33;color:#fff}
+.chips button,.chips3 button{text-transform:uppercase;letter-spacing:.01em;font-size:12px}
+/* sayı kutuları: küçük simge + etiket, büyük sayı, altında açıklama */
+.k{display:grid;grid-template-columns:18px 1fr;column-gap:8px;row-gap:2px;align-items:center;padding:14px 16px;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh)}
+.k>div{display:contents}
+.k i{grid-area:1/1;width:auto;height:auto;background:none!important;border-radius:0}.k i .ic{width:16px;height:16px}
+.k small{grid-area:1/2;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.01em;color:var(--mut)}
+.k b{grid-area:2/1/3/3;font-size:30px;line-height:1.1;font-weight:800;margin-top:4px}
+.k em{grid-area:3/1/4/3;font-style:normal;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.01em;line-height:1.3}
+.k2{padding:14px 16px;border-radius:14px;box-shadow:var(--sh)}.k2 small{text-transform:uppercase;letter-spacing:.01em;color:var(--mut);font-size:12.5px}.k2 b{font-size:30px;font-weight:800;margin-top:4px}.k2 em{text-transform:uppercase;font-size:11px}
+/* kartlar ve paneller */
+.card,.pn{border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh)}
+.pn{padding:18px}
+.card h2,.pn h2,.arh h2,.rph h2{text-transform:uppercase;letter-spacing:.01em}
+.st b,.sech,.tbl th{text-transform:uppercase;letter-spacing:.01em}
+/* düğmeler: ana düğme turkuaz ve hafif parıltılı, hepsi büyük harf */
+.btn{text-transform:uppercase;letter-spacing:.01em;font-size:13.5px;font-weight:700;border-color:var(--line)}
+.btn:hover{border-color:var(--acc)}
+.btn.sm{font-size:12.5px}.btn.lg{font-size:14.5px}
+.btn.pri,.btn.go{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 12px 24px -14px var(--teal)}
+.btn.pri:hover,.btn.go:hover{background:var(--teal2);border-color:var(--teal2)}
+.btn.go{font-size:15px}.btn.big{font-size:17px}
+.btn.go[disabled],.btn.pri[disabled]{background:#9ad6cd;border-color:#9ad6cd;box-shadow:none}
+.btn.dis{box-shadow:none}
+.uchip{background:#fff;border:1px solid var(--line)}
+@media(max-width:900px){
+  .top{padding:8px 0 4px}.top .in{width:calc(100% - 24px);padding:8px 12px}
+  .sh{padding:0 12px}.hd{padding:14px 16px;margin:4px 0 12px}.hd h1{font-size:22px}.hd-r{width:100%}.hd-r .btn{flex:1}
+  .k{padding:10px 12px}.k b{font-size:24px;margin-top:2px}.k em{display:none}.k2 b{font-size:24px}.st b{text-transform:none;font-size:12.5px}
 }

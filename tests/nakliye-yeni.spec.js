@@ -469,3 +469,25 @@ test('depo: yükler seçilince alttaki "Etiket yazdır" düğmesi seçilenlerin 
   expect(html).toContain('QRKODL5000');
   expect((html.match(/class="lb"/g) || []).length).toBe(1);
 });
+
+test('tarz: müşteri ve depo sayfalarında ofis ekranındaki gibi başlık kartı, sayı kutuları ve sayılı sekmeler var', async ({ page }) => {
+  const problems = await customerPage(page, null);
+  await expect(page.locator('.hd .eyebrow')).toHaveText('Müşteri portalı');
+  await expect(page.locator('.hd h1')).toHaveText('Yükler ve araçlar');
+  await expect(page.locator('.hd [data-a="refresh"]')).toHaveCount(1);
+  for (const [v, t] of [['takip', 'Yük takibi'], ['rapor', 'Rapor ve arşiv'], ['yazisma', 'Ofisle yazışma']]) {
+    await page.locator(`[data-a="page"][data-v="${v}"]`).click();
+    await expect(page.locator('.hd h1')).toHaveText(t);
+  }
+  await page.goto('/nakliye.html?d=tokD');
+  await expect(page.locator('.dwrap .hd h1')).toHaveText('Depo ekranı');
+  await expect(page.locator('.hd [data-a="refresh"]')).toHaveCount(1);
+  await expect(page.locator('.hd [data-a="print"]')).toHaveCount(1);
+  await expect(page.locator('.kp .k')).toHaveCount(5);
+  await expect(page.locator('.kp .k').first()).toContainText('Müşteri yazdı, depoya gelmedi');
+  await expect(page.locator('.tabs button.on')).toContainText('Bekleyenler');
+  // başlık kartı çerçeveli: şeffaf kenarlık + gradyan arka plan
+  const bi = await page.locator('.hd').evaluate(e => getComputedStyle(e).backgroundImage);
+  expect(bi).toContain('linear-gradient');
+  expect(problems).toEqual([]);
+});

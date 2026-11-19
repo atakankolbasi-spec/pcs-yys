@@ -246,7 +246,14 @@
   // ------------------------------------------------------------------ müşteri sayfası (adım adım)
   const topCustomer = () => {
     const d = P.data, c = d.customer, u = d.user;
-    return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>${esc(c.name)}</b><small>Nakliye portalı</small></div></div><div class="who">${c.logo ? `<img class="clogo" src="${esc(c.logo)}" alt="">` : ''}${liveHtml()}<button type="button" class="btn sm" data-a="refresh">${ic('refresh')}Yenile</button>${u ? `<span class="uchip">${ic('user')}<b>${esc(u.name)}</b></span><button type="button" class="btn sm" data-a="logout">${ic('out')}Çıkış</button>` : ''}</div></div></header>`;
+    return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>${esc(c.name)}</b><small>Nakliye portalı</small></div></div><div class="who">${c.logo ? `<img class="clogo" src="${esc(c.logo)}" alt="">` : ''}${liveHtml()}${u ? `<span class="uchip">${ic('user')}<b>${esc(u.name)}</b></span>` : ''}</div></div></header>`;
+  };
+  // Ofis Nakliye ekranıyla aynı tarz: renkli çerçeveli başlık kartı (üstte küçük yazı, büyük başlık, sağda düğmeler)
+  const heading = (eyebrow, title, right) => `<section class="hd"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div><div class="hd-r">${right}</div></section>`;
+  const PAGE_TITLES = { plan: 'Yükler ve araçlar', takip: 'Yük takibi', rapor: 'Rapor ve arşiv', yazisma: 'Ofisle yazışma' };
+  const customerHead = () => {
+    const u = P.data.user;
+    return `${topCustomer()}<div class="sh">${heading('Müşteri portalı', PAGE_TITLES[P.page] || PAGE_TITLES.plan, `<button type="button" class="btn" data-a="refresh">${ic('refresh')}Yenile</button>${u ? `<button type="button" class="btn" data-a="logout">${ic('out')}Çıkış</button>` : ''}`)}${pageNav()}</div>`;
   };
   function stepper(all, free, trips) {
     const s1 = all.length ? 'done' : 'cur', s2 = !all.length ? '' : free.length || !trips.length ? 'cur' : 'done', s3 = trips.length ? (free.length ? '' : 'cur') : '';
@@ -322,8 +329,8 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
   };
   function customerView() {
     const d = P.data, all = d.loads || [], free = all.filter(isFree), trips = sortedTrips();
-    if (P.page !== 'plan' && X.views[P.page]) return `${topCustomer()}${pageNav()}<main class="pg2">${X.views[P.page]()}</main>${datalists()}`;
-    return `${topCustomer()}${pageNav()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}`;
+    if (P.page !== 'plan' && X.views[P.page]) return `${customerHead()}<main class="pg2">${X.views[P.page]()}</main>${datalists()}`;
+    return `${customerHead()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}`;
   }
 
   // ------------------------------------------------------------------ depo sayfası (masa başı tablo)
@@ -350,8 +357,8 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
   function kpi5(S) {
     const arrToday = S.all.filter(l => l.arrived_at && new Date(l.arrived_at).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }) === today()).length;
     const late = S.wait.filter(l => l.expected_date && l.expected_date < today()).length;
-    const k = (icon, label, n, cls) => `<div class="k ${cls}"><i>${ic(icon)}</i><div><small>${label}</small><b>${n}</b></div></div>`;
-    return `<div class="kp">${k('clock', 'Bekleyen', S.wait.length, 'amb')}${k('check', 'Bugün gelen', arrToday, 'grn')}${k('box', 'Depoda', S.idle.length, 'blu')}${k('truck', 'Araçlar', S.trips.length, 'acc')}${k('bell', 'Geciken', late, 'red')}</div>`;
+    const k = (icon, label, n, note, cls) => `<div class="k ${cls}"><i>${ic(icon)}</i><div><small>${label}</small><b>${n}</b><em>${note}</em></div></div>`;
+    return `<div class="kp">${k('clock', 'Bekleyen', S.wait.length, 'Müşteri yazdı, depoya gelmedi', 'amb')}${k('check', 'Bugün gelen', arrToday, 'Bugün depoya alınan', 'grn')}${k('box', 'Depoda', S.idle.length, 'Depoda, araca atanmadı', 'blu')}${k('truck', 'Araçlar', S.trips.length, 'Müşterilerin hazırladığı', 'acc')}${k('bell', 'Geciken', late, 'Beklenen günü geçti', 'red')}</div>`;
   }
   function depotView() {
     const S = depotSets(), cu = id => (custOf(id) || {}).name || '?';
@@ -376,8 +383,8 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     const tabs = [['bekliyor', 'Bekleyenler', S.wait.length], ['depoda', 'Depoda', S.idle.length], ['araclar', 'Araçlar', S.trips.length], ['program', 'Program', ''], ['okut', 'Okut', '']];
     const ext = P.tab === 'program' || P.tab === 'okut';
     const side = P.drawer ? drawerHtml() : (X.sideHtml ? X.sideHtml() : '');
-    return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>Depo ekranı</b><small>Nakliye portalı${P.name.trim() ? ` · ${esc(P.name.trim())}` : ''}</small></div></div><div class="who"><label class="nm ${P.name.trim() ? '' : 'need'}"><span>Adınız</span><input id="nm" data-i="name" value="${esc(P.name)}" maxlength="60" autocomplete="off" placeholder="İşlemler adınızla kaydedilir"></label>${liveHtml()}<button type="button" class="btn sm" data-a="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn sm" data-a="print">${ic('print')}Listeyi yazdır</button></div></div></header>
-<main class="dwrap">${ext ? '' : kpi5(S)}<div class="tools"><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}${n === '' ? '' : `<span>${n}</span>`}</button>`).join('')}</div>${ext ? '' : chips + searchBar('Plaka, firma, mal ara…')}</div>
+    return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>Depo ekranı</b><small>Nakliye portalı${P.name.trim() ? ` · ${esc(P.name.trim())}` : ''}</small></div></div><div class="who"><label class="nm ${P.name.trim() ? '' : 'need'}"><span>Adınız</span><input id="nm" data-i="name" value="${esc(P.name)}" maxlength="60" autocomplete="off" placeholder="İşlemler adınızla kaydedilir"></label>${liveHtml()}</div></div></header>
+<main class="dwrap">${heading('Depo portalı', 'Depo ekranı', `<button type="button" class="btn" data-a="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn" data-a="print">${ic('print')}Listeyi yazdır</button>`)}${ext ? '' : kpi5(S)}<div class="tools"><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}${n === '' ? '' : `<span>${n}</span>`}</button>`).join('')}</div>${ext ? '' : chips + searchBar('Plaka, firma, mal ara…')}</div>
 ${ext ? (X.views['d-' + P.tab] ? X.views['d-' + P.tab](S) : '') + (side ? `<div class="dmain with side-only">${side}</div>` : '') : `<div class="dmain ${side ? 'with' : ''}"><div class="card flush scroll">${body}</div>${side}</div>`}</main>${ext ? '' : bulkBar()}${dl('dl-plate', uniq(S.all.map(l => l.inbound_plate)))}`;
   }
   const tripsShown = S => S.trips.filter(t => !P.q || [t.poz_no, t.tractor, t.trailer, (custOf(t.customer_id) || {}).name].some(x => tr(x).includes(tr(P.q))));
