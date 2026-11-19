@@ -17,7 +17,7 @@ Site GitHub Pages'te yayınlanır: https://atakankolbasi-spec.github.io/pcs-yys/
 | `app.js` | Uygulamanın kendisi (pano, raporlar, saha modu, senkron) |
 | `nakliye.js`, `nakliye.css` | Nakliye programı (operatör ekranı): müşteri yükleri, boşta yükler, araca atama, seferler. Kurulum ve kullanım: `supabase/NAKLIYE.md` |
 | `nakliye.html`, `nakliye-sayfa.js`, `nakliye-sayfa.css` | Nakliye müşteri sayfası (kullanıcı adı ve şifreyle giriş; kullanıcısı olmayan müşteri için `?m=anahtar`) ve depo sayfası (`?d=anahtar`, şifresiz): 5 saniyede bir kendiliğinden yenilenir, yetki sunucuda doğrulanır |
-| `nakliye-musteri.js`, `nakliye-depo.js`, `nakliye-qr.js`, `qr/` | Nakliye sayfasının eklentileri: müşteri takip/rapor/sohbet balonu/Excel'den yükleme, depo teslim alma (fotoğraf, sayım farkı)/Program/Okut, QR etiket ve kamerayla okuma (`qr/` içinde MIT/Apache lisanslı hazır kütüphaneler) |
+| `nakliye-musteri.js`, `nakliye-depo.js`, `nakliye-qr.js`, `qr/` | Nakliye sayfasının eklentileri: müşteri takip/rapor/depoyla sohbet balonu/Excel'den yükleme, depo teslim alma (fotoğraf, sayım farkı)/Program/Okut, QR etiket ve kamerayla okuma (`qr/` içinde MIT/Apache lisanslı hazır kütüphaneler) |
 | `nakliye-belge.js` | Lade Liste ve CMR belgelerini tarayıcıda A4 olarak hazırlar (önizleme, yazdır / PDF) |
 | `xlsx.js` | Excel içe / dışa aktarma |
 | `xlsx-templates.js` | Excel şablonları (openpyxl ile üretildi) |

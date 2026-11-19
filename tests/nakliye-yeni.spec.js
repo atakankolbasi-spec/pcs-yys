@@ -161,13 +161,15 @@ test('müşteri: arşivdeki eski seferin belgeleri sunucudan hazırlanır (ana l
 });
 
 // ================================================================================================ müşteri: ofisle yazışma
-test('müşteri: sohbet balonu — okunmamış cevap rozeti, açılınca okundu işareti, konu seçerek mesaj, 5 saniyede yeni cevap', async ({ page }) => {
+test('müşteri: sohbet balonu — depoyla yazışma; okunmamış cevap rozeti, açılınca okundu işareti, konu seçerek mesaj, 5 saniyede yeni cevap', async ({ page }) => {
   await customerPage(page);
-  await expect(page.locator('.pnav [data-v="yazisma"]')).toHaveCount(0);              // artık ayrı sekme yok
-  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');                       // ofisin okunmamış cevabı
+  await expect(page.locator('.pnav [data-v="yazisma"]')).toHaveCount(0);              // ayrı sekme yok
+  await expect(page.locator('#chat-fab')).toHaveAttribute('aria-label', 'Depo ile yazışma');
+  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');                       // okunmamış cevap
   await expect(page.locator('#chat-panel')).toHaveCount(0);
   await page.locator('#chat-fab').click();
   await expect(page.locator('#chat-panel')).toBeVisible();
+  await expect(page.locator('#chat-panel .chead b')).toHaveText('Depo ile yazışma');
   await expect(page.locator('#msgs')).toContainText('Yarın sabah çıkabilir mi?');
   await expect(page.locator('#msgs')).toContainText('06:00\'da çıkış planladık');
   await expect(page.locator('#msgs .m.me .lk')).toContainText('PCS-26-0001');        // mesaj seferle ilişkili
@@ -193,15 +195,16 @@ test('müşteri: sohbet balonu — okunmamış cevap rozeti, açılınca okundu 
   await page.locator('#msg-body').type('ikinci satır');
   expect(await page.locator('#msg-body').inputValue()).toBe('birinci satır\nikinci satır');
   await page.locator('#msg-body').fill('');
-  // ofis cevap yazar: 5 saniyede ekrana gelir (panel açıkken kendiliğinden okundu olur)
-  await page.evaluate(() => window.__db.shp_messages.push({ id: 'm9', customer_id: 'c1', from_role: 'ofis', author: 'Ofis', body: 'Tamam, güncelledik.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:05Z', read_at: null }));
+  // depo cevap yazar: 5 saniyede ekrana gelir ("Depo" olarak, personel adı gizli); panel açıkken kendiliğinden okundu olur
+  await page.evaluate(() => window.__db.shp_messages.push({ id: 'm9', customer_id: 'c1', channel: 'musteri', from_role: 'depo', author: 'Depo · Ahmet', body: 'Yükünüz rampada, yarın çıkıyor.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:05Z', read_at: null }));
   await page.clock.runFor(5100);
-  await expect(page.locator('#msgs')).toContainText('Tamam, güncelledik.');
+  await expect(page.locator('#msgs .m.o', { hasText: 'Yükünüz rampada' })).toContainText('Depo');
+  await expect(page.locator('#msgs .m.o', { hasText: 'Yükünüz rampada' })).not.toContainText('Ahmet');
   await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm9').read_at)).toBeTruthy();
-  // Esc ya da balonun üstündeki düğmeyle kapanır; panel kapalıyken yeni cevap rozet olur
+  // Esc kapatır; panel kapalıyken yeni cevap rozet olur
   await page.keyboard.press('Escape');
   await expect(page.locator('#chat-panel')).toHaveCount(0);
-  await page.evaluate(() => window.__db.shp_messages.push({ id: 'm10', customer_id: 'c1', from_role: 'ofis', author: 'Ofis', body: 'Bir şey daha.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:20Z', read_at: null }));
+  await page.evaluate(() => window.__db.shp_messages.push({ id: 'm10', customer_id: 'c1', channel: 'musteri', from_role: 'ofis', author: 'Ofis', body: 'Bir şey daha.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:20Z', read_at: null }));
   await page.clock.runFor(5100);
   await expect(page.locator('#chat-fab .cdot')).toHaveText('1');
   await page.locator('#chat-fab').click();
@@ -510,40 +513,46 @@ test('tarz: müşteri ve depo sayfalarında ofis ekranındaki gibi başlık kart
   expect(problems).toEqual([]);
 });
 
-test('depo: sohbet balonu — ofise yazar (adıyla), ofisin cevabı rozet olur ve açılınca okundu olur; müşteri mesajları karışmaz', async ({ page }) => {
-  const msgs = [
-    { id: 'd1', customer_id: null, channel: 'depo', from_role: 'depo', author: 'Depo · Ahmet', body: 'Bugün kaç araç gelecek?', load_id: null, trip_id: null, created_at: '2026-09-22T09:00:00Z', read_at: null },
-    { id: 'd2', customer_id: null, channel: 'depo', from_role: 'ofis', author: 'Ofis', body: 'Üç araç, öğleden sonra.', load_id: null, trip_id: null, created_at: '2026-09-22T09:05:00Z', read_at: null },
-    ...messages()];
+test('depo: sohbet balonu — müşteri seçilip yazışılır; müşterinin yazdığı rozet olur, açılınca okundu olur; başka müşterinin mesajı karışmaz', async ({ page }) => {
+  const m = (id, cid, from, body, extra = {}) => ({ id, customer_id: cid, channel: 'musteri', from_role: from, author: from === 'ofis' ? 'Ofis' : from === 'depo' ? 'Depo · Ahmet' : 'Müşteri · Ali', body, load_id: null, trip_id: null, created_at: '2026-09-22T09:00:00Z', read_at: null, ...extra });
+  const msgs = [m('d1', 'c1', 'musteri', 'Yüküm ne zaman yüklenir?'), m('d2', 'c1', 'musteri', 'Acil lütfen.', { created_at: '2026-09-22T09:01:00Z' }),
+    m('d3', 'c2', 'musteri', 'Belgeler hazır mı?', { created_at: '2026-09-22T10:00:00Z' }), m('d4', 'c2', 'depo', 'Hazır.', { created_at: '2026-09-22T10:05:00Z', read_at: '2026-09-22T10:06:00Z' })];
   const problems = await depot(page, null, { data: { shp_messages: msgs } });
   await page.locator('#nm').fill('Ahmet');
-  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');                       // ofisin okunmamış cevabı
+  await expect(page.locator('#chat-fab')).toHaveAttribute('aria-label', 'Müşteri yazışmaları');
+  await expect(page.locator('#chat-fab .cdot')).toHaveText('3');                       // 2 + 1 okunmamış müşteri mesajı
   await page.locator('#chat-fab').click();
   await expect(page.locator('#chat-panel')).toBeVisible();
-  await expect(page.locator('#msgs')).toContainText('Bugün kaç araç gelecek?');
-  await expect(page.locator('#msgs')).toContainText('Üç araç, öğleden sonra.');
-  await expect(page.locator('#msgs')).not.toContainText('Yarın sabah çıkabilir mi?');  // müşteri yazışması depoya görünmez
-  await expect(page.locator('#chat-panel [data-i="msg-ref"]')).toHaveCount(0);          // depoda konu seçimi yok
-  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'd2').read_at)).toBeTruthy();
-  expect((await rpcs(page, 'shp_depot_messages_read')).length).toBe(1);
-  await expect(page.locator('#chat-fab .cdot')).toHaveCount(0);
-  // yazar: adıyla kaydolur; boş mesaj gitmez; Enter gönderir
+  // en eski okunmamış mesajı olan müşteri açılır (ÖRNEK NAKLİYAT: iki okunmamış)
+  await expect(page.locator('#chat-panel [data-i="dc-cust"]')).toHaveValue('c1');
+  await expect(page.locator('#msgs')).toContainText('Yükum ne zaman'.replace('Yükum', 'Yüküm'));
+  await expect(page.locator('#msgs')).toContainText('Acil lütfen.');
+  await expect(page.locator('#msgs')).not.toContainText('Belgeler hazır mı?');         // başka müşteri
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.filter(x => x.customer_id === 'c1' && !x.read_at).length)).toBe(0);
+  expect(await page.evaluate(() => window.__db.shp_messages.find(x => x.id === 'd3').read_at)).toBeNull();   // öteki müşteriye dokunulmadı
+  expect(await rpcs(page, 'shp_depot_messages_read')).toEqual([{ p_token: 'tokD', p_name: 'Ahmet', p_customer: 'c1' }]);
+  await expect(page.locator('#chat-panel [data-i="dc-cust"] option[value="c2"]')).toContainText('(1 yeni)');
+  // müşteriye cevap: adıyla kaydolur; boş mesaj gitmez; Enter gönderir
   await page.locator('form[data-f="msg"] button[type="submit"]').click();
   await expect(page.locator('#msg-err')).toContainText('Mesaj yazın');
-  await page.locator('#msg-body').fill('Tamam, rampayı hazırlıyoruz.');
+  await page.locator('#msg-body').fill('Yarın sabah yüklüyoruz.');
   await page.locator('#msg-body').press('Enter');
-  await expect(page.locator('#msgs')).toContainText('Tamam, rampayı hazırlıyoruz.');
-  const sent = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'depo' && m.body.startsWith('Tamam')));
-  expect(sent).toHaveLength(1); expect(sent[0]).toMatchObject({ customer_id: null, channel: 'depo', author: 'Depo · Ahmet' });
-  expect(await rpcs(page, 'shp_depot_message_send')).toEqual([{ p_token: 'tokD', p_name: 'Ahmet', p_body: 'Tamam, rampayı hazırlıyoruz.' }]);
-  // ofis cevap yazar: 5 saniyede balonda rozet
+  await expect(page.locator('#msgs')).toContainText('Yarın sabah yüklüyoruz.');
+  const sent = await page.evaluate(() => window.__db.shp_messages.filter(x => x.from_role === 'depo' && x.body.startsWith('Yarın')));
+  expect(sent).toHaveLength(1); expect(sent[0]).toMatchObject({ customer_id: 'c1', author: 'Depo · Ahmet' });
+  expect(await rpcs(page, 'shp_depot_message_send')).toEqual([{ p_token: 'tokD', p_name: 'Ahmet', p_customer: 'c1', p_body: 'Yarın sabah yüklüyoruz.' }]);
+  // öteki müşteriyi seç: onun yazışması açılır, okundu olur, rozet kalkar
+  await page.locator('#chat-panel [data-i="dc-cust"]').selectOption('c2');
+  await expect(page.locator('#msgs')).toContainText('Belgeler hazır mı?');
+  await expect(page.locator('#msgs')).not.toContainText('Yarın sabah yüklüyoruz.');
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(x => x.id === 'd3').read_at)).toBeTruthy();
+  await expect(page.locator('#chat-panel')).toBeVisible();
+  // kapat; müşteri yazınca 5 saniyede balonda rozet
   await page.keyboard.press('Escape');
   await expect(page.locator('#chat-panel')).toHaveCount(0);
-  await page.evaluate(() => window.__db.shp_messages.push({ id: 'd9', customer_id: null, channel: 'depo', from_role: 'ofis', author: 'Ofis', body: 'Teşekkürler.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:20Z', read_at: null }));
+  await expect(page.locator('#chat-fab .cdot')).toHaveCount(0);
+  await page.evaluate(() => window.__db.shp_messages.push({ id: 'd9', customer_id: 'c2', channel: 'musteri', from_role: 'musteri', author: 'Müşteri · Ali', body: 'Teşekkürler.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:20Z', read_at: null }));
   await page.clock.runFor(5100);
   await expect(page.locator('#chat-fab .cdot')).toHaveText('1');
-  // müşterinin balonunda depo mesajı görünmez
-  const cust = await page.evaluate(() => window.__db.shp_messages.filter(m => m.customer_id === 'c1').length);
-  expect(cust).toBe(2);
   expect(problems).toEqual([]);
 });

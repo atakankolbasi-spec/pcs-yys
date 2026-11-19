@@ -65,7 +65,7 @@
       } else {
         S.customers = a.data || []; S.trips = t.data || []; S.loads = l.data || [];
         S.log = g && !g.error && Array.isArray(g.data) ? g.data : []; S.logMiss = !!(g && g.error);
-        S.msgs = mg && !mg.error && Array.isArray(mg.data) ? mg.data.slice().reverse() : []; S.outbox = ob && !ob.error && Array.isArray(ob.data) ? ob.data : []; S.newMiss = !!((mg && mg.error) || (ob && ob.error));
+        S.msgs = mg && !mg.error && Array.isArray(mg.data) ? mg.data.filter(m => m.customer_id).reverse() : []; S.outbox = ob && !ob.error && Array.isArray(ob.data) ? ob.data : []; S.newMiss = !!((mg && mg.error) || (ob && ob.error));
         S.err = ''; S.missing = false; S.ready = true;
         for (const id of [...S.sel]) { const x = loadOf(id); if (!x || x.status !== 'depoda') S.sel.delete(id); }
       }
@@ -75,7 +75,6 @@
     S.loading = false;
     redraw();
     syncPano();
-    if (S.tab === 'msg') readCurrent();
   }
 
   // Panodaki müşteriler (Plaka kayıtları ve araç geliş kayıtları) Nakliye müşterisi olarak kendiliğinden eklenir.
@@ -124,7 +123,7 @@
   }
 
   function tabs() {
-    const t = [['idle', 'Boşta yükler', idleLoads().length], ['trips', 'Araçlar', S.trips.length], ['wait', 'Bekleyenler', waitLoads().length], ['all', 'Tüm yükler', S.loads.length], ['msg', 'Mesajlar', unreadMsgs()], ['out', 'Bildirimler', S.outbox.length], ['log', 'Hareketler', S.log.length]];
+    const t = [['idle', 'Boşta yükler', idleLoads().length], ['trips', 'Araçlar', S.trips.length], ['wait', 'Bekleyenler', waitLoads().length], ['all', 'Tüm yükler', S.loads.length], ['msg', 'Mesajlar', new Set(S.msgs.map(tk)).size], ['out', 'Bildirimler', S.outbox.length], ['log', 'Hareketler', S.log.length]];
     return `<div class="nk-tabs" role="tablist">${t.map(([k, l, n]) => `<button type="button" role="tab" class="${S.tab === k ? 'on' : ''}" aria-selected="${S.tab === k}" data-nk="tab" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>`;
   }
 
@@ -212,66 +211,54 @@
   }
 
   const waPhone = ph => { let d = String(ph || '').replace(/[^\d]/g, ''); if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '90' + d.slice(1); else if (d.length === 10 && d[0] === '5') d = '90' + d; return d; };
-  const tk = m => m.customer_id || 'depo';                                           // konuşma anahtarı: müşteri kimliği, depo yazışmasında 'depo'
-  const thName = id => id === 'depo' ? 'Depo' : (cust(id) || {}).name || '?';
-  const fromThem = m => m.from_role === 'musteri' || m.from_role === 'depo';
+  // Yazışma müşteri ile depo arasındadır; ofis konuşmaları görür ve isterse yazar. Okundu işareti alıcıya (müşteri / depo) aittir: ofis okuyunca işaretlenmez.
+  const dtm = iso => stamp(iso);
+  const tk = m => m.customer_id;
+  const thName = id => (cust(id) || {}).name || '?';
   const lastAt = id => { const ms = S.msgs.filter(m => tk(m) === id); return ms.length ? String(ms[ms.length - 1].created_at) : ''; };
   const curThread = () => {
     const ids = [...new Set(S.msgs.map(tk))];
-    return S.msgCust && (ids.includes(S.msgCust) || S.msgCust === 'depo' || cust(S.msgCust)) ? S.msgCust : (ids.sort((a, b) => lastAt(b).localeCompare(lastAt(a)))[0] || '');
+    return S.msgCust && (ids.includes(S.msgCust) || cust(S.msgCust)) ? S.msgCust : (ids.sort((a, b) => lastAt(b).localeCompare(lastAt(a)))[0] || '');
   };
-  async function readCurrent() {
-    const id = curThread(), un = S.msgs.filter(m => tk(m) === id && fromThem(m) && !m.read_at);
-    if (!id || !un.length || S.reading) return;
-    S.reading = true;
-    let q = X.client.from('shp_messages').update({ read_at: new Date().toISOString() });
-    q = id === 'depo' ? q.eq('channel', 'depo').eq('from_role', 'depo') : q.eq('customer_id', id).eq('from_role', 'musteri');
-    const r = await q.is('read_at', null);
-    S.reading = false;
-    if (!r.error) { un.forEach(m => { m.read_at = new Date().toISOString(); }); redraw(); }
-  }
-  const unreadMsgs = () => S.msgs.filter(m => fromThem(m) && !m.read_at).length;
-  const dtm = iso => stamp(iso);
-  // Mesajlar: müşteri başına yazışma; okunmamışlar üstte
+  const unread4depot = id => S.msgs.filter(m => tk(m) === id && m.from_role === 'musteri' && !m.read_at).length;   // depo henüz okumadı
   function msgView() {
     if (S.newMiss) return notice('Yazışma ve bildirimler kurulmamış', 'Bu bölüm için <b>supabase/nakliye-kurulumu.sql</b> dosyasının son halini Supabase SQL Editor\'de çalıştırın, sonra Yenile\'ye basın.', true);
     const by = {};
     S.msgs.forEach(m => { (by[tk(m)] = by[tk(m)] || []).push(m); });
-    if (!by.depo) by.depo = [];                                                        // depo ile yazışma her zaman başlatılabilir
-    const ids = Object.keys(by).sort((a, b) => (by[b].length ? 1 : 0) - (by[a].length ? 1 : 0) || lastAt(b).localeCompare(lastAt(a)));
+    const ids = Object.keys(by).sort((a, b) => lastAt(b).localeCompare(lastAt(a)));
     const cur = curThread() || (S.customers[0] || {}).id || '';
-    const list = ids.map(id => { const ms = by[id], un = ms.filter(m => fromThem(m) && !m.read_at).length, last = ms[ms.length - 1];
-      return `<button type="button" class="nk-th ${id === cur ? 'on' : ''}" data-nk="msg-open" data-id="${id}"><b>${id === 'depo' ? ic('building') : ''}${esc(thName(id))}</b>${un ? `<span class="nk-bdg">${un}</span>` : ''}<small>${last ? esc(String(last.body).slice(0, 60)) : 'Henüz yazışma yok'}</small></button>`; }).join('');
+    const list = ids.length ? ids.map(id => { const ms = by[id], un = unread4depot(id), last = ms[ms.length - 1];
+      return `<button type="button" class="nk-th ${id === cur ? 'on' : ''}" data-nk="msg-open" data-id="${id}"><b>${esc(thName(id))}</b>${un ? `<span class="nk-bdg" title="Depo henüz okumadı">${un}</span>` : ''}<small>${esc(String(last.body).slice(0, 60))}</small></button>`; }).join('') : '<div class="nk-empty">Henüz mesaj yok. Müşteriler sayfalarından depoya yazınca burada görünür.</div>';
     const thread = (by[cur] || []).map(msgBubble).join('');
     return `<section class="nk-pn nk-msgs"><div class="nk-bar"><h2>Mesajlar <span>${S.msgs.length}</span></h2><div class="nk-bar-r">${custSelect().replace('Tüm müşteriler', 'Müşteri seç')}</div></div>
+<div class="nk-note2">Müşteriler <b>depoyla</b> yazışır, depo da müşteriyle. Burada bütün konuşmaları görürsünüz; isterseniz siz de yazabilirsiniz (müşteri "Ofis" olarak görür). Kırmızı sayı, müşterinin yazdığı ama deponun henüz okumadığı mesajlardır.</div>
 <div class="nk-mg"><div class="nk-ths">${list}</div><div class="nk-thread"><div class="nk-mlist" id="nk-mlist">${thread || `<div class="nk-empty">${esc(thName(cur))} ile henüz yazışma yok.</div>`}</div>
-${cur ? `<form data-nk-form="reply" data-cid="${cur}" class="nk-reply"><textarea id="nk-reply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc(thName(cur))} için cevabınızı yazın…">${esc(S.msgBody)}</textarea><button type="submit" class="btn primary">${ic('check')}Gönder</button></form>` : ''}</div></div></section>`;
+${cur ? `<form data-nk-form="reply" data-cid="${cur}" class="nk-reply"><textarea id="nk-reply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc(thName(cur))} için yazın…">${esc(S.msgBody)}</textarea><button type="submit" class="btn primary">${ic('check')}Gönder</button></form>` : ''}</div></div></section>`;
   }
   const msgBubble = m => { const mine = m.from_role === 'ofis', l = m.load_id && loadOf(m.load_id), t = m.trip_id && byId(S.trips, m.trip_id);
     return `<div class="nk-m ${mine ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${l ? `<span class="nk-lk2">${esc(l.sender)} → ${esc(l.consignee)}</span>` : t ? `<span class="nk-lk2">${esc(t.poz_no)} · ${esc(t.tractor)}</span>` : ''}<small>${esc(dtm(m.created_at))} · ${esc(mine ? 'Ofis' : m.author || (m.from_role === 'depo' ? 'Depo' : 'Müşteri'))}</small></div>`; };
   // Mesaj balonu simgeleri (uygulamanın simge listesinde yok)
   const svg = d => `<svg class="nk-svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const BIC = { chat: svg('<path d="M4 5h16v11H9l-5 4z"/>'), send: svg('<path d="M21 3L10 14M21 3l-7 18-4-8-8-4z"/>'), close: svg('<path d="M6 6l12 12M6 18L18 6"/>') };
-  // Mesaj balonu (sayfanın sağ altı): müşteri ve depo yazışmalarına hızlı erişim; konuşma seçilir, cevap yazılır
+  // Mesaj balonu (sayfanın sağ altı): müşteri ile depo yazışmalarına hızlı bakış; konuşma seçilir, isterseniz yazarsınız
   function msgBubbleHtml() {
     if (S.newMiss) return '';
-    const un = unreadMsgs(), ids = new Set(S.msgs.map(tk));
     let panel = '';
     if (S.bub) {
-      const cur = curThread() || 'depo';
-      const opts = [{ id: 'depo', name: 'Depo' }, ...S.customers.filter(c => c.active || ids.has(c.id)).map(c => ({ id: c.id, name: c.name }))]
-        .map(o => ({ ...o, un: S.msgs.filter(m => tk(m) === o.id && fromThem(m) && !m.read_at).length, at: lastAt(o.id) }))
-        .sort((a, b) => (b.un > 0) - (a.un > 0) || (a.id === 'depo' ? -1 : 0) - (b.id === 'depo' ? -1 : 0) || b.at.localeCompare(a.at) || a.name.localeCompare(b.name, 'tr'));
+      const cur = curThread() || (S.customers[0] || {}).id || '';
+      const ids = new Set(S.msgs.map(tk));
+      const opts = S.customers.filter(c => c.active || ids.has(c.id)).map(c => ({ id: c.id, name: c.name, un: unread4depot(c.id), at: lastAt(c.id) }))
+        .sort((a, b) => b.at.localeCompare(a.at) || a.name.localeCompare(b.name, 'tr'));
       const thread = S.msgs.filter(m => tk(m) === cur).map(msgBubble).join('');
       panel = `<div class="nk-cpanel" id="nk-cpanel" role="dialog" aria-label="Nakliye mesajları"><div class="nk-chead"><span class="nk-cava">PCS</span><div><b>Nakliye mesajları</b><small>Müşteri ve depo yazışmaları</small></div><button type="button" class="nk-cx" data-nk="bub-close" aria-label="Kapat">${BIC.close}</button></div>
-<div class="nk-csel"><select data-nk-in="bub-th" aria-label="Konuşma seç">${opts.map(o => `<option value="${esc(o.id)}" ${o.id === cur ? 'selected' : ''}>${esc(o.name)}${o.un ? ` (${o.un} yeni)` : ''}</option>`).join('')}</select></div>
+<div class="nk-csel"><select data-nk-in="bub-th" aria-label="Müşteri seç">${opts.map(o => `<option value="${esc(o.id)}" ${o.id === cur ? 'selected' : ''}>${esc(o.name)}${o.un ? ` (${o.un} okunmadı)` : ''}</option>`).join('')}</select></div>
 <div class="nk-cmsgs" id="nk-bmlist">${thread || `<div class="nk-cempty">${esc(thName(cur))} ile henüz yazışma yok.</div>`}</div>
-<form data-nk-form="reply" data-cid="${esc(cur)}" class="nk-cform"><textarea id="nk-breply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc(thName(cur))} için yazın…" aria-label="Cevabınız">${esc(S.msgBody)}</textarea><button type="submit" class="nk-csend" aria-label="Gönder">${BIC.send}</button></form></div>`;
+<form data-nk-form="reply" data-cid="${esc(cur)}" class="nk-cform"><textarea id="nk-breply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc(thName(cur))} için yazın…" aria-label="Mesajınız">${esc(S.msgBody)}</textarea><button type="submit" class="nk-csend" aria-label="Gönder">${BIC.send}</button></form></div>`;
     }
-    return `<div class="nk-cwrap">${panel}<button type="button" class="nk-cfab ${S.bub ? 'open' : ''}" id="nk-cfab" data-nk="bub-toggle" title="Nakliye mesajları" aria-label="Nakliye mesajları" aria-expanded="${!!S.bub}">${(S.bub ? BIC.close : BIC.chat)}${un && !S.bub ? `<span class="nk-cdot">${un}</span>` : ''}</button></div>`;
+    return `<div class="nk-cwrap">${panel}<button type="button" class="nk-cfab ${S.bub ? 'open' : ''}" id="nk-cfab" data-nk="bub-toggle" title="Müşteri ve depo yazışmaları" aria-label="Müşteri ve depo yazışmaları" aria-expanded="${!!S.bub}">${S.bub ? BIC.close : BIC.chat}</button></div>`;
   }
   // Bildirimler: kuyruktaki haberler müşteri ve konuya göre birleşir; tek tıkla WhatsApp'ta gönderilir
-  const EVT = { geldi: ['📦 Yükünüz depoya geldi', 'Depoya geldi'], yola: ['🚚 Aracınız yola çıktı', 'Yola çıktı'], teslim: ['✅ Yükünüz teslim edildi', 'Teslim'], sorun: ['⚠️ Yükünüzde sorun bildirildi', 'Sorun'], mesaj: ['💬 Ofisten yeni mesaj', 'Mesaj'] };
+  const EVT = { geldi: ['📦 Yükünüz depoya geldi', 'Depoya geldi'], yola: ['🚚 Aracınız yola çıktı', 'Yola çıktı'], teslim: ['✅ Yükünüz teslim edildi', 'Teslim'], sorun: ['⚠️ Yükünüzde sorun bildirildi', 'Sorun'], mesaj: ['💬 Yeni mesaj', 'Mesaj'] };
   function outGroups() {
     const m = new Map();
     S.outbox.forEach(o => { const k = o.customer_id + '|' + o.event + '|' + o.phone; if (!m.has(k)) m.set(k, { key: k, customer_id: o.customer_id, event: o.event, phone: o.phone, items: [], err: '' }); const g = m.get(k); g.items.push(o); if (o.status === 'hata' && o.error && !g.err) g.err = o.error; });
@@ -371,7 +358,7 @@ ${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderi
   async function onClick(e) {
     const t = e.target.closest('[data-nk]'); if (!t || !X) return;
     const a = t.dataset.nk, id = t.dataset.id;
-    if (a === 'tab') { S.tab = t.dataset.v; S.confirm = ''; redraw(); if (S.tab === 'msg') await readCurrent(); return; }
+    if (a === 'tab') { S.tab = t.dataset.v; S.confirm = ''; redraw(); return; }
     if (a === 'refresh') { await load(); return; }
     if (a === 'pick') {
       if (S.sel.has(id)) S.sel.delete(id);
@@ -417,10 +404,10 @@ ${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderi
     if (a.startsWith('lk-')) { await linkAction(a, t); return; }
     if (a === 'edit-cust') { customerForm(id); return; }
     if (a === 'back-cust') { customersModal(); return; }
-    if (a === 'bub-toggle') { S.bub = !S.bub; redraw(); if (S.bub) { await readCurrent(); const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; const ta = document.getElementById('nk-breply'); if (ta) ta.focus(); } return; }
+    if (a === 'bub-toggle') { S.bub = !S.bub; redraw(); if (S.bub) { const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; const ta = document.getElementById('nk-breply'); if (ta) ta.focus(); } return; }
     if (a === 'bub-close') { S.bub = false; redraw(); return; }
     if (a === 'msg-open') {
-      S.msgCust = id; redraw(); await readCurrent();
+      S.msgCust = id; redraw();
       return;
     }
     if (a === 'out-send' || a === 'out-done' || a === 'out-skip') {
@@ -459,7 +446,7 @@ ${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderi
     if (k === 'tq') { S.tq = v; redraw(); return; }
     if (k === 'cust') { if (S.tab === 'msg') S.msgCust = v; S.cust = v; redraw(); return; }
     if (k === 'msg-body') { S.msgBody = v; return; }
-    if (k === 'bub-th') { S.msgCust = v; redraw(); readCurrent().then(() => { const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; }); return; }
+    if (k === 'bub-th') { S.msgCust = v; redraw(); const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; return; }
     if (k === 'f-tractor') S.form.tractor = v;
     else if (k === 'f-trailer') S.form.trailer = v;
     else if (k === 'f-date') S.form.date = v;
@@ -581,7 +568,7 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
   async function sendReply(form) {
     const body = S.msgBody.trim(), cid = form.dataset.cid;
     if (!body || !cid) return;
-    const r = await X.client.from('shp_messages').insert(cid === 'depo' ? { customer_id: null, channel: 'depo', from_role: 'ofis', body } : { customer_id: cid, from_role: 'ofis', body });
+    const r = await X.client.from('shp_messages').insert({ customer_id: cid, from_role: 'ofis', body });
     if (r.error) { X.toast(r.error.message || 'Gönderilemedi', true); return; }
     S.msgBody = ''; X.toast('Cevabınız gönderildi'); await load(true);
     for (const id of ['nk-mlist', 'nk-bmlist']) { const el = document.getElementById(id); if (el) el.scrollTop = el.scrollHeight; }

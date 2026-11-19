@@ -1,4 +1,4 @@
-/* Nakliye müşteri sayfası ek ekranları: Takip (durum çizgisi + bildirim ayarı), Rapor ve arşiv, Ofisle yazışma, Excel'den toplu yük.
+/* Nakliye müşteri sayfası ek ekranları: Takip (durum çizgisi + bildirim ayarı), Rapor ve arşiv, Excel'den toplu yük; sohbet balonu (müşteri ile depo yazışması).
  * Fotoğraf görüntüleyici müşteri ve depo sayfasında ortaktır. nakliye-sayfa.js çekirdeğine window.PCSNKP üzerinden bağlanır. */
 (() => {
   'use strict';
@@ -6,7 +6,7 @@
   if (!X) return;
   const { P, esc, ic, kg, ton, stamp, uniq, plate, tr } = X;
   const B = X.B;
-  const M = { rp: 'hafta', report: null, month: '', msg: { body: '', ref: '' }, nf: null, imp: null, stick: false, reading: false, ph: null };
+  const M = { rp: 'hafta', report: null, month: '', msg: { body: '', ref: '' }, dc: '', nf: null, imp: null, stick: false, reading: false, ph: null };
 
   const cut = (s, n) => { const t = String(s || ''); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
   const dt = iso => stamp(iso);
@@ -50,21 +50,38 @@ ${l && (l.receive_note || l.condition) ? `<div class="ferr" style="background:#f
   X.photoDialog = photoDialog;
 
   // ------------------------------------------------------------------ sohbet balonu (müşteri: ofisle yazışma · depo: ofisle yazışma)
+  // Müşteri ↔ depo yazışması. Müşteri sayfasında tek konuşma (depo ile); depo sayfasında müşteri seçilir.
+  // Okundu işareti alıcıya aittir: müşterinin yazdığını depo okuyunca, deponun yazdığını müşteri okuyunca işaretlenir.
   const CUST = X.MODE === 'm', MINE = CUST ? 'musteri' : 'depo';
+  const THEM = m => CUST ? (m.from_role === 'ofis' || m.from_role === 'depo') : m.from_role === 'musteri';   // bana yazılan mesaj mı
+  const custName = id => ((P.data.customers || []).find(c => c.id === id) || {}).name || '?';
+  const allMsgs = () => P.data.messages || [];
+  const cur = () => {                                                       // depo: açık konuşmanın müşterisi
+    if (CUST) return '';
+    const cs = (P.data.customers || []);
+    if (M.dc && cs.some(c => c.id === M.dc)) return M.dc;
+    const unread = allMsgs().filter(m => THEM(m) && !m.read_at).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))[0];
+    const last = allMsgs().slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+    return (unread || last || {}).customer_id || (cs[0] || {}).id || '';
+  };
+  const thread = () => CUST ? allMsgs() : allMsgs().filter(m => m.customer_id === cur());
+  const unreadAll = () => allMsgs().filter(m => THEM(m) && !m.read_at).length;
+  const unreadHere = () => thread().filter(m => THEM(m) && !m.read_at).length;
   async function markRead() {
-    if (M.reading || !X.unread()) return;
+    if (M.reading || !unreadHere()) return;
     M.reading = true;
-    const r = await (CUST ? X.rpc('shp_portal_messages_read') : X.rpc('shp_depot_messages_read', { p_name: X.name() }));
+    const cid = cur();
+    const r = await (CUST ? X.rpc('shp_portal_messages_read') : X.rpc('shp_depot_messages_read', { p_name: X.name(), p_customer: cid }));
     M.reading = false;
-    if (!r.error) { (P.data.messages || []).forEach(m => { if (m.from_role === 'ofis' && !m.read_at) m.read_at = new Date().toISOString(); }); X.draw(); }
+    if (!r.error) { thread().forEach(m => { if (THEM(m) && !m.read_at) m.read_at = new Date().toISOString(); }); X.draw(); }
   }
-  // Sohbet balonu: sayfanın sağ altında, ana ekrandaki sohbet balonu gibi; tıklayınca ofisle yazışma paneli açılır
+  // Sohbet balonu: sayfanın sağ altında, ana ekrandaki sohbet balonu gibi
   const CH = { open: false };
-  const openChat = () => { CH.open = true; CH.n = (P.data.messages || []).length; M.stick = true; X.draw(); setTimeout(() => { markRead(); const t = document.getElementById('msg-body'); if (t && !document.activeElement.matches('input,textarea,select')) t.focus(); }, 60); };
+  const openChat = () => { M.dc = cur(); CH.open = true; CH.n = thread().length; M.stick = true; X.draw(); setTimeout(() => { markRead(); const t = document.getElementById('msg-body'); if (t && !document.activeElement.matches('input,textarea,select')) t.focus(); }, 60); };
   const closeChat = () => { CH.open = false; X.draw(); };
   X.act['chat-toggle'] = () => { CH.open ? closeChat() : openChat(); };
   X.act['chat-close'] = () => closeChat();
-  X.after.push(() => { if (CH.open) { const n = (P.data.messages || []).length; if (n !== CH.n) { CH.n = n; M.stick = true; } setTimeout(markRead, 50); } });
+  X.after.push(() => { if (CH.open) { const n = thread().length; if (n !== CH.n) { CH.n = n; M.stick = true; } setTimeout(markRead, 50); } });
   X.onDraw.push(() => { const el = document.getElementById('msgs'); if (el && M.stick) { el.scrollTop = el.scrollHeight; M.stick = false; } });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && CH.open && !document.querySelector('dialog[open]')) { CH.open = false; X.draw(); return; }
@@ -73,24 +90,38 @@ ${l && (l.receive_note || l.condition) ? `<div class="ferr" style="background:#f
   });
   const refLabel = m => { const l = m.load_id && (P.data.loads || []).find(x => x.id === m.load_id), t = m.trip_id && X.tripOf(m.trip_id);
     return l ? `${ic('box')}${esc(cut(l.sender + ' → ' + l.consignee, 40))}` : t ? `${ic('truck')}${esc(t.poz_no)} · ${esc(t.tractor)}` : ''; };
+  const who = m => m.from_role === 'ofis' ? 'Ofis' : m.from_role === 'depo' ? (CUST ? 'Depo' : m.author || 'Depo') : (CUST ? m.author || 'Siz' : m.author || 'Müşteri');
+  // depo: konuşma listesi (okunmamışı olan müşteri üstte, sonra en son yazışılan)
+  function customerOptions() {
+    const by = {};
+    allMsgs().forEach(m => { const o = by[m.customer_id] = by[m.customer_id] || { un: 0, at: '' }; if (THEM(m) && !m.read_at) o.un++; if (String(m.created_at) > o.at) o.at = String(m.created_at); });
+    return (P.data.customers || []).map(c => ({ id: c.id, name: c.name, un: (by[c.id] || {}).un || 0, at: (by[c.id] || {}).at || '' }))
+      .sort((a, b) => (b.un > 0) - (a.un > 0) || b.at.localeCompare(a.at) || a.name.localeCompare(b.name, 'tr'));
+  }
   function chatWidget() {
-    const un = X.unread(), ms = P.data.messages || [];
+    const un = unreadAll();
     let panel = '';
     if (CH.open) {
-      const trips = CUST ? X.sortedTrips().slice(0, 12) : [], loads = CUST ?  (P.data.loads || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 25) : [];
-      const bubble = m => `<div class="m ${m.from_role === MINE ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${refLabel(m) ? `<span class="lk">${refLabel(m)}</span>` : ''}<small>${esc(dt(m.created_at))} · ${esc(m.from_role === 'ofis' ? 'Ofis' : m.author || (CUST ? 'Siz' : 'Depo'))}</small></div>`;
-      panel = `<div class="cpanel" id="chat-panel" role="dialog" aria-label="Ofisle yazışma"><div class="chead"><span class="cava">PCS</span><div><b>Ofisle yazışma</b><small>${CUST ? 'Yükle ya da seferle ilgili yazın; cevap burada görünür' : 'Depodan ofise yazın; cevap burada görünür'}</small></div><button type="button" class="cx" data-a="chat-close" aria-label="Sohbeti kapat">${ic('close')}</button></div>
-<div class="msgs" id="msgs">${ms.length ? ms.map(bubble).join('') : '<div class="empty">Henüz mesaj yok. Aşağıdan ofise yazabilirsiniz.</div>'}</div>
-<form data-f="msg" class="cform">${CUST ? `<select data-i="msg-ref" aria-label="Mesajın konusu"><option value="">Konu: genel</option>${trips.length ? `<optgroup label="Araçlarım">${trips.map(t => `<option value="t:${esc(t.id)}" ${M.msg.ref === 't:' + t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(t.tractor)}</option>`).join('')}</optgroup>` : ''}${loads.length ? `<optgroup label="Yüklerim">${loads.map(l => `<option value="l:${esc(l.id)}" ${M.msg.ref === 'l:' + l.id ? 'selected' : ''}>${esc(cut(l.sender + ' → ' + l.consignee, 48))}</option>`).join('')}</optgroup>` : ''}</select>` : ''}
-<div class="crow"><textarea id="msg-body" data-i="msg-body" rows="2" maxlength="1000" placeholder="Mesajınızı yazın…" aria-label="Mesajınız">${esc(M.msg.body)}</textarea><button type="submit" class="csend" aria-label="Gönder">${ic('send')}</button></div>
+      const ms = thread(), cid = cur();
+      const trips = CUST ? X.sortedTrips().slice(0, 12) : [], loads = CUST ? (P.data.loads || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 25) : [];
+      const bubble = m => `<div class="m ${m.from_role === MINE ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${refLabel(m) ? `<span class="lk">${refLabel(m)}</span>` : ''}<small>${esc(dt(m.created_at))} · ${esc(who(m))}</small></div>`;
+      const head = CUST ? ['Depo ile yazışma', 'Yükünüz ya da aracınızla ilgili depoya yazın; cevap burada görünür'] : ['Müşteri yazışmaları', 'Müşteri seçin; yazdıkları ve cevabınız burada görünür'];
+      const pick = CUST ? `<select data-i="msg-ref" aria-label="Mesajın konusu"><option value="">Konu: genel</option>${trips.length ? `<optgroup label="Araçlarım">${trips.map(t => `<option value="t:${esc(t.id)}" ${M.msg.ref === 't:' + t.id ? 'selected' : ''}>${esc(t.poz_no)} · ${esc(t.tractor)}</option>`).join('')}</optgroup>` : ''}${loads.length ? `<optgroup label="Yüklerim">${loads.map(l => `<option value="l:${esc(l.id)}" ${M.msg.ref === 'l:' + l.id ? 'selected' : ''}>${esc(cut(l.sender + ' → ' + l.consignee, 48))}</option>`).join('')}</optgroup>` : ''}</select>`
+        : `<select data-i="dc-cust" aria-label="Müşteri seç">${customerOptions().map(o => `<option value="${esc(o.id)}" ${o.id === cid ? 'selected' : ''}>${esc(o.name)}${o.un ? ` (${o.un} yeni)` : ''}</option>`).join('')}</select>`;
+      panel = `<div class="cpanel" id="chat-panel" role="dialog" aria-label="${head[0]}"><div class="chead"><span class="cava">PCS</span><div><b>${head[0]}</b><small>${head[1]}</small></div><button type="button" class="cx" data-a="chat-close" aria-label="Sohbeti kapat">${ic('close')}</button></div>
+<div class="msgs" id="msgs">${ms.length ? ms.map(bubble).join('') : `<div class="empty">${CUST ? 'Henüz mesaj yok. Aşağıdan depoya yazabilirsiniz.' : `${esc(custName(cid))} ile henüz yazışma yok.`}</div>`}</div>
+<form data-f="msg" class="cform">${pick}
+<div class="crow"><textarea id="msg-body" data-i="msg-body" rows="2" maxlength="1000" placeholder="${CUST ? 'Depoya yazın…' : esc(custName(cid)) + ' için yazın…'}" aria-label="Mesajınız">${esc(M.msg.body)}</textarea><button type="submit" class="csend" aria-label="Gönder">${ic('send')}</button></div>
 <div id="msg-err" class="ferr" hidden role="alert"></div></form></div>`;
     }
-    return `<div class="cwrap">${panel}<button type="button" class="cfab ${CH.open ? 'open' : ''}" id="chat-fab" data-a="chat-toggle" aria-label="Ofisle yazışma" aria-expanded="${CH.open}">${ic(CH.open ? 'close' : 'chat')}${un && !CH.open ? `<span class="cdot" aria-label="${un} okunmamış mesaj">${un}</span>` : ''}</button></div>`;
+    const label = CUST ? 'Depo ile yazışma' : 'Müşteri yazışmaları';
+    return `<div class="cwrap">${panel}<button type="button" class="cfab ${CH.open ? 'open' : ''}" id="chat-fab" data-a="chat-toggle" aria-label="${label}" aria-expanded="${CH.open}">${ic(CH.open ? 'close' : 'chat')}${un && !CH.open ? `<span class="cdot" aria-label="${un} okunmamış mesaj">${un}</span>` : ''}</button></div>`;
   }
   X.floats.push(chatWidget);
   X.inp.push((t, k) => {
     if (k === 'msg-body') { M.msg.body = t.value; return true; }
     if (k === 'msg-ref') { M.msg.ref = t.value; return true; }
+    if (k === 'dc-cust') { M.dc = t.value; M.stick = true; X.draw(); setTimeout(markRead, 50); return true; }
     return false;
   });
   X.submit.msg = async () => {
@@ -98,10 +129,11 @@ ${l && (l.receive_note || l.condition) ? `<div class="ferr" style="background:#f
     const body = M.msg.body.trim();
     if (!body) return err('Mesaj yazın.');
     const ref = M.msg.ref, r = CUST ? await X.rpc('shp_portal_message_send', { p_body: body, p_load: ref.startsWith('l:') ? ref.slice(2) : null, p_trip: ref.startsWith('t:') ? ref.slice(2) : null })
-      : await X.rpc('shp_depot_message_send', { p_name: X.name(), p_body: body });
+      : await X.rpc('shp_depot_message_send', { p_name: X.name(), p_customer: cur(), p_body: body });
     if (r.error) { err(X.explain(r.error)); return; }
     (P.data.messages = P.data.messages || []).push(r.data); M.msg.body = ''; M.stick = true; X.draw(); X.load0();
   };
+
 
 
   if (X.MODE !== 'm') return;   // buradan sonrası yalnızca müşteri sayfası
@@ -130,7 +162,7 @@ ${l && (l.receive_note || l.condition) ? `<div class="ferr" style="background:#f
 <div class="tl5">${steps(l)}</div>${sorun}</article>`;
   }
   const DEF = { geldi: ['Yük depoya gelince', '📦 Yükünüz depoya geldi'], yola: ['Araç yola çıkınca', '🚚 Aracınız yola çıktı'], teslim: ['Teslim edilince', '✅ Yükünüz teslim edildi'],
-    sorun: ['Eksik / hasar bildirilince', '⚠️ Yükünüzde sorun bildirildi'], mesaj: ['Ofis mesaj yazınca', '💬 Ofisten yeni mesaj'] };
+    sorun: ['Eksik / hasar bildirilince', '⚠️ Yükünüzde sorun bildirildi'], mesaj: ['Depo ya da ofis mesaj yazınca', '💬 Yeni mesaj'] };
   function nfState() {
     if (!M.nf) { const n = P.data.notify || {}; M.nf = { phone: n.phone || '', events: { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true, ...(n.events || {}) }, saved: true }; }
     return M.nf;
@@ -237,7 +269,6 @@ ${shown.length ? `<div class="scroll"><table class="tbl2"><thead><tr><th>Poz No<
     download(`yuklerim-${X.today()}.csv`, [head, ...rows].map(r => r.map(csvCell).join(';')).join('\r\n'));
   };
 
-  // ------------------------------------------------------------------ Ofisle yazışma
   // ------------------------------------------------------------------ Excel'den (ya da yapıştırarak) toplu yük
   const norm = s => String(s == null ? '' : s).toLocaleUpperCase('tr-TR').replace(/İ/g, 'I').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
   const HEAD = { sender: ['GONDERICI', 'GONDEREN', 'GONDERENFIRMA'], consignee: ['ALICI', 'ALICIFIRMA', 'ALICIFIRMASI'], goods: ['MAL', 'MALCINSI', 'URUN', 'ACIKLAMA', 'MALINCINSI'],

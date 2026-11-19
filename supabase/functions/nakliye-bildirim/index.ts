@@ -2,7 +2,7 @@
 // Kurulum adımları: supabase/NAKLIYE.md > "Otomatik bildirim".
 //
 // Nasıl çalışır:
-//   1. Depoda "Geldi", araç "Yola çıktı", sefer "Teslim edildi", depoda eksik/hasar ya da ofisin müşteriye yazdığı mesaj gibi
+//   1. Depoda "Geldi", araç "Yola çıktı", sefer "Teslim edildi", depoda eksik/hasar ya da depo ya da ofisin müşteriye yazdığı mesaj gibi
 //      bir olay olunca veritabanı (nakliye-kurulumu.sql) shp_outbox tablosuna bir haber ekler ve bu fonksiyonu çağırır.
 //      Haber yalnızca müşteri bildirim numarasını yazmış ve o haberi açık bırakmışsa eklenir.
 //   2. Fonksiyon birkaç saniye bekler (aynı anda gelen birkaç yük tek mesajda birleşsin), bekleyen haberleri alır ve
@@ -23,7 +23,7 @@
 //   WA_BEKLE      İsteğe bağlı: birleştirme için bekleme saniyesi (varsayılan 8)
 // SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY Supabase tarafından kendiliğinden verilir.
 
-const BASLIK = { geldi: '📦 Yükünüz depoya geldi', yola: '🚚 Aracınız yola çıktı', teslim: '✅ Yükünüz teslim edildi', sorun: '⚠️ Yükünüzde sorun bildirildi', mesaj: '💬 Ofisten yeni mesaj' };
+const BASLIK = { geldi: '📦 Yükünüz depoya geldi', yola: '🚚 Aracınız yola çıktı', teslim: '✅ Yükünüz teslim edildi', sorun: '⚠️ Yükünüzde sorun bildirildi', mesaj: '💬 Yeni mesaj' };
 const TAKIP_MS = 10 * 60 * 1000;   // "gonderiliyor" durumunda bu süreden uzun kalan haber (fonksiyon yarıda kesildi) yeniden denenir
 const LIMIT = 100;                 // bir çalışmada en çok bu kadar haber
 
