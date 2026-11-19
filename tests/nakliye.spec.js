@@ -438,17 +438,22 @@ test('operatör: depoya gelmemiş yükle yola çıkarken uyarır; teslim edildi 
 test('operatör: Bildirimler sekmesi haberleri birleştirir, WhatsApp\'ta açar, gönderildi sayar ya da iptal eder', async ({ page }) => {
   const ob = (id, event, body) => ({ id, customer_id: 'c1', event, phone: '+90 532 000 00 00', body, status: 'bekliyor', error: '', created_at: '2026-09-23T06:00:00Z', sent_at: null });
   await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [],
-    shp_outbox: [ob(1, 'geldi', 'A → B · 4 kap · 100 kg'), ob(2, 'geldi', 'C → D · 2 kap · 50 kg'), ob(3, 'sorun', 'A → B: eksik var')] } });
+    shp_outbox: [ob(1, 'geldi', 'A → B · 4 kap · 100 kg'), ob(2, 'geldi', 'C → D · 2 kap · 50 kg'), ob(3, 'sorun', 'A → B: eksik var'),
+      { ...ob(4, 'teslim', 'gönderilmiş'), status: 'gonderildi' }, { ...ob(5, 'teslim', '34 ABC 123 · PCS-26-0001'), status: 'hata', error: 'WhatsApp 400 (131047): Re-engagement message — onaylı şablon gerekir (WA_SABLON).' }] } });
   await page.evaluate(() => { window.__hrefs = []; });
   await page.locator('[data-nk="tab"][data-v="out"]').click();
-  await expect(page.locator('.nk-ol li')).toHaveCount(2);                            // iki "geldi" tek mesaj
+  await expect(page.locator('.nk-ol li')).toHaveCount(3);                            // iki "geldi" tek mesaj; gönderilmiş olan yok; hata verenin nedeni yazar
+  await expect(page.locator('.nk-ol li', { hasText: '34 ABC 123' })).toContainText('Gönderilemedi');
+  await expect(page.locator('.nk-ol li', { hasText: '34 ABC 123' })).toContainText('onaylı şablon gerekir');
   await expect(page.locator('.nk-ol li').first()).toContainText('A → B · 4 kap · 100 kg');
   await expect(page.locator('.nk-ol li').first()).toContainText('C → D · 2 kap · 50 kg');
   await page.locator('.nk-ol li').first().locator('[data-nk="out-done"]').click();
-  await expect(page.locator('.nk-ol li')).toHaveCount(1);
-  expect(await page.evaluate(() => window.__db.shp_outbox.map(o => `${o.id}:${o.status}`))).toEqual(['1:gonderildi', '2:gonderildi', '3:bekliyor']);
-  await page.locator('.nk-ol li').locator('[data-nk="out-skip"]').click();
+  await expect(page.locator('.nk-ol li')).toHaveCount(2);
+  expect(await page.evaluate(() => window.__db.shp_outbox.map(o => `${o.id}:${o.status}`))).toEqual(['1:gonderildi', '2:gonderildi', '3:bekliyor', '4:gonderildi', '5:hata']);
+  await page.locator('.nk-ol li', { hasText: 'eksik var' }).locator('[data-nk="out-skip"]').click();
   expect(await page.evaluate(() => window.__db.shp_outbox[2].status)).toBe('iptal');
+  await page.locator('.nk-ol li', { hasText: '34 ABC 123' }).locator('[data-nk="out-done"]').click();   // hata veren haber elle gönderilince tamam sayılır
+  expect(await page.evaluate(() => window.__db.shp_outbox[4].status)).toBe('gonderildi');
   await expect(page.locator('.nk-empty')).toContainText('Gönderilecek bildirim yok');
 });
 

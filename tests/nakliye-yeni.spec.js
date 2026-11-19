@@ -161,15 +161,18 @@ test('müşteri: arşivdeki eski seferin belgeleri sunucudan hazırlanır (ana l
 });
 
 // ================================================================================================ müşteri: ofisle yazışma
-test('müşteri: Ofisle yazışma — okunmamış cevap rozeti, okundu işareti, konu seçerek mesaj, 5 saniyede yeni cevap', async ({ page }) => {
+test('müşteri: sohbet balonu — okunmamış cevap rozeti, açılınca okundu işareti, konu seçerek mesaj, 5 saniyede yeni cevap', async ({ page }) => {
   await customerPage(page);
-  await expect(page.locator('.pnav .bdg')).toHaveText('1');                          // ofisin okunmamış cevabı
-  await page.locator('[data-a="page"][data-v="yazisma"]').click();
+  await expect(page.locator('.pnav [data-v="yazisma"]')).toHaveCount(0);              // artık ayrı sekme yok
+  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');                       // ofisin okunmamış cevabı
+  await expect(page.locator('#chat-panel')).toHaveCount(0);
+  await page.locator('#chat-fab').click();
+  await expect(page.locator('#chat-panel')).toBeVisible();
   await expect(page.locator('#msgs')).toContainText('Yarın sabah çıkabilir mi?');
   await expect(page.locator('#msgs')).toContainText('06:00\'da çıkış planladık');
   await expect(page.locator('#msgs .m.me .lk')).toContainText('PCS-26-0001');        // mesaj seferle ilişkili
   await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm2').read_at)).toBeTruthy();
-  await expect(page.locator('.pnav .bdg')).toHaveCount(0);
+  await expect(page.locator('#chat-fab .cdot')).toHaveCount(0);
   expect((await rpcs(page, 'shp_portal_messages_read')).length).toBe(1);
   // boş mesaj gitmez; konu seçerek yazılır
   await page.locator('form[data-f="msg"] button[type="submit"]').click();
@@ -181,15 +184,30 @@ test('müşteri: Ofisle yazışma — okunmamış cevap rozeti, okundu işareti,
   const sent = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'musteri' && m.body.startsWith('Bu araca')));
   expect(sent).toHaveLength(1); expect(sent[0]).toMatchObject({ customer_id: 'c1', trip_id: 't2', load_id: null });
   await expect(page.locator('#msg-body')).toHaveValue('');
-  // ofis cevap yazar: 5 saniyede ekrana gelir
+  // Enter gönderir, Shift+Enter yeni satır açar
+  await page.locator('#msg-body').fill('Enter ile gider');
+  await page.locator('#msg-body').press('Enter');
+  await expect(page.locator('#msgs')).toContainText('Enter ile gider');
+  await page.locator('#msg-body').fill('birinci satır');
+  await page.locator('#msg-body').press('Shift+Enter');
+  await page.locator('#msg-body').type('ikinci satır');
+  expect(await page.locator('#msg-body').inputValue()).toBe('birinci satır\nikinci satır');
+  await page.locator('#msg-body').fill('');
+  // ofis cevap yazar: 5 saniyede ekrana gelir (panel açıkken kendiliğinden okundu olur)
   await page.evaluate(() => window.__db.shp_messages.push({ id: 'm9', customer_id: 'c1', from_role: 'ofis', author: 'Ofis', body: 'Tamam, güncelledik.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:05Z', read_at: null }));
   await page.clock.runFor(5100);
   await expect(page.locator('#msgs')).toContainText('Tamam, güncelledik.');
-  // başka sayfadayken rozet çıkar
-  await page.locator('[data-a="page"][data-v="plan"]').click();
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm9').read_at)).toBeTruthy();
+  // Esc ya da balonun üstündeki düğmeyle kapanır; panel kapalıyken yeni cevap rozet olur
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#chat-panel')).toHaveCount(0);
   await page.evaluate(() => window.__db.shp_messages.push({ id: 'm10', customer_id: 'c1', from_role: 'ofis', author: 'Ofis', body: 'Bir şey daha.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:20Z', read_at: null }));
   await page.clock.runFor(5100);
-  await expect(page.locator('.pnav .bdg')).toHaveText('1');
+  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');
+  await page.locator('#chat-fab').click();
+  await expect(page.locator('#msgs')).toContainText('Bir şey daha.');
+  await page.locator('#chat-panel [data-a="chat-close"]').click();
+  await expect(page.locator('#chat-panel')).toHaveCount(0);
 });
 
 // ================================================================================================ müşteri: Excel'den toplu yük
@@ -475,7 +493,7 @@ test('tarz: müşteri ve depo sayfalarında ofis ekranındaki gibi başlık kart
   await expect(page.locator('.hd .eyebrow')).toHaveText('Müşteri portalı');
   await expect(page.locator('.hd h1')).toHaveText('Yükler ve araçlar');
   await expect(page.locator('.hd [data-a="refresh"]')).toHaveCount(1);
-  for (const [v, t] of [['takip', 'Yük takibi'], ['rapor', 'Rapor ve arşiv'], ['yazisma', 'Ofisle yazışma']]) {
+  for (const [v, t] of [['takip', 'Yük takibi'], ['rapor', 'Rapor ve arşiv']]) {
     await page.locator(`[data-a="page"][data-v="${v}"]`).click();
     await expect(page.locator('.hd h1')).toHaveText(t);
   }

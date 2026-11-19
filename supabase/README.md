@@ -287,6 +287,7 @@ site eskisi gibi çalışır: Ücret kutuları çıkmaz, ücret notta kalır ve 
 | `mesaj-kurulumu.sql` | WhatsApp'tan gelen müşteri mesajlarından araç ekleme için tablo ve yetki kuralları. Kullanım: `MESAJ.md` |
 | `nakliye-kurulumu.sql` | Nakliye programı: müşteri, yük ve sefer tabloları, araca atama, otomatik Poz No (PCS-26-0001 ...). Müşteri/depo takibi, bildirim kuyruğu, fotoğraf, QR, yazışma. Kullanım: `NAKLIYE.md` |
 | `functions/whatsapp-webhook/index.ts` | WhatsApp numarasına gelen fotoğrafı alan sunucu fonksiyonu |
+| `functions/nakliye-bildirim/index.ts` | Nakliye haberlerini (depoya geldi, yola çıktı, teslim, sorun, mesaj) müşteriye WhatsApp'tan gönderen sunucu fonksiyonu (isteğe bağlı). Kurulum: `NAKLIYE.md` > "Otomatik bildirim kurulumu" |
 | `functions/ruhsat-oku/index.ts` | Ruhsat fotoğrafını ve müşteri mesajlarını Google Gemini ile okuyan sunucu fonksiyonu (isteğe bağlı). Kurulum: `GEMINI.md`, `MESAJ.md` |
 | `WHATSAPP.md` | WhatsApp kurulum rehberi (Meta + Supabase) |
 | `NAKLIYE.md` | Nakliye programı: kurulum ve kullanım (boşta yükler, araca atama, Lade Liste ve CMR) |

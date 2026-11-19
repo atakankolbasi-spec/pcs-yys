@@ -276,6 +276,7 @@ dialog#m:has(.imp){width:min(1180px,calc(100% - 20px))}
   .slot{grid-template-columns:54px 1fr;gap:8px}.top5 span{width:100px}
 }
 @media print{
+  .cwrap{display:none!important}
   .top,.hd,.sh,.steps,.kp,.tools,.bulk,.drw,.pnav,#toast,.tbl .act,.tbl .ck,.tbl th:last-child,.tbl th.ck,.btn,.acts{display:none!important}
   body{background:#fff}.dwrap{padding:0}.card.flush{border:0;box-shadow:none}
 }
@@ -329,3 +330,25 @@ dialog#m:has(.imp){width:min(1180px,calc(100% - 20px))}
   .sh{padding:0 12px}.hd{padding:14px 16px;margin:4px 0 12px}.hd h1{font-size:22px}.hd-r{width:100%}.hd-r .btn{flex:1}
   .k{padding:10px 12px}.k b{font-size:24px;margin-top:2px}.k em{display:none}.k2 b{font-size:24px}.st b{text-transform:none;font-size:12.5px}
 }
+
+/* ---- sohbet balonu (müşteri sayfası, sağ alt): ana ekrandaki sohbet balonu gibi */
+.cwrap{position:fixed;right:22px;bottom:22px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:12px;pointer-events:none}.cwrap>*{pointer-events:auto}
+.cfab{position:relative;width:58px;height:58px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#fff;background:linear-gradient(135deg,#10a090,#22d3ee);box-shadow:0 12px 30px #0b153059,0 2px 6px #0b153033;transition:transform .2s}
+.cfab:hover{transform:translateY(-2px) scale(1.04)}.cfab:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 6px #10a09088}
+.cfab .ic{width:27px;height:27px;stroke-width:2}
+.cdot{position:absolute;top:-3px;right:-3px;min-width:21px;height:21px;padding:0 5px;border-radius:99px;display:grid;place-items:center;background:#dc2626;color:#fff;font-size:11px;font-weight:800;border:2px solid #fff}
+.cpanel{width:min(392px,calc(100vw - 24px));height:min(580px,calc(100vh - 120px));display:flex;flex-direction:column;overflow:hidden;border-radius:20px;border:1px solid var(--line);background:#f0f2f5;box-shadow:0 26px 70px #0b155259;text-transform:none}
+.chead{display:flex;align-items:center;gap:11px;padding:12px 14px;color:#fff;background:linear-gradient(120deg,#16233a,#0f766e)}
+.chead b{display:block;font-size:14px;letter-spacing:.02em}.chead small{display:block;margin:1px 0 0;color:#fff;font-size:11px;opacity:.8}
+.cava{flex:none;display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#128c7e;font-size:11px;font-weight:800}
+.cx{margin-left:auto;flex:none;width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:10px;background:#ffffff1f;color:#fff;cursor:pointer}.cx:hover{background:#ffffff38}
+.cpanel .msgs{flex:1;min-height:0;max-height:none;overflow:auto;padding:14px 12px;gap:10px;background-color:#efeae2;background-image:radial-gradient(circle at 20% 30%,#00000008 0 1.5px,transparent 2px),radial-gradient(circle at 70% 70%,#00000006 0 1.5px,transparent 2px);background-size:34px 34px}
+.cpanel .m{max-width:88%;color:#111b21;background:#fff;border-radius:14px;padding:8px 11px;box-shadow:0 1px 1px #0000002e}.cpanel .m small{color:#667781}
+.cpanel .m.o{border-bottom-left-radius:4px}.cpanel .m.me{background:#d9fdd3;color:#111b21;border-bottom-right-radius:4px}.cpanel .m.me small{color:#667781}
+.cpanel .empty{margin:auto;text-align:center;color:#667781;font-size:13px;background:#ffffffb8;border-radius:12px;padding:10px 14px}
+.cform{display:grid;gap:8px;padding:10px;background:#f0f2f5;border-top:1px solid #00000014}
+.cform select{min-height:38px;border:1px solid #d0d7e2;border-radius:10px;background:#fff;color:var(--ink);padding:0 10px;font:600 12.5px/1 var(--ff);text-transform:none}
+.crow{display:flex;gap:8px;align-items:flex-end}
+.crow textarea{flex:1;min-height:44px;max-height:120px;resize:none;border:1px solid #d0d7e2;border-radius:14px;background:#fff;color:var(--ink);padding:10px 12px;font:14px/1.4 var(--ff);text-transform:none}
+.csend{flex:none;width:44px;height:44px;border:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#fff;background:#10a090;box-shadow:0 8px 18px -10px #10a090}.csend:hover{background:#0c8a7c}
+@media(max-width:700px){.cwrap{right:12px;bottom:12px}.cpanel{width:calc(100vw - 24px);height:min(560px,calc(100vh - 96px))}.cfab{width:54px;height:54px}}
