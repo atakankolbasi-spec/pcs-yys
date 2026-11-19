@@ -313,7 +313,7 @@
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
       // data.shp_users: [{ id, customer_id, username, display_name, active, pw }]; kullanıcısı olan müşterinin bağlantısı giriş ister
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|depot_message_send|depot_messages_read|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart)$/.test(name)) {
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|depot_message_send|depot_messages_read|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart|depot_load|depot_labels_claim)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
         if (name === 'shp_stamp' && (cfg.missing || []).includes('shp-stamp')) return guardErr('PGRST202', 'Could not find the function public.shp_stamp');
         if (cfg.offline && /^shp_(portal|depot|stamp|login)/.test(name)) return netError();
@@ -507,7 +507,7 @@
             const l = db.shp_loads.find(x => x.id === params.p_load_id && x.customer_id === k.customer && x.status === 'aracta');
             const t = l && db.shp_trips.find(x => x.id === l.trip_id);
             if (!l || !t || t.status !== 'hazirlaniyor') return guardErr('22023', 'Yük bir araçta değil ya da araç yola çıktığı için değiştirilemez');
-            Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, updated_at: now(), updated_by: actor }); log(k.customer, actor, 'Araçtan çıkarıldı', lsum(l));
+            Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, loaded_at: null, loaded_by: '', updated_at: now(), updated_by: actor }); log(k.customer, actor, 'Araçtan çıkarıldı', lsum(l));
             const gone = !db.shp_loads.some(x => x.trip_id === t.id);
             if (gone) { db.shp_trips = db.shp_trips.filter(x => x.id !== t.id); log(k.customer, actor, 'Sefer silindi', t.poz_no); }
             return { data: { trip_deleted: gone }, error: null };
@@ -580,6 +580,24 @@
           log(l.customer_id, actor, first ? 'Depoya geldi olarak işaretlendi' : 'Depo teslim bilgisi girildi', lsum(l));
           return { data: loadJson(l), error: null };
         }
+        if (name === 'shp_depot_load') {
+          const l = db.shp_loads.find(x => x.id === params.p_id);
+          if (!l) return guardErr('22023', 'Yük bulunamadı');
+          if (!l.trip_id) return guardErr('22023', 'Bu yük bir araca atanmamış (müşteri araç seçmemiş)');
+          const t = db.shp_trips.find(x => x.id === l.trip_id);
+          if (!t || t.status !== 'hazirlaniyor') return guardErr('22023', 'Bu araç yola çıkmış; yükleme durumu değiştirilemez');
+          if (params.p_loaded !== false) {
+            if (!l.arrived_at) return guardErr('22023', 'Yük depoya henüz gelmemiş; önce GELDİ işaretleyin');
+            if (!l.loaded_at) { l.loaded_at = now(); l.loaded_by = String(params.p_name || '').trim(); log(l.customer_id, actor, 'Araca yüklendi', lsum(l)); }
+          } else if (l.loaded_at) { l.loaded_at = null; l.loaded_by = ''; log(l.customer_id, actor, 'Yüklendi işareti geri alındı', lsum(l)); }
+          l.updated_at = now(); l.updated_by = actor;
+          return { data: loadJson(l), error: null };
+        }
+        if (name === 'shp_depot_labels_claim') {
+          const got = db.shp_loads.filter(l => (params.p_ids || []).includes(l.id) && l.arrived_at && !l.label_printed_at);
+          got.forEach(l => { l.label_printed_at = now(); });
+          return { data: got.map(loadJson), error: null };
+        }
         if (name === 'shp_depot_depart') {
           const t = db.shp_trips.find(x => x.id === params.p_trip);
           if (!t) return guardErr('22023', 'Sefer bulunamadı');
@@ -608,7 +626,7 @@
         }
         const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? ['depoda', 'aracta'].includes(x.status) && x.arrived_at : ['bekliyor', 'depoda', 'aracta'].includes(x.status)));
         if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
-        if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now(), updated_by: actor });
+        if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', loaded_at: null, loaded_by: '', updated_at: now(), updated_by: actor });
         else { const was = !!l.arrived_at; Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now(), updated_by: actor }); if (!was) enqueue(l.customer_id, 'geldi', `${l.sender} → ${l.consignee} · ${l.pieces} kap · ${l.weight} kg`); }
         log(l.customer_id, actor, params.p_arrived === false ? 'Geldi işareti geri alındı' : 'Depoya geldi olarak işaretlendi', lsum(l));
         return { data: loadJson(l), error: null };

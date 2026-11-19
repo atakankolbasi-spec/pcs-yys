@@ -66,6 +66,40 @@
     const page = z => `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Yük etiketleri</title><style>${css(z)}</style></head><body>${list.map(l => labelHtml(l, ctx)).join('')}</body></html>`;
     X.B.show(SIZES.map(z => ({ label: z.name, html: page(z) })), { title: `Yük etiketleri (${list.length})`, start: savedSize(), onTab: saveSize });
   }
+  // Etiket istasyonu: etiketleri pencere açmadan doğrudan yazıcıya yollar (Chrome --kiosk-printing ile soru sormadan basılır).
+  // Gizli bir iframe'e sayfa yazılır, yüklenince print() çağrılır; iş bitince iframe silinir.
+  function printHtml(html) {
+    return new Promise(resolve => {
+      const f = document.createElement('iframe');
+      f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none';
+      let done = false;
+      const end = ok => { if (done) return; done = true; setTimeout(() => { try { f.remove(); } catch (_) { /* zaten kalkmış */ } }, 4000); resolve(ok); };
+      // çerçeve eklenirken önce boş bir sayfa "yüklendi" diye bildirilebilir: yalnızca etiket sayfası yüklenince (içi dolu) yazdırılır, bir kez
+      f.onload = () => {
+        if (done) return;
+        try {
+          const d = f.contentDocument;
+          if (!d || !d.body || !d.body.childElementCount) return;
+          const w = f.contentWindow; w.focus(); w.print(); end(true);
+        } catch (_) { end(false); }
+      };
+      try { f.srcdoc = html; } catch (_) { end(false); return; }
+      document.body.appendChild(f);
+      setTimeout(() => end(false), 15000);
+    });
+  }
+  // seçili etiket boyutu (Etiket yazdır penceresinde son seçilen; hiç seçilmediyse Zebra 100×70 = 10×7 cm)
+  const stationSize = () => { try { const z = SIZES.find(x => x.id === localStorage.getItem(SIZE_KEY)); return z || SIZES.find(x => x.id === 'z70'); } catch (_) { return SIZES.find(x => x.id === 'z70'); } };
+  async function printDirect(loads) {
+    const list = loads.filter(l => l && l.qr_code);
+    if (!list.length) return false;
+    await qrLib();
+    const trips = Object.fromEntries(((X.P.data && X.P.data.trips) || []).map(t => [t.id, t]));
+    const ctx = { trips, customerName: l => (X.custOf(l.customer_id) || {}).name || '' };
+    const z = stationSize();
+    return X.qr.printHtml(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Yük etiketleri</title><style>${css(z)}</style></head><body>${list.map(l => labelHtml(l, ctx)).join('')}</body></html>`);
+  }
   X.act.label = (t, e, id) => { const l = (X.P.data.loads || []).find(x => x.id === id); return printLabels(l ? [l] : []); };
   X.act.labels = () => {
     const sel = X.selLoads();
@@ -121,6 +155,6 @@
   }
   X.onDraw.push(placeVideo);
 
-  X.qr = { svgOf, labelHtml, printLabels, SIZES, parseCode, payload, scanStart, scanStop, lib: { gen: qrLib, dec: jsqrLib }, decode: (data, w, h) => { const r = window.jsQR(data, w, h); return r ? r.data : ''; },
+  X.qr = { svgOf, labelHtml, printLabels, printHtml, printDirect, stationSize, SIZES, parseCode, payload, scanStart, scanStop, lib: { gen: qrLib, dec: jsqrLib }, decode: (data, w, h) => { const r = window.jsQR(data, w, h); return r ? r.data : ''; },
     scanning: () => !!Scan.stream };
 })();
