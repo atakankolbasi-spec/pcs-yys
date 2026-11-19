@@ -464,7 +464,7 @@ test('operatör: Mesajlar sekmesi müşterinin yazdığını gösterir, okundu y
   await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [], shp_messages: msgs } });
   await expect(page.locator('[data-nk="tab"][data-v="msg"] span')).toHaveText('1');  // 1 okunmamış
   await page.locator('[data-nk="tab"][data-v="msg"]').click();
-  await expect(page.locator('.nk-th')).toHaveCount(2);
+  await expect(page.locator('.nk-th')).toHaveCount(3);                               // iki müşteri + her zaman Depo
   await expect(page.locator('.nk-mlist')).toContainText('Yarın çıkabilir mi?');
   await expect.poll(() => page.evaluate(() => window.__db.shp_messages[0].read_at)).toBeTruthy();    // açılınca okundu olur
   await expect(page.locator('[data-nk="tab"][data-v="msg"] span')).toHaveText('0');
@@ -476,6 +476,46 @@ test('operatör: Mesajlar sekmesi müşterinin yazdığını gösterir, okundu y
   await expect(page.locator('.nk-mlist')).toContainText('06:00');
   await page.locator('.nk-th', { hasText: 'DENEME LOJİSTİK' }).click();
   await expect(page.locator('.nk-mlist')).toContainText('Belgeler hazır mı?');
+});
+
+test('operatör: mesaj balonu müşteri ve depo mesajlarını gösterir; konuşma seçilir, okundu olur, cevap müşteriye ya da depoya gider', async ({ page }) => {
+  const msgs = [
+    { id: 'm1', customer_id: 'c1', channel: 'musteri', from_role: 'musteri', author: 'Müşteri · Ali Yılmaz', body: 'Yarın çıkabilir mi?', load_id: null, trip_id: null, created_at: '2026-09-23T06:00:00Z', read_at: null },
+    { id: 'm2', customer_id: null, channel: 'depo', from_role: 'depo', author: 'Depo · Ahmet', body: 'A-3 rafı doldu, nereye koyalım?', load_id: null, trip_id: null, created_at: '2026-09-23T06:30:00Z', read_at: null }];
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [], shp_messages: msgs } });
+  await expect(page.locator('#nk-cfab .nk-cdot')).toHaveText('2');                   // müşteri + depo, okunmamış
+  await expect(page.locator('[data-nk="tab"][data-v="msg"] span')).toHaveText('2');
+  await expect(page.locator('#nk-cpanel')).toHaveCount(0);
+  await page.locator('#nk-cfab').click();
+  await expect(page.locator('#nk-cpanel')).toBeVisible();
+  // en yeni yazışma (depo) açılır, okundu olur
+  await expect(page.locator('#nk-bmlist')).toContainText('A-3 rafı doldu');
+  expect(await page.locator('#nk-bmlist .nk-m').first().evaluate(e => getComputedStyle(e).textTransform)).toBe('none');   // mesajlar büyük harfe çevrilmez
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm2').read_at)).toBeTruthy();
+  expect(await page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm1').read_at)).toBeNull();   // müşterinki henüz okunmadı
+  // depoya cevap: depo kanalına yazılır, müşteriye bildirim olmaz
+  await page.locator('#nk-breply').fill('B-1 rafına koyun.');
+  await page.locator('#nk-cpanel button[type="submit"]').click();
+  await expect(page.locator('#nk-bmlist')).toContainText('B-1 rafına koyun.');
+  const toDepo = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'ofis'));
+  expect(toDepo).toHaveLength(1); expect(toDepo[0]).toMatchObject({ customer_id: null, channel: 'depo', body: 'B-1 rafına koyun.' });
+  // müşteriyi seç: mesajı görünür, okundu olur; Enter ile cevap gider
+  await page.locator('#nk-cpanel select').selectOption({ label: 'ÖRNEK NAKLİYAT (1 yeni)' });
+  await expect(page.locator('#nk-bmlist')).toContainText('Yarın çıkabilir mi?');
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm1').read_at)).toBeTruthy();
+  await expect(page.locator('#nk-cfab .nk-cdot')).toHaveCount(0);
+  await page.locator('#nk-breply').fill('Evet, 06:00\'da.');
+  await page.locator('#nk-breply').press('Enter');
+  await expect(page.locator('#nk-bmlist')).toContainText('Evet, 06:00');
+  const toCust = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'ofis' && m.customer_id));
+  expect(toCust).toHaveLength(1); expect(toCust[0]).toMatchObject({ customer_id: 'c1', body: 'Evet, 06:00\'da.' });
+  // Esc kapatır
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#nk-cpanel')).toHaveCount(0);
+  // depo yeni mesaj yazınca (anlık güncelleme) rozet çıkar
+  await page.evaluate(() => { window.__db.shp_messages.push({ id: 'm9', customer_id: null, channel: 'depo', from_role: 'depo', author: 'Depo · Ahmet', body: 'Tamamdır', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:00Z', read_at: null }); });
+  await page.locator('[data-nk="refresh"]').click();
+  await expect(page.locator('#nk-cfab .nk-cdot')).toHaveText('1');
 });
 
 test('operatör: müşteri bildirim telefonunu ve yükün depo teslim bilgisini (sorun, konum, fotoğraf) görür', async ({ page }) => {

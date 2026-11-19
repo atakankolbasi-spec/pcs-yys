@@ -509,3 +509,41 @@ test('tarz: müşteri ve depo sayfalarında ofis ekranındaki gibi başlık kart
   expect(bi).toContain('linear-gradient');
   expect(problems).toEqual([]);
 });
+
+test('depo: sohbet balonu — ofise yazar (adıyla), ofisin cevabı rozet olur ve açılınca okundu olur; müşteri mesajları karışmaz', async ({ page }) => {
+  const msgs = [
+    { id: 'd1', customer_id: null, channel: 'depo', from_role: 'depo', author: 'Depo · Ahmet', body: 'Bugün kaç araç gelecek?', load_id: null, trip_id: null, created_at: '2026-09-22T09:00:00Z', read_at: null },
+    { id: 'd2', customer_id: null, channel: 'depo', from_role: 'ofis', author: 'Ofis', body: 'Üç araç, öğleden sonra.', load_id: null, trip_id: null, created_at: '2026-09-22T09:05:00Z', read_at: null },
+    ...messages()];
+  const problems = await depot(page, null, { data: { shp_messages: msgs } });
+  await page.locator('#nm').fill('Ahmet');
+  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');                       // ofisin okunmamış cevabı
+  await page.locator('#chat-fab').click();
+  await expect(page.locator('#chat-panel')).toBeVisible();
+  await expect(page.locator('#msgs')).toContainText('Bugün kaç araç gelecek?');
+  await expect(page.locator('#msgs')).toContainText('Üç araç, öğleden sonra.');
+  await expect(page.locator('#msgs')).not.toContainText('Yarın sabah çıkabilir mi?');  // müşteri yazışması depoya görünmez
+  await expect(page.locator('#chat-panel [data-i="msg-ref"]')).toHaveCount(0);          // depoda konu seçimi yok
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'd2').read_at)).toBeTruthy();
+  expect((await rpcs(page, 'shp_depot_messages_read')).length).toBe(1);
+  await expect(page.locator('#chat-fab .cdot')).toHaveCount(0);
+  // yazar: adıyla kaydolur; boş mesaj gitmez; Enter gönderir
+  await page.locator('form[data-f="msg"] button[type="submit"]').click();
+  await expect(page.locator('#msg-err')).toContainText('Mesaj yazın');
+  await page.locator('#msg-body').fill('Tamam, rampayı hazırlıyoruz.');
+  await page.locator('#msg-body').press('Enter');
+  await expect(page.locator('#msgs')).toContainText('Tamam, rampayı hazırlıyoruz.');
+  const sent = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'depo' && m.body.startsWith('Tamam')));
+  expect(sent).toHaveLength(1); expect(sent[0]).toMatchObject({ customer_id: null, channel: 'depo', author: 'Depo · Ahmet' });
+  expect(await rpcs(page, 'shp_depot_message_send')).toEqual([{ p_token: 'tokD', p_name: 'Ahmet', p_body: 'Tamam, rampayı hazırlıyoruz.' }]);
+  // ofis cevap yazar: 5 saniyede balonda rozet
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#chat-panel')).toHaveCount(0);
+  await page.evaluate(() => window.__db.shp_messages.push({ id: 'd9', customer_id: null, channel: 'depo', from_role: 'ofis', author: 'Ofis', body: 'Teşekkürler.', load_id: null, trip_id: null, created_at: '2026-09-23T07:00:20Z', read_at: null }));
+  await page.clock.runFor(5100);
+  await expect(page.locator('#chat-fab .cdot')).toHaveText('1');
+  // müşterinin balonunda depo mesajı görünmez
+  const cust = await page.evaluate(() => window.__db.shp_messages.filter(m => m.customer_id === 'c1').length);
+  expect(cust).toBe(2);
+  expect(problems).toEqual([]);
+});

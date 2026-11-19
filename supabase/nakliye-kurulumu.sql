@@ -455,7 +455,10 @@ begin
                        where l.status <> 'aracta' or l.updated_at > now() - interval '30 days'), '[]'::jsonb),
     'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' - 'updated_by' order by t.created_at desc)
                        from public.shp_trips t where t.created_at > now() - interval '30 days'), '[]'::jsonb),
-    'photo_counts', coalesce((select jsonb_object_agg(p.load_id, p.n) from (select load_id, count(*) as n from public.shp_photos group by 1) p), '{}'::jsonb));
+    'photo_counts', coalesce((select jsonb_object_agg(p.load_id, p.n) from (select load_id, count(*) as n from public.shp_photos group by 1) p), '{}'::jsonb),
+    'messages', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'from_role', m.from_role, 'author', case m.from_role when 'ofis' then 'Ofis' else m.author end, 'body', m.body,
+                                                              'load_id', null, 'trip_id', null, 'created_at', m.created_at, 'read_at', m.read_at) order by m.id)
+                          from (select * from public.shp_messages where channel = 'depo' order by id desc limit 100) m), '[]'::jsonb));
 end $$;
 
 create or replace function public.shp_depot_mark(p_token text, p_id uuid, p_arrived boolean, p_name text default '') returns jsonb
@@ -910,7 +913,7 @@ begin
   end;
   select (select count(*)::text || '/' || coalesce(max(l.updated_at)::text, '') from public.shp_loads l where isdepot or l.customer_id = cid) || '|' ||
          (select count(*)::text || '/' || coalesce(max(t.updated_at)::text, '') from public.shp_trips t where isdepot or t.customer_id = cid) || '|' ||
-         case when isdepot then '' else (select count(*)::text || '/' || coalesce(max(m.id)::text, '') || '/' || count(m.read_at)::text from public.shp_messages m where m.customer_id = cid) end into r;
+         (select count(*)::text || '/' || coalesce(max(m.id)::text, '') || '/' || count(m.read_at)::text from public.shp_messages m where case when isdepot then m.channel = 'depo' else m.customer_id = cid end) into r;
   return r;
 end $$;
 
@@ -1019,8 +1022,9 @@ create index if not exists shp_photos_yuk on public.shp_photos (load_id, created
 -- Ofisle yazışma
 create table if not exists public.shp_messages (
   id bigint generated always as identity primary key,
-  customer_id uuid not null references public.shp_customers (id) on delete cascade,
-  from_role text not null check (from_role in ('musteri', 'ofis')),
+  customer_id uuid references public.shp_customers (id) on delete cascade,   -- depo yazışmasında boş
+  channel text not null default 'musteri',                                    -- musteri: müşteri ile ofis · depo: depo ile ofis
+  from_role text not null check (from_role in ('musteri', 'ofis', 'depo')),
   author text not null default '',
   body text not null check (length(btrim(body)) between 1 and 1000),
   load_id uuid references public.shp_loads (id) on delete set null,
@@ -1028,6 +1032,14 @@ create table if not exists public.shp_messages (
   created_at timestamptz not null default now(),
   read_at timestamptz
 );
+-- Daha önce çalıştırılmış kurulumlarda depo yazışması için tablo genişletilir
+alter table public.shp_messages add column if not exists channel text not null default 'musteri';
+alter table public.shp_messages alter column customer_id drop not null;
+alter table public.shp_messages drop constraint if exists shp_messages_from_role_check;
+alter table public.shp_messages add constraint shp_messages_from_role_check check (from_role in ('musteri', 'ofis', 'depo'));
+alter table public.shp_messages drop constraint if exists shp_messages_channel_check;
+alter table public.shp_messages add constraint shp_messages_channel_check check (channel in ('musteri', 'depo') and (channel = 'depo' or customer_id is not null));
+create index if not exists shp_messages_depo on public.shp_messages (id desc) where channel = 'depo';
 create index if not exists shp_messages_musteri on public.shp_messages (customer_id, id desc);
 
 -- Bildirim kuyruğu: depoya geldi, yola çıktı, teslim, sorun, ofis mesajı. Gönderim: sunucu fonksiyonu nakliye-bildirim (WhatsApp, kendiliğinden) ya da ofiste tek tıkla.
@@ -1135,7 +1147,7 @@ create trigger shp_trips_notify after update on public.shp_trips for each row ex
 create or replace function private.shp_notify_message() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  if new.from_role = 'ofis' then perform private.shp_enqueue(new.customer_id, 'mesaj', left(new.body, 200)); end if;
+  if new.from_role = 'ofis' and new.customer_id is not null then perform private.shp_enqueue(new.customer_id, 'mesaj', left(new.body, 200)); end if;
   return null;
 end $$;
 drop trigger if exists shp_messages_notify on public.shp_messages;
@@ -1193,6 +1205,29 @@ declare k record;
 begin
   select * into k from private.shp_cust_auth(p_token);
   update public.shp_messages set read_at = now() where customer_id = k.customer_id and from_role = 'ofis' and read_at is null;
+end $$;
+
+-- Depo: ofise mesaj yazar / okundu der (depo ile ofis arasında ayrı yazışma)
+create or replace function public.shp_depot_message_send(p_token text, p_name text default '', p_body text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  b text := left(btrim(replace(coalesce(p_body, ''), E'\r', '')), 1000);
+  m public.shp_messages;
+begin
+  perform private.shp_depot_auth(p_token, p_name);
+  if b = '' then raise exception 'Mesaj boş olamaz' using errcode = '22023'; end if;
+  if (select count(*) from public.shp_messages x where x.channel = 'depo' and x.from_role = 'depo' and x.created_at > now() - interval '1 minute') >= 15 then
+    raise exception 'Çok sık mesaj gönderiyorsunuz; bir dakika sonra tekrar deneyin' using errcode = '22023';
+  end if;
+  insert into public.shp_messages (customer_id, channel, from_role, body) values (null, 'depo', 'depo', b) returning * into m;
+  return jsonb_build_object('id', m.id, 'from_role', m.from_role, 'author', m.author, 'body', m.body, 'load_id', null, 'trip_id', null, 'created_at', m.created_at, 'read_at', m.read_at);
+end $$;
+
+create or replace function public.shp_depot_messages_read(p_token text, p_name text default '') returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform private.shp_depot_auth(p_token, p_name);
+  update public.shp_messages set read_at = now() where channel = 'depo' and from_role = 'ofis' and read_at is null;
 end $$;
 
 -- Müşteri: Excel'den toplu yük (hepsi ya da hiçbiri; en çok 200 satır)
@@ -1448,12 +1483,13 @@ end $$;
 
 -- durum çizgisi, bildirim, toplu yükleme, rapor, fotoğraf, teslim alma, yola çıkarma, yazışma işlevlerinin yetkileri
 revoke all on function public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text),
+  public.shp_depot_message_send(text, text, text), public.shp_depot_messages_read(text, text),
   public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid),
   public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text),
   public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text) from public;
 revoke all on function private.shp_load_times(), private.shp_trip_times(), private.shp_message_author(), private.shp_enqueue(uuid, text, text),
   private.shp_notify_load(), private.shp_notify_trip(), private.shp_notify_message() from public;
-do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text)'; begin
+do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text), public.shp_depot_message_send(text, text, text), public.shp_depot_messages_read(text, text)'; begin
   if exists (select 1 from pg_roles where rolname = 'anon') then execute 'grant execute on function ' || fl || ' to anon'; end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then execute 'grant execute on function ' || fl || ' to authenticated'; end if;
 end $$;
@@ -1551,6 +1587,8 @@ select 'depoda teslim alma, fotoğraf, QR kodu ve yola çıkarma kontrolü',
                  and to_regprocedure('public.shp_depot_depart(text, uuid, text)') is not null
                  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'qr_code') then 'tamam' else 'EKSİK' end
 union all
-select 'ofisle yazışma',
+select 'ofisle ve depoyla yazışma',
        case when to_regclass('public.shp_messages') is not null and to_regprocedure('public.shp_portal_message_send(text, text, uuid, uuid)') is not null
+                 and to_regprocedure('public.shp_depot_message_send(text, text, text)') is not null
+                 and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_messages' and column_name = 'channel')
                  and exists (select 1 from pg_trigger where tgrelid = 'public.shp_messages'::regclass and tgname = 'shp_messages_notify') then 'tamam' else 'EKSİK' end;
