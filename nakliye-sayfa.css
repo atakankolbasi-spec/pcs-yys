@@ -366,3 +366,14 @@ dialog#m:has(.imp){width:min(1180px,calc(100% - 20px))}
 .scflash.top{position:fixed;left:50%;top:12px;transform:translateX(-50%);width:min(560px,calc(100% - 24px));z-index:80;box-shadow:0 18px 50px #0b155266;margin:0}
 .sink{position:fixed;left:-200px;top:0;width:1px;height:1px;opacity:0;border:0;padding:0}
 .btn.on{background:var(--acc2);border-color:var(--acc);color:var(--acc)}
+
+/* ---- Yükleme modu (okutunca araca YÜKLENDİ) ve etiket istasyonu */
+.scflash.yk{background:#1a5fd0}
+.sclist li span.ch{flex:none}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px}
+.seg2 button{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--card,#fff);color:inherit;border-radius:12px;padding:12px 8px;font:800 14px/1.1 var(--ff);cursor:pointer}
+.seg2 button .ic{width:18px;height:18px}.seg2 button.on{background:var(--acc2);border-color:var(--acc);color:var(--acc)}
+.pgb + .pgb{margin-top:6px}.pgb .pgr.yk i{background:#1a5fd0}
+.cks .ck .btn.sm{margin-left:auto;align-self:center;flex:none}.cks .ck .ch{vertical-align:baseline}
+.lpc .lpr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;margin:6px 0}
+.lpc{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px}.lpc .lbl2{margin:0}

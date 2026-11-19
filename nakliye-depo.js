@@ -8,7 +8,7 @@
   const B = X.B;
   const pref = (k, d) => { try { const v = localStorage.getItem('pcs.okut.' + k); return v === null ? d : v === '1'; } catch (_) { return d; } };
   const setPref = (k, v) => { try { localStorage.setItem('pcs.okut.' + k, v ? '1' : '0'); } catch (_) { /* tarayıcı saklamıyorsa oturumda kalır */ } };
-  const D = { recv: null, sc: { code: '', load: null, loc: '', busy: false, err: '', camErr: '', done: '', auto: pref('auto', true), reader: pref('reader', false), q: [], working: false, flash: null, list: [], timer: null }, trip: '' };
+  const D = { recv: null, sc: { code: '', load: null, loc: '', busy: false, err: '', camErr: '', done: '', auto: pref('auto', true), reader: pref('reader', false), mode: (() => { try { return localStorage.getItem('pcs.okut.mode') === 'yukle' ? 'yukle' : 'geldi'; } catch (_) { return 'geldi'; } })(), q: [], working: false, flash: null, list: [], timer: null }, trip: '' };
   const LOCS = ['A-1', 'A-2', 'A-3', 'B-1', 'B-2', 'Açık alan'];
   const istNow = () => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date()).map(x => [x.type, x.value])); return Number(p.hour) * 60 + Number(p.minute); };
   const istDate = iso => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
@@ -153,12 +153,14 @@ ${ph.length < 8 ? `<label class="add" for="rc-file">${ic('camera')}<span>Fotoğr
     const open = S.trips.filter(t => t.status === 'hazirlaniyor'), all = S.trips.filter(t => t.status === 'hazirlaniyor' || t.status === 'yolda');
     let t = all.find(x => x.id === D.trip) || open[0] || all[0];
     if (!t) return `<section class="card"><h2>Araç yükleme kontrolü</h2><small>Araç yola çıkmadan önce hiçbir yük unutulmasın</small><div class="empty">Araca konmuş yük yok. Müşteri ya da ofis araca yük koyunca burada görünür.</div></section>`;
-    const n = B.order(S.all.filter(l => l.trip_id === t.id)), got = n.filter(l => l.arrived_at).length, miss = n.length - got, ready = t.status === 'hazirlaniyor' && miss === 0 && n.length > 0;
+    const n = B.order(S.all.filter(l => l.trip_id === t.id)), got = n.filter(l => l.arrived_at).length, miss = n.length - got, ready = t.status === 'hazirlaniyor' && miss === 0 && n.length > 0, ld = n.filter(l => l.loaded_at).length, open1 = t.status === 'hazirlaniyor';
     return `<section class="card"><h2>Araç yükleme kontrolü</h2><small>Araç yola çıkmadan önce hiçbir yük unutulmasın</small>
 ${all.length > 1 ? `<div class="chips3">${all.map(x => `<button type="button" class="${x.id === t.id ? 'on' : ''}" data-a="chk-trip" data-id="${esc(x.id)}">${esc(x.poz_no)} · ${esc(x.tractor)}</button>`).join('')}</div>` : ''}
 <div class="chk-h">${plate(t.tractor)}<b>${esc(t.poz_no)}</b><span class="ch b">${esc(cu(t.customer_id))}</span></div>
-<div class="pgb"><div class="pgr"><i style="width:${n.length ? Math.round(got / n.length * 100) : 0}%"></i></div><b>${got} / ${n.length} yük</b></div>
-<div class="cks">${n.map(l => `<div class="ck"><span class="cb ${l.arrived_at ? 'on' : 'no'}">${l.arrived_at ? '✓' : '!'}</span><div><b>${esc(l.sender)} → ${esc(l.consignee)}</b><small class="${l.arrived_at ? '' : 'late'}">${l.arrived_at ? `${kg(l.weight)} kg${l.location ? ' · ' + esc(l.location) : ''} · Geldi ${esc(stampOf(l.arrived_at))}${X.condChip(l) ? ' · ' : ''}` : `Depoya henüz gelmedi${l.expected_date ? ' · beklenen ' + esc(B.dmy(l.expected_date)) + (l.expected_time ? ' ' + esc(l.expected_time) : '') : ''}`}</small></div></div>`).join('')}</div>
+<div class="pgb"><div class="pgr"><i style="width:${n.length ? Math.round(got / n.length * 100) : 0}%"></i></div><b>${got} / ${n.length} yük geldi</b></div>
+<div class="pgb"><div class="pgr yk"><i style="width:${n.length ? Math.round(ld / n.length * 100) : 0}%"></i></div><b>${ld} / ${n.length} yüklendi</b></div>
+<div class="cks">${n.map(l => `<div class="ck"><span class="cb ${l.arrived_at ? 'on' : 'no'}">${l.arrived_at ? '✓' : '!'}</span><div><b>${esc(l.sender)} → ${esc(l.consignee)}</b><small class="${l.arrived_at ? '' : 'late'}">${l.arrived_at ? `${kg(l.weight)} kg${l.location ? ' · ' + esc(l.location) : ''} · Geldi ${esc(stampOf(l.arrived_at))}${X.condChip(l) ? ' · ' : ''}${l.loaded_at ? ` · <span class="ch b">${ic('truck')}Yüklendi ${esc(stampOf(l.loaded_at))}</span>` : ''}` : `Depoya henüz gelmedi${l.expected_date ? ' · beklenen ' + esc(B.dmy(l.expected_date)) + (l.expected_time ? ' ' + esc(l.expected_time) : '') : ''}`}</small></div>${open1 && l.arrived_at ? `<button type="button" class="btn sm ${l.loaded_at ? '' : 'go'}" data-a="chk-load" data-id="${esc(l.id)}" data-on="${l.loaded_at ? '0' : '1'}" ${P.busy === l.id ? 'disabled' : ''}>${l.loaded_at ? 'Geri al' : 'Yüklendi'}</button>` : ''}</div>`).join('')}</div>
+${open1 && !miss && ld > 0 && ld < n.length ? `<div class="alert">${ic('warn')}<div><b>${n.length - ld} yük araca yüklendi işaretlenmemiş.</b> Barkodunu okutun ya da <b>Yüklendi</b>'ye basın; sonra yola çıkarın.</div></div>` : ''}
 ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b>${miss} yük eksik.</b> Yola çıkarmadan önce ofisi arayın ya da yükü araçtan çıkarın.</div></div>` : ''}
 <button type="button" class="btn ${ready ? 'go' : 'dis'} wide" data-a="depart" data-id="${esc(t.id)}" ${ready ? '' : 'disabled'}>${ic('truck')}${t.status === 'yolda' ? 'Yola çıktı ✓' : 'Yola çıktı (müşteri değiştiremesin)'}</button>
 <small class="cn">${t.status === 'yolda' ? 'Bu araç kilitlendi; müşteri artık değişiklik yapamaz.' : 'Tüm yükler gelince bu düğme yeşile döner. Eksik yükle çıkarmak için ofisle görüşün.'}</small></section>`;
@@ -179,6 +181,15 @@ ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b
     await X.load0();
   };
   X.act['chk-trip'] = (t, e, id) => { D.trip = id; X.draw(); };
+  // elle yüklendi işareti (okuyucu yoksa ya da bozulduysa)
+  X.act['chk-load'] = async (t, e, id) => {
+    if (P.busy) return;
+    P.busy = id; X.draw();
+    const r = await X.rpc('shp_depot_load', { p_id: id, p_loaded: t.dataset.on === '1', ...nameArg() });
+    P.busy = '';
+    if (r.error) X.toast(X.explain(r.error), true); else X.toast(t.dataset.on === '1' ? 'Araca yüklendi olarak işaretlendi' : 'Yüklendi işareti geri alındı');
+    await X.load0();
+  };
   X.act.depart = async (t, e, id) => {
     if (P.busy) return;
     P.busy = 'depart';
@@ -222,23 +233,46 @@ ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b
     const S = D.sc, l = findByCode(code);
     S.code = ''; S.err = ''; S.done = ''; S.load = null;
     if (!l) { S.flash = { kind: 'bad', title: 'KOD BULUNAMADI', text: code }; flashed(); feedback('bad'); X.draw(); return; }
+    if (S.mode === 'yukle') return loadOne(l);
     if (l.arrived_at) { S.flash = { kind: 'warn', title: 'ZATEN GELMİŞ', text: `${l.sender} → ${l.consignee}`, sub: `${hm(l.arrived_at)}${l.arrived_by ? ' · ' + l.arrived_by : ''} · yeniden işaretlenmedi` }; flashed(); feedback('bad'); X.draw(); return; }
     const r = await X.rpc('shp_depot_receive', { p_id: l.id, p_counted_pieces: null, p_counted_weight: null, p_condition: 'saglam', p_note: '', p_location: S.loc.trim(), ...nameArg() });
     if (r.error) { S.flash = { kind: 'bad', title: 'İŞARETLENEMEDİ', text: `${l.sender} → ${l.consignee}`, sub: X.explain(r.error) }; flashed(); feedback('bad'); X.draw(); return; }
     l.arrived_at = new Date().toISOString(); l.arrived_by = X.name(); if (l.status === 'bekliyor') l.status = 'depoda'; if (S.loc.trim()) l.location = S.loc.trim();   // aynı kutu hemen yeniden okutulursa ikinci kez işlenmesin
     const c = X.custOf(l.customer_id) || {}, more = sameTruck(l);
-    S.flash = { kind: 'ok', title: 'GELDİ', id: l.id, text: `${l.sender} → ${l.consignee}`, sub: `${c.name ? c.name + ' · ' : ''}${l.pieces} kap · ${kg(l.weight)} kg${l.inbound_plate ? ' · ' + l.inbound_plate : ''}${S.loc.trim() ? ' · ' + S.loc.trim() : ''}`, more };
-    S.list.unshift({ id: l.id, label: `${l.sender} → ${l.consignee}`, at: new Date().toISOString() }); S.list.length = Math.min(S.list.length, 10);
+    S.flash = { kind: 'ok', title: 'GELDİ', act: 'geldi', id: l.id, text: `${l.sender} → ${l.consignee}`, sub: `${c.name ? c.name + ' · ' : ''}${l.pieces} kap · ${kg(l.weight)} kg${l.inbound_plate ? ' · ' + l.inbound_plate : ''}${S.loc.trim() ? ' · ' + S.loc.trim() : ''}`, more };
+    S.list.unshift({ id: l.id, act: 'geldi', label: `${l.sender} → ${l.consignee}`, at: new Date().toISOString() }); S.list.length = Math.min(S.list.length, 10);
+    flashed(); feedback('ok'); X.draw();
+    X.load0();
+  }
+  // araca yükleme: yük araca yüklenirken barkod okutulur → "yüklendi" (yalnızca depoya gelmiş, araca atanmış, yola çıkmamış araçtaki yükler)
+  async function loadOne(l) {
+    const S = D.sc, t = X.tripOf(l.trip_id), lbl = `${l.sender} → ${l.consignee}`;
+    const stop = (kind, title, sub) => { S.flash = { kind, title, text: lbl, sub }; flashed(); feedback('bad'); X.draw(); };
+    if (!l.arrived_at) return stop('bad', 'HENÜZ GELMEMİŞ', 'Önce depoya GELDİ olarak işaretleyin');
+    if (!l.trip_id || !t) return stop('warn', 'ARACA ATANMAMIŞ', 'Müşteri bu yükü bir araca koymamış');
+    if (t.status !== 'hazirlaniyor') return stop('bad', 'ARAÇ YOLA ÇIKMIŞ', `${t.tractor} · yükleme değiştirilemez`);
+    if (l.loaded_at) return stop('warn', 'ZATEN YÜKLENMİŞ', `${hm(l.loaded_at)}${l.loaded_by ? ' · ' + l.loaded_by : ''} · ${t.tractor}`);
+    const r = await X.rpc('shp_depot_load', { p_id: l.id, p_loaded: true, ...nameArg() });
+    if (r.error) return stop('bad', 'İŞARETLENEMEDİ', X.explain(r.error));
+    l.loaded_at = new Date().toISOString(); l.loaded_by = X.name();                 // aynı kutu hemen yeniden okutulursa ikinci kez işlenmesin
+    const mine = (P.data.loads || []).filter(x => x.trip_id === t.id), done = mine.filter(x => x.loaded_at).length, left = mine.length - done;
+    S.flash = { kind: 'ok yk', title: 'YÜKLENDİ', act: 'yukle', id: l.id, text: lbl, sub: `${t.tractor} · ${t.poz_no} · ${done}/${mine.length} yüklendi`, note: left ? `Bu araçta ${left} yük daha yüklenecek` : 'Bu araçtaki tüm yükler yüklendi ✓' };
+    S.list.unshift({ id: l.id, act: 'yukle', label: `${lbl} → ${t.tractor}`, at: new Date().toISOString() }); S.list.length = Math.min(S.list.length, 10);
     flashed(); feedback('ok'); X.draw();
     X.load0();
   }
   function onCode(code) {
-    if (D.sc.auto) { D.sc.q.push(code); pump(); } else manualFind(code);
+    if (D.sc.auto || D.sc.mode === 'yukle') { D.sc.q.push(code); pump(); } else manualFind(code);
   }
+  // sonuç kutusu (Okut sekmesinde ve diğer sekmelerde üstte aynı görünür); Geri al yalnız o işlem hâlâ geçerliyse
+  const flashHtml = (f, top) => {
+    const l = f.id && loadOf(f.id), can = l && (f.act === 'yukle' ? l.loaded_at : l.arrived_at);
+    return `<div class="scflash${top ? ' top' : ''} ${f.kind}" role="status" aria-live="polite"><b>${ic(f.kind.startsWith('ok') ? 'check' : 'warn')}${esc(f.title)}</b><span class="t">${esc(f.text)}</span>${f.sub ? `<span>${esc(f.sub)}</span>` : ''}${f.more ? `<span>Aynı araçtan ${f.more} yük daha var: okutmaya devam edin</span>` : ''}${f.note ? `<span>${esc(f.note)}</span>` : ''}${can ? `<button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(f.id)}" data-k="${f.act === 'yukle' ? 'yukle' : 'geldi'}">${ic('undo')}Geri al</button>` : ''}</div>`;
+  };
   X.views['d-okut'] = () => {
     const S = D.sc, l = S.load && loadOf(S.load.id), cam = X.qr && X.qr.scanning(), f = S.flash;
-    const flash = f ? `<div class="scflash ${f.kind}" role="status" aria-live="polite"><b>${ic(f.kind === 'ok' ? 'check' : 'warn')}${esc(f.title)}</b><span class="t">${esc(f.text)}</span>${f.sub ? `<span>${esc(f.sub)}</span>` : ''}${f.more ? `<span>Aynı araçtan ${f.more} yük daha var: okutmaya devam edin</span>` : ''}${f.id && loadOf(f.id) && loadOf(f.id).arrived_at ? `<button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(f.id)}">${ic('undo')}Geri al</button>` : ''}</div>` : '';
-    const list = S.list.length ? `<section class="card"><div class="lbl2">BU OTURUMDA GELENLER (${S.list.length})</div><ul class="sclist">${S.list.map(x => `<li><span>${esc(x.label)}</span><small>${esc(hm(x.at))}</small><button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(x.id)}">Geri al</button></li>`).join('')}</ul></section>` : '';
+    const flash = f ? flashHtml(f, false) : '';
+    const list = S.list.length ? `<section class="card"><div class="lbl2">BU OTURUMDA OKUTULANLAR (${S.list.length})</div><ul class="sclist">${S.list.map(x => `<li><span class="ch ${x.act === 'yukle' ? 'b' : 'g'}">${x.act === 'yukle' ? 'Yüklendi' : 'Geldi'}</span><span>${esc(x.label)}</span><small>${esc(hm(x.at))}</small><button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(x.id)}" data-k="${x.act === 'yukle' ? 'yukle' : 'geldi'}">Geri al</button></li>`).join('')}</ul></section>` : '';
     const locs = S.auto ? `<div class="lbl2">RAF / KONUM (isteğe bağlı; okutulan yüklere yazılır)</div><div class="chips3">${locOptions().map(x => `<button type="button" class="${S.loc === x ? 'on' : ''}" data-a="sc-loc" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '';
     const result = l ? `<div class="card2"><div class="rline">${l.inbound_plate ? plate(l.inbound_plate, 'big') : ''}${l.arrived_at ? `<span class="ch g">Geldi ${esc(hm(l.arrived_at))}${l.arrived_by ? ' · ' + esc(l.arrived_by) : ''}</span>` : '<span class="ch a">Depoya gelmedi</span>'}</div>
 <div class="rt">${esc(l.sender)} → ${esc(l.consignee)}</div><div class="row"><span>Mal</span><b>${esc(l.goods) || '—'}</b></div><div class="row"><span>Kap · Kilo</span><b>${esc(l.pieces)} · ${kg(l.weight)} kg</b></div><div class="row"><span>Varış</span><b>${esc(l.dest_customs) || '—'}</b></div>
@@ -247,11 +281,12 @@ ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b
 <button type="button" class="btn go big" data-a="sc-go" ${S.busy ? 'disabled' : ''}>${ic('check')}${l.arrived_at ? 'KONUMU KAYDET' : 'GELDİ'}</button>
 ${sameTruck(l) ? `<div class="same">Aynı araçtan ${sameTruck(l)} yük daha var: okutmaya devam edin</div>` : ''}</div>` : '';
     return `<div class="okt"><section class="card"><h2>${ic('qr')} Yük okut</h2>
-<div class="sws"><label class="tg"><span>Okutunca otomatik GELDİ</span><input type="checkbox" role="switch" data-i="sc-auto" ${S.auto ? 'checked' : ''}></label><label class="tg"><span>Okuyucu modu (Zebra / USB okuyucu)</span><input type="checkbox" role="switch" data-i="sc-reader" ${S.reader ? 'checked' : ''}></label></div>
-${flash}<div class="camwrap">${cam ? '<div id="scan-slot" class="scan-slot"></div><div class="vf2"></div>' : `<div class="camoff">${ic('camera')}<span>${esc(S.camErr || 'Kamera kapalı')}</span></div>`}</div>
+<div class="seg2" role="group" aria-label="Okutunca ne olsun"><button type="button" class="${S.mode === 'geldi' ? 'on' : ''}" data-a="sc-mode" data-v="geldi">${ic('check')}Depoya GELDİ</button><button type="button" class="${S.mode === 'yukle' ? 'on' : ''}" data-a="sc-mode" data-v="yukle">${ic('truck')}Araca YÜKLENDİ</button></div>
+<div class="sws"><label class="tg"><span>Okutunca otomatik GELDİ</span><input type="checkbox" role="switch" data-i="sc-auto" ${S.auto ? 'checked' : ''} ${S.mode === 'yukle' ? 'disabled' : ''}></label><label class="tg"><span>Okuyucu modu (Zebra / USB okuyucu)</span><input type="checkbox" role="switch" data-i="sc-reader" ${S.reader ? 'checked' : ''}></label></div>
+${stationCard()}${flash}<div class="camwrap">${cam ? '<div id="scan-slot" class="scan-slot"></div><div class="vf2"></div>' : `<div class="camoff">${ic('camera')}<span>${esc(S.camErr || 'Kamera kapalı')}</span></div>`}</div>
 <div class="acts"><button type="button" class="btn ${cam ? '' : 'pri'}" data-a="sc-cam">${ic('camera')}${cam ? 'Kamerayı kapat' : 'Kamerayı aç'}</button></div>
-<form data-f="sccode" class="codef"><label class="fld"><span>${S.reader ? 'Okuyucuyla okutun (kutu hazır bekliyor)' : 'Ya da kodu yazın / USB okuyucuyla okutun'}</span><input id="sc-code" data-i="sc-code" value="${esc(S.code)}" placeholder="PCS:ABCDEFGHIJ" autocomplete="off" autocapitalize="characters" enterkeyhint="go" inputmode="${S.reader ? 'none' : 'text'}" maxlength="30" style="text-transform:uppercase"></label><button type="submit" class="btn">${ic('search')}${S.auto ? 'Geldi say' : 'Bul'}</button></form>
-${locs}${S.err ? `<div class="ferr" role="alert">${esc(S.err)}</div>` : ''}${S.done ? `<div class="okb" role="status">${ic('check')}${esc(S.done)}</div>` : ''}<small>${S.auto ? 'Etiketteki QR kodu çerçeveye alın: okununca yük kendiliğinden <b>geldi</b> olur. Yanlış okuttuysanız <b>Geri al</b>.' : 'Etiketteki QR kodu çerçeveye alın; okununca yük açılır, GELDİ\'ye basın.'} Etiketsiz yükte <b>Bekleyenler</b> sekmesinden plaka ya da firma adıyla bulun.</small></section>
+<form data-f="sccode" class="codef"><label class="fld"><span>${S.reader ? 'Okuyucuyla okutun (kutu hazır bekliyor)' : 'Ya da kodu yazın / USB okuyucuyla okutun'}</span><input id="sc-code" data-i="sc-code" value="${esc(S.code)}" placeholder="PCS:ABCDEFGHIJ" autocomplete="off" autocapitalize="characters" enterkeyhint="go" inputmode="${S.reader ? 'none' : 'text'}" maxlength="30" style="text-transform:uppercase"></label><button type="submit" class="btn">${ic('search')}${S.mode === 'yukle' ? 'Yüklendi say' : S.auto ? 'Geldi say' : 'Bul'}</button></form>
+${locs}${S.err ? `<div class="ferr" role="alert">${esc(S.err)}</div>` : ''}${S.done ? `<div class="okb" role="status">${ic('check')}${esc(S.done)}</div>` : ''}<small>${S.mode === 'yukle' ? 'Yükü araca yüklerken etiketteki QR kodu okutun: yük kendiliğinden <b>yüklendi</b> olur. Yalnız depoya gelmiş ve araca konmuş yükler okunur. Yanlış okuttuysanız <b>Geri al</b>.' : S.auto ? 'Etiketteki QR kodu çerçeveye alın: okununca yük kendiliğinden <b>geldi</b> olur. Yanlış okuttuysanız <b>Geri al</b>.' : 'Etiketteki QR kodu çerçeveye alın; okununca yük açılır, GELDİ\'ye basın.'} Etiketsiz yükte <b>Bekleyenler</b> sekmesinden plaka ya da firma adıyla bulun.</small></section>
 ${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
   };
   // ---------------- Genel okuma: Okut ekranını açmaya gerek yok.
@@ -263,7 +298,7 @@ ${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
     const S = D.sc, now = Date.now();
     if (code === G.code && now - G.at < 1500) return;                          // aynı kod iki yoldan gelirse bir kez işlenir
     G.code = code; G.at = now;
-    if (S.auto) { onCode(code); return; }
+    if (S.auto || S.mode === 'yukle') { onCode(code); return; }
     P.tab = 'okut'; manualFind(code);
   }
   document.addEventListener('keydown', e => {
@@ -296,12 +331,14 @@ ${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
   }, true);
   // Okuyucu modu açıkken her sekmede görünmez bir kutu seçili kalır: ekran klavyesi gibi "metin yazan" okuyucular da çalışsın
   X.headTools.push(() => `<button type="button" class="btn ${D.sc.reader ? 'on' : ''}" data-a="reader-toggle" aria-pressed="${D.sc.reader}" title="Zebra / USB okuyucu: her sekmede okutunca yük kendiliğinden gelir">${ic('qr')}Okuyucu ${D.sc.reader ? 'açık' : 'kapalı'}</button>`);
+  X.headTools.push(() => `<button type="button" class="btn ${D.sc.mode === 'yukle' ? 'on' : ''}" data-a="sc-mode" data-v="${D.sc.mode === 'yukle' ? 'geldi' : 'yukle'}" title="Okutunca ne olsun: depoya GELDİ ya da araca YÜKLENDİ">${ic(D.sc.mode === 'yukle' ? 'truck' : 'check')}Okutunca: ${D.sc.mode === 'yukle' ? 'YÜKLENDİ' : 'GELDİ'}</button>`);
+  X.act['sc-mode'] = t => { const m = t.dataset.v === 'yukle' ? 'yukle' : 'geldi'; D.sc.mode = m; try { localStorage.setItem('pcs.okut.mode', m); } catch (_) { /* tarayıcı saklamıyorsa her açılışta GELDİ */ } D.sc.flash = null; D.sc.err = ''; D.sc.load = null; X.draw(); };
   X.act['reader-toggle'] = () => { D.sc.reader = !D.sc.reader; setPref('reader', D.sc.reader); X.draw(); };
   X.floats.push(() => {
     const S = D.sc, f = S.flash, parts = [];
     if (S.reader && P.tab !== 'okut') parts.push('<input id="scan-sink" class="sink" data-i="sc-sink" inputmode="none" autocomplete="off" autocapitalize="characters" aria-hidden="true" tabindex="-1">');
     if (f && P.tab !== 'okut' && S.flashAt && Date.now() - S.flashAt < 5000) {
-      parts.push(`<div class="scflash top ${f.kind}" role="status" aria-live="polite"><b>${ic(f.kind === 'ok' ? 'check' : 'warn')}${esc(f.title)}</b><span class="t">${esc(f.text)}</span>${f.sub ? `<span>${esc(f.sub)}</span>` : ''}${f.more ? `<span>Aynı araçtan ${f.more} yük daha var: okutmaya devam edin</span>` : ''}${f.id && loadOf(f.id) && loadOf(f.id).arrived_at ? `<button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(f.id)}">${ic('undo')}Geri al</button>` : ''}</div>`);
+      parts.push(flashHtml(f, true));
     }
     return parts.join('');
   });
@@ -341,11 +378,12 @@ ${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
   };
   // yanlış okutulan yükü geri al (Geldi işareti kalkar)
   X.act['sc-undo'] = async (t, e, id) => {
-    const S = D.sc, l = loadOf(id); if (!l) return;
-    const r = await X.markOne(id, false);
+    const S = D.sc, l = loadOf(id), yk = t.dataset.k === 'yukle'; if (!l) return;
+    const r = yk ? await X.rpc('shp_depot_load', { p_id: id, p_loaded: false, ...nameArg() }) : await X.markOne(id, false);
     if (r.error) { X.toast(X.explain(r.error), true); return; }
-    S.list = S.list.filter(x => x.id !== id);
-    S.flash = { kind: 'warn', title: 'GERİ ALINDI', text: `${l.sender} → ${l.consignee}`, sub: 'Yük yeniden "depoya gelmedi" görünür' };
+    if (yk) { l.loaded_at = null; l.loaded_by = null; }
+    S.list = S.list.filter(x => !(x.id === id && (x.act === 'yukle') === yk));
+    S.flash = { kind: 'warn', title: 'GERİ ALINDI', text: `${l.sender} → ${l.consignee}`, sub: yk ? 'Yük yeniden "yüklenmedi" görünür' : 'Yük yeniden "depoya gelmedi" görünür' };
     X.toast('Geri alındı'); await X.load0();
   };
   X.act['sc-cam'] = async () => {
@@ -366,5 +404,47 @@ ${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
     const a = document.activeElement, el = document.getElementById('sc-code');
     if (el && a !== el && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) el.focus();
   });
+  // ---------------- Etiket istasyonu: depo "Geldi" işaretleyince etiket yazıcıdan kendiliğinden çıkar.
+  // Yazıcının bağlı olduğu bilgisayarda (Chrome'u --kiosk-printing ile açın, ZD230 varsayılan yazıcı olsun) başlıktan açılır; her yük için etiket
+  // yalnızca BİR kez basılır: sunucu etiketi "basıldı" diye işaretler, başka bir cihaz aynı yükü basamaz. Açıldığı andan SONRA gelen yükler basılır.
+  const LP_KEY = 'pcs.etiket.istasyon';
+  const LP = D.lp = { on: false, since: '', busy: false, n: 0, last: [], err: '' };
+  try { const v = localStorage.getItem(LP_KEY); if (v) { LP.on = true; LP.since = v; } } catch (_) { /* saklanamıyorsa her açılışta kapalı */ }
+  async function station() {
+    if (!LP.on || LP.busy || !P.data) return;
+    const since = Date.parse(LP.since) || 0;
+    const ids = (P.data.loads || []).filter(l => l.arrived_at && !l.label_printed_at && l.qr_code && Date.parse(l.arrived_at) >= since).map(l => l.id);
+    if (!ids.length) return;
+    LP.busy = true;
+    try {
+      const r = await X.rpc('shp_depot_labels_claim', { p_ids: ids, ...nameArg() });
+      if (r.error) { LP.err = X.explain(r.error); X.toast(`Etiket basılamadı: ${LP.err}`, true); return; }
+      const got = r.data || [];
+      if (!got.length) return;                                                  // başka cihaz basmış
+      LP.err = ''; LP.last = got;
+      let ok = false;
+      try { ok = await X.qr.printDirect(got); } catch (_) { ok = false; }
+      if (ok) { LP.n += got.length; X.toast(`${got.length} etiket yazıcıya gönderildi`); }
+      else { LP.err = 'Yazıcıya gönderilemedi'; X.toast('Etiket yazıcıya gönderilemedi; Okut sekmesinden "Son etiketleri yeniden bas"a basın', true); }
+    } catch (er) { LP.err = String((er && er.message) || er); X.toast(`Etiket basılamadı: ${LP.err}`, true); }
+    finally { LP.busy = false; X.draw(); }
+  }
+  X.after.push(() => { station(); });
+  X.headTools.push(() => `<button type="button" class="btn ${LP.on ? 'on' : ''}" data-a="lp-toggle" aria-pressed="${LP.on}" title="Yük depoya GELDİ olunca etiket bu bilgisayardaki yazıcıdan kendiliğinden çıkar">${ic('print')}Etiket yazıcı ${LP.on ? 'açık' : 'kapalı'}</button>`);
+  X.act['lp-toggle'] = () => {
+    LP.on = !LP.on; LP.err = '';
+    LP.since = LP.on ? ((P.data && P.data.now) || new Date().toISOString()) : '';
+    try { if (LP.on) localStorage.setItem(LP_KEY, LP.since); else localStorage.removeItem(LP_KEY); } catch (_) { /* saklanamadı */ }
+    X.toast(LP.on ? 'Etiket yazıcı açık: bundan sonra GELDİ olan yüklerin etiketi otomatik basılır' : 'Etiket yazıcı kapatıldı');
+    X.draw();
+  };
+  X.act['lp-again'] = async () => {
+    if (!LP.last.length || LP.busy) return;
+    LP.busy = true; X.draw();
+    let ok = false; try { ok = await X.qr.printDirect(LP.last); } catch (_) { ok = false; }
+    LP.busy = false; if (ok) LP.err = '';
+    X.toast(ok ? `${LP.last.length} etiket yeniden gönderildi` : 'Yazıcıya gönderilemedi', !ok); X.draw();
+  };
+  const stationCard = () => !LP.on ? '' : `<div class="lpc"><div class="lbl2">ETİKET YAZICI · AÇIK</div><div class="lpr"><span>${LP.n ? `<b>${LP.n}</b> etiket gönderildi` : 'Yük GELDİ olunca etiket kendiliğinden çıkar'}${LP.err ? ` · <b class="late">${esc(LP.err)}</b>` : ''}</span>${LP.last.length ? `<button type="button" class="btn sm" data-a="lp-again" ${LP.busy ? 'disabled' : ''}>${ic('print')}Son ${LP.last.length} etiketi yeniden bas</button>` : ''}</div><small>Boyut: ${esc(X.qr.stationSize().name)} · Etiket yazdır penceresinde başka boyut seçilirse bu da değişir.</small></div>`;
   X.depo = { groups, waLink, onCode, state: D };
 })();

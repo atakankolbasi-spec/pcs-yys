@@ -149,9 +149,10 @@ ${l && (l.receive_note || l.condition) ? `<div class="ferr" style="background:#f
       const cls = s[2] ? 'done' : i === cur ? 'cur' : 'todo';
       let sub = '—';
       if (s[2]) sub = s[1] ? dt(s[1]) : '✓';
+      if (i === 2 && s[2] && l.loaded_at) sub = `yüklendi · ${dt(l.loaded_at)}`;                // depo yüklerken barkodu okutunca
       else if (i === cur) sub = i === 1 && l.expected_date ? `bekleniyor · ${B.dmy(l.expected_date)}${l.expected_time ? ' ' + l.expected_time : ''}` : 'bekleniyor';
       const icon = s[2] ? '✓' : i === cur ? ic(['', 'clock', 'box', 'truck', 'check'][i] || 'clock') : String(i + 1);
-      return `<div class="s ${cls}"><i>${icon}</i><b>${s[0]}</b><small>${esc(sub)}${i === 1 && l.arrived_at && l.location ? ' · ' + esc(l.location) : ''}</small></div>`;
+      return `<div class="s ${cls}"><i>${icon}</i><b>${i === 2 && l.loaded_at ? 'Araca yüklendi' : s[0]}</b><small>${esc(sub)}${i === 1 && l.arrived_at && l.location ? ' · ' + esc(l.location) : ''}</small></div>`;
     }).join('');
   }
   function trackCard(l) {

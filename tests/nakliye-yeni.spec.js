@@ -739,3 +739,195 @@ test('depo: başlıktaki "Okuyucu" düğmesi her sekmede görünmez bir kutuyu s
   await expect(page.locator('[data-a="tab"][data-v="okut"].on')).toHaveCount(1);
   expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l3').arrived_at)).toBeNull();
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Araca YÜKLENDİ (okutunca) ve etiketin otomatik basımı
+const yukData = () => ({ shp_customers: customers(), shp_loads: [...loads(), L('l9', 'c1', 'SIRA GIDA A.Ş.', 'YENI IMPEX SRL', { pieces: 3, weight: 300, goods: 'UN', status: 'aracta', trip_id: 't2', assigned_at: '2026-09-23T05:20:00Z', arrived_at: '2026-09-23T06:10:00Z' })],
+  shp_trips: trips(), shp_messages: [], shp_photos: [] });
+const db1 = (page, id) => page.evaluate(i => window.__db.shp_loads.find(x => x.id === i), id);
+
+test('depo: Okut — "Araca YÜKLENDİ" modu: okutunca yük araçta yüklendi olur; gelmemiş / araçsız / yola çıkmış / zaten yüklenmiş uyarıları; geri al; oturum listesi', async ({ page }) => {
+  const problems = await depot(page, 'okut', { data: yukData() });
+  await page.locator('#nm').fill('Ahmet');
+  await page.locator('.seg2 [data-a="sc-mode"][data-v="yukle"]').click();
+  await expect(page.locator('.seg2 .on')).toContainText('Araca YÜKLENDİ');
+  await expect(page.locator('[data-i="sc-auto"]')).toBeDisabled();                       // yükleme modunda her okutma tek adımdır
+  const scan = async code => { await page.locator('#sc-code').fill(code); await page.locator('#sc-code').press('Enter'); };
+  await scan('PCS:YANLIS0000');
+  await expect(page.locator('.scflash.bad')).toContainText('KOD BULUNAMADI');
+  await scan('QRKODL6000');                                                              // depoya henüz gelmemiş
+  await expect(page.locator('.scflash.bad')).toContainText('HENÜZ GELMEMİŞ');
+  await scan('QRKODL8000');                                                              // geldi ama müşteri araca koymamış
+  await expect(page.locator('.scflash.warn')).toContainText('ARACA ATANMAMIŞ');
+  await scan('QRKODL1000');                                                              // araç yolda
+  await expect(page.locator('.scflash.bad')).toContainText('ARAÇ YOLA ÇIKMIŞ');
+  expect(await rpcs(page, 'shp_depot_load')).toHaveLength(0);                            // hiçbiri sunucuya gitmedi
+  expect(await rpcs(page, 'shp_depot_receive')).toHaveLength(0);
+  await scan('pcs:qrkodl2000');
+  const ok = page.locator('.scflash.ok.yk');
+  await expect(ok).toContainText('YÜKLENDİ');
+  await expect(ok).toContainText('DEMİR GIDA LTD. ŞTİ. → COMPACT RB');
+  await expect(ok).toContainText('06 ZZ 999');
+  await expect(ok).toContainText('1/2 yüklendi');
+  await expect(ok).toContainText('Bu araçta 1 yük daha yüklenecek');
+  expect(await db1(page, 'l2')).toMatchObject({ loaded_by: 'Ahmet' });
+  expect((await db1(page, 'l2')).loaded_at).toBeTruthy();
+  expect(await rpcs(page, 'shp_depot_load')).toEqual([{ p_token: 'tokD', p_id: 'l2', p_loaded: true, p_name: 'Ahmet' }]);
+  await scan('QRKODL2000');                                                              // aynı kutu ikinci kez
+  await expect(page.locator('.scflash.warn')).toContainText('ZATEN YÜKLENMİŞ');
+  expect(await rpcs(page, 'shp_depot_load')).toHaveLength(1);
+  await scan('QRKODL9000');
+  await expect(page.locator('.scflash.ok.yk')).toContainText('2/2 yüklendi');
+  await expect(page.locator('.scflash.ok.yk')).toContainText('tüm yükler yüklendi');
+  await expect(page.locator('.sclist li')).toHaveCount(2);
+  await expect(page.locator('.sclist li .ch.b').first()).toHaveText('Yüklendi');
+  // yükleme sayıları: Araçlar başlığı ve Program'daki yükleme kontrolü
+  await page.locator('[data-a="tab"][data-v="program"]').click();
+  const card = page.locator('.prg .card').last();
+  await expect(card).toContainText('2 / 2 yüklendi');
+  await expect(card.locator('.ck .ch.b')).toHaveCount(2);
+  await page.locator('[data-a="tab"][data-v="araclar"]').click();
+  await expect(page.locator('tr.gt', { hasText: 'PCS-26-0002' })).toContainText('2/2 yüklendi');
+  await expect(page.locator('tr.dr .ch.b', { hasText: 'Yüklendi' })).toHaveCount(2);
+  // yanlış okutulan: geri al (oturum listesinden)
+  await page.locator('[data-a="tab"][data-v="okut"]').click();
+  await page.locator('.sclist li', { hasText: 'SIRA GIDA' }).locator('[data-a="sc-undo"]').click();
+  await expect(page.locator('.scflash.warn')).toContainText('GERİ ALINDI');
+  await expect(page.locator('.sclist li')).toHaveCount(1);
+  expect((await db1(page, 'l9')).loaded_at).toBeNull();
+  expect(await rpcs(page, 'shp_depot_load')).toHaveLength(3);
+  expect(problems).toEqual([]);
+});
+
+test('depo: Araç yükleme kontrolü — yüklendi sayısı, elle "Yüklendi" / geri al düğmesi, eksik yüklenmiş uyarısı; araç yola çıkınca yükleme değişmez', async ({ page }) => {
+  const problems = await depot(page, 'program', { data: yukData() });
+  await page.locator('#nm').fill('Ahmet');
+  const card = page.locator('.prg .card').last();
+  await expect(card).toContainText('2 / 2 yük geldi');
+  await expect(card).toContainText('0 / 2 yüklendi');
+  await expect(card.locator('[data-a="depart"]')).toBeEnabled();                          // yüklendi bilgisi yola çıkışı engellemez
+  await card.locator('.ck', { hasText: 'DEMİR GIDA' }).locator('[data-a="chk-load"]').click();
+  await expect(page.locator('#toast')).toContainText('yüklendi olarak işaretlendi');
+  await expect(card).toContainText('1 / 2 yüklendi');
+  await expect(card).toContainText('1 yük araca yüklendi işaretlenmemiş');                // bazısı yüklendi, bazısı değil: uyarı
+  await card.locator('.ck', { hasText: 'DEMİR GIDA' }).locator('[data-a="chk-load"]').click();   // geri al
+  await expect(card).toContainText('0 / 2 yüklendi');
+  await expect(card).not.toContainText('işaretlenmemiş');
+  await card.locator('.ck', { hasText: 'DEMİR GIDA' }).locator('[data-a="chk-load"]').click();
+  await card.locator('.ck', { hasText: 'SIRA GIDA' }).locator('[data-a="chk-load"]').click();
+  await expect(card).toContainText('2 / 2 yüklendi');
+  await card.locator('[data-a="depart"]').click();
+  await expect(page.locator('#toast')).toContainText('yola çıktı');
+  await expect(page.locator('.prg .card').last().locator('[data-a="chk-load"]')).toHaveCount(0);   // yola çıkan araçta düğme yok
+  // sunucu da yola çıkmış araçta yüklemeyi değiştirtmez
+  const r = await page.evaluate(() => window.PCSNKP.rpc('shp_depot_load', { p_id: 'l2', p_loaded: false, p_name: 'Ahmet' }));
+  expect(r.error && r.error.message).toContain('yola çıkmış');
+  expect(problems).toEqual([]);
+});
+
+test('depo: Yükleme modu her sekmede çalışır (üstte kısa süre görünen kutu); başlıktaki düğmeyle mod değişir ve hatırlanır', async ({ page }) => {
+  const problems = await depot(page, 'bekliyor', { data: yukData() });
+  await page.locator('#nm').fill('Ahmet');
+  const btn = page.locator('.hd [data-a="sc-mode"]');
+  await expect(btn).toContainText('Okutunca: GELDİ');
+  await btn.click();
+  await expect(btn).toContainText('Okutunca: YÜKLENDİ');
+  expect(await page.evaluate(() => localStorage.getItem('pcs.okut.mode'))).toBe('yukle');
+  await page.locator('.hd h1').click();
+  await page.keyboard.type('PCS:QRKODL2000');                                            // hangi sekmede olursa olsun
+  const top = page.locator('.scflash.top.ok.yk');
+  await expect(top).toContainText('YÜKLENDİ');
+  await expect(top).toContainText('COMPACT RB');
+  await expect(page.locator('[data-a="tab"][data-v="bekliyor"].on')).toHaveCount(1);
+  expect((await db1(page, 'l2')).loaded_at).toBeTruthy();
+  expect(await rpcs(page, 'shp_depot_receive')).toHaveLength(0);
+  await top.locator('[data-a="sc-undo"]').click();                                       // üstteki kutudan geri al: yükleme geri alınır, geldi işareti kalır
+  expect((await db1(page, 'l2')).loaded_at).toBeNull();
+  expect((await db1(page, 'l2')).arrived_at).toBeTruthy();
+  await btn.click();
+  await expect(btn).toContainText('Okutunca: GELDİ');
+  expect(problems).toEqual([]);
+});
+
+test('müşteri: Takip — depo yüklendi işaretleyince "Araca yüklendi" ve saati görünür', async ({ page }) => {
+  const data = yukData(); data.shp_loads.find(l => l.id === 'l9').loaded_at = '2026-09-23T06:40:00Z'; data.shp_loads.find(l => l.id === 'l9').loaded_by = 'Ahmet';
+  await customerPage(page, 'takip', { data });
+  const card = page.locator('article.ld', { hasText: 'SIRA GIDA' });
+  await expect(card.locator('.tl5')).toContainText('Araca yüklendi');
+  await expect(card.locator('.tl5')).toContainText('yüklendi ·');
+  await expect(page.locator('article.ld', { hasText: 'DEMİR GIDA' }).locator('.tl5')).toContainText('Araca kondu');   // yüklenmemiş yükte eski adım adı
+});
+
+test('depo: Etiket yazıcı — açıldıktan sonra GELDİ olan yükün etiketi kendiliğinden basılır; bir kez; başka cihazın bastığı basılmaz; boyut; yeniden bas; kapatınca durur', async ({ page }) => {
+  const problems = await depot(page, 'bekliyor', { data: yukData() });
+  await page.locator('#nm').fill('Ahmet');
+  await page.evaluate(() => { window.__printed = []; window.__okPrint = true; window.PCSNKP.qr.printHtml = async html => { window.__printed.push(html); return window.__okPrint; }; });
+  const printed = () => page.evaluate(() => window.__printed.length);
+  const lp = page.locator('.hd [data-a="lp-toggle"]');
+  await expect(lp).toContainText('Etiket yazıcı kapalı');
+  await page.locator('tr.dr', { hasText: 'ÇELİK PLASTİK' }).locator('[data-a="arrive"]').click();   // kapalıyken gelen: basılmaz
+  await expect(page.locator('#toast')).toContainText('geldi olarak işaretlendi');
+  expect(await printed()).toBe(0);
+  await lp.click();
+  await expect(lp).toContainText('Etiket yazıcı açık');
+  expect(await page.evaluate(() => localStorage.getItem('pcs.etiket.istasyon'))).toBeTruthy();
+  await page.clock.runFor(5100);
+  expect(await printed()).toBe(0);                                                       // eskiden gelmiş yükler (açılmadan önce) basılmaz
+  expect(await rpcs(page, 'shp_depot_labels_claim')).toHaveLength(0);
+  // açıldıktan sonra gelen: otomatik basılır (varsayılan boyut Zebra 100×70 = 10×7 cm)
+  await page.clock.runFor(1000);
+  await page.locator('tr.dr', { hasText: 'BERK TEKSTİL' }).locator('[data-a="arrive"]').click();
+  await expect.poll(printed).toBe(1);
+  const html = await page.evaluate(() => window.__printed[0]);
+  expect(html).toContain('@page{size:100mm 70mm');
+  expect(html).toContain('QRKODL6000');
+  expect(html).toContain('NOVA TEXTIL SRL');
+  await expect(page.locator('#toast')).toContainText('1 etiket yazıcıya gönderildi');
+  expect((await db1(page, 'l6')).label_printed_at).toBeTruthy();
+  expect((await rpcs(page, 'shp_depot_labels_claim'))[0]).toMatchObject({ p_token: 'tokD', p_ids: ['l6'] });
+  await page.clock.runFor(11000);                                                        // sonraki yenilemelerde aynı etiket yeniden basılmaz
+  expect(await printed()).toBe(1);
+  // başka bir bilgisayar (aynı depo) bu yükün etiketini zaten bastıysa burada basılmaz
+  await page.evaluate(() => { const l = window.__db.shp_loads.find(x => x.id === 'l7'); l.arrived_at = new Date().toISOString(); l.status = 'depoda'; l.label_printed_at = new Date().toISOString(); });
+  await page.clock.runFor(5100);
+  expect(await printed()).toBe(1);
+  // yazıcı boyutu: Etiket yazdır penceresinde seçilen boyut kullanılır
+  await page.evaluate(() => localStorage.setItem('pcs.etiket.boyut', 'z150'));
+  await page.evaluate(() => { const l = window.__db.shp_loads.find(x => x.id === 'l5'); l.arrived_at = new Date().toISOString(); l.status = 'depoda'; });
+  await page.clock.runFor(5100);
+  await expect.poll(printed).toBe(2);
+  expect(await page.evaluate(() => window.__printed[1])).toContain('@page{size:100mm 150mm');
+  // yazıcıya gönderilemezse uyarı çıkar, Okut sekmesinden yeniden basılır
+  await page.evaluate(() => { window.__okPrint = false; const l = window.__db.shp_loads.find(x => x.id === 'l3'); l.arrived_at = new Date().toISOString(); l.status = 'depoda'; });
+  await page.clock.runFor(5100);
+  await expect(page.locator('#toast')).toContainText('yazıcıya gönderilemedi');
+  await page.locator('[data-a="tab"][data-v="okut"]').click();
+  await expect(page.locator('.lpc')).toContainText('ETİKET YAZICI · AÇIK');
+  await page.evaluate(() => { window.__okPrint = true; });
+  const before = await printed();
+  await page.locator('.lpc [data-a="lp-again"]').click();
+  await expect.poll(printed).toBe(before + 1);
+  expect(await page.evaluate(() => window.__printed[window.__printed.length - 1])).toContain('EUROFINA');
+  // kapatınca durur
+  await lp.click();
+  await expect(lp).toContainText('Etiket yazıcı kapalı');
+  expect(await page.evaluate(() => localStorage.getItem('pcs.etiket.istasyon'))).toBeNull();
+  await page.evaluate(() => { const l = window.__db.shp_loads.find(x => x.id === 'l7'); l.label_printed_at = null; });
+  await page.clock.runFor(5100);
+  expect(await printed()).toBe(before + 1);
+  expect(problems).toEqual([]);
+});
+
+test('etiket: printHtml gizli bir çerçeveye sayfayı yazar ve print() çağırır; iş bitince çerçeve silinir', async ({ page }) => {
+  // çerçevelerde print() sayılır (gerçek yazdırma penceresi açılmasın)
+  await page.addInitScript(() => { if (window !== window.top) window.print = () => { window.parent.__prints = (window.parent.__prints || 0) + 1; window.parent.__printedText = document.body.innerText; }; });
+  await depot(page, 'bekliyor', { data: yukData() });
+  const ok = await page.evaluate(() => window.PCSNKP.qr.printHtml('<!doctype html><html><body><p id="x">ÖRNEK ETİKET</p></body></html>'));
+  expect(ok).toBe(true);
+  expect(await page.evaluate(() => window.__prints)).toBe(1);
+  expect(await page.evaluate(() => window.__printedText)).toContain('ÖRNEK ETİKET');       // boş sayfa değil, etiket yazdırılır
+  await expect(page.locator('iframe[aria-hidden="true"]')).toHaveCount(1);              // iş sırasında görünmez çerçeve durur
+  expect(await page.locator('iframe[aria-hidden="true"]').evaluate(f => f.srcdoc)).toContain('ÖRNEK ETİKET');
+  await page.clock.runFor(5000);
+  await expect(page.locator('iframe[aria-hidden="true"]')).toHaveCount(0);              // sonra silinir
+});

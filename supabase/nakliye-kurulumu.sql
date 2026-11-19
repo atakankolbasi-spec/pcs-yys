@@ -94,6 +94,16 @@ alter table public.shp_loads add column if not exists qr_code text;
 update public.shp_loads set qr_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10)) where qr_code is null;
 alter table public.shp_loads alter column qr_code set default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
 alter table public.shp_loads alter column qr_code set not null;
+-- Araca yükleme (depo yükü araca yükleyince barkodu okutur) ve etiket basım kaydı
+alter table public.shp_loads add column if not exists loaded_at timestamptz;
+alter table public.shp_loads add column if not exists loaded_by text not null default '' check (length(loaded_by) <= 120);
+-- label_printed_at yalnızca ilk eklenişte: o ana dek depoya gelmiş yükler "etiketi basıldı" sayılır (eski yükler için toplu etiket çıkmasın)
+do $$ begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'label_printed_at') then
+    alter table public.shp_loads add column label_printed_at timestamptz;
+    update public.shp_loads set label_printed_at = coalesce(arrived_at, now()) where arrived_at is not null;
+  end if;
+end $$;
 create unique index if not exists shp_loads_qr on public.shp_loads (qr_code);
 update public.shp_loads set assigned_at = updated_at where status = 'aracta' and assigned_at is null;
 alter table public.shp_trips add column if not exists departed_at timestamptz;
@@ -306,7 +316,8 @@ language sql immutable set search_path = '' as $$
     'broker', l.broker, 'expected_date', l.expected_date, 'status', l.status, 'arrived_at', l.arrived_at,
     'arrived_by', l.arrived_by, 'trip_id', l.trip_id, 'note', l.note, 'inbound_plate', l.inbound_plate, 'created_at', l.created_at,
     'expected_time', to_char(l.expected_time, 'HH24:MI'), 'driver', l.driver, 'assigned_at', l.assigned_at, 'counted_pieces', l.counted_pieces,
-    'counted_weight', l.counted_weight, 'condition', l.condition, 'receive_note', l.receive_note, 'location', l.location, 'qr_code', l.qr_code)
+    'counted_weight', l.counted_weight, 'condition', l.condition, 'receive_note', l.receive_note, 'location', l.location, 'qr_code', l.qr_code,
+    'loaded_at', l.loaded_at, 'loaded_by', l.loaded_by, 'label_printed_at', l.label_printed_at)
 $$;
 
 create or replace function private.shp_customer_json(c public.shp_customers) returns jsonb
@@ -760,6 +771,8 @@ begin
     elsif old.trip_id is distinct from new.trip_id then
       if new.trip_id is null then act := 'Araçtan çıkarıldı';
       else act := 'Araca konuldu: ' || coalesce((select t.poz_no || ' · ' || t.tractor from public.shp_trips t where t.id = new.trip_id), ''); end if;
+    elsif old.loaded_at is null and new.loaded_at is not null then act := 'Araca yüklendi';
+    elsif old.loaded_at is not null and new.loaded_at is null then act := 'Yüklendi işareti geri alındı';
     elsif (old.sender, old.consignee, old.sender_addr, old.consignee_addr, old.notify, old.pieces, old.packing, old.goods, old.weight, old.volume,
            old.country, old.code, old.dest_customs, old.broker, old.expected_date, old.expected_time, old.driver, old.inbound_plate, old.note)
           is distinct from
@@ -984,6 +997,10 @@ language plpgsql set search_path = '' as $$
 begin
   if new.trip_id is distinct from old.trip_id then
     new.assigned_at := case when new.trip_id is null then null else now() end;
+    new.loaded_at := null; new.loaded_by := '';
+  end if;
+  if new.arrived_at is null and old.arrived_at is not null then
+    new.loaded_at := null; new.loaded_by := '';
   end if;
   return new;
 end $$;
@@ -1433,6 +1450,45 @@ begin
 end $$;
 
 -- Depo: araç yola çıkar (yalnızca tüm yükler depoya gelmişse); kilitler, müşteri artık değiştiremez
+-- Depo: yük araca yüklenince barkodu okutur ("yüklendi"); geri alınabilir. Yalnızca depoya gelmiş, araca atanmış ve yola çıkmamış araçtaki yük işaretlenir.
+create or replace function public.shp_depot_load(p_token text, p_id uuid, p_loaded boolean default true, p_name text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  l public.shp_loads;
+  t public.shp_trips;
+begin
+  select * into k from private.shp_depot_auth(p_token, p_name);
+  select * into l from public.shp_loads x where x.id = p_id for update;
+  if not found then raise exception 'Yük bulunamadı' using errcode = '22023'; end if;
+  if l.trip_id is null then raise exception 'Bu yük bir araca atanmamış (müşteri araç seçmemiş)' using errcode = '22023'; end if;
+  select * into t from public.shp_trips x where x.id = l.trip_id;
+  if t.status <> 'hazirlaniyor' then raise exception 'Bu araç yola çıkmış; yükleme durumu değiştirilemez' using errcode = '22023'; end if;
+  if coalesce(p_loaded, true) then
+    if l.arrived_at is null then raise exception 'Yük depoya henüz gelmemiş; önce GELDİ işaretleyin' using errcode = '22023'; end if;
+    update public.shp_loads set loaded_at = coalesce(loaded_at, now()), loaded_by = case when loaded_at is null then left(btrim(coalesce(p_name, '')), 120) else loaded_by end
+    where id = l.id returning * into l;
+  else
+    update public.shp_loads set loaded_at = null, loaded_by = '' where id = l.id returning * into l;
+  end if;
+  return private.shp_load_json(l);
+end $$;
+
+-- Depo: etiketi yazıcıya gönderilecek yükleri "alır" (aynı anda birden çok bilgisayar açıksa her etiket yalnızca bir kez basılır); alınanların bilgisini döndürür
+create or replace function public.shp_depot_labels_claim(p_token text, p_ids uuid[], p_name text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  perform private.shp_depot_auth(p_token, p_name);
+  with u as (
+    update public.shp_loads x set label_printed_at = now()
+    where x.id = any(coalesce(p_ids, '{}'::uuid[])) and x.arrived_at is not null and x.label_printed_at is null
+    returning x.*
+  )
+  select coalesce(jsonb_agg(private.shp_load_json(u) order by u.arrived_at, u.created_at), '[]'::jsonb) into r from u;
+  return r;
+end $$;
+
 create or replace function public.shp_depot_depart(p_token text, p_trip uuid, p_name text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -1489,12 +1545,13 @@ end $$;
 -- durum çizgisi, bildirim, toplu yükleme, rapor, fotoğraf, teslim alma, yola çıkarma, yazışma işlevlerinin yetkileri
 revoke all on function public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text),
   public.shp_depot_message_send(text, text, uuid, text), public.shp_depot_messages_read(text, text, uuid),
+  public.shp_depot_load(text, uuid, boolean, text), public.shp_depot_labels_claim(text, uuid[], text),
   public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid),
   public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text),
   public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text) from public;
 revoke all on function private.shp_load_times(), private.shp_trip_times(), private.shp_message_author(), private.shp_enqueue(uuid, text, text),
   private.shp_notify_load(), private.shp_notify_trip(), private.shp_notify_message() from public;
-do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text), public.shp_depot_message_send(text, text, uuid, text), public.shp_depot_messages_read(text, text, uuid)'; begin
+do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text), public.shp_depot_message_send(text, text, uuid, text), public.shp_depot_messages_read(text, text, uuid), public.shp_depot_load(text, uuid, boolean, text), public.shp_depot_labels_claim(text, uuid[], text)'; begin
   if exists (select 1 from pg_roles where rolname = 'anon') then execute 'grant execute on function ' || fl || ' to anon'; end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then execute 'grant execute on function ' || fl || ' to authenticated'; end if;
 end $$;
@@ -1587,9 +1644,12 @@ select 'Excel''den toplu yükleme ve rapor',
        case when to_regprocedure('public.shp_portal_import(text, jsonb)') is not null and to_regprocedure('public.shp_portal_report(text)') is not null
                  and to_regprocedure('public.shp_portal_trip_docs(text, uuid)') is not null then 'tamam' else 'EKSİK' end
 union all
-select 'depoda teslim alma, fotoğraf, QR kodu ve yola çıkarma kontrolü',
+select 'depoda teslim alma, fotoğraf, QR kodu, araca yükleme, etiket basımı ve yola çıkarma kontrolü',
        case when to_regclass('public.shp_photos') is not null and to_regprocedure('public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text)') is not null
                  and to_regprocedure('public.shp_depot_depart(text, uuid, text)') is not null
+                 and to_regprocedure('public.shp_depot_load(text, uuid, boolean, text)') is not null and to_regprocedure('public.shp_depot_labels_claim(text, uuid[], text)') is not null
+                 and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'loaded_at')
+                 and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'label_printed_at')
                  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'qr_code') then 'tamam' else 'EKSİK' end
 union all
 select 'müşteri ile depo yazışması',
