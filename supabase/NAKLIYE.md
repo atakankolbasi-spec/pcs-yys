@@ -5,10 +5,10 @@ sitede hazırlayın.
 
 ## Kurulum (bir kez)
 
-1. Supabase > **SQL Editor**'de `nakliye-kurulumu.sql` dosyasının **tamamını** çalıştırın. En altta on satır "tamam" görünmelidir.
+1. Supabase > **SQL Editor**'de `nakliye-kurulumu.sql` dosyasının **tamamını** çalıştırın. En altta 14 satır "tamam" görünmelidir.
 2. Sitede soldaki menüden **Nakliye**'yi açın. (Yalnızca düzenleyici hesaplarda görünür.)
 
-`nakliye-kurulumu.sql` güncellendiğinde (örneğin müşteri araç planı eklenince) dosyanın **tamamını yeniden çalıştırın**; mevcut kayıtlar korunur, en altta on satır "tamam" görünür (kullanıcı girişi, işlem geçmişi ve 5 saniyelik yenileme eklenince on satıra çıktı).
+`nakliye-kurulumu.sql` güncellendiğinde (örneğin müşteri araç planı eklenince) dosyanın **tamamını yeniden çalıştırın**; mevcut kayıtlar korunur, en altta 14 satır "tamam" görünür (yük takibi ve bildirim, Excel'den yükleme, depoda teslim alma ve fotoğraf, ofisle yazışma eklenince 14 satıra çıktı).
 
 Çalıştırılmadan Nakliye sayfası açılırsa sayfada "bir kerelik kurulum gerekli" uyarısı çıkar; başka bir yer etkilenmez.
 
@@ -77,6 +77,38 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
   araçtaki yük düzenlenir (silmek için önce "Araçtan çıkar"); sefer **Yola çıktı** diye kilitlenince hiçbiri değişmez.
 - **Depo** yük bilgisini (gerçek kap, kilo, plaka) **Düzenle** ile (sağdan açılan çekmecede) düzeltir; araca konmamış yükü **Sil** ile siler. Birden çok yükü kutucukla seçip **Seçilileri geldi işaretle** ile topluca işaretleyebilir.
 - Siz Nakliye sayfasında her yükü düzenleyebilirsiniz (araçtaki yük silinmez, önce araçtan çıkarılır).
+
+## Yük takibi, bildirim ve Excel'den yükleme (müşteri sayfası)
+
+- **Takip** sekmesi: her yük için 5 adımlı çizgi (yazıldı, araca konuldu, depoya geldi, yola çıktı, teslim edildi). Depoda eksik ya da hasar görülürse yükte kırmızı uyarı çıkar.
+  Müşteri aynı sekmeden hangi haberleri istediğini seçer (depoya geldi, yola çıktı, teslim, sorun, ofis mesajı) ve haberlerin gideceği WhatsApp numarasını yazar.
+- **Excel'den ekle** (Yeni yük düğmesinin yanında): müşteri Excel ya da CSV dosyasını seçer ya da tabloyu yapıştırır; sütun başlıkları Türkçe/İngilizce tanınır.
+  Önizlemede hatalı satırlar kırmızı görünür. Hepsi doğruysa toplu eklenir; tek satır hatalıysa hiçbiri eklenmez. En çok 200 satır. Örnek dosya sayfadan indirilir.
+- **Rapor ve arşiv** sekmesi: haftalık/aylık yük ve ton grafiği, en çok gönderilen alıcılar, geçmiş seferler (belgeleri yeniden açılır, bir ayın belgeleri birlikte açılıp yazdırılır) ve CSV olarak indirme.
+- **Ofisle yazışma** sekmesi: müşteri ofise yazar (isterse bir yüke bağlayarak). Siz Nakliye > **Mesajlar** sekmesinden yanıtlarsınız; okunmamış mesajlar rozetle görünür.
+
+## Depoda teslim alma, fotoğraf, QR etiket ve günün programı (depo sayfası)
+
+- **Teslim al** (kamera simgesi): depodaki arkadaş gerçek kap ve kiloyu yazar; yük "sağlam / eksik / hasarlı" işaretlenir, not ve raf konumu yazılır, telefonla en çok 8 fotoğraf çekilir.
+  Sayım beyandan farklıysa ya da yük eksik/hasarlıysa müşteriye otomatik "sorun" haberi gider ve ofis ekranında yükün yanında görünür. Fotoğraflar küçültülerek veritabanında saklanır.
+- **Etiket**: her yükün 10 harfli kısa kodu vardır. Yükte **Etiket** düğmesi (ya da birkaç yükü seçip alttaki **Etiket yazdır**) A6 boyutunda, QR kodlu etiket açar; yazdırıp kabın üstüne yapıştırın. QR kodda gizli anahtar yok, yalnızca yükün kısa kodu var.
+- **Okut** sekmesi: telefonla etiketi okutun (ya da kodu elle yazın, USB okuyucu da yazar gibi çalışır); yük açılır, tek dokunuşla **Geldi** denir. Kamera için tarayıcı izin ister; izin verilmezse kod elle yazılır.
+- **Program** sekmesi: bugün gelmesi beklenen yükler müşteri ve araca göre gruplanır (geçti / şimdi / bekliyor / tamam). Araç depoya gelince **Araç geldi** ile o aracın yükleri topluca işaretlenir.
+  **Araçlar** sekmesinde yükleme kontrolü vardır: araçtaki yüklerin kaçı depoya geldi, doluluk (24 ton kamyon esas alınır). Geri kalan yük varsa **Yola çıktı** düğmesi uyarır ve yola çıkarmaz; hepsi gelince basılır.
+
+## Bildirimler (ofis)
+
+Müşterinin seçtiği haberler (depoya geldi, yola çıktı, teslim edildi, sorun, ofis mesajı) Nakliye > **Bildirimler** sekmesinde müşteri bazında birikir.
+**WhatsApp'ta gönder** müşterinin numarasına hazır mesajı açar; gönderdikten sonra **Gönderildi say** denir (istenmeyen haber **Gönderme** ile geçilir). Araç **Yola çıktı** diye kilitlenince müşteriye "Lade Liste ve CMR belgeleriniz hazır" haberi çıkar.
+Yola çıkmış seferde **Teslim edildi (müşteriye bildirilir)** düğmesi vardır; teslim edilmemiş yük kalmışsa onay sorar.
+
+### Otomatik bildirim (isteğe bağlı)
+
+Haberlerin elle değil kendiliğinden gitmesini isterseniz (WhatsApp Business API gerekir): GitHub'da **Settings > Secrets and variables > Actions** altına şu gizli değerleri ekleyin:
+`WA_TOKEN` (Meta WhatsApp Cloud API erişim anahtarı), `WA_PHONE_ID` (WhatsApp telefon numarası kimliği) ve isteğe bağlı `WA_SABLON` (Meta'da onaylı şablon adı; tek gövde değişkeni almalı).
+`SUPABASE_URL` ve `SUPABASE_SERVICE_ROLE_KEY` mail okuma için zaten tanımlıdır. Gizli değerler tamamsa **Nakliye bildirimlerini WhatsApp'tan gönder** görevi 5 dakikada bir bekleyen haberleri toplayıp (aynı müşteri ve aynı tür tek mesaj) gönderir ve sonucu işaretler;
+başarısızlar Bildirimler sekmesinde "hata" ile kalır, oradan elle gönderilebilir. Gizli değerler yoksa görev hiçbir şey yapmaz.
+Not: Meta, müşteri sizinle son 24 saat içinde yazışmadıysa yalnızca onaylı **şablon** mesajına izin verir; bu yüzden pratikte bir şablon (`WA_SABLON`) gerekir. Elle denemek için Actions > Nakliye bildirimlerini WhatsApp'tan gönder > Run workflow.
 
 ## PLASTNAK taslağı
 

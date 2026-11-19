@@ -391,7 +391,7 @@ ${ext ? (X.views['d-' + P.tab] ? X.views['d-' + P.tab](S) : '') + (side ? `<div 
   function bulkBar() {
     const sl = selLoads(); if (!sl.length) return '';
     const undo = P.tab === 'depoda';
-    return `<div class="bulk" role="region" aria-label="Seçili yükler"><b>${sl.length} yük seçili</b><span class="bs">${sum(sl, 'pieces')} kap · ${kg(sum(sl, 'weight'))} kg</span><button type="button" class="btn go" data-a="bulk" ${P.busy === 'bulk' ? 'disabled' : ''}>${ic('check')}${P.busy === 'bulk' ? 'İşaretleniyor…' : undo ? 'Seçilileri geri al' : 'Seçilileri geldi işaretle'}</button><button type="button" class="bx" data-a="clear" aria-label="Seçimi temizle">${ic('close')}</button></div>`;
+    return `<div class="bulk" role="region" aria-label="Seçili yükler"><b>${sl.length} yük seçili</b><span class="bs">${sum(sl, 'pieces')} kap · ${kg(sum(sl, 'weight'))} kg</span><button type="button" class="btn go" data-a="bulk" ${P.busy === 'bulk' ? 'disabled' : ''}>${ic('check')}${P.busy === 'bulk' ? 'İşaretleniyor…' : undo ? 'Seçilileri geri al' : 'Seçilileri geldi işaretle'}</button><button type="button" class="btn lbl" data-a="labels" title="Seçili yüklerin QR etiketlerini yazdır">${ic('qr')}Etiket yazdır</button><button type="button" class="bx" data-a="clear" aria-label="Seçimi temizle">${ic('close')}</button></div>`;
   }
   const DRF = ['sender', 'consignee', 'pieces', 'weight', 'goods', 'inbound_plate', 'driver', 'dest_customs', 'expected_date', 'expected_time'];
   function openDrawer(l) { if (X.closeSide) X.closeSide(); P.drawer = l.id; P.confirm = ''; P.dr = Object.fromEntries(DRF.map(k => [k, l[k] == null ? '' : String(l[k])])); }

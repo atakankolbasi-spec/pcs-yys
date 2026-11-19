@@ -459,3 +459,13 @@ test('depo: tablo satırından etiket yazdırılır ve Araçlar başlığında k
   await page.locator('[data-a="tab"][data-v="araclar"]').click();
   await expect(page.locator('tr.gt', { hasText: 'PCS-26-0001' })).toContainText('1/1 yük geldi');
 });
+
+test('depo: yükler seçilince alttaki "Etiket yazdır" düğmesi seçilenlerin etiketini açar', async ({ page }) => {
+  await depot(page, 'bekliyor');
+  const row = page.locator('tr.dr', { hasText: 'ÇELİK PLASTİK' });
+  await row.locator('input[data-a="pick"]').check();
+  await page.locator('.bulk [data-a="labels"]').click();
+  const html = await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc);
+  expect(html).toContain('QRKODL5000');
+  expect((html.match(/class="lb"/g) || []).length).toBe(1);
+});

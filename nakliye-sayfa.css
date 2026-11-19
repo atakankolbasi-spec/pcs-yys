@@ -135,7 +135,7 @@ input:focus,textarea:focus,select:focus,.btn:focus-visible,.vh:focus-visible,.ib
 .dft{padding:12px 18px;display:flex;gap:8px;border-top:1px solid #edf1f9;background:#f8fafd;align-items:center}.sp{flex:1}
 .x{border:0;background:none;color:var(--mut);cursor:pointer;padding:6px;height:34px}
 .bulk{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:#14243a;color:#fff;border-radius:16px;padding:10px 12px 10px 20px;display:flex;align-items:center;gap:16px;box-shadow:0 14px 40px #14243a66;z-index:40;max-width:calc(100% - 16px)}
-.bulk .bs{opacity:.75;font-size:13px}.bulk .btn.go{min-height:44px}.bx{background:none;border:0;color:#fff;opacity:.7;cursor:pointer;padding:6px}
+.bulk .bs{opacity:.75;font-size:13px}.bulk .btn.go{min-height:44px}.bulk .btn.lbl{min-height:44px;background:transparent;color:#fff;border:1px solid #ffffff55}.bulk .btn.lbl:hover{background:#ffffff1f}.bx{background:none;border:0;color:#fff;opacity:.7;cursor:pointer;padding:6px}
 /* form penceresi */
 dialog#m{border:0;padding:0;border-radius:18px;width:min(860px,calc(100% - 20px));max-height:94vh;overflow:hidden;color:var(--ink);box-shadow:0 24px 100px #14243a55}
 dialog#m[open]{display:flex;flex-direction:column}
