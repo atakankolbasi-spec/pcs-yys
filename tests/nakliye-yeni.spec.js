@@ -669,3 +669,73 @@ test('etiket: yazıcıya göre boyut sekmeleri (A6, Zebra 100×150 / 100×100 / 
   await expect(page.locator('#nkb-dlg [data-nkb-tab].on')).toHaveText('Zebra 100×150');
   expect(await page.locator('#nkb-dlg iframe').evaluate(f => f.srcdoc)).toContain('@page{size:100mm 150mm;margin:0}');
 });
+
+test('depo: Okut ekranını açmadan, hangi sekmede olursa olsun okuyucu kodu yük kendiliğinden GELDİ olur (üstte kısa süre görünen kutu, geri al)', async ({ page }) => {
+  const problems = await depot(page, 'bekliyor');
+  await page.locator('#nm').fill('Ahmet');
+  await page.locator('.hd h1').click();                                                // hiçbir kutu seçili değil
+  await page.keyboard.type('PCS:QRKODL6000');                                          // okuyucu hızında (gecikmesiz)
+  const top = page.locator('.scflash.top.ok');
+  await expect(top).toContainText('GELDİ');
+  await expect(top).toContainText('NOVA TEXTIL SRL');
+  await expect(page.locator('[data-a="tab"][data-v="bekliyor"].on')).toHaveCount(1);   // sekme değişmedi
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l6'))).toMatchObject({ status: 'depoda', arrived_by: 'Ahmet' });
+  // elle yazış yavaştır: okuma sayılmaz
+  await page.keyboard.type('PCS:QRKODL7000', { delay: 120 });
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l7').arrived_at)).toBeNull();
+  // sonuna Enter ekleyen okuyucu (önek olmadan 10 harf + Enter)
+  await page.keyboard.type('QRKODL7000');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.scflash.top.ok')).toContainText('GOURMET SRL');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l7').arrived_at)).toBeTruthy();
+  // yanlış okutulan geri alınır
+  await page.locator('.scflash.top [data-a="sc-undo"]').click();
+  await expect(page.locator('.scflash.top')).toContainText('GERİ ALINDI');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l7').arrived_at)).toBeNull();
+  // kutu birkaç saniye sonra kendiliğinden kapanır
+  await page.clock.runFor(6000);
+  await expect(page.locator('.scflash.top')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('depo: okuyucu kodu yanlışlıkla ad ya da arama kutusuna yazılırsa oradan silinir ve yük yine gelir; pencere açıkken okuma yok sayılır', async ({ page }) => {
+  await depot(page, 'bekliyor');
+  await page.locator('#nm').fill('Ahmet');
+  await page.locator('#nm').focus();
+  await page.keyboard.type('PCS:QRKODL5000');
+  await expect(page.locator('.scflash.top.ok')).toContainText('DAKO SRL');
+  await expect(page.locator('#nm')).toHaveValue('Ahmet');                              // kod ad kutusundan silindi
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l5').arrived_by)).toBe('Ahmet');
+  // etiket penceresi açıkken (kullanıcı başka işte) okuma yok sayılır
+  await page.locator('tr.dr', { hasText: 'BERK TEKSTİL' }).locator('[data-a="label"]').click();
+  await expect(page.locator('#nkb-dlg')).toBeVisible();
+  await page.keyboard.type('PCS:QRKODL6000');
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l6').arrived_at)).toBeNull();
+});
+
+test('depo: başlıktaki "Okuyucu" düğmesi her sekmede görünmez bir kutuyu seçili tutar (klavye olayı vermeyen okuyucular için de); otomatik kapalıysa Okut açılır', async ({ page }) => {
+  await depot(page, 'bekliyor');
+  await page.locator('#nm').fill('Ahmet');
+  await expect(page.locator('[data-a="reader-toggle"]')).toContainText('Okuyucu kapalı');
+  await page.locator('[data-a="reader-toggle"]').click();
+  await expect(page.locator('[data-a="reader-toggle"]')).toContainText('Okuyucu açık');
+  await expect(page.locator('#scan-sink')).toBeFocused();
+  // metin olarak gelen okuma (klavye olayı yok, yalnızca giriş olayı)
+  await page.locator('#scan-sink').evaluate(el => { el.value = 'PCS:QRKODL6000'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(page.locator('.scflash.top.ok')).toContainText('NOVA TEXTIL SRL');
+  await expect(page.locator('#scan-sink')).toBeFocused();                              // sıradaki okuma için hazır
+  // klavye olayı olarak gelen okuma
+  await page.keyboard.type('PCS:QRKODL7000');
+  await expect(page.locator('.scflash.top.ok')).toContainText('GOURMET SRL');
+  expect(await rpcs(page, 'shp_depot_receive')).toHaveLength(2);                      // iki yoldan gelse de bir kez işlendi
+  // otomatik kapalı: okuma Okut sekmesini açar, GELDİ'ye elle basılır
+  await page.locator('[data-a="tab"][data-v="okut"]').click();
+  await page.locator('[data-i="sc-auto"]').uncheck();
+  await page.locator('[data-a="tab"][data-v="bekliyor"]').click();
+  await page.locator('#scan-sink').focus();
+  await page.keyboard.type('PCS:QRKODL3000');
+  await expect(page.locator('.res')).toContainText('YILDIZ PLASTİK A.Ş.');
+  await expect(page.locator('[data-a="tab"][data-v="okut"].on')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l3').arrived_at)).toBeNull();
+});
