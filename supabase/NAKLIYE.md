@@ -92,13 +92,29 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 
 - **Teslim al** (kamera simgesi): depodaki arkadaş gerçek kap ve kiloyu yazar; yük "sağlam / eksik / hasarlı" işaretlenir, not ve raf konumu yazılır, telefonla en çok 8 fotoğraf çekilir.
   Sayım beyandan farklıysa ya da yük eksik/hasarlıysa müşteriye otomatik "sorun" haberi gider ve ofis ekranında yükün yanında görünür. Fotoğraflar küçültülerek veritabanında saklanır.
-- **Etiket**: her yükün 10 harfli kısa kodu vardır. Yükte **Etiket** düğmesi (ya da birkaç yükü seçip alttaki **Etiket yazdır**) A6 boyutunda, QR kodlu etiket açar; yazdırıp kabın üstüne yapıştırın. QR kodda gizli anahtar yok, yalnızca yükün kısa kodu var.
+- **Etiket**: her yükün 10 harfli kısa kodu vardır. Yükte **Etiket** düğmesi (ya da birkaç yükü seçip alttaki **Etiket yazdır**) QR kodlu etiket açar (A6 ya da Zebra rulo boyutları, aşağıda); yazdırıp kabın üstüne yapıştırın. QR kodda gizli anahtar yok, yalnızca yükün kısa kodu var.
 - **Okut** sekmesi: telefonun kamerasıyla etiketteki QR kodu okutun; **yük kendiliğinden GELDİ olur** (ekranda büyük yeşil kutu, kısa ses ve titreşim; sonraki kutuya geçilir). Arka arkaya okutulan kutular sırayla işlenir.
   Aynı kutu ikinci kez okutulursa turuncu "ZATEN GELMİŞ" uyarısı çıkar ve bir şey değişmez; bilinmeyen kod kırmızı uyarı verir. İsterseniz önce **raf** seçin, okutulan yüklere yazılır. Yanlış okutulanı **Geri al** ile geri alırsınız (kutuda ve "Bu oturumda gelenler" listesinde).
   Kamera izni bir kez verilince sekme açılınca kamera kendiliğinden açılır. **Okutunca otomatik GELDİ** anahtarı kapatılırsa eski düzen gelir (yük açılır, raf seçilir, GELDİ'ye elle basılır). Seçimler cihazda hatırlanır.
   **Zebra el terminali ya da USB / Bluetooth okuyucu** için **Okuyucu modu**'nu açın: kod kutusu hep seçili bekler, ekran klavyesi açılmaz, okuyucu kodu klavyeden yazılmış gibi gönderir ve yük kendiliğinden gelir (Zebra'da DataWedge'de çıktı "klavye / keystroke" olmalı; sonuna Enter eklenmesi gerekmez, tam kod gelince işlenir).
 - **Program** sekmesi: bugün gelmesi beklenen yükler müşteri ve araca göre gruplanır (geçti / şimdi / bekliyor / tamam). Araç depoya gelince **Araç geldi** ile o aracın yükleri topluca işaretlenir.
   **Araçlar** sekmesinde yükleme kontrolü vardır: araçtaki yüklerin kaçı depoya geldi, doluluk (24 ton kamyon esas alınır). Geri kalan yük varsa **Yola çıktı** düğmesi uyarır ve yola çıkarmaz; hepsi gelince basılır.
+
+## Zebra cihazları: TC21 el terminali ile okutma, ZD230 yazıcıyla etiket basma
+
+**TC21 (el terminali, Android)**
+1. TC21'de Chrome ile depo bağlantısını (`nakliye.html?d=…`) açın; Chrome menüsünden **Ana ekrana ekle** deyin.
+2. **Okut** sekmesinde **Okuyucu modu**'nu açın (bir kez, hatırlanır). Kod kutusu hazır bekler, ekran klavyesi açılmaz.
+3. Etikete bakıp cihazın yanındaki **tarama tuşuna** basın: kod kendiliğinden yazılır ve yük **GELDİ** olur. Tuşu bırakmadan sıradaki kutuya geçebilirsiniz.
+4. Çalışmazsa **DataWedge** uygulamasında (Zebra'nın kendi uygulaması) **Profile0** ya da Chrome'a bağlı bir profilde şunlar açık olmalı: *Barcode input*, *Keystroke output*, kod türlerinde **QR Code**.
+   Çıktının sonuna Enter eklemek gerekmez; tam kod gelince yük kendiliğinden işlenir.
+5. Kamerayla okutmak da mümkündür (**Kamerayı aç**), ama tarama tuşu daha hızlı ve karanlıkta da çalışır.
+
+**ZD230 (masaüstü etiket yazıcısı, 203 dpi)**
+1. Etiketi basacağınız bilgisayara Zebra'nın yazıcı sürücüsünü kurun ("ZDesigner ZD230"; zebra.com, Zebra Setup Utilities) ve USB ile bağlayın. Sürücü tercihlerinde **kağıt boyutu** rulonuzla aynı olsun (ör. 100×150 mm).
+2. Yükte **Etiket yazdır** (ya da QR simgesi) deyin. Açılan pencerede üstteki sekmelerden **rulonuzun boyutunu** seçin: *Zebra 100×150*, *100×100*, *100×70*, *100×50* ya da normal yazıcı için *A6*. Seçiminiz hatırlanır.
+3. **Yazdır**'a basın; yazıcı olarak ZD230'u seçin, ölçek %100, kenar boşluğu yok. İlk etiketi deneme olarak basıp QR'ı TC21 ile okutun.
+4. Rulonuzun ölçüsü listede yoksa söyleyin, eklenir.
 
 ## Ofis: yazışmaları izleme (mesaj balonu ve Mesajlar sekmesi)
 

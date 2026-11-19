@@ -26,14 +26,28 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
   }
 
-  const CSS = `@page{size:A6 landscape;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}
-.lb{width:148mm;height:105mm;padding:6mm;page-break-after:always;break-after:page;display:flex}.lb:last-child{page-break-after:auto;break-after:auto}
-.bx{flex:1;border:0.8mm solid #000;border-radius:3mm;padding:5mm;display:flex;flex-direction:column;justify-content:space-between}
-.t{display:flex;gap:5mm;align-items:flex-start}.qq{width:46mm;height:46mm;flex:none}.qq svg{width:100%;height:100%;display:block}
-.in{flex:1;min-width:0}.pz{font-size:3.4mm;font-weight:700;color:#444}.sn{font-size:6.6mm;font-weight:800;line-height:1.15;margin:1.5mm 0;overflow-wrap:anywhere}
-.cs{font-size:4.6mm;overflow-wrap:anywhere}.gd{font-size:4mm;margin-top:3mm}.pl{display:inline-block;border:0.6mm solid #000;border-radius:1.6mm;padding:0.8mm 3mm;font-weight:800;font-size:4.6mm;letter-spacing:.4mm;margin-top:3mm}
-.bt{display:flex;justify-content:space-between;align-items:flex-end;border-top:0.5mm dashed #000;padding-top:3mm}.cd{font:700 5mm "Courier New",monospace;letter-spacing:.8mm}.bt b{font-size:5mm}
+  // Etiket boyutları: A6 (normal yazıcı) ve Zebra gibi etiket yazıcıları için yaygın rulo ölçüleri (mm). Yazıcı sürücüsünde kağıt boyutu rulonuzla aynı olmalı.
+  const SIZES = [
+    { id: 'a6', name: 'A6 (normal yazıcı)', w: 148, h: 105, qr: 46, pad: 6, k: 1 },
+    { id: 'z150', name: 'Zebra 100×150', w: 100, h: 150, qr: 66, pad: 3, k: 1, portrait: true },
+    { id: 'z100', name: 'Zebra 100×100', w: 100, h: 100, qr: 48, pad: 3, k: 0.85, portrait: true },
+    { id: 'z70', name: 'Zebra 100×70', w: 100, h: 70, qr: 38, pad: 3, k: 0.7 },
+    { id: 'z50', name: 'Zebra 100×50', w: 100, h: 50, qr: 30, pad: 2.5, k: 0.55 }
+  ];
+  const SIZE_KEY = 'pcs.etiket.boyut';
+  const savedSize = () => { try { const i = SIZES.findIndex(x => x.id === localStorage.getItem(SIZE_KEY)); return i < 0 ? 0 : i; } catch (_) { return 0; } };
+  const saveSize = i => { try { localStorage.setItem(SIZE_KEY, SIZES[i].id); } catch (_) { /* tarayıcı saklamıyorsa her seferinde A6 açılır */ } };
+  const css = z => {
+    const k = z.k, f = n => (n * k).toFixed(2);
+    return `@page{size:${z.w}mm ${z.h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}
+.lb{width:${z.w}mm;height:${z.h}mm;padding:${z.pad}mm;page-break-after:always;break-after:page;display:flex;overflow:hidden}.lb:last-child{page-break-after:auto;break-after:auto}
+.bx{flex:1;min-width:0;min-height:0;border:${f(0.8)}mm solid #000;border-radius:${f(3)}mm;padding:${f(5)}mm;display:flex;flex-direction:column;justify-content:space-between}
+.t{display:flex;gap:${f(5)}mm;align-items:${z.portrait ? 'center' : 'flex-start'};flex-direction:${z.portrait ? 'column' : 'row'};${z.portrait ? 'text-align:center;' : ''}}.qq{width:${z.qr}mm;height:${z.qr}mm;flex:none}.qq svg{width:100%;height:100%;display:block}
+.in{flex:1;min-width:0;${z.portrait ? 'width:100%;' : ''}}.pz{font-size:${f(3.4)}mm;font-weight:700;color:#444}.sn{font-size:${f(6.6)}mm;font-weight:800;line-height:1.15;margin:${f(1.5)}mm 0;overflow-wrap:anywhere}
+.cs{font-size:${f(4.6)}mm;overflow-wrap:anywhere}.gd{font-size:${f(4)}mm;margin-top:${f(3)}mm}.pl{display:inline-block;border:${f(0.6)}mm solid #000;border-radius:${f(1.6)}mm;padding:${f(0.8)}mm ${f(3)}mm;font-weight:800;font-size:${f(4.6)}mm;letter-spacing:.4mm;margin-top:${f(3)}mm}
+.bt{display:flex;justify-content:space-between;align-items:flex-end;border-top:${f(0.5)}mm dashed #000;padding-top:${f(3)}mm}.cd{font:700 ${f(5)}mm "Courier New",monospace;letter-spacing:${f(0.8)}mm}.bt b{font-size:${f(5)}mm}
 @media screen{body{background:#e6eaee;padding:12px 0}.lb{margin:0 auto 12px;background:#fff;box-shadow:0 2px 14px #0003}}`;
+  };
 
   function labelHtml(l, ctx) {
     const t = ctx.trips[l.trip_id], cust = ctx.customerName(l);
@@ -49,8 +63,8 @@
     try { await qrLib(); } catch (e) { X.toast(e.message, true); return; }
     const trips = Object.fromEntries(((X.P.data && X.P.data.trips) || []).map(t => [t.id, t]));
     const ctx = { trips, customerName: l => (X.custOf(l.customer_id) || {}).name || '' };
-    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Yük etiketleri</title><style>${CSS}</style></head><body>${list.map(l => labelHtml(l, ctx)).join('')}</body></html>`;
-    X.B.show([{ label: 'Etiketler', html }], { title: `Yük etiketleri (${list.length})` });
+    const page = z => `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Yük etiketleri</title><style>${css(z)}</style></head><body>${list.map(l => labelHtml(l, ctx)).join('')}</body></html>`;
+    X.B.show(SIZES.map(z => ({ label: z.name, html: page(z) })), { title: `Yük etiketleri (${list.length})`, start: savedSize(), onTab: saveSize });
   }
   X.act.label = (t, e, id) => { const l = (X.P.data.loads || []).find(x => x.id === id); return printLabels(l ? [l] : []); };
   X.act.labels = () => {
@@ -107,6 +121,6 @@
   }
   X.onDraw.push(placeVideo);
 
-  X.qr = { svgOf, labelHtml, printLabels, parseCode, payload, scanStart, scanStop, lib: { gen: qrLib, dec: jsqrLib }, decode: (data, w, h) => { const r = window.jsQR(data, w, h); return r ? r.data : ''; },
+  X.qr = { svgOf, labelHtml, printLabels, SIZES, parseCode, payload, scanStart, scanStop, lib: { gen: qrLib, dec: jsqrLib }, decode: (data, w, h) => { const r = window.jsQR(data, w, h); return r ? r.data : ''; },
     scanning: () => !!Scan.stream };
 })();

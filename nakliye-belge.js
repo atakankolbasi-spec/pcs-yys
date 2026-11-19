@@ -246,7 +246,7 @@ body{font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}
       dlg = document.createElement('dialog'); dlg.id = 'nkb-dlg'; dlg.setAttribute('aria-label', 'Belge önizleme');
       document.body.appendChild(dlg);
     }
-    let cur = 0;
+    let cur = Math.min(Math.max(Number(opts.start) || 0, 0), items.length - 1);
     const draw = () => {
       dlg.innerHTML = `<div class="nkb-bar"><h2>${esc(opts.title || 'Belge')}</h2>${items.length > 1 ? items.map((x, i) => `<button type="button" data-nkb-tab="${i}" class="${i === cur ? 'on' : ''}">${esc(x.label)}</button>`).join('') : ''}` +
         `<span class="sp"></span><button type="button" class="pr" data-nkb="print">Yazdır / PDF olarak kaydet</button><button type="button" data-nkb="close">Kapat</button></div>` +
@@ -257,7 +257,7 @@ body{font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.nkb === 'close') return dlg.close();
       if (t.dataset.nkb === 'print') { const f = dlg.querySelector('iframe'); try { f.contentWindow.focus(); f.contentWindow.print(); } catch (_) { /* yazdırma açılamadı */ } return; }
-      if (t.dataset.nkbTab != null) { cur = Number(t.dataset.nkbTab) || 0; draw(); }
+      if (t.dataset.nkbTab != null) { cur = Number(t.dataset.nkbTab) || 0; if (opts.onTab) { try { opts.onTab(cur); } catch (_) { /* tercih kaydedilemedi */ } } draw(); }
     };
     draw();
     if (!dlg.open) dlg.showModal();
