@@ -53,6 +53,7 @@
       limit(n) { st.to = st.from + n - 1; return q; },
       eq(col, val) { st.filters.push(r => r[col] === val); return q; },
       in(col, vals) { st.filters.push(r => vals.includes(r[col])); return q; },
+      is(col, val) { st.filters.push(r => (val === null ? r[col] == null : r[col] === val)); return q; },
       gte(col, val) { st.gte = { col, val }; st.filters.push(r => r[col] != null && Date.parse(r[col]) >= Date.parse(val)); return q; },
       or(expr) { st.filters.push(logic(expr, true)); return q; },
       insert(rows) { st.op = 'insert'; st.rows = Array.isArray(rows) ? rows : [rows]; return q; },

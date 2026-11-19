@@ -10,7 +10,7 @@
   const CAP = 24000;                    // araç kapasitesi (kg): doluluk çubuğu için
   const esc = B.esc;
   const S = {
-    ready: false, loading: false, err: '', missing: false, customers: [], loads: [], trips: [], log: [], logMiss: false,
+    ready: false, loading: false, err: '', missing: false, customers: [], loads: [], trips: [], log: [], logMiss: false, msgs: [], outbox: [], newMiss: false, msgCust: '', msgBody: '',
     tab: 'idle', syncing: false, tried: new Set(), sel: new Set(), cust: '', q: '', tq: '', open: new Set(), busy: false, confirm: '', rt: null,
     form: { tractor: '', trailer: '', date: '', subject: '', lade: true, cmr: true }
   };
@@ -50,11 +50,13 @@
     if (!quiet) { S.err = ''; redraw(); }
     try {
       const c = X.client;
-      const [a, t, l, g] = await Promise.all([
+      const [a, t, l, g, mg, ob] = await Promise.all([
         c.from('shp_customers').select('*').order('name'),
         c.from('shp_trips').select('*').order('created_at', { ascending: false }).limit(500),
         c.from('shp_loads').select('*').order('created_at', { ascending: false }).limit(3000),
-        c.rpc('shp_log_list', { p_customer: null, p_limit: 400 })
+        c.rpc('shp_log_list', { p_customer: null, p_limit: 400 }),
+        c.from('shp_messages').select('*').order('id', { ascending: false }).limit(600),
+        c.from('shp_outbox').select('*').eq('status', 'bekliyor').order('id')
       ]);
       const e = a.error || t.error || l.error;
       if (e) {
@@ -63,6 +65,7 @@
       } else {
         S.customers = a.data || []; S.trips = t.data || []; S.loads = l.data || [];
         S.log = g && !g.error && Array.isArray(g.data) ? g.data : []; S.logMiss = !!(g && g.error);
+        S.msgs = mg && !mg.error && Array.isArray(mg.data) ? mg.data.slice().reverse() : []; S.outbox = ob && !ob.error && Array.isArray(ob.data) ? ob.data : []; S.newMiss = !!((mg && mg.error) || (ob && ob.error));
         S.err = ''; S.missing = false; S.ready = true;
         for (const id of [...S.sel]) { const x = loadOf(id); if (!x || x.status !== 'depoda') S.sel.delete(id); }
       }
@@ -72,6 +75,7 @@
     S.loading = false;
     redraw();
     syncPano();
+    if (S.tab === 'msg') readCurrent();
   }
 
   // Panodaki müşteriler (Plaka kayıtları ve araç geliş kayıtları) Nakliye müşterisi olarak kendiliğinden eklenir.
@@ -99,7 +103,8 @@
       let timer = null;
       const ping = () => { clearTimeout(timer); timer = setTimeout(() => { if (S.ready && document.getElementById('nk-root')) load(true); }, 500); };
       S.rt = X.client.channel('pcs-nakliye').on('postgres_changes', { event: '*', schema: 'public', table: 'shp_loads' }, ping)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'shp_trips' }, ping);
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shp_trips' }, ping)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shp_messages' }, ping).on('postgres_changes', { event: '*', schema: 'public', table: 'shp_outbox' }, ping);
       S.rt.subscribe();
     } catch (_) { S.rt = null; }
   }
@@ -119,7 +124,7 @@
   }
 
   function tabs() {
-    const t = [['idle', 'Boşta yükler', idleLoads().length], ['trips', 'Araçlar', S.trips.length], ['wait', 'Bekleyenler', waitLoads().length], ['all', 'Tüm yükler', S.loads.length], ['log', 'Hareketler', S.log.length]];
+    const t = [['idle', 'Boşta yükler', idleLoads().length], ['trips', 'Araçlar', S.trips.length], ['wait', 'Bekleyenler', waitLoads().length], ['all', 'Tüm yükler', S.loads.length], ['msg', 'Mesajlar', unreadMsgs()], ['out', 'Bildirimler', S.outbox.length], ['log', 'Hareketler', S.log.length]];
     return `<div class="nk-tabs" role="tablist">${t.map(([k, l, n]) => `<button type="button" role="tab" class="${S.tab === k ? 'on' : ''}" aria-selected="${S.tab === k}" data-nk="tab" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>`;
   }
 
@@ -127,7 +132,7 @@
   const searchBox = (id, key, val) => `<label class="nk-search">${ic('search')}<input id="${id}" data-nk-in="${key}" type="search" value="${esc(val)}" placeholder="Ara: gönderici, alıcı, mal, plaka…" autocomplete="off" aria-label="Ara"></label>`;
   const hit = (l, q) => !q || [l.sender, l.consignee, l.goods, l.dest_customs, l.broker, l.note, l.inbound_plate, (cust(l.customer_id) || {}).name, (byId(S.trips, l.trip_id) || {}).poz_no, B.plates(byId(S.trips, l.trip_id))].some(x => tr(x).includes(tr(q)));
 
-  const loadCells = l => `<td>${pill(l.customer_id)}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small>${l.inbound_plate ? `<small>Getirecek araç: <span class="nk-pl">${esc(l.inbound_plate)}</span></small>` : ''}</td><td>${esc(l.goods) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>`;
+  const loadCells = l => `<td>${pill(l.customer_id)}</td><td><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}</small>${l.condition === 'eksik' || l.condition === 'hasarli' || (l.counted_pieces != null && l.counted_pieces !== l.pieces) ? `<small><span class="nk-ch r">${l.condition === 'hasarli' ? 'Hasarlı' : l.condition === 'eksik' ? 'Eksik var' : 'Sayım farkı'}</span>${l.receive_note ? ' ' + esc(l.receive_note) : ''}</small>` : ''}${l.location ? `<small>Konum: ${esc(l.location)}</small>` : ''}${l.inbound_plate ? `<small>Getirecek araç: <span class="nk-pl">${esc(l.inbound_plate)}</span></small>` : ''}</td><td>${esc(l.goods) || '—'}</td><td class="r">${esc(l.pieces)} ${esc(l.packing)}</td><td class="r">${kg(l.weight)}</td>`;
 
   function idleView() {
     const sc = selCust();
@@ -173,7 +178,7 @@
     const trips = S.trips.filter(t => !S.tq || [t.poz_no, t.tractor, t.trailer, (cust(t.customer_id) || {}).name, t.subject].some(x => tr(x).includes(tr(S.tq))));
     const body = trips.map(t => {
       const ls = tripLoads(t), open = S.open.has(t.id);
-      const head = `<tr class="nk-trip ${open ? 'open' : ''}"><td><button type="button" class="nk-exp" data-nk="toggle-trip" data-id="${t.id}" aria-expanded="${open}" aria-label="Yükleri göster">${open ? '▾' : '▸'}</button></td><td><b class="nk-poz">${esc(t.poz_no)}</b>${t.created_by === 'Müşteri' ? '<small>Müşteri planladı</small>' : ''}${t.status !== 'hazirlaniyor' ? ' <span class="nk-ch b">Yolda · kilitli</span>' : ''}${ls.some(l => !l.arrived_at) ? ` <span class="nk-ch a">${ls.filter(l => !l.arrived_at).length} yük depoya gelmedi</span>` : ''}</td>` +
+      const head = `<tr class="nk-trip ${open ? 'open' : ''}"><td><button type="button" class="nk-exp" data-nk="toggle-trip" data-id="${t.id}" aria-expanded="${open}" aria-label="Yükleri göster">${open ? '▾' : '▸'}</button></td><td><b class="nk-poz">${esc(t.poz_no)}</b>${t.created_by === 'Müşteri' ? '<small>Müşteri planladı</small>' : ''}${t.status === 'yolda' ? ' <span class="nk-ch b">Yolda · kilitli</span>' : t.status === 'teslim' ? ' <span class="nk-ch g">Teslim edildi</span>' : ''}${ls.some(l => !l.arrived_at) ? ` <span class="nk-ch a">${ls.filter(l => !l.arrived_at).length} yük depoya gelmedi</span>` : ''}</td>` +
         `<td><span class="nk-pl">${esc(t.tractor)}</span>${t.trailer ? `<span class="nk-pl alt">${esc(t.trailer)}</span>` : ''}</td><td>${pill(t.customer_id)}</td><td>${esc(dmy(t.depart_date))}</td><td class="r">${ls.length}</td><td class="r">${kg(sum(ls, 'weight'))} kg</td>` +
         `<td class="r"><button type="button" class="btn small" data-nk="doc" data-kind="lade" data-id="${t.id}">Lade Liste</button> <button type="button" class="btn small" data-nk="doc" data-kind="cmr" data-id="${t.id}">CMR</button></td></tr>`;
       if (!open) return head;
@@ -181,7 +186,9 @@
         `<td>${l.arrived_at ? `<span class="nk-ch g">Depoda</span><small>${esc(stamp(l.arrived_at))}</small>` : `<span class="nk-ch a">Depoya gelmedi</span> <button type="button" class="nk-lnk" data-nk="arrive-trip" data-id="${l.id}">Geldi</button>`}</td><td class="r"><button type="button" class="nk-lnk" data-nk="doc" data-kind="cmr" data-id="${t.id}" data-load="${l.id}">CMR</button> <button type="button" class="nk-lnk" data-nk="edit-load" data-id="${l.id}">Düzenle</button> <button type="button" class="nk-lnk" data-nk="unassign" data-id="${l.id}">Araçtan çıkar</button></td></tr>`).join('');
       const del = S.confirm === 'trip:' + t.id
         ? `<button type="button" class="btn small danger" data-nk="del-trip" data-id="${t.id}">Evet, seferi sil</button>` : `<button type="button" class="btn small" data-nk="del-trip" data-id="${t.id}">Seferi sil (yükler boşa döner)</button>`;
-      const lock = t.status === 'hazirlaniyor' ? `<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="yolda">Yola çıktı (müşteri değiştiremesin)</button>` : `<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="hazirlaniyor">Kilidi aç (müşteri değiştirebilsin)</button>`;
+      const miss = ls.filter(l => !l.arrived_at).length, askGo = S.confirm === 'go:' + t.id;
+      const lock = t.status === 'hazirlaniyor' ? `<button type="button" class="btn small ${askGo ? 'danger' : ''}" data-nk="lock-trip" data-id="${t.id}" data-v="yolda">${askGo ? `Evet, ${miss} yük depoya gelmedi ama araç yola çıksın` : 'Yola çıktı (müşteri değiştiremesin)'}</button>`
+        : `${t.status === 'yolda' ? `<button type="button" class="btn small primary" data-nk="lock-trip" data-id="${t.id}" data-v="teslim">Teslim edildi (müşteriye bildirilir)</button>` : ''}<button type="button" class="btn small" data-nk="lock-trip" data-id="${t.id}" data-v="hazirlaniyor">Kilidi aç (müşteri değiştirebilsin)</button>`;
       return head + `<tr class="nk-sub"><td></td><td colspan="7"><table class="nk-t inner"><thead><tr><th>CMR No</th><th>Gönderici → Alıcı</th><th>Mal</th><th>Varış</th><th class="r">Kap</th><th class="r">Kilo</th><th>Depo</th><th></th></tr></thead><tbody>${sub}</tbody></table><div class="nk-subact">${lock}${del}</div></td></tr>`;
     }).join('');
     return `<section class="nk-pn"><div class="nk-bar"><h2>Araçlar ve seferler <span>${trips.length}</span></h2><div class="nk-bar-r">${searchBox('nk-tq', 'tq', S.tq)}</div></div>` +
@@ -204,6 +211,49 @@
       (rows.length ? `<div class="nk-scroll"><table class="nk-t"><thead><tr><th>Müşteri</th><th>Gönderici → Alıcı</th><th>Mal</th><th class="r">Kap</th><th class="r">Kilo</th><th>Durum</th><th></th></tr></thead><tbody>${body}</tbody></table></div>` : '<div class="nk-empty">Kayıt yok.</div>') + '</section>';
   }
 
+  const waPhone = ph => { let d = String(ph || '').replace(/[^\d]/g, ''); if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '90' + d.slice(1); else if (d.length === 10 && d[0] === '5') d = '90' + d; return d; };
+  const curThread = () => { const ids = [...new Set(S.msgs.map(m => m.customer_id))]; return S.msgCust && (ids.includes(S.msgCust) || cust(S.msgCust)) ? S.msgCust : (ids.sort((a, b) => String(S.msgs.filter(m => m.customer_id === b).pop().created_at).localeCompare(String(S.msgs.filter(m => m.customer_id === a).pop().created_at)))[0] || ''); };
+  async function readCurrent() {
+    const id = curThread(), un = S.msgs.filter(m => m.customer_id === id && m.from_role === 'musteri' && !m.read_at);
+    if (!id || !un.length || S.reading) return;
+    S.reading = true;
+    const r = await X.client.from('shp_messages').update({ read_at: new Date().toISOString() }).eq('customer_id', id).eq('from_role', 'musteri').is('read_at', null);
+    S.reading = false;
+    if (!r.error) { un.forEach(m => { m.read_at = new Date().toISOString(); }); redraw(); }
+  }
+  const unreadMsgs = () => S.msgs.filter(m => m.from_role === 'musteri' && !m.read_at).length;
+  const dtm = iso => stamp(iso);
+  // Mesajlar: müşteri başına yazışma; okunmamışlar üstte
+  function msgView() {
+    if (S.newMiss) return notice('Yazışma ve bildirimler kurulmamış', 'Bu bölüm için <b>supabase/nakliye-kurulumu.sql</b> dosyasının son halini Supabase SQL Editor\'de çalıştırın, sonra Yenile\'ye basın.', true);
+    const by = {};
+    S.msgs.forEach(m => { (by[m.customer_id] = by[m.customer_id] || []).push(m); });
+    const ids = Object.keys(by).sort((a, b) => String(by[b][by[b].length - 1].created_at).localeCompare(String(by[a][by[a].length - 1].created_at)));
+    const cur = curThread() || (S.customers[0] || {}).id || '';
+    const list = ids.length ? ids.map(id => { const ms = by[id], un = ms.filter(m => m.from_role === 'musteri' && !m.read_at).length, last = ms[ms.length - 1];
+      return `<button type="button" class="nk-th ${id === cur ? 'on' : ''}" data-nk="msg-open" data-id="${id}"><b>${esc((cust(id) || {}).name || '?')}</b>${un ? `<span class="nk-bdg">${un}</span>` : ''}<small>${esc(String(last.body).slice(0, 60))}</small></button>`; }).join('') : '<div class="nk-empty">Henüz mesaj yok. Müşteriler sayfalarından yazınca burada görünür.</div>';
+    const thread = (by[cur] || []).map(m => { const mine = m.from_role === 'ofis', l = m.load_id && loadOf(m.load_id), t = m.trip_id && byId(S.trips, m.trip_id);
+      return `<div class="nk-m ${mine ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${l ? `<span class="nk-lk2">${esc(l.sender)} → ${esc(l.consignee)}</span>` : t ? `<span class="nk-lk2">${esc(t.poz_no)} · ${esc(t.tractor)}</span>` : ''}<small>${esc(dtm(m.created_at))} · ${esc(mine ? 'Ofis' : m.author || 'Müşteri')}</small></div>`; }).join('');
+    return `<section class="nk-pn nk-msgs"><div class="nk-bar"><h2>Mesajlar <span>${S.msgs.length}</span></h2><div class="nk-bar-r">${custSelect().replace('Tüm müşteriler', 'Müşteri seç')}</div></div>
+<div class="nk-mg"><div class="nk-ths">${list}</div><div class="nk-thread"><div class="nk-mlist" id="nk-mlist">${thread || '<div class="nk-empty">Bu müşteriyle henüz yazışma yok.</div>'}</div>
+${cur ? `<form data-nk-form="reply" data-cid="${cur}" class="nk-reply"><textarea id="nk-reply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc((cust(cur) || {}).name || 'Müşteri')} için cevabınızı yazın…">${esc(S.msgBody)}</textarea><button type="submit" class="btn primary">${ic('check')}Gönder</button></form>` : ''}</div></div></section>`;
+  }
+  // Bildirimler: kuyruktaki haberler müşteri ve konuya göre birleşir; tek tıkla WhatsApp'ta gönderilir
+  const EVT = { geldi: ['📦 Yükünüz depoya geldi', 'Depoya geldi'], yola: ['🚚 Aracınız yola çıktı', 'Yola çıktı'], teslim: ['✅ Yükünüz teslim edildi', 'Teslim'], sorun: ['⚠️ Yükünüzde sorun bildirildi', 'Sorun'], mesaj: ['💬 Ofisten yeni mesaj', 'Mesaj'] };
+  function outGroups() {
+    const m = new Map();
+    S.outbox.forEach(o => { const k = o.customer_id + '|' + o.event + '|' + o.phone; if (!m.has(k)) m.set(k, { key: k, customer_id: o.customer_id, event: o.event, phone: o.phone, items: [] }); m.get(k).items.push(o); });
+    return [...m.values()];
+  }
+  const outText = g => `${EVT[g.event][0]}\n${g.items.map(o => o.body).join('\n')}${g.event === 'yola' ? '\nLade Liste ve CMR belgeleriniz hazır.' : ''}`;
+  function outView() {
+    if (S.newMiss) return notice('Yazışma ve bildirimler kurulmamış', 'Bu bölüm için <b>supabase/nakliye-kurulumu.sql</b> dosyasının son halini Supabase SQL Editör\'de çalıştırın, sonra Yenile\'ye basın.', true);
+    const gs = outGroups();
+    const rows = gs.map((g, i) => `<li><div><b>${esc((cust(g.customer_id) || {}).name || '?')}</b> <span class="nk-ch ${g.event === 'sorun' ? 'a' : 'b'}">${EVT[g.event][1]}</span><small>${esc(g.phone)} · ${g.items.length} haber · ${esc(dtm(g.items[0].created_at))}</small><pre class="nk-pre">${esc(outText(g))}</pre></div>
+<div class="nk-lk-a"><button type="button" class="btn small primary" data-nk="out-send" data-i="${i}">${ic('send')}WhatsApp'ta gönder</button><button type="button" class="btn small" data-nk="out-done" data-i="${i}">Gönderildi say</button><button type="button" class="btn small" data-nk="out-skip" data-i="${i}">Gönderme</button></div></li>`).join('');
+    return `<section class="nk-pn"><div class="nk-bar"><h2>Bildirimler <span>${gs.length}</span></h2></div><div class="nk-note2">Müşterilerin seçtiği haberler (depoya geldi, yola çıktı, teslim, sorun, mesaj) burada birikir. <b>WhatsApp'ta gönder</b> mesajı hazır halde açar; gönderdikten sonra <b>Gönderildi say</b> deyin. İsterseniz bu işi sistem kendiliğinden yapar: <b>supabase/NAKLIYE.md</b> > "Otomatik bildirim".</div>
+${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderilecek bildirim yok. Müşteri bildirim numarasını yazınca ve depo yük teslim alınca burada görünür.</div>'}</section>`;
+  }
   const ROLE = { musteri: ['Müşteri', 'b'], depo: ['Depo', 'g'], operator: ['Ofis', 'a'] };
   function logView() {
     if (S.logMiss) return notice('Hareket kaydı kurulmamış', 'Kim neyi yaptı kaydı için <b>supabase/nakliye-kurulumu.sql</b> dosyasının son halini Supabase SQL Editor\'de çalıştırın, sonra Yenile\'ye basın.', true);
@@ -222,7 +272,7 @@
     if (S.err && !S.ready) return notice('Nakliye açılamadı', esc(S.err), true);
     if (!S.ready) return '<div class="nk-pn nk-note"><p>Yükleniyor…</p></div>';
     const err = S.err ? `<div class="nk-warn">${esc(S.err)}</div>` : '';
-    return err + kpis() + tabs() + (S.tab === 'trips' ? tripsView() : S.tab === 'wait' ? waitView() : S.tab === 'all' ? allView() : S.tab === 'log' ? logView() : idleView());
+    return err + kpis() + tabs() + (S.tab === 'trips' ? tripsView() : S.tab === 'wait' ? waitView() : S.tab === 'all' ? allView() : S.tab === 'log' ? logView() : S.tab === 'msg' ? msgView() : S.tab === 'out' ? outView() : idleView());
   }
 
   function redraw() {
@@ -289,7 +339,7 @@
   async function onClick(e) {
     const t = e.target.closest('[data-nk]'); if (!t || !X) return;
     const a = t.dataset.nk, id = t.dataset.id;
-    if (a === 'tab') { S.tab = t.dataset.v; S.confirm = ''; redraw(); return; }
+    if (a === 'tab') { S.tab = t.dataset.v; S.confirm = ''; redraw(); if (S.tab === 'msg') await readCurrent(); return; }
     if (a === 'refresh') { await load(); return; }
     if (a === 'pick') {
       if (S.sel.has(id)) S.sel.delete(id);
@@ -321,7 +371,13 @@
     }
     if (a === 'arrive') { if (await db(X.client.from('shp_loads').update({ status: 'depoda', arrived_at: new Date().toISOString(), arrived_by: 'Operatör' }).eq('id', id), 'Yük boşta listesine alındı')) await load(true); return; }
     if (a === 'arrive-trip') { if (await db(X.client.from('shp_loads').update({ arrived_at: new Date().toISOString(), arrived_by: 'Operatör' }).eq('id', id), 'Yük depoya geldi olarak işaretlendi')) await load(true); return; }
-    if (a === 'lock-trip') { if (await db(X.client.from('shp_trips').update({ status: t.dataset.v }).eq('id', id), t.dataset.v === 'yolda' ? 'Sefer kilitlendi; müşteri artık değiştiremez' : 'Kilit açıldı; müşteri değiştirebilir')) await load(true); return; }
+    if (a === 'lock-trip') {
+      const v = t.dataset.v, tp = byId(S.trips, id);
+      if (v === 'yolda' && tp && tripLoads(tp).some(l => !l.arrived_at) && S.confirm !== 'go:' + id) { S.confirm = 'go:' + id; redraw(); return; }
+      S.confirm = '';
+      if (await db(X.client.from('shp_trips').update({ status: v }).eq('id', id), v === 'yolda' ? 'Sefer kilitlendi; müşteri artık değiştiremez' : v === 'teslim' ? 'Sefer teslim edildi olarak işaretlendi' : 'Kilit açıldı; müşteri değiştirebilir')) await load(true); else redraw();
+      return;
+    }
     if (a === 'add-load') { loadForm(''); return; }
     if (a === 'edit-load') { loadForm(id); return; }
     if (a === 'customers') { customersModal(); return; }
@@ -329,6 +385,23 @@
     if (a.startsWith('lk-')) { await linkAction(a, t); return; }
     if (a === 'edit-cust') { customerForm(id); return; }
     if (a === 'back-cust') { customersModal(); return; }
+    if (a === 'msg-open') {
+      S.msgCust = id; redraw(); await readCurrent();
+      return;
+    }
+    if (a === 'out-send' || a === 'out-done' || a === 'out-skip') {
+      const g = outGroups()[Number(t.dataset.i)]; if (!g) return;
+      if (a === 'out-send') X.wa(waPhone(g.phone), outText(g));
+      const ids = g.items.map(o => o.id);
+      const upd = a === 'out-skip' ? { status: 'iptal' } : { status: 'gonderildi', sent_at: new Date().toISOString() };
+      if (a !== 'out-send') { const r = await X.client.from('shp_outbox').update(upd).in('id', ids); if (r.error) X.toast(r.error.message || 'Kaydedilemedi', true); else { S.outbox = S.outbox.filter(o => !ids.includes(o.id)); redraw(); } }
+      return;
+    }
+    if (a === 'ph-big') {
+      const r = await X.client.from('shp_photos').select('data').eq('id', id); const big = document.getElementById('nk-phbig');
+      if (big && !r.error && r.data && r.data[0]) big.innerHTML = `<img class="nk-phimg" src="${esc(r.data[0].data)}" alt="Yük fotoğrafı">`;
+      return;
+    }
     if (a === 'users') { await usersModal(id); return; }
     if (a === 'users-back') { drawUsers(); return; }
     if (a === 'edit-user') { userForm(id); return; }
@@ -350,7 +423,8 @@
     const k = t.dataset.nkIn, v = t.type === 'checkbox' ? t.checked : t.value;
     if (k === 'q') { S.q = v; redraw(); return; }
     if (k === 'tq') { S.tq = v; redraw(); return; }
-    if (k === 'cust') { S.cust = v; redraw(); return; }
+    if (k === 'cust') { if (S.tab === 'msg') S.msgCust = v; S.cust = v; redraw(); return; }
+    if (k === 'msg-body') { S.msgBody = v; return; }
     if (k === 'f-tractor') S.form.tractor = v;
     else if (k === 'f-trailer') S.form.trailer = v;
     else if (k === 'f-date') S.form.date = v;
@@ -379,11 +453,19 @@ ${fld('goods', 'Mal cinsi', l.goods, { full: true })}
 ${fld('weight', 'Brüt kilo (kg)', num(l.weight), { inputmode: 'decimal' })}${fld('volume', 'Hacim (m³)', num(l.volume), { inputmode: 'decimal', opt: true })}
 ${fld('country', 'Ülke', l.country, { max: 60 })}${fld('dest_customs', 'Varış gümrük', l.dest_customs, { max: 80 })}
 ${fld('code', 'Gümrük kodu', l.code, { max: 40, opt: true })}${fld('broker', 'Gümrükçü', l.broker, { max: 120, opt: true })}
-${fld('expected_date', 'Beklenen tarih', l.expected_date || '', { type: 'date', opt: true })}${fld('inbound_plate', 'Yükü getirecek kamyon plakası', l.inbound_plate || '', { max: 40, opt: true })}
+${fld('expected_date', 'Beklenen tarih', l.expected_date || '', { type: 'date', opt: true })}${fld('expected_time', 'Beklenen saat (depoya varış)', l.expected_time || '', { type: 'time', opt: true })}${fld('inbound_plate', 'Yükü getirecek kamyon plakası', l.inbound_plate || '', { max: 40, opt: true })}${fld('driver', 'Şoför adı ve telefonu', l.driver || '', { max: 80, opt: true })}
 ${fld('note', 'Not', l.note, { max: 500, opt: true, full: true })}
+${id && l.arrived_at ? `<div class="field full nk-rc"><label>Depo teslim bilgisi</label><div class="nk-rcbox"><div>${l.condition === 'eksik' ? '<span class="nk-ch r">Eksik var</span>' : l.condition === 'hasarli' ? '<span class="nk-ch r">Hasarlı</span>' : l.condition === 'saglam' ? '<span class="nk-ch g">Sağlam</span>' : '<span class="nk-ch">Durum girilmedi</span>'} Beyan ${esc(l.pieces)} kap · sayılan ${l.counted_pieces == null ? '—' : esc(l.counted_pieces)}${l.counted_weight != null ? ` · tartı ${kg(l.counted_weight)} kg` : ''}${l.location ? ` · konum ${esc(l.location)}` : ''}${l.receive_note ? `<br>${esc(l.receive_note)}` : ''}</div><div id="nk-phs" class="nk-phs"></div><div id="nk-phbig"></div></div></div>` : ''}
 </div><datalist id="nk-packs"><option>KAP</option><option>PALET</option><option>KOLİ</option><option>RULO</option><option>BIG BAG</option><option>DÖKME</option></datalist>
 ${id ? '' : '<label class="form-chip nk-arr"><input type="checkbox" name="arrived" class="check"><span>Yük zaten depoda (boşta listesine ekle)</span></label>'}
 <div id="nk-ferr" class="nk-ferr" hidden></div></div><div class="modal-footer">${id && l.status !== 'aracta' ? `<button type="button" class="btn danger" data-nk="del-load" data-id="${esc(id)}">Sil</button>` : ''}${id && l.status === 'aracta' ? '<small class="nk-hint2">Araçtaki yük silinemez; önce araçtan çıkarın.</small>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-action="close-modal">Vazgeç</button><button type="submit" class="btn primary">${ic('check')}Kaydet</button></div></form>`);
+    if (id && l.arrived_at) loadPhotos(id);
+  }
+  // Depo fotoğrafları: küçük resimler açılışta, büyük resim tıklayınca yüklenir
+  async function loadPhotos(lid) {
+    const r = await X.client.from('shp_photos').select('id,thumb,created_at,by_name').eq('load_id', lid).order('created_at');
+    const box = document.getElementById('nk-phs'); if (!box || r.error || !(r.data || []).length) return;
+    box.innerHTML = r.data.map(p => `<button type="button" class="nk-pht" data-nk="ph-big" data-id="${esc(p.id)}" aria-label="Fotoğrafı büyüt"><img src="${esc(p.thumb)}" alt=""></button>`).join('');
   }
 
   async function removeLoad(btn) {
@@ -401,7 +483,7 @@ ${id ? '' : '<label class="form-chip nk-arr"><input type="checkbox" name="arrive
     const row = {
       customer_id: g('customer_id'), sender: g('sender'), sender_addr: String(fd.get('sender_addr') || '').trim(), consignee: g('consignee'), consignee_addr: String(fd.get('consignee_addr') || '').trim(),
       notify: String(fd.get('notify') || '').trim(), pieces: pc || 0, packing: g('packing') || 'KAP', goods: g('goods'), weight: w || 0, volume: v == null ? null : v, country: g('country'),
-      code: g('code'), dest_customs: g('dest_customs'), broker: g('broker'), expected_date: g('expected_date') || null, inbound_plate: g('inbound_plate').toUpperCase(), note: g('note')
+      code: g('code'), dest_customs: g('dest_customs'), broker: g('broker'), expected_date: g('expected_date') || null, expected_time: g('expected_time') || null, driver: g('driver'), inbound_plate: g('inbound_plate').toUpperCase(), note: g('note')
     };
     const id = form.dataset.lid;
     let r;
@@ -429,6 +511,7 @@ ${fld('name', 'Müşteri adı', c.name, { req: true, full: true, max: 120 })}
 <div class="field full"><label for="nkf-carrier">Nakliyeci bilgisi <span class="optional">(CMR 16. kutu: ad, adres, telefon, e-posta)</span></label><textarea id="nkf-carrier" name="carrier" rows="4" maxlength="600">${esc(c.carrier)}</textarea></div>
 <div class="field full"><label for="nkf-cmr_notes">Nakliyecinin şart ve mülahazaları <span class="optional">(CMR 18. kutu; her satır ayrı madde)</span></label><textarea id="nkf-cmr_notes" name="cmr_notes" rows="5" maxlength="1500">${esc(c.cmr_notes)}</textarea></div>
 ${fld('loading_place', 'Yükleme yeri (CMR 4. ve 21. kutu)', c.loading_place, { max: 120, full: true })}
+${fld('notify_phone', 'Bildirim telefonu (WhatsApp; müşteri sayfasından da değiştirebilir)', c.notify_phone || '', { max: 30, full: true, opt: true })}
 <div class="field full"><label>Logo <span class="optional">(Lade Liste ve CMR üstünde; isteğe bağlı)</span></label><div class="nk-logo"><span id="nk-logo-prev">${c.logo ? `<img src="${esc(c.logo)}" alt="Logo">` : '<em>Logo yok</em>'}</span><input type="file" id="nk-logo-file" accept="image/png,image/jpeg,image/webp" aria-label="Logo seç"><button type="button" class="nk-lnk" id="nk-logo-clear">Logoyu kaldır</button></div><input type="hidden" name="logo" id="nk-logo-val" value="${esc(c.logo)}"></div>
 ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" class="check" ${c.active ? 'checked' : ''}><span>Müşteri açık (kapatılırsa yeni yük eklenemez)</span></label>` : ''}
 </div><div id="nk-ferr" class="nk-ferr" hidden></div></div><div class="modal-footer"><button type="button" class="btn" data-nk="back-cust">Geri</button><span style="flex:1"></span><button type="submit" class="btn primary">${ic('check')}Kaydet</button></div></form>`);
@@ -451,13 +534,22 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
     const err = m => { const el = document.getElementById('nk-ferr'); if (el) { el.textContent = m; el.hidden = false; } };
     const name = String(fd.get('name') || '').trim().replace(/\s+/g, ' ');
     if (!name) return err('Müşteri adı yazılmalı.');
-    const row = { name, carrier: String(fd.get('carrier') || '').trim(), cmr_notes: String(fd.get('cmr_notes') || '').trim(), loading_place: String(fd.get('loading_place') || '').trim() || 'İSTANBUL - Turkey', logo: String(fd.get('logo') || '') };
+    const row = { name, carrier: String(fd.get('carrier') || '').trim(), cmr_notes: String(fd.get('cmr_notes') || '').trim(), loading_place: String(fd.get('loading_place') || '').trim() || 'İSTANBUL - Turkey', logo: String(fd.get('logo') || ''), notify_phone: String(fd.get('notify_phone') || '').trim().slice(0, 30) };
     if (id) row.active = !!fd.get('active');
     const r = id ? await X.client.from('shp_customers').update(row).eq('id', id) : await X.client.from('shp_customers').insert(row);
     if (r.error) return err(/23505|duplicate/.test(`${r.error.code} ${r.error.message}`) ? 'Bu adla bir müşteri zaten var.' : (r.error.message || 'Kaydedilemedi'));
     X.toast(id ? 'Müşteri güncellendi' : 'Müşteri eklendi');
     await load(true);
     customersModal();
+  }
+
+  async function sendReply(form) {
+    const body = S.msgBody.trim(), cid = form.dataset.cid;
+    if (!body || !cid) return;
+    const r = await X.client.from('shp_messages').insert({ customer_id: cid, from_role: 'ofis', body });
+    if (r.error) { X.toast(r.error.message || 'Gönderilemedi', true); return; }
+    S.msgBody = ''; X.toast('Cevabınız gönderildi'); await load(true);
+    const el = document.getElementById('nk-mlist'); if (el) el.scrollTop = el.scrollHeight;
   }
 
   // ------------------------------------------------------------------ müşteri kullanıcıları (kullanıcı adı ve şifre)
@@ -585,7 +677,7 @@ ${uid ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cl
     document.addEventListener('submit', e => {
       const f = e.target.closest && e.target.closest('form[data-nk-form]'); if (!f) return;
       e.preventDefault();
-      (f.dataset.nkForm === 'load' ? saveLoad(f) : f.dataset.nkForm === 'user' ? saveUser(f) : saveCustomer(f)).catch(() => X.toast('Kaydedilemedi', true));
+      (f.dataset.nkForm === 'load' ? saveLoad(f) : f.dataset.nkForm === 'user' ? saveUser(f) : f.dataset.nkForm === 'reply' ? sendReply(f) : saveCustomer(f)).catch(() => X.toast('Kaydedilemedi', true));
     });
   }
 
