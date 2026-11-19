@@ -431,6 +431,7 @@ test('depo: Teslim al — fotoğraf çekilir (küçültülüp yüklenir), büyü
 // ================================================================================================ depo: okut
 test('depo: Okut — kod elle yazılır ya da USB okuyucuyla okutulur; raf seçilip GELDİ denir; aynı araçtan kalan yük hatırlatılır', async ({ page }) => {
   await depot(page, 'okut');
+  await page.locator('[data-i="sc-auto"]').uncheck();                               // elle düzen: yük açılır, GELDİ'ye elle basılır
   await page.locator('#nm').fill('Ahmet');
   await page.locator('#sc-code').fill('PCS:YANLIS0000');
   await page.locator('#sc-code').press('Enter');
@@ -465,6 +466,7 @@ test('depo: Okut — kod elle yazılır ya da USB okuyucuyla okutulur; raf seçi
 test('depo: Okut — kamera yoksa ya da izin verilmezse anlaşılır uyarı çıkar, elle kod yazma çalışır', async ({ page }) => {
   await page.addInitScript(() => { Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: () => Promise.reject(new DOMException('izin yok', 'NotAllowedError')) }, configurable: true }); });
   await depot(page, 'okut');
+  await page.locator('[data-i="sc-auto"]').uncheck();
   await page.locator('[data-a="sc-cam"]').click();
   await expect(page.locator('.camoff')).toContainText('Kamera açılamadı');
   await page.locator('#sc-code').fill('QRKODL5000');
@@ -555,4 +557,93 @@ test('depo: sohbet balonu — müşteri seçilip yazışılır; müşterinin yaz
   await page.clock.runFor(5100);
   await expect(page.locator('#chat-fab .cdot')).toHaveText('1');
   expect(problems).toEqual([]);
+});
+
+test('depo: Okut — kod okununca yük kendiliğinden GELDİ olur (sonuç kutusu, raf, aynı araç hatırlatması, zaten gelmiş uyarısı, geri al, oturum listesi)', async ({ page }) => {
+  const problems = await depot(page, 'okut');
+  await page.locator('#nm').fill('Ahmet');
+  await expect(page.locator('[data-i="sc-auto"]')).toBeChecked();                       // varsayılan: otomatik
+  // bilinmeyen kod: kırmızı uyarı, hiçbir şey değişmez
+  await page.locator('#sc-code').fill('PCS:YANLIS0000');
+  await page.locator('#sc-code').press('Enter');
+  await expect(page.locator('.scflash.bad')).toContainText('KOD BULUNAMADI');
+  // geçersiz yazı
+  await page.locator('#sc-code').fill('kısa');
+  await page.locator('#sc-code').press('Enter');
+  await expect(page.locator('.okt .ferr')).toContainText('Kod geçersiz');
+  // gerçek kod: Enter ile tek adımda GELDİ
+  await page.locator('#sc-code').fill('pcs:qrkodl6000');
+  await page.locator('#sc-code').press('Enter');
+  const ok = page.locator('.scflash.ok');
+  await expect(ok).toContainText('GELDİ');
+  await expect(ok).toContainText('BERK TEKSTİL A.Ş. → NOVA TEXTIL SRL');
+  await expect(ok).toContainText('ÖRNEK NAKLİYAT');
+  await expect(ok).toContainText('22 kap');
+  await expect(ok).toContainText('Aynı araçtan 1 yük daha var');
+  await expect(page.locator('.res')).toHaveCount(0);                                     // sonuç kartı / GELDİ düğmesi yok
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l6'))).toMatchObject({ status: 'depoda', arrived_by: 'Ahmet', location: '' });
+  expect(await rpcs(page, 'shp_depot_receive')).toHaveLength(1);
+  await expect(page.locator('#sc-code')).toHaveValue('');                                // kutu temizlenir, sıradaki okutmaya hazır
+  // raf seçilirse sonraki yüklere yazılır
+  await page.locator('.okt [data-a="sc-loc"][data-v="B-2"]').click();
+  await page.locator('#sc-code').fill('QRKODL7000');
+  await page.locator('#sc-code').press('Enter');
+  await expect(page.locator('.scflash.ok')).toContainText('ARDA KİMYA → GOURMET SRL');
+  await expect(page.locator('.scflash.ok')).toContainText('B-2');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l7').location)).toBe('B-2');
+  await expect(page.locator('.sclist li')).toHaveCount(2);
+  // aynı kutuyu yeniden okutmak ikinci kez işlemez
+  await page.locator('#sc-code').fill('QRKODL6000');
+  await page.locator('#sc-code').press('Enter');
+  await expect(page.locator('.scflash.warn')).toContainText('ZATEN GELMİŞ');
+  expect(await rpcs(page, 'shp_depot_receive')).toHaveLength(2);
+  // yanlış okutulan: geri al
+  await page.locator('.sclist li', { hasText: 'ARDA KİMYA' }).locator('[data-a="sc-undo"]').click();
+  await expect(page.locator('.scflash.warn')).toContainText('GERİ ALINDI');
+  await expect(page.locator('.sclist li')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l7').arrived_at)).toBeNull();
+  // tam kod (PCS: ile) Enter'a basmadan, okuyucu gibi hızlı yazılınca da işlenir
+  await page.locator('#sc-code').fill('PCS:QRKODL5000');
+  await expect(page.locator('.scflash.ok')).toContainText('ÇELİK PLASTİK LTD. → DAKO SRL');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l5').status)).toBe('depoda');
+  expect(problems).toEqual([]);
+});
+
+test('depo: Okut — arka arkaya okutulan kutular sırayla işlenir; tercihler hatırlanır; elle düzen açılabilir', async ({ page }) => {
+  await depot(page, 'okut');
+  await page.locator('#nm').fill('Ahmet');
+  // iki kod hemen peş peşe (kamera aynı anda iki kutu görürse) kaybolmaz
+  await page.evaluate(() => { window.PCSNKP.depo.onCode('QRKODL5000'); window.PCSNKP.depo.onCode('QRKODL7000'); });
+  await expect(page.locator('.sclist li')).toHaveCount(2);
+  expect(await page.evaluate(() => window.__db.shp_loads.filter(x => ['l5', 'l7'].includes(x.id)).map(x => x.status))).toEqual(['depoda', 'depoda']);
+  // tercih: otomatik kapatılır, sayfa yenilenince de kapalı kalır
+  await page.locator('[data-i="sc-auto"]').uncheck();
+  await page.reload();
+  await expect(page.locator('.dwrap')).toBeVisible();
+  await page.locator('[data-a="tab"][data-v="okut"]').click();
+  await expect(page.locator('[data-i="sc-auto"]')).not.toBeChecked();
+  await page.locator('#sc-code').fill('QRKODL3000');
+  await page.locator('#sc-code').press('Enter');
+  await expect(page.locator('.res')).toContainText('YILDIZ PLASTİK A.Ş.');                // elle düzen: sonuç kartı
+  await expect(page.locator('.res [data-a="sc-go"]')).toContainText('GELDİ');
+  expect(await page.evaluate(() => window.__db.shp_loads.find(x => x.id === 'l3').arrived_at)).toBeNull();   // elle basılana dek gelmedi
+});
+
+test('depo: Okut — okuyucu modu (Zebra / USB): kutu hep seçili, ekran klavyesi açılmaz, okutulan kod kendiliğinden GELDİ olur', async ({ page }) => {
+  await depot(page, 'okut');
+  await page.locator('#nm').fill('Ahmet');
+  await page.locator('[data-i="sc-reader"]').check();
+  await expect(page.locator('#sc-code')).toBeFocused();
+  await expect(page.locator('#sc-code')).toHaveAttribute('inputmode', 'none');
+  // okuyucu kodu klavyeden yazar ve Enter gönderir
+  await page.keyboard.type('PCS:QRKODL6000');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.scflash.ok')).toContainText('NOVA TEXTIL SRL');
+  await expect(page.locator('#sc-code')).toBeFocused();                                  // sıradaki okutma için kutu hazır
+  await page.keyboard.type('QRKODL7000');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.scflash.ok')).toContainText('GOURMET SRL');
+  await expect(page.locator('.sclist li')).toHaveCount(2);
+  await page.locator('[data-i="sc-reader"]').uncheck();
+  await expect(page.locator('#sc-code')).toHaveAttribute('inputmode', 'text');
 });

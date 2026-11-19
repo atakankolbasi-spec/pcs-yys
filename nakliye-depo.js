@@ -6,7 +6,9 @@
   if (!X || X.MODE !== 'd') return;
   const { P, esc, ic, kg, plate, uniq, tr, sum } = X;
   const B = X.B;
-  const D = { recv: null, sc: { code: '', load: null, loc: '', busy: false, err: '', camErr: '', done: '' }, trip: '' };
+  const pref = (k, d) => { try { const v = localStorage.getItem('pcs.okut.' + k); return v === null ? d : v === '1'; } catch (_) { return d; } };
+  const setPref = (k, v) => { try { localStorage.setItem('pcs.okut.' + k, v ? '1' : '0'); } catch (_) { /* tarayıcı saklamıyorsa oturumda kalır */ } };
+  const D = { recv: null, sc: { code: '', load: null, loc: '', busy: false, err: '', camErr: '', done: '', auto: pref('auto', true), reader: pref('reader', false), q: [], working: false, flash: null, list: [], timer: null }, trip: '' };
   const LOCS = ['A-1', 'A-2', 'A-3', 'B-1', 'B-2', 'Açık alan'];
   const istNow = () => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date()).map(x => [x.type, x.value])); return Number(p.hour) * 60 + Number(p.minute); };
   const istDate = iso => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
@@ -186,17 +188,55 @@ ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b
     X.toast('Araç yola çıktı olarak işaretlendi; müşteri artık değiştiremez'); await X.load0();
   };
 
-  // ------------------------------------------------------------------ Okut: telefonla QR (ya da elle kod)
+  // ------------------------------------------------------------------ Okut: telefon kamerası, USB / Zebra okuyucu ya da elle kod
+  // Varsayılan: kod okununca yük kendiliğinden GELDİ olur, ekranda büyük renkli bir sonuç çıkar, okutmaya devam edilir.
+  // "Otomatik GELDİ" kapatılırsa eski düzen: yük açılır, raf seçilir, GELDİ'ye elle basılır.
+  // Okuyucu modu: Zebra el terminali ya da USB / Bluetooth okuyucu kodu klavyeden yazılmış gibi gönderir; kutu hep seçili kalır, ekran klavyesi açılmaz.
   const findByCode = code => (P.data.loads || []).find(l => l.qr_code === code);
-  function onCode(code) {
+  function sameTruck(l) { return (P.data.loads || []).filter(x => x.id !== l.id && !x.arrived_at && x.customer_id === l.customer_id && (x.inbound_plate || '') === (l.inbound_plate || '') && (l.inbound_plate || x.trip_id === l.trip_id)).length; }
+  let actx = null;
+  function feedback(kind) {
+    try {
+      const A = window.AudioContext || window.webkitAudioContext;
+      if (A) { actx = actx || new A(); const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.value = kind === 'ok' ? 880 : 300; g.gain.value = 0.12; o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + (kind === 'ok' ? 0.12 : 0.3)); }
+    } catch (_) { /* ses yok */ }
+    try { if (navigator.vibrate) navigator.vibrate(kind === 'ok' ? 90 : [120, 60, 120]); } catch (_) { /* titreşim yok */ }
+  }
+  // elle düzen (otomatik kapalı): yük açılır, GELDİ'ye elle basılır
+  function manualFind(code) {
     const S = D.sc, l = findByCode(code);
-    S.code = code; S.done = ''; S.err = l ? '' : `Bu kodlu yük bulunamadı: ${code}`; S.load = l || null; S.loc = l ? (l.location || '') : '';
-    if (l && navigator.vibrate) { try { navigator.vibrate(80); } catch (_) { /* titreşim yok */ } }
+    S.code = code; S.done = ''; S.err = l ? '' : `Bu kodlu yük bulunamadı: ${code}`; S.load = l || null; S.loc = l ? (l.location || '') : ''; S.flash = null;
+    if (l) feedback('ok');
     X.draw();
   }
-  function sameTruck(l) { return (P.data.loads || []).filter(x => x.id !== l.id && !x.arrived_at && x.customer_id === l.customer_id && (x.inbound_plate || '') === (l.inbound_plate || '') && (l.inbound_plate || x.trip_id === l.trip_id)).length; }
+  // otomatik düzen: kodlar sırayla işlenir (arka arkaya okutulan kutular kaybolmaz)
+  async function pump() {
+    const S = D.sc; if (S.working) return;
+    S.working = true;
+    try { while (S.q.length) await autoOne(S.q.shift()); } finally { S.working = false; }
+  }
+  async function autoOne(code) {
+    const S = D.sc, l = findByCode(code);
+    S.code = ''; S.err = ''; S.done = ''; S.load = null;
+    if (!l) { S.flash = { kind: 'bad', title: 'KOD BULUNAMADI', text: code }; feedback('bad'); X.draw(); return; }
+    if (l.arrived_at) { S.flash = { kind: 'warn', title: 'ZATEN GELMİŞ', text: `${l.sender} → ${l.consignee}`, sub: `${hm(l.arrived_at)}${l.arrived_by ? ' · ' + l.arrived_by : ''} · yeniden işaretlenmedi` }; feedback('bad'); X.draw(); return; }
+    const r = await X.rpc('shp_depot_receive', { p_id: l.id, p_counted_pieces: null, p_counted_weight: null, p_condition: 'saglam', p_note: '', p_location: S.loc.trim(), ...nameArg() });
+    if (r.error) { S.flash = { kind: 'bad', title: 'İŞARETLENEMEDİ', text: `${l.sender} → ${l.consignee}`, sub: X.explain(r.error) }; feedback('bad'); X.draw(); return; }
+    l.arrived_at = new Date().toISOString(); l.arrived_by = X.name(); if (l.status === 'bekliyor') l.status = 'depoda'; if (S.loc.trim()) l.location = S.loc.trim();   // aynı kutu hemen yeniden okutulursa ikinci kez işlenmesin
+    const c = X.custOf(l.customer_id) || {}, more = sameTruck(l);
+    S.flash = { kind: 'ok', title: 'GELDİ', id: l.id, text: `${l.sender} → ${l.consignee}`, sub: `${c.name ? c.name + ' · ' : ''}${l.pieces} kap · ${kg(l.weight)} kg${l.inbound_plate ? ' · ' + l.inbound_plate : ''}${S.loc.trim() ? ' · ' + S.loc.trim() : ''}`, more };
+    S.list.unshift({ id: l.id, label: `${l.sender} → ${l.consignee}`, at: new Date().toISOString() }); S.list.length = Math.min(S.list.length, 10);
+    feedback('ok'); X.draw();
+    X.load0();
+  }
+  function onCode(code) {
+    if (D.sc.auto) { D.sc.q.push(code); pump(); } else manualFind(code);
+  }
   X.views['d-okut'] = () => {
-    const S = D.sc, l = S.load && loadOf(S.load.id), cam = X.qr && X.qr.scanning();
+    const S = D.sc, l = S.load && loadOf(S.load.id), cam = X.qr && X.qr.scanning(), f = S.flash;
+    const flash = f ? `<div class="scflash ${f.kind}" role="status" aria-live="polite"><b>${ic(f.kind === 'ok' ? 'check' : 'warn')}${esc(f.title)}</b><span class="t">${esc(f.text)}</span>${f.sub ? `<span>${esc(f.sub)}</span>` : ''}${f.more ? `<span>Aynı araçtan ${f.more} yük daha var: okutmaya devam edin</span>` : ''}${f.id && loadOf(f.id) && loadOf(f.id).arrived_at ? `<button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(f.id)}">${ic('undo')}Geri al</button>` : ''}</div>` : '';
+    const list = S.list.length ? `<section class="card"><div class="lbl2">BU OTURUMDA GELENLER (${S.list.length})</div><ul class="sclist">${S.list.map(x => `<li><span>${esc(x.label)}</span><small>${esc(hm(x.at))}</small><button type="button" class="btn sm" data-a="sc-undo" data-id="${esc(x.id)}">Geri al</button></li>`).join('')}</ul></section>` : '';
+    const locs = S.auto ? `<div class="lbl2">RAF / KONUM (isteğe bağlı; okutulan yüklere yazılır)</div><div class="chips3">${locOptions().map(x => `<button type="button" class="${S.loc === x ? 'on' : ''}" data-a="sc-loc" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '';
     const result = l ? `<div class="card2"><div class="rline">${l.inbound_plate ? plate(l.inbound_plate, 'big') : ''}${l.arrived_at ? `<span class="ch g">Geldi ${esc(hm(l.arrived_at))}${l.arrived_by ? ' · ' + esc(l.arrived_by) : ''}</span>` : '<span class="ch a">Depoya gelmedi</span>'}</div>
 <div class="rt">${esc(l.sender)} → ${esc(l.consignee)}</div><div class="row"><span>Mal</span><b>${esc(l.goods) || '—'}</b></div><div class="row"><span>Kap · Kilo</span><b>${esc(l.pieces)} · ${kg(l.weight)} kg</b></div><div class="row"><span>Varış</span><b>${esc(l.dest_customs) || '—'}</b></div>
 <div class="lbl2">DEPO KONUMU</div><div class="chips3">${locOptions().map(x => `<button type="button" class="${S.loc === x ? 'on' : ''}" data-a="sc-loc" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>
@@ -204,14 +244,28 @@ ${t.status === 'hazirlaniyor' && miss ? `<div class="alert">${ic('warn')}<div><b
 <button type="button" class="btn go big" data-a="sc-go" ${S.busy ? 'disabled' : ''}>${ic('check')}${l.arrived_at ? 'KONUMU KAYDET' : 'GELDİ'}</button>
 ${sameTruck(l) ? `<div class="same">Aynı araçtan ${sameTruck(l)} yük daha var: okutmaya devam edin</div>` : ''}</div>` : '';
     return `<div class="okt"><section class="card"><h2>${ic('qr')} Yük okut</h2>
-<div class="camwrap">${cam ? '<div id="scan-slot" class="scan-slot"></div><div class="vf2"></div>' : `<div class="camoff">${ic('camera')}<span>${esc(S.camErr || 'Kamera kapalı')}</span></div>`}</div>
+<div class="sws"><label class="tg"><span>Okutunca otomatik GELDİ</span><input type="checkbox" role="switch" data-i="sc-auto" ${S.auto ? 'checked' : ''}></label><label class="tg"><span>Okuyucu modu (Zebra / USB okuyucu)</span><input type="checkbox" role="switch" data-i="sc-reader" ${S.reader ? 'checked' : ''}></label></div>
+${flash}<div class="camwrap">${cam ? '<div id="scan-slot" class="scan-slot"></div><div class="vf2"></div>' : `<div class="camoff">${ic('camera')}<span>${esc(S.camErr || 'Kamera kapalı')}</span></div>`}</div>
 <div class="acts"><button type="button" class="btn ${cam ? '' : 'pri'}" data-a="sc-cam">${ic('camera')}${cam ? 'Kamerayı kapat' : 'Kamerayı aç'}</button></div>
-<form data-f="sccode" class="codef"><label class="fld"><span>Ya da kodu yazın / USB okuyucuyla okutun</span><input id="sc-code" data-i="sc-code" value="${esc(S.code)}" placeholder="PCS:ABCDEFGHIJ" autocomplete="off" autocapitalize="characters" maxlength="30" style="text-transform:uppercase"></label><button type="submit" class="btn">${ic('search')}Bul</button></form>
-${S.err ? `<div class="ferr" role="alert">${esc(S.err)}</div>` : ''}${S.done ? `<div class="okb" role="status">${ic('check')}${esc(S.done)}</div>` : ''}<small>Etiketteki QR kodu çerçeveye alın; okununca yük kendiliğinden açılır. Etiketsiz yükte <b>Bekleyenler</b> sekmesinden plaka ya da firma adıyla bulun.</small></section>
-${result ? `<section class="card res">${result}</section>` : ''}</div>`;
+<form data-f="sccode" class="codef"><label class="fld"><span>${S.reader ? 'Okuyucuyla okutun (kutu hazır bekliyor)' : 'Ya da kodu yazın / USB okuyucuyla okutun'}</span><input id="sc-code" data-i="sc-code" value="${esc(S.code)}" placeholder="PCS:ABCDEFGHIJ" autocomplete="off" autocapitalize="characters" enterkeyhint="go" inputmode="${S.reader ? 'none' : 'text'}" maxlength="30" style="text-transform:uppercase"></label><button type="submit" class="btn">${ic('search')}${S.auto ? 'Geldi say' : 'Bul'}</button></form>
+${locs}${S.err ? `<div class="ferr" role="alert">${esc(S.err)}</div>` : ''}${S.done ? `<div class="okb" role="status">${ic('check')}${esc(S.done)}</div>` : ''}<small>${S.auto ? 'Etiketteki QR kodu çerçeveye alın: okununca yük kendiliğinden <b>geldi</b> olur. Yanlış okuttuysanız <b>Geri al</b>.' : 'Etiketteki QR kodu çerçeveye alın; okununca yük açılır, GELDİ\'ye basın.'} Etiketsiz yükte <b>Bekleyenler</b> sekmesinden plaka ya da firma adıyla bulun.</small></section>
+${result ? `<section class="card res">${result}</section>` : ''}${list}</div>`;
   };
-  X.inp.push((t, k) => { if (k === 'sc-code') { D.sc.code = t.value; return true; } return false; });
-  X.submit.sccode = () => { const c = X.qr.parseCode(D.sc.code); if (!c) { D.sc.err = 'Kod geçersiz: 10 harf / rakam (örn. PCS:ABCDEFGHIJ)'; D.sc.load = null; X.draw(); return; } onCode(c); };
+  // kutuya yazılan / okuyucudan gelen kod: "PCS:" ile başlayan tam kod (14 karakter) Enter beklemeden işlenir
+  const FULL = /^PCS[:\-\s]*[A-Z0-9]{10}$/i;
+  X.inp.push((t, k) => {
+    const S = D.sc;
+    if (k === 'sc-code') { S.code = t.value; clearTimeout(S.timer); if (FULL.test(t.value.trim())) S.timer = setTimeout(() => { if (FULL.test(String(S.code).trim())) X.submit.sccode(); }, 150); return true; }
+    if (k === 'sc-auto') { S.auto = t.checked; setPref('auto', S.auto); S.flash = null; X.draw(); return true; }
+    if (k === 'sc-reader') { S.reader = t.checked; setPref('reader', S.reader); X.draw(); return true; }
+    return false;
+  });
+  X.submit.sccode = () => {
+    const S = D.sc; clearTimeout(S.timer);
+    const c = X.qr.parseCode(S.code);
+    if (!c) { S.err = 'Kod geçersiz: 10 harf / rakam (örn. PCS:ABCDEFGHIJ)'; S.load = null; S.flash = null; if (S.auto) feedback('bad'); X.draw(); return; }
+    onCode(c);
+  };
   X.act['sc-loc'] = t => { D.sc.loc = D.sc.loc === t.dataset.v ? '' : t.dataset.v; X.draw(); };
   X.act['sc-recv'] = () => { const l = D.sc.load && loadOf(D.sc.load.id); if (l) return openRecv(l, { loc: D.sc.loc }); };
   X.act['sc-problem'] = () => { const l = D.sc.load && loadOf(D.sc.load.id); if (l) return openRecv(l, { loc: D.sc.loc, cond: 'eksik' }); };
@@ -225,6 +279,15 @@ ${result ? `<section class="card res">${result}</section>` : ''}</div>`;
     S.done = `${l.sender} → ${l.consignee} ${l.arrived_at ? 'kaydedildi' : 'geldi olarak işaretlendi'}${more ? ` · aynı araçtan ${more} yük daha var` : ''}`;
     S.load = null; S.code = ''; S.err = ''; X.toast(l.arrived_at ? 'Konum kaydedildi' : 'Yük geldi olarak işaretlendi'); await X.load0();
   };
+  // yanlış okutulan yükü geri al (Geldi işareti kalkar)
+  X.act['sc-undo'] = async (t, e, id) => {
+    const S = D.sc, l = loadOf(id); if (!l) return;
+    const r = await X.markOne(id, false);
+    if (r.error) { X.toast(X.explain(r.error), true); return; }
+    S.list = S.list.filter(x => x.id !== id);
+    S.flash = { kind: 'warn', title: 'GERİ ALINDI', text: `${l.sender} → ${l.consignee}`, sub: 'Yük yeniden "depoya gelmedi" görünür' };
+    X.toast('Geri alındı'); await X.load0();
+  };
   X.act['sc-cam'] = async () => {
     const S = D.sc;
     if (X.qr.scanning()) { X.qr.scanStop(); X.draw(); return; }
@@ -232,6 +295,16 @@ ${result ? `<section class="card res">${result}</section>` : ''}</div>`;
     try { await X.qr.scanStart(onCode); } catch (er) { S.camErr = er.message; X.qr.scanStop(); }
     X.draw();
   };
+  // sekme açılınca: kamera izni daha önce verildiyse kamera kendiliğinden açılır
+  X.enter['d-okut'] = () => {
+    try { if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'camera' }).then(p => { if (p.state === 'granted' && P.tab === 'okut' && X.qr && !X.qr.scanning()) X.act['sc-cam'](); }).catch(() => {}); } catch (_) { /* izin sorgusu yok */ }
+  };
   X.onDraw.push(() => { if (P.tab !== 'okut' && X.qr && X.qr.scanning()) X.qr.scanStop(); });
+  // okuyucu modu: kutu hep seçili kalır (ekran klavyesi açılmaz), böylece okutulan kod doğrudan oraya yazılır
+  X.onDraw.push(() => {
+    if (P.tab !== 'okut' || !D.sc.reader || document.querySelector('dialog[open]') || P.drawer) return;
+    const a = document.activeElement, el = document.getElementById('sc-code');
+    if (el && a !== el && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) el.focus();
+  });
   X.depo = { groups, waLink, onCode, state: D };
 })();
