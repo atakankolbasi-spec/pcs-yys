@@ -550,7 +550,7 @@
           if (!l) return guardErr('22023', 'Yük bulunamadı');
           if (db.shp_photos.filter(p => p.load_id === l.id).length >= 8) return guardErr('22023', 'Bir yüke en fazla 8 fotoğraf eklenebilir');
           if (!IMG.test(String(params.p_thumb)) || !IMG.test(String(params.p_data))) return guardErr('22023', 'Fotoğraf geçersiz ya da çok büyük');
-          const ph = { id: 'ph' + (++shpSeq), load_id: l.id, customer_id: l.customer_id, thumb: params.p_thumb, data: params.p_data, by_name: String(params.p_name || '').trim(), created_at: now() };
+          const ph = { id: 'pic' + (++shpSeq), load_id: l.id, customer_id: l.customer_id, thumb: params.p_thumb, data: params.p_data, by_name: String(params.p_name || '').trim(), created_at: now() };
           db.shp_photos.push(ph); l.updated_at = now(); log(l.customer_id, actor, 'Fotoğraf eklendi', `${l.sender} → ${l.consignee}`);
           return { data: { id: ph.id, thumb: ph.thumb, by: ph.by_name, at: ph.created_at }, error: null };
         }
@@ -564,7 +564,7 @@
           Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: l.arrived_at || now(), arrived_by: first ? String(params.p_name || '').trim() : l.arrived_by,
             counted_pieces: params.p_counted_pieces == null ? null : params.p_counted_pieces, counted_weight: params.p_counted_weight == null ? null : params.p_counted_weight, condition: cond,
             receive_note: String(params.p_note || '').trim(), location: String(params.p_location || '').trim(), updated_at: now(), updated_by: actor });
-          if (first) enqueue(l.customer_id, 'geldi', lsum(l));
+          if (first) enqueue(l.customer_id, 'geldi', `${l.sender} → ${l.consignee} · ${l.pieces} kap · ${l.weight} kg`);
           if (cond !== 'saglam' || (l.counted_pieces != null && l.counted_pieces !== l.pieces)) enqueue(l.customer_id, 'sorun', `${l.sender} → ${l.consignee}: ${cond === 'eksik' ? 'eksik var' : cond === 'hasarli' ? 'hasarlı' : 'sayım farkı'}`);
           log(l.customer_id, actor, first ? 'Depoya geldi olarak işaretlendi' : 'Depo teslim bilgisi girildi', lsum(l));
           return { data: loadJson(l), error: null };
@@ -598,7 +598,7 @@
         const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? ['depoda', 'aracta'].includes(x.status) && x.arrived_at : ['bekliyor', 'depoda', 'aracta'].includes(x.status)));
         if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
         if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now(), updated_by: actor });
-        else { const was = !!l.arrived_at; Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now(), updated_by: actor }); if (!was) enqueue(l.customer_id, 'geldi', lsum(l)); }
+        else { const was = !!l.arrived_at; Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now(), updated_by: actor }); if (!was) enqueue(l.customer_id, 'geldi', `${l.sender} → ${l.consignee} · ${l.pieces} kap · ${l.weight} kg`); }
         log(l.customer_id, actor, params.p_arrived === false ? 'Geldi işareti geri alındı' : 'Depoya geldi olarak işaretlendi', lsum(l));
         return { data: loadJson(l), error: null };
       }

@@ -586,7 +586,7 @@ ${fld('display_name', 'Görünen ad <span class="optional">(işlem kayıtlarınd
 <div class="field full"><label for="nkf-password">Şifre${uid ? ' <span class="optional">(boş bırakırsanız değişmez)</span>' : ''}</label><div class="nk-pw"><input id="nkf-password" name="password" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" ${uid ? '' : 'required'} placeholder="En az 6 karakter"><button type="button" class="btn small" data-nk="pw-gen">Şifre öner</button></div></div>
 ${uid ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" class="check" ${u.active ? 'checked' : ''}><span>Kullanıcı açık (kapatılırsa giriş yapamaz)</span></label>` : ''}
 </div><div id="nk-ferr" class="nk-ferr" hidden></div></div><div class="modal-footer"><button type="button" class="btn" data-nk="users-back">Geri</button><span style="flex:1"></span><button type="submit" class="btn primary">${ic('check')}Kaydet</button></div></form>`);
-    setTimeout(() => document.getElementById('nkf-username')?.focus(), 30);
+    document.getElementById('nkf-username')?.focus();
   }
   async function saveUser(form) {
     const fd = new FormData(form), uid = form.dataset.uid;

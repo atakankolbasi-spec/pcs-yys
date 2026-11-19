@@ -1,6 +1,7 @@
 /* Nakliye programı: müşteri sayfası (adım adım, 3 sütun) ve depo sayfası (masa başı tablo). Telefonda sütunlar alt alta, tablo satırları kart olur. */
 :root{--ff:"Plus Jakarta Sans",Inter,"Segoe UI",system-ui,Arial,sans-serif;--bg:#f1f4fa;--card:#fff;--ink:#14243a;--mut:#5d6c82;--line:#e1e8f1;--acc:#3453d1;--acc2:#eaf0ff;--navy:#16233a;--ok:#127a3a;--okbg:#dcf5e7;--grn:#16a34a;--warn:#8a5a00;--warnbg:#fdf0d2;--bad:#b3312b;--badbg:#fdecea;--blue:#1d4c9b;--bluebg:#dfeafb;--r:16px}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Plus Jakarta Sans",Inter,"Segoe UI",system-ui,Arial,sans-serif}
 h1,h2,h3,p{margin:0}

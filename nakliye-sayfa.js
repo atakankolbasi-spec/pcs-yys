@@ -195,7 +195,7 @@
 <div class="mb"><input type="hidden" name="id" value="${esc(f.id)}">${SEC.map((t, s) => `<section class="fs"><h3>${t}</h3><div class="grid">${F.filter(x => x[4] === s).map(x => inp(x[0], x[1], x[2], x[3], f[x[0]])).join('')}</div></section>`).join('')}<div id="ferr" class="ferr" hidden></div></div>
 <div class="mf">${canDel(f) && edit ? `<button type="button" class="btn danger" data-a="mdel" data-id="${esc(f.id)}">${ic('trash')}Sil</button>` : ''}<span class="sp"></span><button type="button" class="btn" data-a="mclose">Vazgeç</button><button type="submit" class="btn pri">${ic('check')}${edit ? 'Değişikliği kaydet' : 'Yükü ekle'}</button></div></form>`;
     if (!dlg.open) dlg.showModal();
-    setTimeout(() => dlg.querySelector('#f-sender')?.focus(), 30);
+    dlg.querySelector('#f-sender')?.focus();
   }
   const closeForm = () => { const d = document.getElementById('m'); if (d.open) d.close(); };
   // Kayıtlı firma seçilince boş adres / ülke / gümrük alanları kendiliğinden dolar
