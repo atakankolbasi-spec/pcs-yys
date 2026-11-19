@@ -414,7 +414,7 @@
           if (dk && dk.kind === 'depo' && dk.active) { ls = db.shp_loads; ts = db.shp_trips; }
           else { const ca = cAuth(params.p_token); if (ca.res) return ca.res; ls = db.shp_loads.filter(l => l.customer_id === ca.customer); ts = db.shp_trips.filter(t => t.customer_id === ca.customer); }
           const s = JSON.stringify([ls, ts]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-          const ms = '/' + JSON.stringify(dk && dk.kind === 'depo' ? db.shp_messages.filter(m => m.channel === 'depo') : db.shp_messages.filter(m => m.customer_id === (T[params.p_token] ? T[params.p_token].customer : (SS[params.p_token] ? (db.shp_users.find(u => u.id === SS[params.p_token]) || {}).customer_id : null)))).length;
+          const ms = '/' + JSON.stringify(dk && dk.kind === 'depo' ? db.shp_messages.filter(m => m.customer_id) : db.shp_messages.filter(m => m.customer_id === (T[params.p_token] ? T[params.p_token].customer : (SS[params.p_token] ? (db.shp_users.find(u => u.id === SS[params.p_token]) || {}).customer_id : null)))).length;
           return { data: `${ls.length}/${ts.length}/${s.length}/${h}${ms}`, error: null };
         }
         if (name.startsWith('shp_portal')) {
@@ -428,7 +428,7 @@
               log: db.shp_log.filter(x => x.customer_id === k.customer).slice().reverse().slice(0, 60).map(x => ({ at: x.at, actor: x.role === 'operator' ? 'Ofis' : x.role === 'depo' ? 'Depo' : x.actor, action: x.action, summary: x.summary })),
               photo_counts: db.shp_photos.filter(p => p.customer_id === k.customer).reduce((m, p) => ((m[p.load_id] = (m[p.load_id] || 0) + 1), m), {}),
               notify: { phone: c.notify_phone || '', events: c.notify_events || { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true } },
-              messages: db.shp_messages.filter(m => m.customer_id === k.customer).slice(-100).map(m => ({ id: m.id, from_role: m.from_role, author: m.from_role === 'ofis' ? 'Ofis' : m.author, body: m.body, load_id: m.load_id || null, trip_id: m.trip_id || null, created_at: m.created_at, read_at: m.read_at || null })) }, error: null };
+              messages: db.shp_messages.filter(m => m.customer_id === k.customer).slice(-100).map(m => ({ id: m.id, from_role: m.from_role, author: m.from_role === 'ofis' ? 'Ofis' : m.from_role === 'depo' ? 'Depo' : m.author, body: m.body, load_id: m.load_id || null, trip_id: m.trip_id || null, created_at: m.created_at, read_at: m.read_at || null })) }, error: null };
           }
           if (name === 'shp_portal_notify_save') {
             const ph = String(params.p_phone || '').replace(/[^0-9+() -]/g, '').slice(0, 30), dg = ph.replace(/[^0-9]/g, '').length;
@@ -445,7 +445,7 @@
             const m = { id: 'msg' + (++shpSeq), customer_id: k.customer, from_role: 'musteri', author: actor, body: b, load_id: own(db.shp_loads, params.p_load), trip_id: own(db.shp_trips, params.p_trip), created_at: now(), read_at: null };
             db.shp_messages.push(m); return { data: clone(m), error: null };
           }
-          if (name === 'shp_portal_messages_read') { db.shp_messages.forEach(m => { if (m.customer_id === k.customer && m.from_role === 'ofis' && !m.read_at) m.read_at = now(); }); return { data: null, error: null }; }
+          if (name === 'shp_portal_messages_read') { db.shp_messages.forEach(m => { if (m.customer_id === k.customer && (m.from_role === 'ofis' || m.from_role === 'depo') && !m.read_at) m.read_at = now(); }); return { data: null, error: null }; }
           if (name === 'shp_portal_import') {
             const rows = params.p_loads;
             if (!Array.isArray(rows) || rows.length < 1 || rows.length > 200) return guardErr('22023', 'Bir seferde 1 ile 200 arası satır eklenebilir');
@@ -542,14 +542,17 @@
         actor = 'Depo · ' + (String(params.p_name || '').trim() || 'adı yazılmamış');
         if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(tripJson),
           photo_counts: db.shp_photos.reduce((m, p) => ((m[p.load_id] = (m[p.load_id] || 0) + 1), m), {}),
-          messages: db.shp_messages.filter(m => m.channel === 'depo').slice(-100).map(m => ({ id: m.id, from_role: m.from_role, author: m.from_role === 'ofis' ? 'Ofis' : m.author, body: m.body, load_id: null, trip_id: null, created_at: m.created_at, read_at: m.read_at })) }, error: null };
+          messages: db.shp_messages.filter(m => m.customer_id).slice(-500).map(m => ({ id: m.id, customer_id: m.customer_id, from_role: m.from_role, author: m.from_role === 'ofis' ? 'Ofis' : m.author, body: m.body, load_id: m.load_id || null, trip_id: m.trip_id || null, created_at: m.created_at, read_at: m.read_at })) }, error: null };
         if (name === 'shp_depot_message_send') {
           const b = String(params.p_body || '').replace(/\r/g, '').trim().slice(0, 1000);
           if (!b) return guardErr('22023', 'Mesaj boş olamaz');
-          const m = { id: 'msg' + (++shpSeq), customer_id: null, channel: 'depo', from_role: 'depo', author: actor, body: b, load_id: null, trip_id: null, created_at: now(), read_at: null };
-          db.shp_messages.push(m); return { data: clone(m), error: null };
+          if (!db.shp_customers.some(c => c.id === params.p_customer && c.active)) return guardErr('22023', 'Müşteri bulunamadı');
+          const m = { id: 'msg' + (++shpSeq), customer_id: params.p_customer, channel: 'musteri', from_role: 'depo', author: actor, body: b, load_id: null, trip_id: null, created_at: now(), read_at: null };
+          db.shp_messages.push(m);
+          enqueue(params.p_customer, 'mesaj', 'Depo: ' + b.slice(0, 200));
+          return { data: clone(m), error: null };
         }
-        if (name === 'shp_depot_messages_read') { db.shp_messages.forEach(m => { if (m.channel === 'depo' && m.from_role === 'ofis' && !m.read_at) m.read_at = now(); }); return { data: null, error: null }; }
+        if (name === 'shp_depot_messages_read') { db.shp_messages.forEach(m => { if (m.customer_id === params.p_customer && m.from_role === 'musteri' && !m.read_at) m.read_at = now(); }); return { data: null, error: null }; }
         const IMG = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
         if (name === 'shp_depot_photos') return { data: db.shp_photos.filter(p => p.load_id === params.p_load).map(p => ({ id: p.id, thumb: p.thumb, by: p.by_name, at: p.created_at })), error: null };
         if (name === 'shp_depot_photo') { const p = db.shp_photos.find(x => x.id === params.p_photo); return p ? { data: p.data, error: null } : guardErr('22023', 'Fotoğraf bulunamadı'); }

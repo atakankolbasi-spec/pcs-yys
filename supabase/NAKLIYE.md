@@ -81,12 +81,12 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 ## Yük takibi, bildirim ve Excel'den yükleme (müşteri sayfası)
 
 - **Takip** sekmesi: her yük için 5 adımlı çizgi (yazıldı, araca konuldu, depoya geldi, yola çıktı, teslim edildi). Depoda eksik ya da hasar görülürse yükte kırmızı uyarı çıkar.
-  Müşteri aynı sekmeden hangi haberleri istediğini seçer (depoya geldi, yola çıktı, teslim, sorun, ofis mesajı) ve haberlerin gideceği WhatsApp numarasını yazar.
+  Müşteri aynı sekmeden hangi haberleri istediğini seçer (depoya geldi, yola çıktı, teslim, sorun, depo ya da ofis mesajı) ve haberlerin gideceği WhatsApp numarasını yazar.
 - **Excel'den ekle** (Yeni yük düğmesinin yanında): müşteri Excel ya da CSV dosyasını seçer ya da tabloyu yapıştırır; sütun başlıkları Türkçe/İngilizce tanınır.
   Önizlemede hatalı satırlar kırmızı görünür. Hepsi doğruysa toplu eklenir; tek satır hatalıysa hiçbiri eklenmez. En çok 200 satır. Örnek dosya sayfadan indirilir.
 - **Rapor ve arşiv** sekmesi: haftalık/aylık yük ve ton grafiği, en çok gönderilen alıcılar, geçmiş seferler (belgeleri yeniden açılır, bir ayın belgeleri birlikte açılıp yazdırılır) ve CSV olarak indirme.
-- **Sohbet balonu** (sayfanın sağ altı, ana ekrandaki gibi): müşteri ofise yazar (isterse bir yüke ya da araca bağlayarak); Enter gönderir. Siz Nakliye > **Mesajlar** sekmesinden yanıtlarsınız; ofisin cevabı balonda kırmızı rozetle görünür.
-  **Depo sayfasında da** aynı sohbet balonu vardır: depodaki arkadaş balona basıp ofise yazar (adıyla kaydolur), ofisin cevabı rozetle görünür. Depo yazışması müşterilerden ayrıdır; müşteriler görmez, müşteriye WhatsApp haberi gitmez.
+- **Sohbet balonu** (sayfanın sağ altı, ana ekrandaki gibi): müşteri **depoyla** yazışır (isterse bir yüke ya da araca bağlayarak); Enter gönderir. Deponun cevabı balonda kırmızı rozetle görünür ve müşteri bildirimi açıksa WhatsApp haberi olarak da gider. Deponun personel adı müşteriye görünmez, yalnızca "Depo" yazar.
+  **Depo sayfasında** aynı sohbet balonu vardır: depodaki arkadaş balona basıp bir **müşteri seçer**, müşterinin yazdıklarını görür (açılınca okundu olur) ve cevap yazar (adıyla kaydolur). Okunmamış müşteri mesajları balonda ve müşteri listesinde sayılır. Ofis bu yazışmaların tarafı değildir; müşteri ofise değil depoya yazar.
 
 ## Depoda teslim alma, fotoğraf, QR etiket ve günün programı (depo sayfası)
 
@@ -97,17 +97,18 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 - **Program** sekmesi: bugün gelmesi beklenen yükler müşteri ve araca göre gruplanır (geçti / şimdi / bekliyor / tamam). Araç depoya gelince **Araç geldi** ile o aracın yükleri topluca işaretlenir.
   **Araçlar** sekmesinde yükleme kontrolü vardır: araçtaki yüklerin kaçı depoya geldi, doluluk (24 ton kamyon esas alınır). Geri kalan yük varsa **Yola çıktı** düğmesi uyarır ve yola çıkarmaz; hepsi gelince basılır.
 
-## Ofis: mesaj balonu ve Mesajlar sekmesi
+## Ofis: yazışmaları izleme (mesaj balonu ve Mesajlar sekmesi)
 
-Nakliye sayfasının sağ altında, ana ekrandaki sohbet balonunun hemen üstünde **mesaj balonu** durur (okunmamış mesaj sayısı kırmızı rozetle görünür). Balona basınca
-konuşma listesinden **Depo** ya da bir müşteri seçilir, mesajlar görünür (açılınca okundu olur) ve cevap yazılır (Enter gönderir). **Mesajlar** sekmesi aynı yazışmaların
-tam sayfa halidir; Depo orada da bir konuşma olarak durur ve ofis ilk mesajı da yazabilir. Müşteriye yazdığınız cevap WhatsApp haberi olarak gider (aşağıda), depoya yazdığınız gitmez.
+Müşteriler depoyla yazışır; ofis bu konuşmaları görür. Nakliye sayfasının sağ altında, ana ekrandaki sohbet balonunun hemen üstünde **mesaj balonu** durur: balona basınca üstteki listeden müşteriyi seçersiniz,
+müşteri ile deponun yazışması görünür. **Mesajlar** sekmesi aynı yazışmaların tam sayfa halidir. İsterseniz siz de yazabilirsiniz (Enter gönderir); müşteri bunu "Ofis" olarak görür ve WhatsApp haberi gider.
+Okundu işareti müşteriye ve depoya aittir: ofis okuyunca işaretlenmez. Listede kırmızı sayı, müşterinin yazdığı ama deponun henüz okumadığı mesajlardır.
+
 
 ## Bildirimler (kendiliğinden WhatsApp'a, ofiste kontrol)
 
-Müşterinin seçtiği haberler (depoya geldi, yola çıktı, teslim edildi, sorun, ofisin yazdığı mesaj) **olay olur olmaz** müşterinin yazdığı WhatsApp numarasına gider
+Müşterinin seçtiği haberler (depoya geldi, yola çıktı, teslim edildi, sorun, deponun ya da ofisin yazdığı mesaj) **olay olur olmaz** müşterinin yazdığı WhatsApp numarasına gider
 (aşağıdaki kurulum yapıldıysa): depoda **Geldi** denince "Yükünüz depoya geldi", araç **Yola çıktı** denince "Aracınız yola çıktı, Lade Liste ve CMR belgeleriniz hazır",
-sefer **Teslim edildi** olunca, depo eksik/hasar bildirince ve siz **Mesajlar**'dan cevap yazınca. Aynı anda gelen birkaç yük tek mesajda birleşir.
+sefer **Teslim edildi** olunca, depo eksik/hasar bildirince ve depo (ya da siz) müşteriye mesaj yazınca. Aynı anda gelen birkaç yük tek mesajda birleşir.
 Haber yalnızca müşterinin **bildirim telefonu** yazılıysa (siz Müşteriler'den ya da müşteri kendi sayfasında *Takip* sekmesinden yazar) ve o haberi kapatmadıysa gönderilir.
 
 Nakliye > **Bildirimler** sekmesi kontrol yeridir: yalnızca **henüz gönderilemeyen** haberler görünür. Otomatik gönderim kurulmadıysa hepsi burada bekler;
@@ -135,7 +136,7 @@ gönderilemeyenlerin yanında nedeni yazar (ör. "onaylı şablon gerekir", "num
 
 Notlar:
 - Meta, şablon (işletmenin başlattığı) mesajlar için küçük bir ücret alır; güncel fiyat için Meta'nın fiyat sayfasına bakın. Yalnızca müşterinin seçtiği haberler gönderilir.
-- Müşteri bu mesaja cevap yazarsa cevap `whatsapp-webhook` fonksiyonuna düşer (ruhsat/araç listesi okuyucusu); ofisle yazışma için müşteriye sayfadaki sohbet balonunu kullanmasını söyleyin.
+- Müşteri bu mesaja cevap yazarsa cevap `whatsapp-webhook` fonksiyonuna düşer (ruhsat/araç listesi okuyucusu); depoyla yazışmak için müşteriye sayfadaki sohbet balonunu kullanmasını söyleyin.
 - Fonksiyon kurulmadıysa ya da gizli ayarlar eksikse hiçbir şey bozulmaz; haberler Bildirimler sekmesinde elle gönderilmeyi bekler.
 
 ## PLASTNAK taslağı

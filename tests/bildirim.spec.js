@@ -73,7 +73,7 @@ test('aynı müşteri ve haber türü tek mesajda birleşir; metin ofisteki ve m
   expect(mod.metin(g[0])).toBe('📦 Yükünüz depoya geldi\nX → Y · 4 kap · 100 kg\nZ → W · 2 kap · 50 kg');
   expect(mod.metin({ event: 'yola', items: [{ body: '34 ABC 123 · PCS-26-0001' }] })).toBe('🚚 Aracınız yola çıktı\n34 ABC 123 · PCS-26-0001\nLade Liste ve CMR belgeleriniz hazır.');
   expect(mod.metin({ event: 'teslim', items: [{ body: 'x' }] })).toContain('✅ Yükünüz teslim edildi');
-  expect(mod.metin({ event: 'mesaj', items: [{ body: 'x' }] })).toContain('💬 Ofisten yeni mesaj');
+  expect(mod.metin({ event: 'mesaj', items: [{ body: 'x' }] })).toContain('💬 Yeni mesaj');
 });
 
 test('şablon adı verilirse şablon, verilmezse düz yazı gönderilir; şablon değişkeninde satır sonu olmaz', async () => {
