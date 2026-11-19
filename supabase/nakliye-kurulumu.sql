@@ -81,6 +81,28 @@ update public.shp_loads set arrived_at = coalesce(arrived_at, updated_at) where 
 -- Yükü depoya getirecek nakliye kamyonunun plakası (müşteri yazar, depo ve operatör görür)
 alter table public.shp_loads add column if not exists inbound_plate text not null default '' check (length(inbound_plate) <= 40);
 
+-- Durum çizgisi, beklenen saat, şoför, depo teslim bilgisi (sayım, durum, not, raf) ve etiket (QR) kodu
+alter table public.shp_loads add column if not exists assigned_at timestamptz;
+alter table public.shp_loads add column if not exists expected_time time;
+alter table public.shp_loads add column if not exists driver text not null default '' check (length(driver) <= 80);
+alter table public.shp_loads add column if not exists counted_pieces integer check (counted_pieces is null or counted_pieces between 0 and 1000000);
+alter table public.shp_loads add column if not exists counted_weight numeric(12, 2) check (counted_weight is null or (counted_weight >= 0 and counted_weight < 10000000));
+alter table public.shp_loads add column if not exists condition text not null default '' check (condition in ('', 'saglam', 'eksik', 'hasarli'));
+alter table public.shp_loads add column if not exists receive_note text not null default '' check (length(receive_note) <= 500);
+alter table public.shp_loads add column if not exists location text not null default '' check (length(location) <= 40);
+alter table public.shp_loads add column if not exists qr_code text;
+update public.shp_loads set qr_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10)) where qr_code is null;
+alter table public.shp_loads alter column qr_code set default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
+alter table public.shp_loads alter column qr_code set not null;
+create unique index if not exists shp_loads_qr on public.shp_loads (qr_code);
+update public.shp_loads set assigned_at = updated_at where status = 'aracta' and assigned_at is null;
+alter table public.shp_trips add column if not exists departed_at timestamptz;
+alter table public.shp_trips add column if not exists delivered_at timestamptz;
+update public.shp_trips set departed_at = updated_at where status in ('yolda', 'teslim') and departed_at is null;
+update public.shp_trips set delivered_at = updated_at where status = 'teslim' and delivered_at is null;
+alter table public.shp_customers add column if not exists notify_phone text not null default '' check (length(notify_phone) <= 30);
+alter table public.shp_customers add column if not exists notify_events jsonb not null default '{"geldi": true, "yola": true, "teslim": true, "sorun": true, "mesaj": true}'::jsonb;
+
 create index if not exists shp_loads_durum on public.shp_loads (status, customer_id);
 create index if not exists shp_loads_sefer on public.shp_loads (trip_id);
 create index if not exists shp_trips_musteri on public.shp_trips (customer_id, created_at desc);
@@ -282,7 +304,9 @@ language sql immutable set search_path = '' as $$
     'consignee_addr', l.consignee_addr, 'notify', l.notify, 'pieces', l.pieces, 'packing', l.packing, 'goods', l.goods,
     'weight', l.weight, 'volume', l.volume, 'country', l.country, 'code', l.code, 'dest_customs', l.dest_customs,
     'broker', l.broker, 'expected_date', l.expected_date, 'status', l.status, 'arrived_at', l.arrived_at,
-    'arrived_by', l.arrived_by, 'trip_id', l.trip_id, 'note', l.note, 'inbound_plate', l.inbound_plate, 'created_at', l.created_at)
+    'arrived_by', l.arrived_by, 'trip_id', l.trip_id, 'note', l.note, 'inbound_plate', l.inbound_plate, 'created_at', l.created_at,
+    'expected_time', to_char(l.expected_time, 'HH24:MI'), 'driver', l.driver, 'assigned_at', l.assigned_at, 'counted_pieces', l.counted_pieces,
+    'counted_weight', l.counted_weight, 'condition', l.condition, 'receive_note', l.receive_note, 'location', l.location, 'qr_code', l.qr_code)
 $$;
 
 create or replace function private.shp_customer_json(c public.shp_customers) returns jsonb
@@ -309,6 +333,11 @@ begin
                          and (l.status <> 'aracta' or l.updated_at > now() - interval '120 days')), '[]'::jsonb),
     'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' - 'updated_by' order by t.created_at desc)
                        from public.shp_trips t where t.customer_id = c.id and t.created_at > now() - interval '120 days'), '[]'::jsonb),
+    'photo_counts', coalesce((select jsonb_object_agg(p.load_id, p.n) from (select load_id, count(*) as n from public.shp_photos where customer_id = c.id group by 1) p), '{}'::jsonb),
+    'notify', jsonb_build_object('phone', c.notify_phone, 'events', c.notify_events),
+    'messages', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'from_role', m.from_role, 'author', case m.from_role when 'ofis' then 'Ofis' else m.author end, 'body', m.body,
+                                                              'load_id', m.load_id, 'trip_id', m.trip_id, 'created_at', m.created_at, 'read_at', m.read_at) order by m.id)
+                          from (select * from public.shp_messages where customer_id = c.id order by id desc limit 100) m), '[]'::jsonb),
     'user', case when k.user_id is null then null else (select jsonb_build_object('username', u.username, 'name', coalesce(nullif(u.display_name, ''), u.username)) from public.shp_users u where u.id = k.user_id) end,
     'contacts', coalesce((select jsonb_agg(jsonb_build_object('kind', x.kind, 'name', x.name, 'addr', x.addr, 'notify', x.notify, 'country', x.country,
                                                              'dest_customs', x.dest_customs, 'code', x.code, 'broker', x.broker) order by x.used_at desc)
@@ -345,8 +374,9 @@ begin
     r.volume := nullif(p ->> 'volume', '')::numeric;
     r.pieces := coalesce(nullif(p ->> 'pieces', '')::int, 0);
     r.expected_date := nullif(p ->> 'expected_date', '')::date;
+    r.expected_time := nullif(p ->> 'expected_time', '')::time;
   exception when others then
-    raise exception 'Kap, kilo, hacim ya da tarih sayı / tarih olarak okunamadı' using errcode = '22023';
+    raise exception 'Kap, kilo, hacim, tarih ya da saat sayı / tarih / saat (örn. 10:30) olarak okunamadı' using errcode = '22023';
   end;
   if r.weight < 0 or r.weight >= 10000000 or r.pieces < 0 or r.pieces > 1000000 or (r.volume is not null and (r.volume < 0 or r.volume >= 1000000)) then
     raise exception 'Kap, kilo ya da hacim aralık dışında' using errcode = '22023';
@@ -361,6 +391,7 @@ begin
   r.dest_customs := private.shp_txt(p, 'dest_customs', 80);
   r.broker := private.shp_txt(p, 'broker', 120);
   r.inbound_plate := upper(private.shp_txt(p, 'inbound_plate', 40));
+  r.driver := private.shp_txt(p, 'driver', 80);
   r.note := private.shp_txt(p, 'note', 500);
   return r;
 end $$;
@@ -381,14 +412,15 @@ begin
       raise exception 'Açık yük sayısı sınırına ulaşıldı' using errcode = '22023';
     end if;
     insert into public.shp_loads (customer_id, sender, sender_addr, consignee, consignee_addr, notify, pieces, packing, goods, weight, volume,
-                                  country, code, dest_customs, broker, expected_date, inbound_plate, note, created_by)
+                                  country, code, dest_customs, broker, expected_date, expected_time, driver, inbound_plate, note, created_by)
     values (k.customer_id, c.sender, c.sender_addr, c.consignee, c.consignee_addr, c.notify, c.pieces, c.packing, c.goods, c.weight, c.volume,
-            c.country, c.code, c.dest_customs, c.broker, c.expected_date, c.inbound_plate, c.note, 'Müşteri')
+            c.country, c.code, c.dest_customs, c.broker, c.expected_date, c.expected_time, c.driver, c.inbound_plate, c.note, 'Müşteri')
     returning * into l;
   else
     update public.shp_loads x set sender = c.sender, sender_addr = c.sender_addr, consignee = c.consignee, consignee_addr = c.consignee_addr,
       notify = c.notify, pieces = c.pieces, packing = c.packing, goods = c.goods, weight = c.weight, volume = c.volume, country = c.country,
-      code = c.code, dest_customs = c.dest_customs, broker = c.broker, expected_date = c.expected_date, inbound_plate = c.inbound_plate, note = c.note
+      code = c.code, dest_customs = c.dest_customs, broker = c.broker, expected_date = c.expected_date, expected_time = c.expected_time, driver = c.driver,
+      inbound_plate = c.inbound_plate, note = c.note
     where x.id = pid and x.customer_id = k.customer_id
       and ((x.status in ('bekliyor', 'depoda') and x.trip_id is null)
            or (x.status = 'aracta' and exists (select 1 from public.shp_trips t where t.id = x.trip_id and t.status = 'hazirlaniyor')))
@@ -422,7 +454,8 @@ begin
                        from public.shp_loads l
                        where l.status <> 'aracta' or l.updated_at > now() - interval '30 days'), '[]'::jsonb),
     'trips', coalesce((select jsonb_agg(to_jsonb(t) - 'created_by' - 'updated_by' order by t.created_at desc)
-                       from public.shp_trips t where t.created_at > now() - interval '30 days'), '[]'::jsonb));
+                       from public.shp_trips t where t.created_at > now() - interval '30 days'), '[]'::jsonb),
+    'photo_counts', coalesce((select jsonb_object_agg(p.load_id, p.n) from (select load_id, count(*) as n from public.shp_photos group by 1) p), '{}'::jsonb));
 end $$;
 
 create or replace function public.shp_depot_mark(p_token text, p_id uuid, p_arrived boolean, p_name text default '') returns jsonb
@@ -461,7 +494,8 @@ begin
   c := private.shp_clean_load(p_load);
   update public.shp_loads x set sender = c.sender, sender_addr = c.sender_addr, consignee = c.consignee, consignee_addr = c.consignee_addr,
     notify = c.notify, pieces = c.pieces, packing = c.packing, goods = c.goods, weight = c.weight, volume = c.volume, country = c.country,
-    code = c.code, dest_customs = c.dest_customs, broker = c.broker, expected_date = c.expected_date, inbound_plate = c.inbound_plate, note = c.note
+    code = c.code, dest_customs = c.dest_customs, broker = c.broker, expected_date = c.expected_date, expected_time = c.expected_time, driver = c.driver,
+    inbound_plate = c.inbound_plate, note = c.note
   where x.id = pid returning * into l;
   if not found then raise exception 'Yük bulunamadı' using errcode = '22023'; end if;
   return private.shp_load_json(l);
@@ -717,17 +751,21 @@ begin
   elsif tg_op = 'INSERT' then r := new; act := 'Yük eklendi';
   else
     r := new;
-    if old.arrived_at is null and new.arrived_at is not null then act := 'Depoya geldi olarak işaretlendi';
+    if old.arrived_at is null and new.arrived_at is not null then
+      act := 'Depoya geldi olarak işaretlendi' || case new.condition when 'eksik' then ' (eksik var)' when 'hasarli' then ' (hasarlı)' else '' end;
     elsif old.arrived_at is not null and new.arrived_at is null then act := 'Geldi işareti geri alındı';
     elsif old.trip_id is distinct from new.trip_id then
       if new.trip_id is null then act := 'Araçtan çıkarıldı';
       else act := 'Araca konuldu: ' || coalesce((select t.poz_no || ' · ' || t.tractor from public.shp_trips t where t.id = new.trip_id), ''); end if;
     elsif (old.sender, old.consignee, old.sender_addr, old.consignee_addr, old.notify, old.pieces, old.packing, old.goods, old.weight, old.volume,
-           old.country, old.code, old.dest_customs, old.broker, old.expected_date, old.inbound_plate, old.note)
+           old.country, old.code, old.dest_customs, old.broker, old.expected_date, old.expected_time, old.driver, old.inbound_plate, old.note)
           is distinct from
           (new.sender, new.consignee, new.sender_addr, new.consignee_addr, new.notify, new.pieces, new.packing, new.goods, new.weight, new.volume,
-           new.country, new.code, new.dest_customs, new.broker, new.expected_date, new.inbound_plate, new.note)
+           new.country, new.code, new.dest_customs, new.broker, new.expected_date, new.expected_time, new.driver, new.inbound_plate, new.note)
     then act := 'Yük düzenlendi';
+    elsif (old.counted_pieces, old.counted_weight, old.condition, old.receive_note, old.location)
+          is distinct from (new.counted_pieces, new.counted_weight, new.condition, new.receive_note, new.location)
+    then act := 'Depo teslim bilgisi girildi' || case new.condition when 'eksik' then ' (eksik var)' when 'hasarli' then ' (hasarlı)' else '' end;
     else return null; end if;
   end if;
   insert into public.shp_log (customer_id, actor, role, action, summary)
@@ -871,7 +909,8 @@ begin
     isdepot := true;
   end;
   select (select count(*)::text || '/' || coalesce(max(l.updated_at)::text, '') from public.shp_loads l where isdepot or l.customer_id = cid) || '|' ||
-         (select count(*)::text || '/' || coalesce(max(t.updated_at)::text, '') from public.shp_trips t where isdepot or t.customer_id = cid) into r;
+         (select count(*)::text || '/' || coalesce(max(t.updated_at)::text, '') from public.shp_trips t where isdepot or t.customer_id = cid) || '|' ||
+         case when isdepot then '' else (select count(*)::text || '/' || coalesce(max(m.id)::text, '') || '/' || count(m.read_at)::text from public.shp_messages m where m.customer_id = cid) end into r;
   return r;
 end $$;
 
@@ -935,6 +974,418 @@ begin
                    left join public.shp_customers c on c.id = y.customer_id), '[]'::jsonb);
 end $$;
 
+-- ---------------------------------------------------------------- yeni özellikler: durum zamanları, bildirim kuyruğu, depo teslim bilgisi ve fotoğraf, yazışma, toplu yükleme, rapor
+-- Durum çizgisi: yük "araca kondu" ve sefer "yola çıktı / teslim" zamanları kendiliğinden yazılır.
+create or replace function private.shp_load_times() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.trip_id is distinct from old.trip_id then
+    new.assigned_at := case when new.trip_id is null then null else now() end;
+  end if;
+  return new;
+end $$;
+drop trigger if exists shp_loads_times on public.shp_loads;
+create trigger shp_loads_times before update on public.shp_loads for each row execute function private.shp_load_times();
+
+create or replace function private.shp_trip_times() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.status is distinct from old.status then
+    if new.status = 'yolda' then
+      new.departed_at := now(); new.delivered_at := null;
+    elsif new.status = 'teslim' then
+      new.delivered_at := now(); new.departed_at := coalesce(new.departed_at, old.departed_at, now());
+    else
+      new.departed_at := null; new.delivered_at := null;
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists shp_trips_times on public.shp_trips;
+create trigger shp_trips_times before update on public.shp_trips for each row execute function private.shp_trip_times();
+
+-- Fotoğraflar (depo yükü teslim alırken çeker; küçük resim + sıkıştırılmış resim yazı olarak saklanır)
+create table if not exists public.shp_photos (
+  id uuid primary key default gen_random_uuid(),
+  load_id uuid not null references public.shp_loads (id) on delete cascade,
+  customer_id uuid not null references public.shp_customers (id) on delete cascade,
+  thumb text not null check (length(thumb) <= 60000 and thumb ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'),
+  data text not null check (length(data) <= 500000 and data ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'),
+  by_name text not null default '' check (length(by_name) <= 120),
+  created_at timestamptz not null default now()
+);
+create index if not exists shp_photos_yuk on public.shp_photos (load_id, created_at);
+
+-- Ofisle yazışma
+create table if not exists public.shp_messages (
+  id bigint generated always as identity primary key,
+  customer_id uuid not null references public.shp_customers (id) on delete cascade,
+  from_role text not null check (from_role in ('musteri', 'ofis')),
+  author text not null default '',
+  body text not null check (length(btrim(body)) between 1 and 1000),
+  load_id uuid references public.shp_loads (id) on delete set null,
+  trip_id uuid references public.shp_trips (id) on delete set null,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists shp_messages_musteri on public.shp_messages (customer_id, id desc);
+
+-- Bildirim kuyruğu: depoya geldi, yola çıktı, teslim, sorun, ofis mesajı. Gönderim: ofiste tek tıkla ya da isteğe bağlı otomatik (scripts/bildirim).
+create table if not exists public.shp_outbox (
+  id bigint generated always as identity primary key,
+  customer_id uuid not null references public.shp_customers (id) on delete cascade,
+  event text not null check (event in ('geldi', 'yola', 'teslim', 'sorun', 'mesaj')),
+  phone text not null,
+  body text not null,
+  status text not null default 'bekliyor' check (status in ('bekliyor', 'gonderildi', 'hata', 'iptal')),
+  error text not null default '',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+create index if not exists shp_outbox_durum on public.shp_outbox (status, created_at);
+
+alter table public.shp_photos enable row level security;
+alter table public.shp_messages enable row level security;
+alter table public.shp_outbox enable row level security;
+revoke all on public.shp_photos, public.shp_messages, public.shp_outbox from anon;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on public.shp_photos, public.shp_messages, public.shp_outbox from authenticated';
+    execute 'grant select, delete on public.shp_photos to authenticated';
+    execute 'grant select, insert, update, delete on public.shp_messages to authenticated';
+    execute 'grant select, update, delete on public.shp_outbox to authenticated';
+  end if;
+end $$;
+drop policy if exists shp_photos_editor on public.shp_photos;
+create policy shp_photos_editor on public.shp_photos for all to authenticated using ((select private.is_editor())) with check ((select private.is_editor()));
+drop policy if exists shp_messages_editor on public.shp_messages;
+create policy shp_messages_editor on public.shp_messages for all to authenticated using ((select private.is_editor())) with check ((select private.is_editor()));
+drop policy if exists shp_outbox_editor on public.shp_outbox;
+create policy shp_outbox_editor on public.shp_outbox for all to authenticated using ((select private.is_editor())) with check ((select private.is_editor()));
+
+-- Mesajı yazanı kayda geçir (ofis düzenleyicisi: e-posta; müşteri: kullanıcı adı)
+create or replace function private.shp_message_author() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  new.author := left(case when new.from_role = 'ofis' then 'Ofis' else private.shp_actor() end, 120);
+  return new;
+end $$;
+drop trigger if exists shp_messages_author on public.shp_messages;
+create trigger shp_messages_author before insert on public.shp_messages for each row execute function private.shp_message_author();
+
+-- Bildirimi kuyruğa ekle: müşterinin numarası yoksa ya da o haberi kapatmışsa eklenmez
+create or replace function private.shp_enqueue(p_customer uuid, p_event text, p_body text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare c public.shp_customers;
+begin
+  select * into c from public.shp_customers x where x.id = p_customer;
+  if not found or btrim(c.notify_phone) = '' or coalesce(c.notify_events ->> p_event, 'true') <> 'true' then return; end if;
+  insert into public.shp_outbox (customer_id, event, phone, body) values (p_customer, p_event, c.notify_phone, left(p_body, 500));
+end $$;
+
+create or replace function private.shp_notify_load() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if old.arrived_at is null and new.arrived_at is not null then
+    perform private.shp_enqueue(new.customer_id, 'geldi', new.sender || ' → ' || new.consignee || ' · ' || new.pieces || ' kap · ' || trim_scale(new.weight) || ' kg');
+  end if;
+  return null;
+end $$;
+drop trigger if exists shp_loads_notify on public.shp_loads;
+create trigger shp_loads_notify after update on public.shp_loads for each row execute function private.shp_notify_load();
+
+create or replace function private.shp_notify_trip() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare txt text := new.tractor || case when new.trailer <> '' then ' / ' || new.trailer else '' end || ' · ' || new.poz_no;
+begin
+  if old.status is distinct from new.status then
+    if new.status = 'yolda' then perform private.shp_enqueue(new.customer_id, 'yola', txt);
+    elsif new.status = 'teslim' then perform private.shp_enqueue(new.customer_id, 'teslim', txt); end if;
+  end if;
+  return null;
+end $$;
+drop trigger if exists shp_trips_notify on public.shp_trips;
+create trigger shp_trips_notify after update on public.shp_trips for each row execute function private.shp_notify_trip();
+
+create or replace function private.shp_notify_message() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.from_role = 'ofis' then perform private.shp_enqueue(new.customer_id, 'mesaj', left(new.body, 200)); end if;
+  return null;
+end $$;
+drop trigger if exists shp_messages_notify on public.shp_messages;
+create trigger shp_messages_notify after insert on public.shp_messages for each row execute function private.shp_notify_message();
+
+-- Müşteri: bildirim numarası ve hangi haberleri alacağı
+create or replace function public.shp_portal_notify_save(p_token text, p_phone text, p_events jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  ph text := left(regexp_replace(btrim(coalesce(p_phone, '')), '[^0-9+() -]', '', 'g'), 30);
+  ev jsonb;
+  key text;
+  c public.shp_customers;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  if ph <> '' and length(regexp_replace(ph, '[^0-9]', '', 'g')) not between 10 and 15 then
+    raise exception 'Telefon numarasını ülke ya da alan koduyla yazın (örn. +90 5xx xxx xx xx)' using errcode = '22023';
+  end if;
+  select x.notify_events into ev from public.shp_customers x where x.id = k.customer_id;
+  if jsonb_typeof(p_events) = 'object' then
+    foreach key in array array['geldi', 'yola', 'teslim', 'sorun', 'mesaj'] loop
+      if p_events ? key and jsonb_typeof(p_events -> key) = 'boolean' then ev := jsonb_set(ev, array[key], p_events -> key); end if;
+    end loop;
+  end if;
+  update public.shp_customers set notify_phone = ph, notify_events = ev where id = k.customer_id returning * into c;
+  insert into public.shp_log (customer_id, actor, role, action) values (k.customer_id, private.shp_actor(), 'musteri', 'Bildirim ayarı değiştirildi');
+  return jsonb_build_object('phone', c.notify_phone, 'events', c.notify_events);
+end $$;
+
+-- Müşteri: ofise mesaj yazar / okundu der
+create or replace function public.shp_portal_message_send(p_token text, p_body text, p_load uuid default null, p_trip uuid default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  b text := left(btrim(replace(coalesce(p_body, ''), E'\r', '')), 1000);
+  m public.shp_messages;
+  lid uuid := p_load;
+  tid uuid := p_trip;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  if b = '' then raise exception 'Mesaj boş olamaz' using errcode = '22023'; end if;
+  if (select count(*) from public.shp_messages x where x.customer_id = k.customer_id and x.from_role = 'musteri' and x.created_at > now() - interval '1 minute') >= 10 then
+    raise exception 'Çok sık mesaj gönderiyorsunuz; bir dakika sonra tekrar deneyin' using errcode = '22023';
+  end if;
+  if lid is not null and not exists (select 1 from public.shp_loads x where x.id = lid and x.customer_id = k.customer_id) then lid := null; end if;
+  if tid is not null and not exists (select 1 from public.shp_trips x where x.id = tid and x.customer_id = k.customer_id) then tid := null; end if;
+  insert into public.shp_messages (customer_id, from_role, body, load_id, trip_id) values (k.customer_id, 'musteri', b, lid, tid) returning * into m;
+  return jsonb_build_object('id', m.id, 'from_role', m.from_role, 'author', m.author, 'body', m.body, 'load_id', m.load_id, 'trip_id', m.trip_id, 'created_at', m.created_at, 'read_at', m.read_at);
+end $$;
+
+create or replace function public.shp_portal_messages_read(p_token text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare k record;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  update public.shp_messages set read_at = now() where customer_id = k.customer_id and from_role = 'ofis' and read_at is null;
+end $$;
+
+-- Müşteri: Excel'den toplu yük (hepsi ya da hiçbiri; en çok 200 satır)
+create or replace function public.shp_portal_import(p_token text, p_loads jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  e jsonb;
+  c public.shp_loads;
+  n int := 0;
+  w int;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  if jsonb_typeof(p_loads) <> 'array' or jsonb_array_length(p_loads) not between 1 and 200 then
+    raise exception 'Bir seferde 1 ile 200 arası satır eklenebilir' using errcode = '22023';
+  end if;
+  w := jsonb_array_length(p_loads);
+  if (select count(*) from public.shp_loads x where x.customer_id = k.customer_id and x.status <> 'aracta') + w > 2000 then
+    raise exception 'Açık yük sayısı sınırına ulaşıldı' using errcode = '22023';
+  end if;
+  for e in select value from jsonb_array_elements(p_loads) loop
+    n := n + 1;
+    begin
+      c := private.shp_clean_load(e);
+    exception when others then
+      raise exception 'Satır %: %', n, sqlerrm using errcode = '22023';
+    end;
+    insert into public.shp_loads (customer_id, sender, sender_addr, consignee, consignee_addr, notify, pieces, packing, goods, weight, volume,
+                                  country, code, dest_customs, broker, expected_date, expected_time, driver, inbound_plate, note, created_by)
+    values (k.customer_id, c.sender, c.sender_addr, c.consignee, c.consignee_addr, c.notify, c.pieces, c.packing, c.goods, c.weight, c.volume,
+            c.country, c.code, c.dest_customs, c.broker, c.expected_date, c.expected_time, c.driver, c.inbound_plate, c.note, 'Müşteri');
+  end loop;
+  return jsonb_build_object('count', n);
+end $$;
+
+-- Müşteri: rapor (haftalık / aylık ağırlık, en çok yük giden alıcılar, göstergeler) ve sefer arşivi
+create or replace function public.shp_portal_report(p_token text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  tz constant text := 'Europe/Istanbul';
+  today_d date := (now() at time zone tz)::date;
+  m0 date := date_trunc('month', now() at time zone tz)::date;
+  pm0 date := (date_trunc('month', now() at time zone tz) - interval '1 month')::date;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  return jsonb_build_object(
+    'weeks', coalesce((select jsonb_agg(jsonb_build_object('start', s.w, 'kg', s.kg, 'loads', s.n) order by s.w)
+                       from (select (date_trunc('week', l.created_at at time zone tz))::date as w, sum(l.weight) as kg, count(*) as n
+                             from public.shp_loads l where l.customer_id = k.customer_id and l.created_at > now() - interval '60 days'
+                             group by 1 order by 1 desc limit 8) s), '[]'::jsonb),
+    'months', coalesce((select jsonb_agg(jsonb_build_object('start', s.w, 'kg', s.kg, 'loads', s.n) order by s.w)
+                        from (select (date_trunc('month', l.created_at at time zone tz))::date as w, sum(l.weight) as kg, count(*) as n
+                              from public.shp_loads l where l.customer_id = k.customer_id and l.created_at > now() - interval '13 months'
+                              group by 1 order by 1 desc limit 12) s), '[]'::jsonb),
+    'top', coalesce((select jsonb_agg(jsonb_build_object('name', s.nm, 'kg', s.kg, 'loads', s.n) order by s.kg desc)
+                     from (select upper(l.consignee) as nm, sum(l.weight) as kg, count(*) as n
+                           from public.shp_loads l where l.customer_id = k.customer_id and l.created_at > now() - interval '120 days'
+                           group by 1 order by 3 desc, 2 desc limit 8) s), '[]'::jsonb),
+    'kpi', jsonb_build_object(
+      'month_loads', (select count(*) from public.shp_loads l where l.customer_id = k.customer_id and (l.created_at at time zone tz)::date >= m0),
+      'month_kg', (select coalesce(sum(l.weight), 0) from public.shp_loads l where l.customer_id = k.customer_id and (l.created_at at time zone tz)::date >= m0),
+      'prev_loads', (select count(*) from public.shp_loads l where l.customer_id = k.customer_id and (l.created_at at time zone tz)::date >= pm0 and (l.created_at at time zone tz)::date < m0),
+      'prev_kg', (select coalesce(sum(l.weight), 0) from public.shp_loads l where l.customer_id = k.customer_id and (l.created_at at time zone tz)::date >= pm0 and (l.created_at at time zone tz)::date < m0),
+      'month_trips', (select count(*) from public.shp_trips t where t.customer_id = k.customer_id and t.depart_date >= m0),
+      'avg_fill', (select round(avg(s.kg) / 24000 * 100) from (select sum(l.weight) as kg from public.shp_loads l join public.shp_trips t on t.id = l.trip_id
+                    where t.customer_id = k.customer_id and t.depart_date >= m0 group by t.id) s),
+      'avg_days', (select round(avg(extract(epoch from (t.delivered_at - t.departed_at)) / 86400)::numeric, 1) from public.shp_trips t
+                   where t.customer_id = k.customer_id and t.delivered_at is not null and t.departed_at is not null and t.delivered_at > now() - interval '120 days')),
+    'archive', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'poz_no', s.poz_no, 'tractor', s.tractor, 'trailer', s.trailer, 'depart_date', s.depart_date,
+                                                           'status', s.status, 'loads', s.n, 'kg', s.kg) order by s.created_at desc)
+                         from (select t.*, (select count(*) from public.shp_loads l where l.trip_id = t.id) as n,
+                                      (select coalesce(sum(l.weight), 0) from public.shp_loads l where l.trip_id = t.id) as kg
+                               from public.shp_trips t where t.customer_id = k.customer_id order by t.created_at desc limit 120) s), '[]'::jsonb),
+    'today', today_d);
+end $$;
+
+-- Müşteri: arşivdeki seferin yükleri (ana listede olmayan eski seferler için; belgeler bununla hazırlanır)
+create or replace function public.shp_portal_trip_docs(p_token text, p_trip uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  t public.shp_trips;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  select * into t from public.shp_trips x where x.id = p_trip and x.customer_id = k.customer_id;
+  if not found then raise exception 'Sefer bulunamadı' using errcode = '22023'; end if;
+  return jsonb_build_object('trip', to_jsonb(t) - 'created_by' - 'updated_by',
+    'loads', coalesce((select jsonb_agg(private.shp_load_json(l) order by l.created_at) from public.shp_loads l where l.trip_id = t.id), '[]'::jsonb));
+end $$;
+
+-- Fotoğraflar: müşteri kendi yüklerinin, depo her yükün fotoğrafını görür; yalnızca depo ekler / siler
+create or replace function public.shp_portal_photos(p_token text, p_load uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k record;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  return coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'thumb', p.thumb, 'by', p.by_name, 'at', p.created_at) order by p.created_at)
+                   from public.shp_photos p where p.load_id = p_load and p.customer_id = k.customer_id), '[]'::jsonb);
+end $$;
+
+create or replace function public.shp_portal_photo(p_token text, p_photo uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare k record; d text;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  select p.data into d from public.shp_photos p where p.id = p_photo and p.customer_id = k.customer_id;
+  if not found then raise exception 'Fotoğraf bulunamadı' using errcode = '22023'; end if;
+  return d;
+end $$;
+
+create or replace function public.shp_depot_photos(p_token text, p_load uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k record;
+begin
+  select * into k from private.shp_depot_auth(p_token, '');
+  return coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'thumb', p.thumb, 'by', p.by_name, 'at', p.created_at) order by p.created_at)
+                   from public.shp_photos p where p.load_id = p_load), '[]'::jsonb);
+end $$;
+
+create or replace function public.shp_depot_photo(p_token text, p_photo uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare k record; d text;
+begin
+  select * into k from private.shp_depot_auth(p_token, '');
+  select p.data into d from public.shp_photos p where p.id = p_photo;
+  if not found then raise exception 'Fotoğraf bulunamadı' using errcode = '22023'; end if;
+  return d;
+end $$;
+
+create or replace function public.shp_depot_photo_add(p_token text, p_load uuid, p_name text, p_thumb text, p_data text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  l public.shp_loads;
+  p public.shp_photos;
+begin
+  select * into k from private.shp_depot_auth(p_token, p_name);
+  select * into l from public.shp_loads x where x.id = p_load;
+  if not found then raise exception 'Yük bulunamadı' using errcode = '22023'; end if;
+  if (select count(*) from public.shp_photos x where x.load_id = p_load) >= 8 then
+    raise exception 'Bir yüke en fazla 8 fotoğraf eklenebilir' using errcode = '22023';
+  end if;
+  begin
+    insert into public.shp_photos (load_id, customer_id, thumb, data, by_name)
+    values (p_load, l.customer_id, p_thumb, p_data, left(btrim(coalesce(p_name, '')), 120)) returning * into p;
+  exception when check_violation then
+    raise exception 'Fotoğraf geçersiz ya da çok büyük' using errcode = '22023';
+  end;
+  update public.shp_loads set updated_at = now() where id = p_load;
+  insert into public.shp_log (customer_id, actor, role, action, summary) values (l.customer_id, private.shp_actor(), 'depo', 'Fotoğraf eklendi', l.sender || ' → ' || l.consignee);
+  return jsonb_build_object('id', p.id, 'thumb', p.thumb, 'by', p.by_name, 'at', p.created_at);
+end $$;
+
+create or replace function public.shp_depot_photo_del(p_token text, p_photo uuid, p_name text default '') returns void
+language plpgsql security definer set search_path = '' as $$
+declare k record; l public.shp_loads;
+begin
+  select * into k from private.shp_depot_auth(p_token, p_name);
+  select x.* into l from public.shp_loads x join public.shp_photos p on p.load_id = x.id where p.id = p_photo;
+  if not found then return; end if;
+  delete from public.shp_photos where id = p_photo;
+  update public.shp_loads set updated_at = now() where id = l.id;
+end $$;
+
+-- Depo: yükü teslim alır (sayım, durum, not, raf konumu); sorun varsa müşteriye bildirim kuyruğa girer
+create or replace function public.shp_depot_receive(p_token text, p_id uuid, p_name text default '', p_counted_pieces int default null,
+                                                     p_counted_weight numeric default null, p_condition text default 'saglam',
+                                                     p_note text default '', p_location text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  l public.shp_loads;
+  cond text := coalesce(nullif(btrim(p_condition), ''), 'saglam');
+  msg text;
+begin
+  select * into k from private.shp_depot_auth(p_token, p_name);
+  if cond not in ('saglam', 'eksik', 'hasarli') then raise exception 'Durum seçimi geçersiz' using errcode = '22023'; end if;
+  if p_counted_pieces is not null and (p_counted_pieces < 0 or p_counted_pieces > 1000000) then raise exception 'Sayılan kap aralık dışında' using errcode = '22023'; end if;
+  if p_counted_weight is not null and (p_counted_weight < 0 or p_counted_weight >= 10000000) then raise exception 'Tartılan kilo aralık dışında' using errcode = '22023'; end if;
+  update public.shp_loads x set
+    status = case when x.status = 'aracta' then 'aracta' else 'depoda' end,
+    arrived_at = coalesce(x.arrived_at, now()),
+    arrived_by = case when x.arrived_at is null then left(btrim(coalesce(p_name, '')), 120) else x.arrived_by end,
+    counted_pieces = p_counted_pieces, counted_weight = p_counted_weight, condition = cond,
+    receive_note = left(btrim(replace(coalesce(p_note, ''), E'\r', '')), 500), location = left(btrim(coalesce(p_location, '')), 40)
+  where x.id = p_id and x.status in ('bekliyor', 'depoda', 'aracta') returning * into l;
+  if not found then raise exception 'Yük bulunamadı ya da bu işlem artık yapılamaz' using errcode = '22023'; end if;
+  if cond in ('eksik', 'hasarli') or (l.counted_pieces is not null and l.counted_pieces <> l.pieces) then
+    msg := l.sender || ' → ' || l.consignee || ': ' ||
+      concat_ws(', ',
+        case when cond = 'eksik' then 'eksik var' when cond = 'hasarli' then 'hasarlı' end,
+        case when l.counted_pieces is not null and l.counted_pieces <> l.pieces then 'beyan ' || l.pieces || ' kap, sayılan ' || l.counted_pieces || ' kap' end,
+        nullif(l.receive_note, ''));
+    perform private.shp_enqueue(l.customer_id, 'sorun', msg);
+  end if;
+  return private.shp_load_json(l);
+end $$;
+
+-- Depo: araç yola çıkar (yalnızca tüm yükler depoya gelmişse); kilitler, müşteri artık değiştiremez
+create or replace function public.shp_depot_depart(p_token text, p_trip uuid, p_name text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  t public.shp_trips;
+begin
+  select * into k from private.shp_depot_auth(p_token, p_name);
+  select * into t from public.shp_trips x where x.id = p_trip for update;
+  if not found then raise exception 'Sefer bulunamadı' using errcode = '22023'; end if;
+  if t.status <> 'hazirlaniyor' then raise exception 'Bu araç zaten yola çıkmış' using errcode = '22023'; end if;
+  if not exists (select 1 from public.shp_loads l where l.trip_id = t.id) then raise exception 'Araçta yük yok' using errcode = '22023'; end if;
+  if exists (select 1 from public.shp_loads l where l.trip_id = t.id and l.arrived_at is null) then
+    raise exception 'Depoya gelmemiş yük var; hepsi gelmeden araç yola çıkarılamaz (ofisle görüşün)' using errcode = '22023';
+  end if;
+  update public.shp_trips set status = 'yolda' where id = t.id returning * into t;
+  return to_jsonb(t) - 'created_by' - 'updated_by';
+end $$;
+
 -- ---------------------------------------------------------------- yetkiler
 revoke all on function public.shp_assign(uuid, uuid[], text, text, date, text), public.shp_unassign(uuid), public.shp_delete_trip(uuid),
   public.shp_links(), public.shp_rotate_link(uuid), public.shp_set_link(uuid, boolean),
@@ -970,9 +1421,21 @@ do $$ begin
   end if;
 end $$;
 
+-- durum çizgisi, bildirim, toplu yükleme, rapor, fotoğraf, teslim alma, yola çıkarma, yazışma işlevlerinin yetkileri
+revoke all on function public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text),
+  public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid),
+  public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text),
+  public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text) from public;
+revoke all on function private.shp_load_times(), private.shp_trip_times(), private.shp_message_author(), private.shp_enqueue(uuid, text, text),
+  private.shp_notify_load(), private.shp_notify_trip(), private.shp_notify_message() from public;
+do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text)'; begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then execute 'grant execute on function ' || fl || ' to anon'; end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then execute 'grant execute on function ' || fl || ' to authenticated'; end if;
+end $$;
+
 -- ---------------------------------------------------------------- anlık güncelleme: müşteri yük yazınca / depo "Geldi" deyince açık ekran hemen yenilenir
 do $$ declare t text; begin
-  foreach t in array array['shp_loads', 'shp_trips'] loop
+  foreach t in array array['shp_loads', 'shp_trips', 'shp_messages', 'shp_outbox'] loop
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
       execute format('alter publication supabase_realtime add table public.%I', t);
     end if;
@@ -1001,7 +1464,7 @@ begin
   end if;
 end $plastnak$;
 
--- ---------------------------------------------------------------- kontrol: on satır da "tamam" olmalı
+-- ---------------------------------------------------------------- kontrol: on dört satır da "tamam" olmalı
 select 'tablolar (müşteri, sefer, yük)' as kontrol,
        case when to_regclass('public.shp_customers') is not null and to_regclass('public.shp_trips') is not null
                  and to_regclass('public.shp_loads') is not null then 'tamam' else 'EKSİK' end as durum
@@ -1045,4 +1508,23 @@ union all
 select 'firma ve araç bilgisi kendiliğinden kaydı, 5 sn yenileme',
        case when to_regclass('public.shp_contacts') is not null and to_regclass('public.shp_vehicles') is not null
                  and to_regprocedure('public.shp_stamp(text)') is not null
-                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_loads'::regclass and tgname = 'shp_loads_remember') then 'tamam' else 'EKSİK' end;
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_loads'::regclass and tgname = 'shp_loads_remember') then 'tamam' else 'EKSİK' end
+union all
+select 'durum çizgisi ve bildirim kuyruğu',
+       case when to_regclass('public.shp_outbox') is not null and to_regprocedure('public.shp_portal_notify_save(text, text, jsonb)') is not null
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_trips'::regclass and tgname = 'shp_trips_notify')
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_trips'::regclass and tgname = 'shp_trips_times')
+                 and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_trips' and column_name = 'delivered_at') then 'tamam' else 'EKSİK' end
+union all
+select 'Excel''den toplu yükleme ve rapor',
+       case when to_regprocedure('public.shp_portal_import(text, jsonb)') is not null and to_regprocedure('public.shp_portal_report(text)') is not null
+                 and to_regprocedure('public.shp_portal_trip_docs(text, uuid)') is not null then 'tamam' else 'EKSİK' end
+union all
+select 'depoda teslim alma, fotoğraf, QR kodu ve yola çıkarma kontrolü',
+       case when to_regclass('public.shp_photos') is not null and to_regprocedure('public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text)') is not null
+                 and to_regprocedure('public.shp_depot_depart(text, uuid, text)') is not null
+                 and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'shp_loads' and column_name = 'qr_code') then 'tamam' else 'EKSİK' end
+union all
+select 'ofisle yazışma',
+       case when to_regclass('public.shp_messages') is not null and to_regprocedure('public.shp_portal_message_send(text, text, uuid, uuid)') is not null
+                 and exists (select 1 from pg_trigger where tgrelid = 'public.shp_messages'::regclass and tgname = 'shp_messages_notify') then 'tamam' else 'EKSİK' end;

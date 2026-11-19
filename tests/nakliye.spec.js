@@ -408,6 +408,92 @@ test('operatör: hareket kaydı kurulmamışsa Hareketler sekmesi bunu söyler',
   await expect(page.locator('#nk-root')).toContainText('Hareket kaydı kurulmamış');
 });
 
+test('operatör: depoya gelmemiş yükle yola çıkarken uyarır; teslim edildi der; müşteri bildirimi kuyruğa girer', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l5' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l.id === 'l1' ? { ...l, status: 'aracta', trip_id: 'tt1' } : l);
+  const cs = customers().map(c => c.id === 'c1' ? { ...c, notify_phone: '+90 532 000 00 00', notify_events: { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true } } : c);
+  const problems = await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: cs, shp_loads: ls, shp_trips: [planTrip()] } });
+  await page.locator('[data-nk="tab"][data-v="trips"]').click();
+  await page.locator('[data-nk="toggle-trip"]').click();
+  const go = () => page.locator('.nk-subact [data-nk="lock-trip"]').first();
+  await go().click();                                                                // l5 depoya gelmedi: önce uyarı
+  await expect(go()).toContainText('1 yük depoya gelmedi');
+  expect(await page.evaluate(() => window.__db.shp_trips[0].status)).toBe('hazirlaniyor');
+  await go().click();                                                                // onay: yola çıkar
+  await expect(page.locator('#toast')).toContainText('kilitlendi');
+  const trip = await page.evaluate(() => window.__db.shp_trips[0]);
+  expect(trip.status).toBe('yolda'); expect(trip.departed_at).toBeTruthy();
+  await page.locator('[data-nk="lock-trip"][data-v="teslim"]').click();
+  await expect(page.locator('#toast')).toContainText('teslim edildi');
+  await expect(page.locator('.nk-trip')).toContainText('Teslim edildi');
+  const t2 = await page.evaluate(() => ({ t: window.__db.shp_trips[0], q: window.__db.shp_outbox.map(o => o.event) }));
+  expect(t2.t.status).toBe('teslim'); expect(t2.t.delivered_at).toBeTruthy();
+  expect(t2.q).toEqual(['yola', 'teslim']);
+  await page.locator('[data-nk="tab"][data-v="out"]').click();                      // Bildirimler sekmesi
+  await expect(page.locator('.nk-ol li')).toHaveCount(2);
+  await expect(page.locator('.nk-ol')).toContainText('34 ABC 123 · PCS-26-0001');
+  await expect(page.locator('.nk-ol')).toContainText('Lade Liste ve CMR belgeleriniz hazır');
+  expect(problems).toEqual([]);
+});
+
+test('operatör: Bildirimler sekmesi haberleri birleştirir, WhatsApp\'ta açar, gönderildi sayar ya da iptal eder', async ({ page }) => {
+  const ob = (id, event, body) => ({ id, customer_id: 'c1', event, phone: '+90 532 000 00 00', body, status: 'bekliyor', error: '', created_at: '2026-09-23T06:00:00Z', sent_at: null });
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [],
+    shp_outbox: [ob(1, 'geldi', 'A → B · 4 kap · 100 kg'), ob(2, 'geldi', 'C → D · 2 kap · 50 kg'), ob(3, 'sorun', 'A → B: eksik var')] } });
+  await page.evaluate(() => { window.__hrefs = []; });
+  await page.locator('[data-nk="tab"][data-v="out"]').click();
+  await expect(page.locator('.nk-ol li')).toHaveCount(2);                            // iki "geldi" tek mesaj
+  await expect(page.locator('.nk-ol li').first()).toContainText('A → B · 4 kap · 100 kg');
+  await expect(page.locator('.nk-ol li').first()).toContainText('C → D · 2 kap · 50 kg');
+  await page.locator('.nk-ol li').first().locator('[data-nk="out-done"]').click();
+  await expect(page.locator('.nk-ol li')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__db.shp_outbox.map(o => `${o.id}:${o.status}`))).toEqual(['1:gonderildi', '2:gonderildi', '3:bekliyor']);
+  await page.locator('.nk-ol li').locator('[data-nk="out-skip"]').click();
+  expect(await page.evaluate(() => window.__db.shp_outbox[2].status)).toBe('iptal');
+  await expect(page.locator('.nk-empty')).toContainText('Gönderilecek bildirim yok');
+});
+
+test('operatör: Mesajlar sekmesi müşterinin yazdığını gösterir, okundu yapar, cevap yazar', async ({ page }) => {
+  const msgs = [
+    { id: 'm1', customer_id: 'c1', from_role: 'musteri', author: 'Müşteri · Ali Yılmaz', body: 'Yarın çıkabilir mi?', load_id: null, trip_id: null, created_at: '2026-09-23T06:00:00Z', read_at: null },
+    { id: 'm2', customer_id: 'c2', from_role: 'musteri', author: 'Müşteri (bağlantı)', body: 'Belgeler hazır mı?', load_id: null, trip_id: null, created_at: '2026-09-22T06:00:00Z', read_at: '2026-09-22T07:00:00Z' }];
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [], shp_messages: msgs } });
+  await expect(page.locator('[data-nk="tab"][data-v="msg"] span')).toHaveText('1');  // 1 okunmamış
+  await page.locator('[data-nk="tab"][data-v="msg"]').click();
+  await expect(page.locator('.nk-th')).toHaveCount(2);
+  await expect(page.locator('.nk-mlist')).toContainText('Yarın çıkabilir mi?');
+  await expect.poll(() => page.evaluate(() => window.__db.shp_messages[0].read_at)).toBeTruthy();    // açılınca okundu olur
+  await expect(page.locator('[data-nk="tab"][data-v="msg"] span')).toHaveText('0');
+  await page.locator('#nk-reply').fill('Evet, 06:00\'da çıkıyor.');
+  await page.locator('form[data-nk-form="reply"] button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('Cevabınız gönderildi');
+  const sent = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'ofis'));
+  expect(sent).toHaveLength(1); expect(sent[0]).toMatchObject({ customer_id: 'c1', body: 'Evet, 06:00\'da çıkıyor.' });
+  await expect(page.locator('.nk-mlist')).toContainText('06:00');
+  await page.locator('.nk-th', { hasText: 'DENEME LOJİSTİK' }).click();
+  await expect(page.locator('.nk-mlist')).toContainText('Belgeler hazır mı?');
+});
+
+test('operatör: müşteri bildirim telefonunu ve yükün depo teslim bilgisini (sorun, konum, fotoğraf) görür', async ({ page }) => {
+  const ls = loads().map(l => l.id === 'l1' ? { ...l, condition: 'eksik', counted_pieces: 830, location: 'A-3', receive_note: '2 koli ıslak', arrived_at: '2026-09-22T08:00:00Z' } : l);
+  const photos = [{ id: 'ph1', load_id: 'l1', customer_id: 'c1', thumb: 'data:image/jpeg;base64,/9j/AAAA', data: 'data:image/jpeg;base64,/9j/BBBB', by_name: 'Ahmet', created_at: '2026-09-22T08:00:00Z' }];
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: ls, shp_trips: [], shp_photos: photos } });
+  await expect(page.locator('.nk-t').first()).toContainText('Eksik var');            // Boşta yükler listesinde sorun etiketi
+  await page.locator('[data-nk="edit-load"][data-id="l1"]').first().click();
+  await expect(page.locator('.nk-rcbox')).toContainText('sayılan 830');
+  await expect(page.locator('.nk-rcbox')).toContainText('konum A-3');
+  await expect(page.locator('.nk-pht')).toHaveCount(1);
+  await page.locator('.nk-pht').click();
+  await expect(page.locator('.nk-phimg')).toHaveAttribute('src', /BBBB/);
+  await page.locator('[data-action="close-modal"]').first().click();
+  // müşteri bildirim telefonu
+  await page.locator('.heading [data-nk="customers"]').click();
+  await page.locator('.nk-cl li', { hasText: 'ÖRNEK NAKLİYAT' }).locator('[data-nk="edit-cust"]').click();
+  await page.locator('#nkf-notify_phone').fill('+90 532 111 22 33');
+  await page.locator('form[data-nk-form="customer"] button[type="submit"]').click();
+  await expect(page.locator('#toast')).toContainText('Müşteri güncellendi');
+  expect(await page.evaluate(() => window.__db.shp_customers.find(c => c.id === 'c1').notify_phone)).toBe('+90 532 111 22 33');
+});
+
 test('Nakliye müşterileri panodaki müşterilerden kendiliğinden eklenir (tekrar yok, harf farkı yok, kapalı olan yeniden eklenmez)', async ({ page }) => {
   const reg = (id, plate, customer) => ({ id, plate, customer, declaration: '', carrier: '', registration: '', updated_at: '2026-09-01T08:00:00Z' });
   const visit = (id, customer) => ({ id, plate: 'X ' + id, customer, declaration: '', carrier: '', registration: '', visit_date: '2026-09-23', visit_time: '09:00', note: '', onsite: false, t1: false, done: false, created_at: '2026-09-23T05:00:00Z', updated_at: '2026-09-23T06:00:00Z', onsite_at: null, done_at: null, sort_order: null });
@@ -450,7 +536,7 @@ test('operatör: müşterinin planladığı araç Araçlar sekmesinde; gelmeyen 
   await expect(page.locator('#toast')).toContainText('kilitlendi');
   expect(await page.evaluate(() => window.__db.shp_trips[0].status)).toBe('yolda');
   await expect(trip).toContainText('kilitli');
-  await page.locator('[data-nk="lock-trip"]').click();
+  await page.locator('[data-nk="lock-trip"][data-v="hazirlaniyor"]').click();
   expect(await page.evaluate(() => window.__db.shp_trips[0].status)).toBe('hazirlaniyor');
   expect(problems).toEqual([]);
 });
