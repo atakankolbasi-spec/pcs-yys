@@ -13,3 +13,7 @@
 /saha.html
   ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
+
+/nakliye.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()

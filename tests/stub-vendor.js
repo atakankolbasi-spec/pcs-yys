@@ -24,7 +24,10 @@
     // Nakliye programı (supabase/nakliye-kurulumu.sql)
     shp_customers: (cfg.data && cfg.data.shp_customers) || [],
     shp_trips: (cfg.data && cfg.data.shp_trips) || [],
-    shp_loads: (cfg.data && cfg.data.shp_loads) || []
+    shp_loads: (cfg.data && cfg.data.shp_loads) || [],
+    shp_messages: (cfg.data && cfg.data.shp_messages) || [],
+    shp_outbox: (cfg.data && cfg.data.shp_outbox) || [],
+    shp_photos: (cfg.data && cfg.data.shp_photos) || []
   });
   const netError = () => ({ data: null, count: null, error: { message: 'TypeError: Failed to fetch', code: '' } });
   const clone = v => JSON.parse(JSON.stringify(v));
@@ -76,8 +79,9 @@
         if (table === 'registry' && st.rows.some(r => t.some(x => plate(x) === plate(r))))
           return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } };
         const shpDefaults = {
-          shp_customers: { active: true, carrier: '', cmr_notes: '', loading_place: 'İSTANBUL - Turkey', logo: '' },
-          shp_loads: { status: 'bekliyor', trip_id: null, arrived_at: null, arrived_by: '', note: '' }
+          shp_customers: { active: true, carrier: '', cmr_notes: '', loading_place: 'İSTANBUL - Turkey', logo: '', notify_phone: '', notify_events: { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true } },
+          shp_loads: { status: 'bekliyor', trip_id: null, arrived_at: null, arrived_by: '', note: '' },
+          shp_messages: { read_at: null, author: 'Ofis' }
         }[table];
         if (table === 'shp_customers' && st.rows.some(r => t.some(x => x.name === r.name))) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "shp_customers_name_key"' } };
         const added = st.rows.map(r => ({ ...(shpDefaults || {}), ...(table.startsWith('shp_') ? { id: 'shp' + (++shpSeq) } : {}), ...r, created_at: now(), updated_at: now() }));
@@ -86,7 +90,14 @@
       }
       if (st.op === 'update') {
         const hit = rowsNow();
-        hit.forEach(r => Object.assign(r, st.patch, { updated_at: now() }));
+        hit.forEach(r => {
+          const old = r.status; Object.assign(r, st.patch, { updated_at: now() });
+          if (table === 'shp_trips' && 'status' in st.patch && st.patch.status !== old) {
+            if (r.status === 'yolda') { r.departed_at = now(); r.delivered_at = null; } else if (r.status === 'teslim') { r.delivered_at = now(); r.departed_at = r.departed_at || now(); } else { r.departed_at = null; r.delivered_at = null; }
+            const c = db.shp_customers.find(x => x.id === r.customer_id), ev = r.status === 'yolda' ? 'yola' : r.status === 'teslim' ? 'teslim' : '';
+            if (ev && c && String(c.notify_phone || '').trim() && (c.notify_events || {})[ev] !== false) db.shp_outbox.push({ id: 'ob' + (++shpSeq), customer_id: r.customer_id, event: ev, phone: c.notify_phone, body: `${r.tractor} · ${r.poz_no}`, status: 'bekliyor', error: '', created_at: now(), sent_at: null });
+          }
+        });
         return { data: clone(hit.map(withFee)), error: null };
       }
       if (st.op === 'delete') {
@@ -301,7 +312,7 @@
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
       // data.shp_users: [{ id, customer_id, username, display_name, active, pw }]; kullanıcısı olan müşterinin bağlantısı giriş ister
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|login|logout|stamp|users_list|user_save|user_delete|log_list)$/.test(name)) {
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
         if (name === 'shp_stamp' && (cfg.missing || []).includes('shp-stamp')) return guardErr('PGRST202', 'Could not find the function public.shp_stamp');
         if (cfg.offline && /^shp_(portal|depot|stamp|login)/.test(name)) return netError();
@@ -309,6 +320,8 @@
         const bad = () => guardErr('42501', 'Bağlantı geçersiz ya da kapatılmış');
         const mk = () => 'k' + Math.random().toString(36).slice(2, 10);
         const loadJson = l => { const { created_by, updated_by, updated_at, ...x } = l; return clone(x); };
+        const qrNew = () => Math.random().toString(36).slice(2, 12).toUpperCase().padEnd(10, 'X');
+        const enqueue = (cid, ev, body) => { const c = db.shp_customers.find(x => x.id === cid); if (!c || !String(c.notify_phone || '').trim() || (c.notify_events || {})[ev] === false) return; db.shp_outbox.push({ id: 'ob' + (++shpSeq), customer_id: cid, event: ev, phone: c.notify_phone, body, status: 'bekliyor', error: '', created_at: now(), sent_at: null }); };
         const tripJson = t => { const { created_by, updated_by, ...x } = t; return clone(x); };
         const isEditor = !!session;
         const SS = (cfg.shpSessions = cfg.shpSessions || {});
@@ -400,7 +413,8 @@
           if (dk && dk.kind === 'depo' && dk.active) { ls = db.shp_loads; ts = db.shp_trips; }
           else { const ca = cAuth(params.p_token); if (ca.res) return ca.res; ls = db.shp_loads.filter(l => l.customer_id === ca.customer); ts = db.shp_trips.filter(t => t.customer_id === ca.customer); }
           const s = JSON.stringify([ls, ts]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-          return { data: `${ls.length}/${ts.length}/${s.length}/${h}`, error: null };
+          const ms = dk && dk.kind === 'depo' ? '' : '/' + JSON.stringify(db.shp_messages.filter(m => m.customer_id === (T[params.p_token] ? T[params.p_token].customer : (SS[params.p_token] ? (db.shp_users.find(u => u.id === SS[params.p_token]) || {}).customer_id : null)))).length;
+          return { data: `${ls.length}/${ts.length}/${s.length}/${h}${ms}`, error: null };
         }
         if (name.startsWith('shp_portal')) {
           const ca = cAuth(params.p_token); if (ca.res) return ca.res;
@@ -410,8 +424,62 @@
             return { data: { now: now(), customer: clone(c), user: ca.user ? { username: ca.user.username, name: ca.user.display_name || ca.user.username } : null,
               loads: db.shp_loads.filter(l => l.customer_id === k.customer).map(loadJson), trips: db.shp_trips.filter(t => t.customer_id === k.customer).map(tripJson),
               contacts: clone(db.shp_contacts.filter(x => x.customer_id === k.customer).slice().reverse()), vehicles: clone(db.shp_vehicles.filter(v => v.customer_id === k.customer)),
-              log: db.shp_log.filter(x => x.customer_id === k.customer).slice().reverse().slice(0, 60).map(x => ({ at: x.at, actor: x.role === 'operator' ? 'Ofis' : x.role === 'depo' ? 'Depo' : x.actor, action: x.action, summary: x.summary })) }, error: null };
+              log: db.shp_log.filter(x => x.customer_id === k.customer).slice().reverse().slice(0, 60).map(x => ({ at: x.at, actor: x.role === 'operator' ? 'Ofis' : x.role === 'depo' ? 'Depo' : x.actor, action: x.action, summary: x.summary })),
+              photo_counts: db.shp_photos.filter(p => p.customer_id === k.customer).reduce((m, p) => ((m[p.load_id] = (m[p.load_id] || 0) + 1), m), {}),
+              notify: { phone: c.notify_phone || '', events: c.notify_events || { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true } },
+              messages: db.shp_messages.filter(m => m.customer_id === k.customer).slice(-100).map(m => ({ id: m.id, from_role: m.from_role, author: m.from_role === 'ofis' ? 'Ofis' : m.author, body: m.body, load_id: m.load_id || null, trip_id: m.trip_id || null, created_at: m.created_at, read_at: m.read_at || null })) }, error: null };
           }
+          if (name === 'shp_portal_notify_save') {
+            const ph = String(params.p_phone || '').replace(/[^0-9+() -]/g, '').slice(0, 30), dg = ph.replace(/[^0-9]/g, '').length;
+            if (ph && (dg < 10 || dg > 15)) return guardErr('22023', 'Telefon numarasını ülke ya da alan koduyla yazın (örn. +90 5xx xxx xx xx)');
+            const c = db.shp_customers.find(x => x.id === k.customer), ev = { geldi: true, yola: true, teslim: true, sorun: true, mesaj: true, ...(c.notify_events || {}) };
+            Object.entries(params.p_events || {}).forEach(([a, b]) => { if (a in ev && typeof b === 'boolean') ev[a] = b; });
+            c.notify_phone = ph; c.notify_events = ev; log(k.customer, actor, 'Bildirim ayarı değiştirildi');
+            return { data: { phone: ph, events: ev }, error: null };
+          }
+          if (name === 'shp_portal_message_send') {
+            const b = String(params.p_body || '').replace(/\r/g, '').trim().slice(0, 1000);
+            if (!b) return guardErr('22023', 'Mesaj boş olamaz');
+            const own = (arr, id) => (id && arr.some(x => x.id === id && x.customer_id === k.customer) ? id : null);
+            const m = { id: 'msg' + (++shpSeq), customer_id: k.customer, from_role: 'musteri', author: actor, body: b, load_id: own(db.shp_loads, params.p_load), trip_id: own(db.shp_trips, params.p_trip), created_at: now(), read_at: null };
+            db.shp_messages.push(m); return { data: clone(m), error: null };
+          }
+          if (name === 'shp_portal_messages_read') { db.shp_messages.forEach(m => { if (m.customer_id === k.customer && m.from_role === 'ofis' && !m.read_at) m.read_at = now(); }); return { data: null, error: null }; }
+          if (name === 'shp_portal_import') {
+            const rows = params.p_loads;
+            if (!Array.isArray(rows) || rows.length < 1 || rows.length > 200) return guardErr('22023', 'Bir seferde 1 ile 200 arası satır eklenebilir');
+            for (let i = 0; i < rows.length; i++) if (!String(rows[i].sender || '').trim() || !String(rows[i].consignee || '').trim()) return guardErr('22023', `Satır ${i + 1}: Gönderici ve alıcı yazılmalı`);
+            rows.forEach(p => {
+              const l = { id: 'shp' + (++shpSeq), customer_id: k.customer, sender: p.sender, sender_addr: p.sender_addr || '', consignee: p.consignee, consignee_addr: p.consignee_addr || '', notify: p.notify || '', pieces: p.pieces || 0, packing: p.packing || 'KAP',
+                goods: p.goods || '', weight: p.weight || 0, volume: p.volume == null ? null : p.volume, country: p.country || '', code: p.code || '', dest_customs: p.dest_customs || '', broker: p.broker || '', expected_date: p.expected_date || null,
+                expected_time: p.expected_time || null, driver: p.driver || '', inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '', qr_code: qrNew(), status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, created_by: actor, created_at: now(), updated_at: now() };
+              db.shp_loads.push(l); remember(k.customer, l); log(k.customer, actor, 'Yük eklendi', lsum(l));
+            });
+            return { data: { count: rows.length }, error: null };
+          }
+          if (name === 'shp_portal_report') {
+            const ls = db.shp_loads.filter(l => l.customer_id === k.customer), ts = db.shp_trips.filter(t => t.customer_id === k.customer);
+            const wk = iso => { const d = new Date(iso); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+            const grp = fn => { const m = {}; ls.forEach(l => { const key = fn(l.created_at); m[key] = m[key] || { kg: 0, n: 0 }; m[key].kg += Number(l.weight) || 0; m[key].n++; }); return Object.entries(m).sort().map(([start, v]) => ({ start, kg: v.kg, loads: v.n })); };
+            const mk = now().slice(0, 7), pk = new Date(Date.UTC(+mk.slice(0, 4), +mk.slice(5) - 2, 1)).toISOString().slice(0, 7);
+            const inM = (l, key) => l.created_at.slice(0, 7) === key, sumKg = a => a.reduce((x, l) => x + (Number(l.weight) || 0), 0);
+            const top = {}; ls.forEach(l => { const n = l.consignee.toUpperCase(); top[n] = top[n] || { kg: 0, n: 0 }; top[n].kg += Number(l.weight) || 0; top[n].n++; });
+            const monthTrips = ts.filter(t => String(t.depart_date).slice(0, 7) === mk);
+            const fills = monthTrips.map(t => sumKg(ls.filter(l => l.trip_id === t.id)) / 24000 * 100), dd = ts.filter(t => t.delivered_at && t.departed_at).map(t => (Date.parse(t.delivered_at) - Date.parse(t.departed_at)) / 864e5);
+            return { data: { weeks: grp(wk).slice(-8), months: grp(i => i.slice(0, 7) + '-01').slice(-12),
+              top: Object.entries(top).map(([name, v]) => ({ name, kg: v.kg, loads: v.n })).sort((a, b) => b.loads - a.loads || b.kg - a.kg).slice(0, 8),
+              kpi: { month_loads: ls.filter(l => inM(l, mk)).length, month_kg: sumKg(ls.filter(l => inM(l, mk))), prev_loads: ls.filter(l => inM(l, pk)).length, prev_kg: sumKg(ls.filter(l => inM(l, pk))), month_trips: monthTrips.length,
+                avg_fill: fills.length ? Math.round(fills.reduce((a, b) => a + b, 0) / fills.length) : null, avg_days: dd.length ? Math.round(dd.reduce((a, b) => a + b, 0) / dd.length * 10) / 10 : null },
+              archive: ts.slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).map(t => ({ id: t.id, poz_no: t.poz_no, tractor: t.tractor, trailer: t.trailer, depart_date: t.depart_date, status: t.status,
+                loads: ls.filter(l => l.trip_id === t.id).length, kg: sumKg(ls.filter(l => l.trip_id === t.id)) })), today: now().slice(0, 10) }, error: null };
+          }
+          if (name === 'shp_portal_trip_docs') {
+            const t = db.shp_trips.find(x => x.id === params.p_trip && x.customer_id === k.customer);
+            if (!t) return guardErr('22023', 'Sefer bulunamadı');
+            return { data: { trip: tripJson(t), loads: db.shp_loads.filter(l => l.trip_id === t.id).map(loadJson) }, error: null };
+          }
+          if (name === 'shp_portal_photos') return { data: db.shp_photos.filter(p => p.load_id === params.p_load && p.customer_id === k.customer).map(p => ({ id: p.id, thumb: p.thumb, by: p.by_name, at: p.created_at })), error: null };
+          if (name === 'shp_portal_photo') { const p = db.shp_photos.find(x => x.id === params.p_photo && x.customer_id === k.customer); return p ? { data: p.data, error: null } : guardErr('22023', 'Fotoğraf bulunamadı'); }
           if (name === 'shp_portal_assign') {
             const ids = [...new Set(params.p_load_ids || [])];
             if (!ids.length) return guardErr('22023', 'Önce yük seçin');
@@ -460,18 +528,56 @@
           if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');
           const row = { sender: p.sender, sender_addr: p.sender_addr || '', consignee: p.consignee, consignee_addr: p.consignee_addr || '', notify: p.notify || '', pieces: p.pieces || 0, packing: p.packing || 'KAP',
             goods: p.goods || '', weight: p.weight || 0, volume: p.volume == null ? null : p.volume, country: p.country || '', code: p.code || '', dest_customs: p.dest_customs || '', broker: p.broker || '',
-            expected_date: p.expected_date || null, inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '' };
+            expected_date: p.expected_date || null, expected_time: p.expected_time || null, driver: p.driver || '', inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '' };
           if (p.id) {
             const l = db.shp_loads.find(x => x.id === p.id && x.customer_id === k.customer && ((['bekliyor', 'depoda'].includes(x.status) && !x.trip_id) || (x.status === 'aracta' && (db.shp_trips.find(t => t.id === x.trip_id) || {}).status === 'hazirlaniyor')));
             if (!l) return guardErr('22023', 'Yük bulunamadı ya da araç yola çıktığı için değiştirilemez');
             Object.assign(l, row, { updated_at: now(), updated_by: actor }); remember(k.customer, l); log(k.customer, actor, 'Yük düzenlendi', lsum(l)); return { data: loadJson(l), error: null };
           }
-          const l = { id: 'shp' + (++shpSeq), customer_id: k.customer, ...row, status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, created_by: actor, created_at: now(), updated_at: now() };
+          const l = { id: 'shp' + (++shpSeq), customer_id: k.customer, ...row, expected_time: p.expected_time || null, driver: p.driver || '', qr_code: qrNew(), status: 'bekliyor', arrived_at: null, arrived_by: '', trip_id: null, created_by: actor, created_at: now(), updated_at: now() };
           db.shp_loads.push(l); remember(k.customer, l); log(k.customer, actor, 'Yük eklendi', lsum(l)); return { data: loadJson(l), error: null };
         }
         if (!k || k.kind !== 'depo' || !k.active) return bad();
         actor = 'Depo · ' + (String(params.p_name || '').trim() || 'adı yazılmamış');
-        if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(tripJson) }, error: null };
+        if (name === 'shp_depot') return { data: { now: now(), customers: clone(db.shp_customers.filter(c => c.active)), loads: db.shp_loads.map(loadJson), trips: db.shp_trips.map(tripJson),
+          photo_counts: db.shp_photos.reduce((m, p) => ((m[p.load_id] = (m[p.load_id] || 0) + 1), m), {}) }, error: null };
+        const IMG = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+        if (name === 'shp_depot_photos') return { data: db.shp_photos.filter(p => p.load_id === params.p_load).map(p => ({ id: p.id, thumb: p.thumb, by: p.by_name, at: p.created_at })), error: null };
+        if (name === 'shp_depot_photo') { const p = db.shp_photos.find(x => x.id === params.p_photo); return p ? { data: p.data, error: null } : guardErr('22023', 'Fotoğraf bulunamadı'); }
+        if (name === 'shp_depot_photo_add') {
+          const l = db.shp_loads.find(x => x.id === params.p_load);
+          if (!l) return guardErr('22023', 'Yük bulunamadı');
+          if (db.shp_photos.filter(p => p.load_id === l.id).length >= 8) return guardErr('22023', 'Bir yüke en fazla 8 fotoğraf eklenebilir');
+          if (!IMG.test(String(params.p_thumb)) || !IMG.test(String(params.p_data))) return guardErr('22023', 'Fotoğraf geçersiz ya da çok büyük');
+          const ph = { id: 'ph' + (++shpSeq), load_id: l.id, customer_id: l.customer_id, thumb: params.p_thumb, data: params.p_data, by_name: String(params.p_name || '').trim(), created_at: now() };
+          db.shp_photos.push(ph); l.updated_at = now(); log(l.customer_id, actor, 'Fotoğraf eklendi', `${l.sender} → ${l.consignee}`);
+          return { data: { id: ph.id, thumb: ph.thumb, by: ph.by_name, at: ph.created_at }, error: null };
+        }
+        if (name === 'shp_depot_photo_del') { const i = db.shp_photos.findIndex(x => x.id === params.p_photo); if (i >= 0) { const l = db.shp_loads.find(x => x.id === db.shp_photos[i].load_id); db.shp_photos.splice(i, 1); if (l) l.updated_at = now(); } return { data: null, error: null }; }
+        if (name === 'shp_depot_receive') {
+          const l = db.shp_loads.find(x => x.id === params.p_id && ['bekliyor', 'depoda', 'aracta'].includes(x.status));
+          if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
+          const cond = params.p_condition || 'saglam';
+          if (!['saglam', 'eksik', 'hasarli'].includes(cond)) return guardErr('22023', 'Durum seçimi geçersiz');
+          const first = !l.arrived_at;
+          Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: l.arrived_at || now(), arrived_by: first ? String(params.p_name || '').trim() : l.arrived_by,
+            counted_pieces: params.p_counted_pieces == null ? null : params.p_counted_pieces, counted_weight: params.p_counted_weight == null ? null : params.p_counted_weight, condition: cond,
+            receive_note: String(params.p_note || '').trim(), location: String(params.p_location || '').trim(), updated_at: now(), updated_by: actor });
+          if (first) enqueue(l.customer_id, 'geldi', lsum(l));
+          if (cond !== 'saglam' || (l.counted_pieces != null && l.counted_pieces !== l.pieces)) enqueue(l.customer_id, 'sorun', `${l.sender} → ${l.consignee}: ${cond === 'eksik' ? 'eksik var' : cond === 'hasarli' ? 'hasarlı' : 'sayım farkı'}`);
+          log(l.customer_id, actor, first ? 'Depoya geldi olarak işaretlendi' : 'Depo teslim bilgisi girildi', lsum(l));
+          return { data: loadJson(l), error: null };
+        }
+        if (name === 'shp_depot_depart') {
+          const t = db.shp_trips.find(x => x.id === params.p_trip);
+          if (!t) return guardErr('22023', 'Sefer bulunamadı');
+          if (t.status !== 'hazirlaniyor') return guardErr('22023', 'Bu araç zaten yola çıkmış');
+          const ls = db.shp_loads.filter(l => l.trip_id === t.id);
+          if (!ls.length) return guardErr('22023', 'Araçta yük yok');
+          if (ls.some(l => !l.arrived_at)) return guardErr('22023', 'Depoya gelmemiş yük var; hepsi gelmeden araç yola çıkarılamaz (ofisle görüşün)');
+          Object.assign(t, { status: 'yolda', departed_at: now(), updated_at: now() }); enqueue(t.customer_id, 'yola', `${t.tractor} · ${t.poz_no}`); log(t.customer_id, actor, 'Sefer kilitlendi (yola çıktı)', t.poz_no);
+          return { data: tripJson(t), error: null };
+        }
         if (name === 'shp_depot_save') {
           const p = params.p_load || {};
           if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');
@@ -479,7 +585,7 @@
           if (!l) return guardErr('22023', 'Yük bulunamadı');
           Object.assign(l, { sender: p.sender, consignee: p.consignee, sender_addr: p.sender_addr || '', consignee_addr: p.consignee_addr || '', notify: p.notify || '', pieces: p.pieces || 0, packing: p.packing || 'KAP',
             goods: p.goods || '', weight: p.weight || 0, volume: p.volume == null ? null : p.volume, country: p.country || '', code: p.code || '', dest_customs: p.dest_customs || '', broker: p.broker || '',
-            expected_date: p.expected_date || null, inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '', updated_at: now(), updated_by: actor });
+            expected_date: p.expected_date || null, expected_time: p.expected_time || null, driver: p.driver || '', inbound_plate: String(p.inbound_plate || '').toUpperCase(), note: p.note || '', updated_at: now(), updated_by: actor });
           log(l.customer_id, actor, 'Yük düzenlendi', lsum(l));
           return { data: loadJson(l), error: null };
         }
@@ -491,7 +597,7 @@
         const l = db.shp_loads.find(x => x.id === params.p_id && (params.p_arrived === false ? ['depoda', 'aracta'].includes(x.status) && x.arrived_at : ['bekliyor', 'depoda', 'aracta'].includes(x.status)));
         if (!l) return guardErr('22023', 'Yük bulunamadı ya da bu işlem artık yapılamaz');
         if (params.p_arrived === false) Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'bekliyor', arrived_at: null, arrived_by: '', updated_at: now(), updated_by: actor });
-        else Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now(), updated_by: actor });
+        else { const was = !!l.arrived_at; Object.assign(l, { status: l.status === 'aracta' ? 'aracta' : 'depoda', arrived_at: now(), arrived_by: String(params.p_name || '').trim(), updated_at: now(), updated_by: actor }); if (!was) enqueue(l.customer_id, 'geldi', lsum(l)); }
         log(l.customer_id, actor, params.p_arrived === false ? 'Geldi işareti geri alındı' : 'Depoya geldi olarak işaretlendi', lsum(l));
         return { data: loadJson(l), error: null };
       }

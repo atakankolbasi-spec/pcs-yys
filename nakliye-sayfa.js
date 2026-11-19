@@ -4,7 +4,9 @@
  *            Yazdığı firma ve araç bilgileri kendiliğinden saklanır, bir daha yazmaya gerek kalmaz.
  *   Depo:    şifresiz bağlantı; gelen yükü "Geldi" diye işaretler (tek tek ya da seçilenleri topluca), yük bilgisini düzeltir.
  * Ekranlar 5 saniyede bir kendiliğinden yenilenir: önce hafif bir değişiklik damgası (shp_stamp) sorulur, değiştiyse veri çekilir.
- * Yetki sunucuda denetlenir (supabase/nakliye-kurulumu.sql). */
+ * Yetki sunucuda denetlenir (supabase/nakliye-kurulumu.sql).
+ * Ek ekranlar ayrı dosyalarda (nakliye-musteri.js: takip, rapor, yazışma, Excel; nakliye-depo.js: program, okut, teslim alma; nakliye-qr.js: QR etiket ve okuyucu)
+ * ve window.PCSNKP üzerinden bu çekirdeğe bağlanır. */
 (() => {
   'use strict';
   const B = window.PCSNKB;
@@ -22,8 +24,10 @@
   const POLL_MS = 5000;
   const P = { data: null, err: '', loading: false, polling: false, down: 0, at: '', stamp: '', noStamp: false, live: '', needLogin: MODE === 'm' && !TOKEN, tab: 'bekliyor', scope: 'free', q: '', cf: '',
     confirm: '', name: '', busy: '', sel: new Set(), target: '', nv: { tractor: '', trailer: '', date: '' }, open: new Set(), editTrip: '', te: { tractor: '', trailer: '', date: '', subject: '' },
-    qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, login: { u: '', p: '', err: '', busy: false } };
+    qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, page: 'plan', login: { u: '', p: '', err: '', busy: false } };
   try { P.name = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* kayıt yoksa boş kalır */ }
+  // Ek ekranların (nakliye-musteri.js, nakliye-depo.js, nakliye-qr.js) bağlandığı yer
+  const X = window.PCSNKP = { views: {}, act: {}, inp: [], submit: {}, after: [], onDraw: [], enter: {}, sideHtml: null, closeSide: null };
 
   // ------------------------------------------------------------------ küçük yardımcılar
   const I = {
@@ -33,7 +37,7 @@
     undo: '<path d="M9 7L4 12l5 5M4 12h9a6 6 0 010 12"/>', doc: '<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>', search: '<circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/>',
     box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>', clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>', close: '<path d="M6 6l12 12M6 18L18 6"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>', out: '<path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/>', print: '<path d="M7 9V4h10v5M7 17H5v-6h14v6h-2M7 14h10v6H7z"/>',
-    bell: '<path d="M6 17v-6a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/>', down: '<path d="M6 9l6 6 6-6"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'
+    bell: '<path d="M6 17v-6a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', qr: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6h-6"/>', upload: '<path d="M12 16V5M7 9l5-5 5 5M4 19h16"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>', warn: '<path d="M12 4l9 16H3zM12 10v5M12 18h.01"/>', sheet: '<path d="M5 4h14v16H5zM5 10h14M5 15h14M11 4v16"/>', wa: '<path d="M4 20l1.3-4.2A8 8 0 1 1 8.4 18.8z"/><path d="M9 9c.3 2.5 2.5 4.7 5.5 5.5l1.3-1.3-2-1-1 .7c-.8-.4-1.6-1.2-2-2l.7-1-1-2z"/>', download: '<path d="M12 4v11M7 11l5 5 5-5M4 19h16"/>', pin: '<path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>', down: '<path d="M6 9l6 6 6-6"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'
   };
   const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${I[n] || ''}</svg>`;
   const tr = s => String(s || '').toLocaleUpperCase('tr-TR');
@@ -51,6 +55,7 @@
   const parseNum = v => { let s = String(v ?? '').replace(/\s/g, ''); if (!s) return null; if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.'); else if (s.includes(',')) s = s.replace(',', '.'); const n = Number(s); return Number.isFinite(n) ? n : NaN; };
   const plate = (p, cls = '') => p ? `<span class="pl ${cls}">${esc(p)}</span>` : '';
   const dash = '<span class="mut">—</span>';
+  const condChip = l => l.condition === 'eksik' ? '<span class="ch r">Eksik var</span>' : l.condition === 'hasarli' ? '<span class="ch r">Hasarlı</span>' : (l.counted_pieces != null && l.counted_pieces !== l.pieces ? '<span class="ch r">Sayım farkı</span>' : '');
   const pct = w => Math.round((Number(w) || 0) / CAP * 100);
   const isFree = l => (l.status === 'bekliyor' || l.status === 'depoda') && !l.trip_id;
   const canEdit = l => isFree(l) || (l.status === 'aracta' && (tripOf(l.trip_id) ? !locked(tripOf(l.trip_id)) : false));
@@ -123,6 +128,7 @@
       for (const id of [...P.sel]) { const l = (P.data.loads || []).find(x => x.id === id); if (!l || !selectable(l)) P.sel.delete(id); }
       if (P.drawer && !(P.data.loads || []).some(x => x.id === P.drawer)) P.drawer = '';
       if (P.target && P.target !== 'new') { const tt = tripOf(P.target); if (!tt || locked(tt)) P.target = ''; }
+      X.after.forEach(f => { try { f(); } catch (_) { /* ek ekran hatası ana ekranı bozmasın */ } });
     }
     draw();
   }
@@ -170,16 +176,16 @@
   const F = [  // [alan, etiket, tür, geniş mi, bölüm]
     ['sender', 'Gönderici', 'text', 0, 0], ['consignee', 'Alıcı', 'text', 0, 0], ['sender_addr', 'Gönderici adresi', 'area', 0, 0], ['consignee_addr', 'Alıcı adresi', 'area', 0, 0], ['notify', 'Notify (bildirim adresi)', 'area', 1, 0],
     ['goods', 'Mal cinsi', 'text', 1, 1], ['pieces', 'Kap adedi', 'num', 0, 1], ['packing', 'Ambalaj', 'text', 0, 1], ['weight', 'Brüt kilo (kg)', 'num', 0, 1], ['volume', 'Hacim (m³)', 'num', 0, 1],
-    ['dest_customs', 'Varış gümrük', 'text', 0, 2], ['country', 'Ülke', 'text', 0, 2], ['code', 'Gümrük kodu', 'text', 0, 2], ['broker', 'Gümrükçü', 'text', 0, 2], ['expected_date', 'Beklenen tarih', 'date', 0, 2],
-    ['inbound_plate', 'Yükü getirecek kamyon plakası', 'plate', 0, 3], ['note', 'Not', 'text', 1, 3]
+    ['dest_customs', 'Varış gümrük', 'text', 0, 2], ['country', 'Ülke', 'text', 0, 2], ['code', 'Gümrük kodu', 'text', 0, 2], ['broker', 'Gümrükçü', 'text', 0, 2], ['expected_date', 'Beklenen tarih', 'date', 0, 2], ['expected_time', 'Beklenen saat (depoya varış)', 'time', 0, 2],
+    ['inbound_plate', 'Yükü getirecek kamyon plakası', 'plate', 0, 3], ['driver', 'Şoför adı ve telefonu', 'text', 0, 3], ['note', 'Not', 'text', 1, 3]
   ];
   const SEC = ['Taraflar', 'Mal bilgisi', 'Varış ve teslim', 'Yükü getirecek araç'];
   const LIST = { sender: 'dl-sender', consignee: 'dl-consignee', inbound_plate: 'dl-plate' };
-  const blank = () => ({ id: '', sender: '', consignee: '', pieces: '', packing: 'KAP', goods: '', weight: '', dest_customs: '', country: '', expected_date: '', sender_addr: '', consignee_addr: '', notify: '', volume: '', code: '', broker: '', inbound_plate: '', note: '' });
+  const blank = () => ({ id: '', sender: '', consignee: '', pieces: '', packing: 'KAP', goods: '', weight: '', dest_customs: '', country: '', expected_date: '', expected_time: '', driver: '', sender_addr: '', consignee_addr: '', notify: '', volume: '', code: '', broker: '', inbound_plate: '', note: '' });
   const inp = (k, lab, kind, wide, v) => {
     const req = k === 'sender' || k === 'consignee';
     const t = kind === 'area' ? `<textarea id="f-${k}" name="${k}" rows="2" maxlength="300">${esc(v)}</textarea>` :
-      `<input id="f-${k}" name="${k}" type="${kind === 'date' ? 'date' : 'text'}" ${kind === 'num' ? 'inputmode="decimal"' : ''} value="${esc(v)}" maxlength="${k === 'note' ? 500 : kind === 'plate' ? 40 : 200}" ${req ? 'required' : ''} ${LIST[k] ? `list="${LIST[k]}"` : ''} ${kind === 'plate' ? 'style="text-transform:uppercase" placeholder="Örn. 34 ABC 123"' : ''} autocomplete="off">`;
+      `<input id="f-${k}" name="${k}" type="${kind === 'date' ? 'date' : kind === 'time' ? 'time' : 'text'}" ${kind === 'num' ? 'inputmode="decimal"' : ''} value="${esc(v)}" maxlength="${k === 'note' ? 500 : kind === 'plate' ? 40 : 200}" ${req ? 'required' : ''} ${LIST[k] ? `list="${LIST[k]}"` : ''} ${kind === 'plate' ? 'style="text-transform:uppercase" placeholder="Örn. 34 ABC 123"' : ''} autocomplete="off">`;
     return `<label class="fld ${wide ? 'wide' : ''}"><span>${lab}${req ? ' <i>*</i>' : ''}</span>${t}</label>`;
   };
   function openForm(l) {
@@ -207,7 +213,7 @@
     if ([w, v, pc].some(Number.isNaN)) return err('Kap, kilo ve hacim sayı olarak yazılmalı.');
     if ((w || 0) < 0 || (v || 0) < 0 || (pc || 0) < 0 || (pc || 0) % 1) return err('Kap, kilo ve hacim eksi olamaz; kap tam sayı olmalı.');
     const row = { id: g('id') || undefined, sender: g('sender'), consignee: g('consignee'), pieces: pc || 0, packing: g('packing') || 'KAP', goods: g('goods'), weight: w || 0, volume: v == null ? null : v,
-      dest_customs: g('dest_customs'), country: g('country'), expected_date: g('expected_date') || null, sender_addr: g('sender_addr'), consignee_addr: g('consignee_addr'), notify: g('notify'), code: g('code'), broker: g('broker'),
+      dest_customs: g('dest_customs'), country: g('country'), expected_date: g('expected_date') || null, expected_time: g('expected_time') || null, driver: g('driver'), sender_addr: g('sender_addr'), consignee_addr: g('consignee_addr'), notify: g('notify'), code: g('code'), broker: g('broker'),
       inbound_plate: g('inbound_plate').toUpperCase(), note: g('note') };
     P.busy = 'save';
     const btn = form.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
@@ -252,8 +258,8 @@
     const state = t ? `<span class="ch b">${esc(t.poz_no)} · ${esc(B.plates(t))}</span>` : '';
     return `<li class="lo ${sel ? 'sel' : ''}"><span class="cbx">${fr ? `<input type="checkbox" data-a="pick" data-id="${esc(l.id)}" ${sel ? 'checked' : ''} aria-label="Araca koymak için seç: ${esc(l.sender)}">` : ''}</span>
 <div class="lm"><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}${l.goods ? ` · ${esc(l.goods)}` : ''} · ${esc(l.pieces)} ${esc(l.packing)} · ${kg(l.weight)} kg</small>
-<div class="chs">${state}${t ? (l.arrived_at ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Depoya gelmedi</span>') : chip(l)}${l.inbound_plate ? plate(l.inbound_plate, 'in sm') : ''}${!l.arrived_at && l.expected_date ? `<span class="ch n">Beklenen ${esc(B.dmy(l.expected_date))}</span>` : ''}</div></div>
-<span class="le">${canEdit(l) ? `<button type="button" class="ib" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button>` : ''}${canDel(l) ? `<button type="button" class="ib bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Sil" aria-label="Sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</span></li>`;
+<div class="chs">${state}${t ? (l.arrived_at ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Depoya gelmedi</span>') : chip(l)}${l.inbound_plate ? plate(l.inbound_plate, 'in sm') : ''}${!l.arrived_at && l.expected_date ? `<span class="ch n">Beklenen ${esc(B.dmy(l.expected_date))}${l.expected_time ? ' ' + esc(l.expected_time) : ''}</span>` : ''}${condChip(l)}</div></div>
+<span class="le"><button type="button" class="ib" data-a="label" data-id="${esc(l.id)}" title="Etiket yazdır" aria-label="Etiket yazdır: ${esc(l.sender)}">${ic('qr')}</button>${canEdit(l) ? `<button type="button" class="ib" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button>` : ''}${canDel(l) ? `<button type="button" class="ib bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Sil" aria-label="Sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</span></li>`;
   }
   function panel1(all, free) {
     const rows = (P.scope === 'all' ? all : free).filter(hit), qa = P.qa;
@@ -264,7 +270,7 @@
 <div class="r3"><input id="qa-goods" data-i="qa-goods" value="${esc(qa.goods)}" placeholder="Mal cinsi" aria-label="Mal cinsi" maxlength="200"><input id="qa-pieces" data-i="qa-pieces" value="${esc(qa.pieces)}" placeholder="Kap" aria-label="Kap adedi" inputmode="numeric" maxlength="8"><input id="qa-weight" data-i="qa-weight" value="${esc(qa.weight)}" placeholder="Kilo" aria-label="Brüt kilo (kg)" inputmode="decimal" maxlength="12"></div>
 <label class="qp">${ic('truck')}<input id="qa-plate" data-i="qa-plate" list="dl-plate" value="${esc(qa.plate)}" placeholder="Getirecek kamyon plakası" aria-label="Yükü getirecek kamyon plakası" maxlength="40" style="text-transform:uppercase"></label>
 <div id="qa-hint" class="qhint" ${hint ? '' : 'hidden'}>${hint}</div><div id="qa-err" class="ferr" hidden role="alert"></div>
-<div class="qb"><button type="submit" class="btn pri" ${P.busy === 'quick' ? 'disabled' : ''}>${ic('plus')}Hızlı ekle</button><button type="button" class="lnk" data-a="add-full">Tüm alanlarla ekle</button></div></form>
+<div class="qb"><button type="submit" class="btn pri" ${P.busy === 'quick' ? 'disabled' : ''}>${ic('plus')}Hızlı ekle</button><button type="button" class="lnk" data-a="add-full">Tüm alanlarla ekle</button><button type="button" class="lnk" data-a="import">${ic('sheet')}Excel'den ekle</button></div></form>
 <div class="lbar"><div class="seg" role="tablist">${sc.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.scope === k}" class="${P.scope === k ? 'on' : ''}" data-a="scope" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>${searchBar('Ara…')}</div>
 ${rows.length ? `<ul class="lol">${rows.map(loadRow).join('')}</ul>` : `<div class="empty">${all.length ? 'Bu görünümde yük yok.' : 'Henüz yük yazmadınız. Yukarıdaki alanlara gönderici ve alıcıyı yazıp "Hızlı ekle" deyin.'}</div>`}</section>`;
   }
@@ -309,9 +315,15 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
 <button type="button" class="btn pri wide" data-a="doc" data-kind="lade" data-id="${esc(t.id)}">${ic('doc')}Lade Liste · PDF / yazdır</button><button type="button" class="btn wide" data-a="doc" data-kind="cmr" data-id="${esc(t.id)}">${ic('doc')}CMR · PDF / yazdır</button><button type="button" class="btn wide" data-a="docs-both" data-id="${esc(t.id)}">${ic('print')}İkisini birlikte aç</button>
 <div class="tip">${ic('lock')}<div>${lk ? 'Bu araç yola çıktı ve kilitlendi. Değişiklik için ofisimizle görüşün.' : 'Araç yola çıkınca ofisimiz kilitler; sonrasında değişiklik için bizimle görüşün.'}</div></div>${logHtml}</section>`;
   }
+  const unread = () => ((P.data && P.data.messages) || []).filter(m => m.from_role === 'ofis' && !m.read_at).length;
+  const pageNav = () => {
+    const un = unread(), pages = [['plan', 'Yükler ve araçlar', 'truck'], ['takip', 'Takip', 'clock'], ['rapor', 'Rapor ve arşiv', 'doc'], ['yazisma', 'Ofisle yazışma', 'chat']];
+    return `<nav class="pnav" aria-label="Sayfalar">${pages.map(([k, l, i]) => `<button type="button" class="${P.page === k ? 'on' : ''}" aria-current="${P.page === k}" data-a="page" data-v="${k}">${ic(i)}${l}${k === 'yazisma' && un ? `<span class="bdg">${un}</span>` : ''}</button>`).join('')}</nav>`;
+  };
   function customerView() {
     const d = P.data, all = d.loads || [], free = all.filter(isFree), trips = sortedTrips();
-    return `${topCustomer()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}`;
+    if (P.page !== 'plan' && X.views[P.page]) return `${topCustomer()}${pageNav()}<main class="pg2">${X.views[P.page]()}</main>${datalists()}`;
+    return `${topCustomer()}${pageNav()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}`;
   }
 
   // ------------------------------------------------------------------ depo sayfası (masa başı tablo)
@@ -331,9 +343,9 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     const t = tripOf(l.trip_id), sel = P.sel.has(l.id), arrived = !!l.arrived_at, ck = selectable(l);
     const act = arrived ? `<button type="button" class="btn undo" data-a="undo" data-id="${esc(l.id)}" ${P.busy === l.id ? 'disabled' : ''}>${ic('undo')}Geri al</button>` : `<button type="button" class="btn go" data-a="arrive" data-id="${esc(l.id)}" ${P.busy === l.id ? 'disabled' : ''}>${ic('check')}Geldi</button>`;
     return `<tr class="dr ${sel ? 'sel' : ''} ${P.drawer === l.id ? 'cur' : ''}"><td class="ck">${ck ? `<input type="checkbox" data-a="pick" data-id="${esc(l.id)}" ${sel ? 'checked' : ''} aria-label="Seç: ${esc(l.sender)}">` : ''}</td>
-<td data-l="Gönderici → Alıcı" class="who2"><b>${esc(l.sender)} → ${esc(l.consignee)}</b>${l.dest_customs ? `<small>${esc(l.dest_customs)}</small>` : ''}${t && mode !== 'trip' ? `<small class="tp">${esc(t.poz_no)} · ${esc(B.plates(t))}</small>` : ''}</td>
+<td data-l="Gönderici → Alıcı" class="who2"><b>${esc(l.sender)} → ${esc(l.consignee)}</b>${l.dest_customs ? `<small>${esc(l.dest_customs)}</small>` : ''}${t && mode !== 'trip' ? `<small class="tp">${esc(t.poz_no)} · ${esc(B.plates(t))}</small>` : ''}${l.location || condChip(l) ? `<small>${l.location ? `${ic('pin')}${esc(l.location)} ` : ''}${condChip(l)}</small>` : ''}</td>
 <td data-l="Mal">${esc(l.goods) || dash}</td><td data-l="Kap · Kilo" class="r">${esc(l.pieces)} · ${kg(l.weight)} kg</td><td data-l="Getirecek araç">${l.inbound_plate ? plate(l.inbound_plate, 'in') : dash}</td>
-<td data-l="${arrived ? 'Geldi' : 'Beklenen'}">${when(l)}</td><td class="act">${act}<button type="button" class="ib sq" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button>${canDel(l) ? `<button type="button" class="ib sq bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Sil" aria-label="Sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</td></tr>`;
+<td data-l="${arrived ? 'Geldi' : 'Beklenen'}">${when(l)}</td><td class="act">${act}<button type="button" class="ib sq" data-a="recv" data-id="${esc(l.id)}" title="Teslim al: sayım, fotoğraf, not, raf" aria-label="Teslim al: ${esc(l.sender)}">${ic('camera')}</button><button type="button" class="ib sq" data-a="label" data-id="${esc(l.id)}" title="Etiket yazdır" aria-label="Etiket yazdır: ${esc(l.sender)}">${ic('qr')}</button><button type="button" class="ib sq" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button>${canDel(l) ? `<button type="button" class="ib sq bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Sil" aria-label="Sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</td></tr>`;
   }
   function kpi5(S) {
     const arrToday = S.all.filter(l => l.arrived_at && new Date(l.arrived_at).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }) === today()).length;
@@ -353,7 +365,7 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
       const ts = tripsShown(S);
       body = ts.length ? `<table class="tbl dt">${head(true)}<tbody>${ts.map(t => {
         const n = B.order(S.all.filter(l => l.trip_id === t.id));
-        return `<tr class="g gt"><td colspan="7"><span class="gtl">${plate(t.tractor)}${plate(t.trailer, 'alt')}<b>${esc(t.poz_no)}</b> <span class="mut">· ${esc(cu(t.customer_id))} · ${esc(B.dmy(t.depart_date))}${locked(t) ? ' · yolda' : ''}</span></span><span class="acts">${docButtons(t)}</span></td></tr>${n.map(l => depotRow(l, 'trip')).join('')}`;
+        return `<tr class="g gt"><td colspan="7"><span class="gtl">${plate(t.tractor)}${plate(t.trailer, 'alt')}<b>${esc(t.poz_no)}</b> <span class="mut">· ${esc(cu(t.customer_id))} · ${esc(B.dmy(t.depart_date))}${locked(t) ? ' · yolda' : ''}</span> <span class="ch ${n.every(l => l.arrived_at) ? 'g' : 'a'}">${n.filter(l => l.arrived_at).length}/${n.length} yük geldi</span></span><span class="acts">${docButtons(t)}</span></td></tr>${n.map(l => depotRow(l, 'trip')).join('')}`;
       }).join('')}</tbody></table>` : '<div class="empty">Araca atanmış yük yok.</div>';
     } else {
       const rows = rowsOf.filter(l => (!cf || l.customer_id === cf) && hit(l)), by = {};
@@ -361,10 +373,12 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
       const ids = Object.keys(by).sort((a, b) => tr(cu(a)).localeCompare(tr(cu(b)), 'tr'));
       body = ids.length ? `<table class="tbl dt">${head(true)}<tbody>${ids.map(id => `<tr class="g"><td colspan="7">${esc(cu(id))} <span class="mut">· ${by[id].length} yük · ${kg(sum(by[id], 'weight'))} kg</span></td></tr>${by[id].map(l => depotRow(l, 'list')).join('')}`).join('')}</tbody></table>` : `<div class="empty">${P.tab === 'depoda' ? 'Depoda araca atanmamış yük yok.' : 'Bekleyen yük yok.'}</div>`;
     }
-    const tabs = [['bekliyor', 'Bekleyenler', S.wait.length], ['depoda', 'Depoda', S.idle.length], ['araclar', 'Araçlar', S.trips.length]];
+    const tabs = [['bekliyor', 'Bekleyenler', S.wait.length], ['depoda', 'Depoda', S.idle.length], ['araclar', 'Araçlar', S.trips.length], ['program', 'Program', ''], ['okut', 'Okut', '']];
+    const ext = P.tab === 'program' || P.tab === 'okut';
+    const side = P.drawer ? drawerHtml() : (X.sideHtml ? X.sideHtml() : '');
     return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>Depo ekranı</b><small>Nakliye portalı${P.name.trim() ? ` · ${esc(P.name.trim())}` : ''}</small></div></div><div class="who"><label class="nm ${P.name.trim() ? '' : 'need'}"><span>Adınız</span><input id="nm" data-i="name" value="${esc(P.name)}" maxlength="60" autocomplete="off" placeholder="İşlemler adınızla kaydedilir"></label>${liveHtml()}<button type="button" class="btn sm" data-a="refresh">${ic('refresh')}Yenile</button><button type="button" class="btn sm" data-a="print">${ic('print')}Listeyi yazdır</button></div></div></header>
-<main class="dwrap">${kpi5(S)}<div class="tools"><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>${chips}${searchBar('Plaka, firma, mal ara…')}</div>
-<div class="dmain ${P.drawer ? 'with' : ''}"><div class="card flush scroll">${body}</div>${P.drawer ? drawerHtml() : ''}</div></main>${bulkBar()}${dl('dl-plate', uniq(S.all.map(l => l.inbound_plate)))}`;
+<main class="dwrap">${ext ? '' : kpi5(S)}<div class="tools"><div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" class="${P.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}${n === '' ? '' : `<span>${n}</span>`}</button>`).join('')}</div>${ext ? '' : chips + searchBar('Plaka, firma, mal ara…')}</div>
+${ext ? (X.views['d-' + P.tab] ? X.views['d-' + P.tab](S) : '') + (side ? `<div class="dmain with side-only">${side}</div>` : '') : `<div class="dmain ${side ? 'with' : ''}"><div class="card flush scroll">${body}</div>${side}</div>`}</main>${ext ? '' : bulkBar()}${dl('dl-plate', uniq(S.all.map(l => l.inbound_plate)))}`;
   }
   const tripsShown = S => S.trips.filter(t => !P.q || [t.poz_no, t.tractor, t.trailer, (custOf(t.customer_id) || {}).name].some(x => tr(x).includes(tr(P.q))));
   const visibleSel = () => {
@@ -379,15 +393,17 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     const undo = P.tab === 'depoda';
     return `<div class="bulk" role="region" aria-label="Seçili yükler"><b>${sl.length} yük seçili</b><span class="bs">${sum(sl, 'pieces')} kap · ${kg(sum(sl, 'weight'))} kg</span><button type="button" class="btn go" data-a="bulk" ${P.busy === 'bulk' ? 'disabled' : ''}>${ic('check')}${P.busy === 'bulk' ? 'İşaretleniyor…' : undo ? 'Seçilileri geri al' : 'Seçilileri geldi işaretle'}</button><button type="button" class="bx" data-a="clear" aria-label="Seçimi temizle">${ic('close')}</button></div>`;
   }
-  const DRF = ['sender', 'consignee', 'pieces', 'weight', 'goods', 'inbound_plate', 'dest_customs', 'expected_date'];
-  function openDrawer(l) { P.drawer = l.id; P.confirm = ''; P.dr = Object.fromEntries(DRF.map(k => [k, l[k] == null ? '' : String(l[k])])); }
+  const DRF = ['sender', 'consignee', 'pieces', 'weight', 'goods', 'inbound_plate', 'driver', 'dest_customs', 'expected_date', 'expected_time'];
+  function openDrawer(l) { if (X.closeSide) X.closeSide(); P.drawer = l.id; P.confirm = ''; P.dr = Object.fromEntries(DRF.map(k => [k, l[k] == null ? '' : String(l[k])])); }
   function drawerHtml() {
     const l = (P.data.loads || []).find(x => x.id === P.drawer); if (!l) return '';
     const f = P.dr, fld = (k, lab, extra = '') => `<label class="fld"><span>${lab}</span><input id="dr-${k}" data-i="dr-${k}" value="${esc(f[k])}" maxlength="200" autocomplete="off" ${extra}></label>`;
     return `<aside class="drw" id="drw" aria-label="Yükü düzenle"><div class="dhd"><b>Yükü düzenle</b><button type="button" class="x" data-a="dclose" aria-label="Kapat">${ic('close')}</button></div>
 <div class="dbody">${fld('sender', 'Gönderici')}${fld('consignee', 'Alıcı')}<div class="g2">${fld('pieces', 'Kap', 'inputmode="numeric"')}${fld('weight', 'Brüt kilo', 'inputmode="decimal"')}</div>${fld('goods', 'Mal cinsi')}
 <label class="fld"><span>Getirecek kamyon plakası</span><input id="dr-inbound_plate" data-i="dr-inbound_plate" list="dl-plate" value="${esc(f.inbound_plate)}" maxlength="40" autocomplete="off" placeholder="Örn. 34 ABC 123" style="text-transform:uppercase"></label>
-<div class="g2">${fld('dest_customs', 'Varış gümrük')}<label class="fld"><span>Beklenen</span><input id="dr-expected_date" data-i="dr-expected_date" type="date" value="${esc(f.expected_date)}"></label></div><div id="derr" class="ferr" hidden role="alert"></div></div>
+${fld('driver', 'Şoför adı ve telefonu')}
+<div class="g2">${fld('dest_customs', 'Varış gümrük')}<label class="fld"><span>Beklenen tarih</span><input id="dr-expected_date" data-i="dr-expected_date" type="date" value="${esc(f.expected_date)}"></label></div>
+<label class="fld"><span>Beklenen saat</span><input id="dr-expected_time" data-i="dr-expected_time" type="time" value="${esc(f.expected_time)}"></label><div id="derr" class="ferr" hidden role="alert"></div></div>
 <div class="dft">${canDel(l) ? `<button type="button" class="btn danger" data-a="ddel" data-id="${esc(l.id)}">${ic('trash')}${P.confirm === 'dr' + l.id ? 'Emin misiniz? Evet, sil' : 'Sil'}</button>` : ''}<span class="sp"></span><button type="button" class="btn" data-a="dclose">Vazgeç</button><button type="button" class="btn pri" data-a="dsave" ${P.busy === 'dsave' ? 'disabled' : ''}>${ic('check')}Kaydet</button></div></aside>`;
   }
   async function saveDrawer() {
@@ -398,7 +414,7 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     if ([w, pc].some(Number.isNaN) || (w || 0) < 0 || (pc || 0) < 0 || (pc || 0) % 1) return err('Kap tam sayı, kilo sayı olmalı (eksi olamaz).');
     const keep = {}; ['sender_addr', 'consignee_addr', 'notify', 'packing', 'volume', 'country', 'code', 'broker', 'note'].forEach(k => { keep[k] = l[k] == null ? (k === 'volume' ? null : '') : l[k]; });
     const row = { ...keep, id: l.id, sender: String(f.sender).trim(), consignee: String(f.consignee).trim(), pieces: pc || 0, weight: w || 0, goods: String(f.goods).trim(), inbound_plate: String(f.inbound_plate).trim().toUpperCase(),
-      dest_customs: String(f.dest_customs).trim(), expected_date: f.expected_date || null };
+      driver: String(f.driver).trim(), dest_customs: String(f.dest_customs).trim(), expected_date: f.expected_date || null, expected_time: f.expected_time || null };
     P.busy = 'dsave'; draw();
     const { error } = await client.rpc('shp_depot_save', { p_token: TOKEN, p_load: row, p_name: P.name.trim() });
     P.busy = '';
@@ -433,6 +449,7 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     if (id) { const el = document.getElementById(id); if (el) { el.focus(); try { el.setSelectionRange(s0, s1); } catch (_) { /* tarih alanı */ } } }
     if (window.scrollY !== y) window.scrollTo(0, y);
     const dw = document.getElementById('drw'); if (dw && dy) dw.scrollTop = dy;
+    X.onDraw.forEach(f => { try { f(); } catch (_) { /* ek ekran hatası ana ekranı bozmasın */ } });
   }
 
   async function assign() {
@@ -476,9 +493,11 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
   async function onClick(e) {
     const t = e.target.closest('[data-a]'); if (!t) return;
     const a = t.dataset.a, id = t.dataset.id;
+    if (X.act[a]) { await X.act[a](t, e, id); return; }
     if (a === 'refresh') { P.err = ''; await load(); return; }
+    if (a === 'page') { P.page = t.dataset.v; if (X.enter[P.page]) X.enter[P.page](); draw(); window.scrollTo(0, 0); return; }
     if (a === 'logout') { await doLogout(); return; }
-    if (a === 'tab') { P.tab = t.dataset.v; P.confirm = ''; P.sel.clear(); P.drawer = ''; draw(); return; }
+    if (a === 'tab') { P.tab = t.dataset.v; P.confirm = ''; P.sel.clear(); P.drawer = ''; if (X.closeSide) X.closeSide(); if (X.enter['d-' + P.tab]) X.enter['d-' + P.tab](); draw(); return; }
     if (a === 'scope') { P.scope = t.dataset.v; draw(); return; }
     if (a === 'chip') { P.cf = id || ''; P.sel.clear(); draw(); return; }
     if (a === 'doc') { showDocs(id, [t.dataset.kind]); return; }
@@ -539,6 +558,7 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
       if (f && (e.target.id === 'f-sender' || e.target.id === 'f-consignee') && (!e.inputType || e.inputType === 'insertReplacementText')) { autofillForm(f, e.target.id === 'f-sender' ? 'sender' : 'consignee', e.target.value); return; }
       const t = e.target.closest('[data-i]'); if (!t) return;
       const k = t.dataset.i;
+      if (X.inp.some(f => f(t, k, e))) return;
       if (k === 'q') { P.q = t.value; draw(); }
       else if (k in QA) {
         P.qa[QA[k]] = t.value;
@@ -561,9 +581,10 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
       if (f.dataset.f === 'load') save(f).catch(() => toast('Kaydedilemedi', true));
       else if (f.dataset.f === 'quick') quickAdd().catch(() => toast('Kaydedilemedi', true));
       else if (f.dataset.f === 'login') doLogin().catch(() => toast('Giriş yapılamadı', true));
+      else if (X.submit[f.dataset.f]) Promise.resolve(X.submit[f.dataset.f](f)).catch(() => toast('İşlem yapılamadı', true));
     });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && P.drawer && !document.querySelector('dialog[open]')) { P.drawer = ''; draw(); return; }
+      if (e.key === 'Escape' && (P.drawer || (X.sideHtml && X.sideHtml())) && !document.querySelector('dialog[open]')) { P.drawer = ''; if (X.closeSide) X.closeSide(); draw(); return; }
       if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.vh[data-a]')) { e.preventDefault(); e.target.click(); return; }
       if (e.key === 'Enter' && MODE === 'd' && P.sel.size && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); bulk().catch(() => toast('İşlem yapılamadı', true)); }
     });
@@ -575,7 +596,15 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
     setInterval(() => { poll().catch(() => {}); }, POLL_MS);
   }
 
-  wire();
-  draw();
-  if (!P.needLogin) load();
+  const rpc = async (name, params = {}) => {
+    let r; try { r = await client.rpc(name, { p_token: TOKEN, ...params }); } catch (_) { r = { error: { message: 'Failed to fetch' } }; }
+    if (r.error && authFail(r.error)) draw();
+    return r;
+  };
+  const dialog = html => { const d = document.getElementById('m'); d.innerHTML = html; if (!d.open) d.showModal(); return d; };
+  Object.assign(X, { P, MODE, client, B, esc, ic, tr, kg, ton, stamp, clock, sum, uniq, today, toast, plate, dash, parseNum, tripOf, custOf, locked, isFree, canEdit, canDel, hit, sortedTrips, draw, load, load0,
+    explain, rpc, dialog, closeForm, openForm, docsOf, showDocs, contactOf, selLoads, depotSets, markOne, condChip, unread, dmy: B.dmy, pct, token: () => TOKEN, name: () => P.name.trim() });
+
+  const start = () => { wire(); draw(); if (!P.needLogin) load(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
