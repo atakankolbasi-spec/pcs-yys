@@ -508,6 +508,33 @@ test('operatör: mesaj balonu müşteri ile depo yazışmalarını gösterir; m�
   await expect(page.locator('#nk-cpanel')).toHaveCount(0);
 });
 
+test('operatör: mesaj balonu yenilenince (Yenile, 5 sn kontrolü, gönderme) sohbet başa atlamaz: altta okuyan altta kalır, yukarı kaydıran yerinde kalır', async ({ page }) => {
+  const many = Array.from({ length: 40 }, (_, i) => ({ id: 'mm' + i, customer_id: 'c1', channel: 'musteri', from_role: i % 2 ? 'depo' : 'musteri', author: i % 2 ? 'Depo · Ahmet' : 'Müşteri · Ali', body: `Mesaj numarası ${i + 1} biraz uzun bir cümle olsun ki satır kaysın`, load_id: null, trip_id: null, created_at: new Date(Date.UTC(2026, 8, 22, 6, i)).toISOString(), read_at: '2026-09-22T09:00:00Z' }));
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [], shp_messages: many } });
+  await page.locator('#nk-cfab').click();
+  const list = page.locator('#nk-bmlist');
+  const pos = () => list.evaluate(e => ({ top: Math.round(e.scrollTop), max: e.scrollHeight - e.clientHeight }));
+  await expect.poll(async () => { const p = await pos(); return p.max > 200 && p.max - p.top < 4; }).toBe(true);        // açılınca en altta
+  // altta okuyan: ekran yenilenince (Yenile) hâlâ en altta
+  await page.locator('[data-nk="refresh"]').first().click();
+  await page.waitForTimeout(200);
+  let p = await pos(); expect(p.max - p.top).toBeLessThan(4);
+  // yukarı kaydıran: yenilenince yerinde kalır
+  await list.evaluate(e => { e.scrollTop = 300; });
+  await page.locator('[data-nk="refresh"]').first().click();
+  await page.waitForTimeout(200);
+  p = await pos(); expect(Math.abs(p.top - 300)).toBeLessThan(4);
+  // mesaj gönderince en alta iner ve sonraki yenilemelerde başa atlamaz
+  await page.locator('#nk-breply').fill('Gönderilen deneme mesajı');
+  await page.locator('#nk-breply').press('Enter');
+  await expect(list).toContainText('Gönderilen deneme mesajı');
+  await expect.poll(async () => { const q = await pos(); return q.max - q.top < 4; }).toBe(true);
+  await page.locator('[data-nk="refresh"]').first().click();
+  await page.waitForTimeout(200);
+  p = await pos(); expect(p.max - p.top).toBeLessThan(4);
+  await expect(list).toContainText('Gönderilen deneme mesajı');
+});
+
 test('operatör: müşteri bildirim telefonunu ve yükün depo teslim bilgisini (sorun, konum, fotoğraf) görür', async ({ page }) => {
   const ls = loads().map(l => l.id === 'l1' ? { ...l, condition: 'eksik', counted_pieces: 830, location: 'A-3', receive_note: '2 koli ıslak', arrived_at: '2026-09-22T08:00:00Z' } : l);
   const photos = [{ id: 'ph1', load_id: 'l1', customer_id: 'c1', thumb: 'data:image/jpeg;base64,/9j/AAAA', data: 'data:image/jpeg;base64,/9j/BBBB', by_name: 'Ahmet', created_at: '2026-09-22T08:00:00Z' }];

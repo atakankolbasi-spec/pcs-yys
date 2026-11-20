@@ -515,6 +515,35 @@ test('tarz: müşteri ve depo sayfalarında ofis ekranındaki gibi başlık kart
   expect(problems).toEqual([]);
 });
 
+test('müşteri ve depo: sohbet balonu ekran yenilenince (5 sn kontrolü, veri değişimi, gönderme) başa atlamaz; altta okuyan altta kalır, yukarı kaydıran yerinde kalır', async ({ page: pg }) => {
+  const many = Array.from({ length: 40 }, (_, i) => ({ id: 'mm' + i, customer_id: 'c1', channel: 'musteri', from_role: i % 2 ? 'depo' : 'musteri', author: i % 2 ? 'Depo · Ahmet' : 'Müşteri · Ali', body: `Mesaj numarası ${i + 1} biraz uzun bir cümle olsun ki satır kaysın`, load_id: null, trip_id: null, created_at: new Date(Date.UTC(2026, 8, 22, 6, i)).toISOString(), read_at: '2026-09-22T09:00:00Z' }));
+  for (const who of ['musteri', 'depo']) {
+    const page = pg;
+    if (who === 'musteri') await customerPage(page, null, { data: { shp_messages: many } }); else await depot(page, null, { data: { shp_messages: many } });
+    if (who === 'depo') await page.locator('#nm').fill('Ahmet');
+    await page.locator('#chat-fab').click();
+    const list = page.locator('#msgs');
+    const pos = () => list.evaluate(e => ({ top: Math.round(e.scrollTop), max: e.scrollHeight - e.clientHeight }));
+    await expect.poll(async () => { const q = await pos(); return q.max > 200 && q.max - q.top < 4; }).toBe(true);
+    // ekran başka bir veri değişikliğiyle yeniden çizilir (örn. yük kilosu değişti): altta kalır
+    await page.evaluate(() => { window.__db.shp_loads.find(l => l.id === 'l8').weight = 777; });
+    await page.clock.runFor(5100);
+    await page.waitForTimeout(150);
+    let q = await pos(); expect(q.max - q.top, `${who}: altta kalmalı`).toBeLessThan(4);
+    // yukarı kaydıran yerinde kalır
+    await list.evaluate(e => { e.scrollTop = 300; });
+    await page.evaluate(() => { window.__db.shp_loads.find(l => l.id === 'l8').weight = 888; });
+    await page.clock.runFor(5100);
+    await page.waitForTimeout(150);
+    q = await pos(); expect(Math.abs(q.top - 300), `${who}: yerinde kalmalı`).toBeLessThan(4);
+    // mesaj gönderince en alta iner
+    await page.locator('#msg-body').fill('Gönderilen deneme mesajı');
+    await page.locator('#msg-body').press('Enter');
+    await expect(list).toContainText('Gönderilen deneme mesajı');
+    await expect.poll(async () => { const z = await pos(); return z.max - z.top < 4; }).toBe(true);
+  }
+});
+
 test('depo: sohbet balonu — müşteri seçilip yazışılır; müşterinin yazdığı rozet olur, açılınca okundu olur; başka müşterinin mesajı karışmaz', async ({ page }) => {
   const m = (id, cid, from, body, extra = {}) => ({ id, customer_id: cid, channel: 'musteri', from_role: from, author: from === 'ofis' ? 'Ofis' : from === 'depo' ? 'Depo · Ahmet' : 'Müşteri · Ali', body, load_id: null, trip_id: null, created_at: '2026-09-22T09:00:00Z', read_at: null, ...extra });
   const msgs = [m('d1', 'c1', 'musteri', 'Yüküm ne zaman yüklenir?'), m('d2', 'c1', 'musteri', 'Acil lütfen.', { created_at: '2026-09-22T09:01:00Z' }),

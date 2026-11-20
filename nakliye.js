@@ -298,7 +298,10 @@ ${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderi
     const root = document.getElementById('nk-root');
     if (!root) return;
     const a = document.activeElement, id = a && a.id, s0 = a && a.selectionStart, s1 = a && a.selectionEnd, y = window.scrollY;
+    // sohbet listeleri baştan çizilir: kaydırma konumu korunur (altta olan altta kalır, yukarıda okuyan yerinde kalır)
+    const keep = ['nk-mlist', 'nk-bmlist'].map(i => { const el = document.getElementById(i); return el ? { i, top: el.scrollTop, end: el.scrollHeight - el.scrollTop - el.clientHeight < 40 } : null; }).filter(Boolean);
     root.innerHTML = inner();
+    keep.forEach(k => { const el = document.getElementById(k.i); if (el) el.scrollTop = k.end ? el.scrollHeight : k.top; });
     if (id) { const el = document.getElementById(id); if (el && el !== document.activeElement) { el.focus(); try { el.setSelectionRange(s0, s1); } catch (_) { /* tarih gibi alanlarda imleç yok */ } } }
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
