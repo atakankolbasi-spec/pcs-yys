@@ -453,7 +453,9 @@ ${fld('driver', 'Şoför adı ve telefonu')}
   function redraw(html) {
     const a = document.activeElement, id = a && a.id, s0 = a && a.selectionStart, s1 = a && a.selectionEnd, y = window.scrollY;
     const dy = (document.getElementById('drw') || {}).scrollTop;
+    const ms = document.getElementById('msgs'), mTop = ms ? ms.scrollTop : 0, mEnd = ms ? ms.scrollHeight - ms.scrollTop - ms.clientHeight < 40 : false;   // sohbet listesi: altta olan altta kalır
     root.innerHTML = html;
+    const ms2 = document.getElementById('msgs'); if (ms && ms2) ms2.scrollTop = mEnd ? ms2.scrollHeight : mTop;
     if (id) { const el = document.getElementById(id); if (el) { el.focus(); try { el.setSelectionRange(s0, s1); } catch (_) { /* tarih alanı */ } } }
     if (window.scrollY !== y) window.scrollTo(0, y);
     const dw = document.getElementById('drw'); if (dw && dy) dw.scrollTop = dy;
