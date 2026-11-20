@@ -501,6 +501,7 @@ test('operatör: mesaj balonu müşteri ile depo yazışmalarını gösterir; m�
   await page.locator('#nk-breply').fill('Hazır, ofisten alabilirsiniz.');
   await page.locator('#nk-breply').press('Enter');
   await expect(page.locator('#nk-bmlist')).toContainText('Hazır, ofisten alabilirsiniz.');
+  await expect(page.locator('#nk-breply')).toHaveValue('');                            // gönderilince yazı kutusu boşalır
   const sent = await page.evaluate(() => window.__db.shp_messages.filter(m => m.from_role === 'ofis'));
   expect(sent).toHaveLength(1); expect(sent[0]).toMatchObject({ customer_id: 'c2', body: 'Hazır, ofisten alabilirsiniz.' });
   expect(await page.evaluate(() => window.__db.shp_messages.find(m => m.id === 'm1').read_at)).toBeNull();
@@ -533,6 +534,50 @@ test('operatör: mesaj balonu yenilenince (Yenile, 5 sn kontrolü, gönderme) so
   await page.waitForTimeout(200);
   p = await pos(); expect(p.max - p.top).toBeLessThan(4);
   await expect(list).toContainText('Gönderilen deneme mesajı');
+});
+
+test('operatör: mesaj gönderilirken başka bir yenileme sürüyorsa da yazı kutusu hemen boşalır ve gönderilen mesaj yenileme bitince görünür', async ({ page }) => {
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [], shp_messages: msgFx() } });
+  await page.locator('#nk-cfab').click();
+  await page.evaluate(() => { window.__holdReads = new Promise(r => { window.__release = r; }); window.PCSNK.reload(); });   // yenileme başladı, cevap bekleniyor
+  await page.locator('#nk-breply').fill('Atakan');
+  await page.locator('#nk-breply').press('Enter');
+  await expect(page.locator('#toast')).toContainText('Cevabınız gönderildi');
+  await expect(page.locator('#nk-breply')).toHaveValue('');                            // yenileme bitmeden de boşalır
+  await page.evaluate(() => { window.__release(); window.__holdReads = null; });
+  await expect(page.locator('#nk-bmlist')).toContainText('Atakan');
+  await expect(page.locator('#nk-breply')).toHaveValue('');
+  expect(await page.evaluate(() => window.__db.shp_messages.filter(m => m.body === 'Atakan').length)).toBe(1);     // iki kez gönderilmedi
+});
+
+test('operatör: Sohbeti temizle — balonda ve Mesajlar sekmesinde; önce onay sorulur, vazgeçilebilir; yalnız o müşterinin yazışması silinir', async ({ page }) => {
+  await openNakliye(page, { data: { registry: [], visits: [], app_settings: [], shp_customers: customers(), shp_loads: loads(), shp_trips: [], shp_messages: msgFx() } });
+  await page.locator('#nk-cfab').click();
+  await expect(page.locator('#nk-bmlist')).toContainText('Yarın çıkabilir mi?');
+  await page.locator('#nk-cpanel [data-nk="chat-clear"]').click();                      // onay çubuğu
+  const ask = page.locator('#nk-cpanel .nk-cask');
+  await expect(ask).toContainText('bütün yazışma silinsin mi');
+  await expect(ask).toContainText('Müşteri ve depo da göremez');
+  await ask.locator('[data-nk="chat-clear-no"]').click();                              // vazgeç
+  await expect(page.locator('#nk-cpanel .nk-cask')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__db.shp_messages.length)).toBe(4);
+  await page.locator('#nk-cpanel [data-nk="chat-clear"]').click();
+  await page.locator('#nk-cpanel .nk-cask [data-nk="chat-clear"]').click();            // evet, sil
+  await expect(page.locator('#toast')).toContainText('Sohbet temizlendi');
+  await expect(page.locator('#nk-bmlist')).toContainText('henüz yazışma yok');
+  await expect(page.locator('#nk-cpanel [data-nk="chat-clear"]')).toHaveCount(0);       // boş sohbette düğme yok
+  const left = await page.evaluate(() => window.__db.shp_messages.map(m => m.id).sort());
+  expect(left).toEqual(['m3', 'm4']);                                                    // c1'in iki mesajı gitti; c2 ve eski depo satırı durur
+  // başka müşteriye geçilince onun yazışması durur; Mesajlar sekmesinden de temizlenir
+  await page.locator('#nk-cpanel select').selectOption('c2');
+  await expect(page.locator('#nk-bmlist')).toContainText('Belgeler hazır mı?');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-nk="tab"][data-v="msg"]').click();
+  await page.locator('.nk-msgs [data-nk="chat-clear"]').click();
+  await page.locator('.nk-msgs .nk-cask [data-nk="chat-clear"]').click();
+  await expect(page.locator('#toast')).toContainText('Sohbet temizlendi');
+  expect(await page.evaluate(() => window.__db.shp_messages.map(m => m.id))).toEqual(['m4']);
+  await expect(page.locator('.nk-msgs [data-nk="chat-clear"]')).toHaveCount(0);
 });
 
 test('operatör: müşteri bildirim telefonunu ve yükün depo teslim bilgisini (sorun, konum, fotoğraf) görür', async ({ page }) => {
