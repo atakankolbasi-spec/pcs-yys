@@ -44,8 +44,15 @@
   }
 
   // ------------------------------------------------------------------ veri
-  async function load(quiet) {
-    if (!X || S.loading) return;
+  // Yükleme sürerken yeni bir istek gelirse (örn. mesaj gönderildi) kaybolmaz: bitince bir kez daha okunur, çağıran da onu bekler
+  let inflight = null, again = false;
+  function load(quiet) {
+    if (!X) return Promise.resolve();
+    if (inflight) { again = true; return inflight; }
+    inflight = loadRun(quiet).finally(() => { inflight = null; if (again) { again = false; return load(true); } });
+    return inflight;
+  }
+  async function loadRun(quiet) {
     S.loading = true;
     if (!quiet) { S.err = ''; redraw(); }
     try {
@@ -232,14 +239,21 @@
     const thread = (by[cur] || []).map(msgBubble).join('');
     return `<section class="nk-pn nk-msgs"><div class="nk-bar"><h2>Mesajlar <span>${S.msgs.length}</span></h2><div class="nk-bar-r">${custSelect().replace('Tüm müşteriler', 'Müşteri seç')}</div></div>
 <div class="nk-note2">Müşteriler <b>depoyla</b> yazışır, depo da müşteriyle. Burada bütün konuşmaları görürsünüz; isterseniz siz de yazabilirsiniz (müşteri "Ofis" olarak görür). Kırmızı sayı, müşterinin yazdığı ama deponun henüz okumadığı mesajlardır.</div>
-<div class="nk-mg"><div class="nk-ths">${list}</div><div class="nk-thread"><div class="nk-mlist" id="nk-mlist">${thread || `<div class="nk-empty">${esc(thName(cur))} ile henüz yazışma yok.</div>`}</div>
+<div class="nk-mg"><div class="nk-ths">${list}</div><div class="nk-thread">${cur && (by[cur] || []).length ? `<div class="nk-tbar">${clearBar(cur, false)}</div>` : ''}<div class="nk-mlist" id="nk-mlist">${thread || `<div class="nk-empty">${esc(thName(cur))} ile henüz yazışma yok.</div>`}</div>
 ${cur ? `<form data-nk-form="reply" data-cid="${cur}" class="nk-reply"><textarea id="nk-reply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc(thName(cur))} için yazın…">${esc(S.msgBody)}</textarea><button type="submit" class="btn primary">${ic('check')}Gönder</button></form>` : ''}</div></div></section>`;
   }
   const msgBubble = m => { const mine = m.from_role === 'ofis', l = m.load_id && loadOf(m.load_id), t = m.trip_id && byId(S.trips, m.trip_id);
     return `<div class="nk-m ${mine ? 'me' : 'o'}">${esc(m.body).replace(/\n/g, '<br>')}${l ? `<span class="nk-lk2">${esc(l.sender)} → ${esc(l.consignee)}</span>` : t ? `<span class="nk-lk2">${esc(t.poz_no)} · ${esc(t.tractor)}</span>` : ''}<small>${esc(dtm(m.created_at))} · ${esc(mine ? 'Ofis' : m.author || (m.from_role === 'depo' ? 'Depo' : 'Müşteri'))}</small></div>`; };
   // Mesaj balonu simgeleri (uygulamanın simge listesinde yok)
   const svg = d => `<svg class="nk-svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-  const BIC = { chat: svg('<path d="M4 5h16v11H9l-5 4z"/>'), send: svg('<path d="M21 3L10 14M21 3l-7 18-4-8-8-4z"/>'), close: svg('<path d="M6 6l12 12M6 18L18 6"/>') };
+  const BIC = { trash: svg('<path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12M10 11v5M14 11v5"/>'), chat: svg('<path d="M4 5h16v11H9l-5 4z"/>'), send: svg('<path d="M21 3L10 14M21 3l-7 18-4-8-8-4z"/>'), close: svg('<path d="M6 6l12 12M6 18L18 6"/>') };
+  // Sohbeti temizle: seçili müşterinin yazışması (müşteri ve depo mesajları) silinir; önce onay sorulur
+  function clearBar(cid, compact) {
+    if (!cid || !S.msgs.some(m => tk(m) === cid)) return '';
+    if (S.confirm === 'chat:' + cid) return `<div class="nk-cask" role="alert"><span><b>${esc(thName(cid))}</b> ile bütün yazışma silinsin mi? Müşteri ve depo da göremez; geri alınmaz.</span><button type="button" class="btn small danger" data-nk="chat-clear" data-id="${esc(cid)}">Evet, sil</button><button type="button" class="btn small" data-nk="chat-clear-no">Vazgeç</button></div>`;
+    return compact ? `<button type="button" class="nk-ctrash" data-nk="chat-clear" data-id="${esc(cid)}" title="Sohbeti temizle" aria-label="Sohbeti temizle">${BIC.trash}</button>`
+      : `<button type="button" class="btn small" data-nk="chat-clear" data-id="${esc(cid)}">${BIC.trash}Sohbeti temizle</button>`;
+  }
   // Mesaj balonu (sayfanın sağ altı): müşteri ile depo yazışmalarına hızlı bakış; konuşma seçilir, isterseniz yazarsınız
   function msgBubbleHtml() {
     if (S.newMiss) return '';
@@ -251,7 +265,7 @@ ${cur ? `<form data-nk-form="reply" data-cid="${cur}" class="nk-reply"><textarea
         .sort((a, b) => b.at.localeCompare(a.at) || a.name.localeCompare(b.name, 'tr'));
       const thread = S.msgs.filter(m => tk(m) === cur).map(msgBubble).join('');
       panel = `<div class="nk-cpanel" id="nk-cpanel" role="dialog" aria-label="Nakliye mesajları"><div class="nk-chead"><span class="nk-cava">PCS</span><div><b>Nakliye mesajları</b><small>Müşteri ve depo yazışmaları</small></div><button type="button" class="nk-cx" data-nk="bub-close" aria-label="Kapat">${BIC.close}</button></div>
-<div class="nk-csel"><select data-nk-in="bub-th" aria-label="Müşteri seç">${opts.map(o => `<option value="${esc(o.id)}" ${o.id === cur ? 'selected' : ''}>${esc(o.name)}${o.un ? ` (${o.un} okunmadı)` : ''}</option>`).join('')}</select></div>
+<div class="nk-csel"><select data-nk-in="bub-th" aria-label="Müşteri seç">${opts.map(o => `<option value="${esc(o.id)}" ${o.id === cur ? 'selected' : ''}>${esc(o.name)}${o.un ? ` (${o.un} okunmadı)` : ''}</option>`).join('')}</select>${S.confirm === 'chat:' + cur ? '' : clearBar(cur, true)}</div>${S.confirm === 'chat:' + cur ? clearBar(cur, true) : ''}
 <div class="nk-cmsgs" id="nk-bmlist">${thread || `<div class="nk-cempty">${esc(thName(cur))} ile henüz yazışma yok.</div>`}</div>
 <form data-nk-form="reply" data-cid="${esc(cur)}" class="nk-cform"><textarea id="nk-breply" data-nk-in="msg-body" rows="2" maxlength="1000" placeholder="${esc(thName(cur))} için yazın…" aria-label="Mesajınız">${esc(S.msgBody)}</textarea><button type="submit" class="nk-csend" aria-label="Gönder">${BIC.send}</button></form></div>`;
     }
@@ -408,9 +422,16 @@ ${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderi
     if (a === 'edit-cust') { customerForm(id); return; }
     if (a === 'back-cust') { customersModal(); return; }
     if (a === 'bub-toggle') { S.bub = !S.bub; redraw(); if (S.bub) { const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; const ta = document.getElementById('nk-breply'); if (ta) ta.focus(); } return; }
-    if (a === 'bub-close') { S.bub = false; redraw(); return; }
+    if (a === 'bub-close') { S.bub = false; S.confirm = ''; redraw(); return; }
+    if (a === 'chat-clear-no') { S.confirm = ''; redraw(); return; }
+    if (a === 'chat-clear') {
+      if (S.confirm !== 'chat:' + id) { S.confirm = 'chat:' + id; redraw(); return; }
+      S.confirm = ''; S.msgCust = id;                                                   // temizlenen müşteri seçili kalır (başka konuşmaya atlamaz)
+      if (await db(X.client.from('shp_messages').delete().eq('customer_id', id), 'Sohbet temizlendi')) await load(true); else redraw();
+      return;
+    }
     if (a === 'msg-open') {
-      S.msgCust = id; redraw();
+      S.msgCust = id; S.confirm = ''; redraw();
       return;
     }
     if (a === 'out-send' || a === 'out-done' || a === 'out-skip') {
@@ -449,7 +470,7 @@ ${gs.length ? `<ul class="nk-ol">${rows}</ul>` : '<div class="nk-empty">Gönderi
     if (k === 'tq') { S.tq = v; redraw(); return; }
     if (k === 'cust') { if (S.tab === 'msg') S.msgCust = v; S.cust = v; redraw(); return; }
     if (k === 'msg-body') { S.msgBody = v; return; }
-    if (k === 'bub-th') { S.msgCust = v; redraw(); const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; return; }
+    if (k === 'bub-th') { S.msgCust = v; S.confirm = ''; redraw(); const el = document.getElementById('nk-bmlist'); if (el) el.scrollTop = el.scrollHeight; return; }
     if (k === 'f-tractor') S.form.tractor = v;
     else if (k === 'f-trailer') S.form.trailer = v;
     else if (k === 'f-date') S.form.date = v;
@@ -573,7 +594,8 @@ ${id ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cla
     if (!body || !cid) return;
     const r = await X.client.from('shp_messages').insert({ customer_id: cid, from_role: 'ofis', body });
     if (r.error) { X.toast(r.error.message || 'Gönderilemedi', true); return; }
-    S.msgBody = ''; X.toast('Cevabınız gönderildi'); await load(true);
+    S.msgBody = ''; for (const id of ['nk-breply', 'nk-reply']) { const ta = document.getElementById(id); if (ta) ta.value = ''; }   // ekran yenilenmeden de kutu boşalır
+    X.toast('Cevabınız gönderildi'); await load(true);
     for (const id of ['nk-mlist', 'nk-bmlist']) { const el = document.getElementById(id); if (el) el.scrollTop = el.scrollHeight; }
   }
 
@@ -700,7 +722,7 @@ ${uid ? `<label class="form-chip nk-arr"><input type="checkbox" name="active" cl
       if (e.target && e.target.id === 'nk-logo-clear') { const v = document.getElementById('nk-logo-val'); if (v) v.value = ''; const p = document.getElementById('nk-logo-prev'); if (p) p.innerHTML = '<em>Logo yok</em>'; const f = document.getElementById('nk-logo-file'); if (f) f.value = ''; }
     });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && S.bub && document.getElementById('nk-cpanel') && !document.querySelector('dialog[open]')) { S.bub = false; redraw(); return; }
+      if (e.key === 'Escape' && S.bub && document.getElementById('nk-cpanel') && !document.querySelector('dialog[open]')) { S.bub = false; S.confirm = ''; redraw(); return; }
       // Mesaj balonunda Enter gönderir, Shift+Enter yeni satır
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target && e.target.id === 'nk-breply') { e.preventDefault(); const f = e.target.closest('form'); if (f) sendReply(f).catch(() => X.toast('Gönderilemedi', true)); }
     });

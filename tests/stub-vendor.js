@@ -59,7 +59,7 @@
       insert(rows) { st.op = 'insert'; st.rows = Array.isArray(rows) ? rows : [rows]; return q; },
       update(patch) { st.op = 'update'; st.patch = patch; return q; },
       delete() { st.op = 'delete'; return q; },
-      then(resolve, reject) { return Promise.resolve().then(run).then(resolve, reject); }
+      then(resolve, reject) { const gate = window.__holdReads && st.op === 'select' ? window.__holdReads : null; return (gate || Promise.resolve()).then(() => {}).then(run).then(resolve, reject); }   // __holdReads: okumalar bu söz çözülene kadar bekler (yükleme sürerken olan işleri denemek için)
     };
     // PostgREST "select *" bütün sütunları döndürür: ücret sütunları varsa boş olsalar da satırda görünür
     const withFee = r => (table === 'visits' && !cfg.noFee && !('fee_amount' in r) ? { ...r, fee_amount: null, fee_currency: '' } : r);
