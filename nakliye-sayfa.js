@@ -22,7 +22,7 @@
   const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co', 'sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
   const CAP = 24000;   // tır kapasitesi (kg): araç doluluk göstergesi için yaklaşık değer
   const POLL_MS = 5000;
-  const P = { data: null, err: '', loading: false, polling: false, down: 0, at: '', stamp: '', noStamp: false, live: '', needLogin: MODE === 'm' && !TOKEN, tab: 'bekliyor', scope: 'free', q: '', cf: '',
+  const P = { tdel: '', data: null, err: '', loading: false, polling: false, down: 0, at: '', stamp: '', noStamp: false, live: '', needLogin: MODE === 'm' && !TOKEN, tab: 'bekliyor', scope: 'free', q: '', cf: '',
     confirm: '', name: '', busy: '', sel: new Set(), target: '', nv: { tractor: '', trailer: '', date: '' }, open: new Set(), editTrip: '', te: { tractor: '', trailer: '', date: '', subject: '' },
     qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, page: 'plan', login: { u: '', p: '', err: '', busy: false } };
   try { P.name = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* kayıt yoksa boş kalır */ }
@@ -59,7 +59,8 @@
   const pct = w => Math.round((Number(w) || 0) / CAP * 100);
   const isFree = l => (l.status === 'bekliyor' || l.status === 'depoda') && !l.trip_id;
   const canEdit = l => isFree(l) || (l.status === 'aracta' && (tripOf(l.trip_id) ? !locked(tripOf(l.trip_id)) : false));
-  const canDel = l => isFree(l);
+  // müşteri: araca konmamış yük ya da yola çıkmamış araçtaki yük silinir (depo "yüklendi" işaretlemişse silinmez); depo: yalnız araca konmamış yük
+  const canDel = l => isFree(l) || (MODE === 'm' && l.status === 'aracta' && !!tripOf(l.trip_id) && !locked(tripOf(l.trip_id)) && !l.loaded_at);
   const sortedTrips = () => ((P.data && P.data.trips) || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 
   // ------------------------------------------------------------------ giriş ve oturum
@@ -293,8 +294,11 @@ ${rows.length ? `<ul class="lol">${rows.map(loadRow).join('')}</ul>` : `<div cla
     const gel = n.filter(l => !l.arrived_at).length;
     const head = editing ? `<div class="grid"><label class="fld"><span>Çekici plaka</span><input id="te-tractor" data-i="te-tractor" list="dl-tractor" value="${esc(te.tractor)}" maxlength="30" autocomplete="off" style="text-transform:uppercase"></label><label class="fld"><span>Dorse plaka</span><input id="te-trailer" data-i="te-trailer" list="dl-trailer" value="${esc(te.trailer)}" maxlength="30" autocomplete="off" style="text-transform:uppercase"></label><label class="fld"><span>Çıkış tarihi</span><input id="te-date" data-i="te-date" type="date" value="${esc(te.date)}"></label><label class="fld"><span>Konu (isteğe bağlı)</span><input id="te-subject" data-i="te-subject" value="${esc(te.subject)}" maxlength="200" autocomplete="off"></label></div><div class="acts"><button type="button" class="btn pri sm" data-a="trip-save" data-id="${esc(t.id)}">${ic('check')}Kaydet</button><button type="button" class="btn sm" data-a="trip-cancel">Vazgeç</button></div>`
       : `<div class="vh" ${lk ? '' : `data-a="target" data-id="${esc(t.id)}" role="button" tabindex="0" aria-pressed="${on}"`}>${truckSvg()}<div class="vi"><div class="vt"><b class="poz">${esc(t.poz_no)}</b>${on ? '<span class="ch g">Seçili</span>' : ''}${lk ? '<span class="ch b">Yolda · kilitli</span>' : ''}</div><div class="vp">${plate(t.tractor)}${plate(t.trailer, 'alt')}</div><small>${n.length} yük · ${ton(w)} t dolu${lk ? '' : ` · ${ton(Math.max(CAP - w, 0))} t boş yer`} · ${esc(B.dmy(t.depart_date))}${gel ? ` · <span class="warn">${gel} yük depoya gelmedi</span>` : ''}</small></div>${ring(w)}</div>`;
-    const lines = open ? `<ul class="vl">${B.order(n).map(l => `<li><span><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)} · ${kg(l.weight)} kg · ${l.arrived_at ? 'Depoda' : 'Depoya gelmedi'}</small></span>${lk ? '' : `<span class="le"><button type="button" class="ib" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button><button type="button" class="ib keep" data-a="unassign" data-id="${esc(l.id)}">${ic('undo')}<span>Araçtan çıkar</span></button></span>`}</li>`).join('')}</ul>` : '';
-    return `<article class="veh ${on ? 'on' : ''} ${lk ? 'lk' : ''}">${head}${editing ? '' : `<div class="vb"><button type="button" class="lnk" data-a="toggle" data-id="${esc(t.id)}" aria-expanded="${open}">${ic('down')}Yükleri ${open ? 'gizle' : 'gör'} (${n.length})</button><button type="button" class="lnk" data-a="doctrip" data-id="${esc(t.id)}">${ic('doc')}Belgeler</button>${lk ? '' : `<button type="button" class="lnk" data-a="trip-edit" data-id="${esc(t.id)}">${ic('edit')}Plakayı değiştir</button>`}</div>`}${lines}</article>`;
+    const lines = open ? `<ul class="vl">${B.order(n).map(l => `<li><span><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)} · ${kg(l.weight)} kg · ${l.arrived_at ? 'Depoda' : 'Depoya gelmedi'}</small></span>${lk ? '' : `<span class="le"><button type="button" class="ib" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button><button type="button" class="ib keep" data-a="unassign" data-id="${esc(l.id)}">${ic('undo')}<span>Araçtan çıkar</span></button>${canDel(l) ? `<button type="button" class="ib bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Yükü sil" aria-label="Yükü sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</span>`}</li>`).join('')}</ul>` : '';
+    const loaded = n.some(l => l.loaded_at);
+    const ask = P.tdel === t.id && !lk ? `<div class="tdel" role="alert">${loaded ? `<p><b>${esc(t.poz_no)}</b>: depo bu araca yük yüklemiş; silinemez. Önce depoyla görüşün.</p><div class="tdb"><button type="button" class="btn" data-a="tdel-no">Tamam</button></div>`
+      : `<p><b>${esc(t.poz_no)} · ${esc(t.tractor)}</b> aracı silinsin mi? Araçta <b>${n.length} yük</b> var.</p><div class="tdb"><button type="button" class="btn" data-a="tdel-go" data-id="${esc(t.id)}" data-w="0" ${P.busy === 'tdel' ? 'disabled' : ''}>Yalnız aracı sil <small>(yükler "Araca konmamış"a döner)</small></button><button type="button" class="btn danger" data-a="tdel-go" data-id="${esc(t.id)}" data-w="1" ${P.busy === 'tdel' ? 'disabled' : ''}>${ic('trash')}Aracı ve ${n.length} yükü sil</button><button type="button" class="btn" data-a="tdel-no">Vazgeç</button></div>`}</div>` : '';
+    return `<article class="veh ${on ? 'on' : ''} ${lk ? 'lk' : ''}">${head}${editing ? '' : `<div class="vb"><button type="button" class="lnk" data-a="toggle" data-id="${esc(t.id)}" aria-expanded="${open}">${ic('down')}Yükleri ${open ? 'gizle' : 'gör'} (${n.length})</button><button type="button" class="lnk" data-a="doctrip" data-id="${esc(t.id)}">${ic('doc')}Belgeler</button>${lk ? '' : `<button type="button" class="lnk" data-a="trip-edit" data-id="${esc(t.id)}">${ic('edit')}Plakayı değiştir</button><button type="button" class="lnk bad" data-a="tdel" data-id="${esc(t.id)}" aria-expanded="${P.tdel === t.id}">${ic('trash')}Aracı sil</button>`}</div>`}${ask}${lines}</article>`;
   }
   function panel2(all, trips) {
     const sl = [...P.sel].map(id => all.find(l => l.id === id)).filter(Boolean), sw = sum(sl, 'weight'), nv = P.nv;
@@ -538,6 +542,19 @@ ${fld('driver', 'Şoför adı ve telefonu')}
     if (a === 'unassign') {
       const { error } = await client.rpc('shp_portal_unassign', { p_token: TOKEN, p_load_id: id });
       if (error) { if (authFail(error)) { draw(); return; } toast(explain(error), true); } else toast('Yük araçtan çıkarıldı');
+      await load0(); return;
+    }
+    if (a === 'tdel') { P.tdel = P.tdel === id ? '' : id; draw(); return; }
+    if (a === 'tdel-no') { P.tdel = ''; draw(); return; }
+    if (a === 'tdel-go') {
+      if (P.busy) return;
+      const w = t.dataset.w === '1'; P.busy = 'tdel'; draw();
+      const { data, error } = await client.rpc('shp_portal_trip_delete', { p_token: TOKEN, p_trip: id, p_with_loads: w });
+      P.busy = ''; P.tdel = '';
+      if (error) { if (authFail(error)) { draw(); return; } toast(explain(error), true); await load0(); return; }
+      if (P.target === id) P.target = '';
+      P.open.delete(id); P.docTrip = P.docTrip === id ? '' : P.docTrip;
+      toast(w ? `Araç ve ${(data && data.loads_deleted) || 0} yük silindi` : 'Araç silindi; yükler "Araca konmamış" listesine döndü');
       await load0(); return;
     }
     if (a === 'trip-edit') { const tp = tripOf(id); if (tp) { P.editTrip = id; P.te = { tractor: tp.tractor || '', trailer: tp.trailer || '', date: tp.depart_date || '', subject: tp.subject || '' }; draw(); } return; }

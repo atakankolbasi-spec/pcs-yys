@@ -247,14 +247,14 @@ test('müşteri: yola çıkıp kilitlenen araçta değişiklik yapamaz', async (
   await expect(page.locator('#toast')).toContainText('Hangi araca');                 // kilitli araç seçilemez
 });
 
-test('müşteri: depoya gelmiş yük düzenlenir ve silinir; araçtaki yük düzenlenir ama silinemez; kilitli araçtaki hiçbiri', async ({ page }) => {
+test('müşteri: depoya gelmiş yük düzenlenir ve silinir; araçtaki yük de düzenlenir ve silinir (yola çıkmadıysa); kilitli araçtaki hiçbiri', async ({ page }) => {
   const cfg = st => ({ data: { shp_customers: customers(), shp_loads: aracta(loads(), 'l3'), shp_trips: [planTrip(st)] } });
   await openPortal(page, '?m=tokC1', cfg());
   await page.locator('[data-a="scope"][data-v="all"]').click();
   await expect(row(page, 'ÖRNEK GÖNDERİCİ BİR').locator('[data-a="edit"]')).toHaveCount(1);   // depoda: düzenlenir
   await expect(row(page, 'ÖRNEK GÖNDERİCİ BİR').locator('[data-a="del"]')).toHaveCount(1);    // ... ve silinir
   await expect(row(page, 'ÖRNEK GÖNDERİCİ ÜÇ').locator('[data-a="edit"]')).toHaveCount(1);    // araçta (kilitsiz): düzenlenir
-  await expect(row(page, 'ÖRNEK GÖNDERİCİ ÜÇ').locator('[data-a="del"]')).toHaveCount(0);     // ... ama silinemez
+  await expect(row(page, 'ÖRNEK GÖNDERİCİ ÜÇ').locator('[data-a="del"]')).toHaveCount(1);     // ... ve silinir
   await expect(row(page, 'ÖRNEK GÖNDERİCİ ÜÇ')).toContainText('PCS-26-0001');
   await expect(row(page, 'ÖRNEK GÖNDERİCİ ÜÇ').locator('input[data-a="pick"]')).toHaveCount(0);
   await row(page, 'ÖRNEK GÖNDERİCİ BİR').locator('[data-a="del"]').click();
@@ -267,6 +267,69 @@ test('müşteri: depoya gelmiş yük düzenlenir ve silinir; araçtaki yük düz
   await p2.locator('[data-a="scope"][data-v="all"]').click();
   await expect(row(p2, 'ÖRNEK GÖNDERİCİ ÜÇ')).toBeVisible();
   await expect(row(p2, 'ÖRNEK GÖNDERİCİ ÜÇ').locator('[data-a="edit"], [data-a="del"]')).toHaveCount(0);
+});
+
+test('müşteri: araçtaki yük silinir (kartından ya da listeden); depo "yüklendi" işaretlediyse silinemez', async ({ page }) => {
+  const ls = aracta(loads(), 'l1', 'l2').map(l => l.id === 'l2' ? { ...l, loaded_at: '2026-09-23T06:30:00Z', loaded_by: 'Ahmet' } : l);
+  await openPortal(page, '?m=tokC1', { data: { shp_customers: customers(), shp_loads: ls, shp_trips: [planTrip()] } });
+  await page.locator('[data-a="scope"][data-v="all"]').click();
+  await expect(row(page, 'ÖRNEK GÖNDERİCİ İKİ').locator('[data-a="del"]')).toHaveCount(0);     // depo yüklendi dedi: silinemez
+  await expect(row(page, 'ÖRNEK GÖNDERİCİ BİR').locator('[data-a="del"]')).toHaveCount(1);
+  // araç kartındaki yük listesinden de silinir
+  await page.locator('.veh [data-a="toggle"]').click();
+  await expect(page.locator('.vl li', { hasText: 'ÖRNEK GÖNDERİCİ BİR' }).locator('[data-a="del"]')).toHaveCount(1);
+  await expect(page.locator('.vl li', { hasText: 'ÖRNEK GÖNDERİCİ İKİ' }).locator('[data-a="del"]')).toHaveCount(0);
+  await page.locator('.vl li', { hasText: 'ÖRNEK GÖNDERİCİ BİR' }).locator('[data-a="del"]').click();
+  await expect(page.locator('.vl li', { hasText: 'ÖRNEK GÖNDERİCİ BİR' }).locator('[data-a="del"]')).toContainText('Evet, sil');
+  await page.locator('.vl li', { hasText: 'ÖRNEK GÖNDERİCİ BİR' }).locator('[data-a="del"]').click();
+  await expect(page.locator('#toast')).toContainText('Yük silindi');
+  expect(await page.evaluate(() => window.__db.shp_loads.some(l => l.id === 'l1'))).toBe(false);
+  expect(await page.evaluate(() => window.__db.shp_trips.some(t => t.id === 'tt1'))).toBe(true);   // araçta hâlâ yük var
+  // sunucu da yüklendi işaretli yükün silinmesini reddeder
+  const r = await page.evaluate(() => window.PCSNKP.rpc('shp_portal_delete', { p_id: 'l2' }));
+  expect(r.error && r.error.message).toContain('yüklenmiş');
+  expect(await page.evaluate(() => window.__db.shp_loads.some(l => l.id === 'l2'))).toBe(true);
+});
+
+test('müşteri: aracı sil — yalnız araç (yükler boşta kalır) ya da araç ve yükleri birlikte; vazgeçilir; yüklenmiş yük varsa silinmez; yoldaki araçta düğme yok', async ({ page }) => {
+  const cfg = (st, extra) => ({ data: { shp_customers: customers(), shp_loads: aracta(loads(), 'l1', 'l2').map(l => extra && l.id === 'l2' ? { ...l, ...extra } : l), shp_trips: [planTrip(st ? { status: st } : {})] } });
+  await openPortal(page, '?m=tokC1', cfg());
+  const veh = page.locator('.veh', { hasText: 'PCS-26-0001' });
+  await expect(page.locator('.tdel')).toHaveCount(0);
+  await veh.locator('[data-a="tdel"]').click();
+  await expect(page.locator('.tdel')).toContainText('PCS-26-0001');
+  await expect(page.locator('.tdel')).toContainText('2 yük');
+  await page.locator('.tdel [data-a="tdel-no"]').click();                                       // vazgeç
+  await expect(page.locator('.tdel')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__db.shp_trips.length)).toBe(1);
+  // yalnız aracı sil: yükler boşta döner
+  await veh.locator('[data-a="tdel"]').click();
+  await page.locator('.tdel [data-a="tdel-go"][data-w="0"]').click();
+  await expect(page.locator('#toast')).toContainText('Araç silindi');
+  const st = await page.evaluate(() => ({ trips: window.__db.shp_trips.length, l1: window.__db.shp_loads.find(l => l.id === 'l1'), l2: window.__db.shp_loads.find(l => l.id === 'l2') }));
+  expect(st.trips).toBe(0);
+  expect([st.l1.status, st.l1.trip_id, st.l2.status, st.l2.trip_id]).toEqual(['depoda', null, 'depoda', null]);
+  await expect(page.locator('.veh', { hasText: 'PCS-26-0001' })).toHaveCount(0);
+  await expect(row(page, 'ÖRNEK GÖNDERİCİ BİR')).toBeVisible();                                 // yük "Araca konmamış" listesinde
+  // araç ve yükleri birlikte sil
+  const p2 = await page.context().newPage();
+  await openPortal(p2, '?m=tokC1', cfg());
+  await p2.locator('.veh', { hasText: 'PCS-26-0001' }).locator('[data-a="tdel"]').click();
+  await p2.locator('.tdel [data-a="tdel-go"][data-w="1"]').click();
+  await expect(p2.locator('#toast')).toContainText('Araç ve 2 yük silindi');
+  const st2 = await p2.evaluate(() => ({ trips: window.__db.shp_trips.length, l1: window.__db.shp_loads.some(l => l.id === 'l1'), l2: window.__db.shp_loads.some(l => l.id === 'l2'), other: window.__db.shp_loads.some(l => l.id === 'l4') }));
+  expect(st2).toEqual({ trips: 0, l1: false, l2: false, other: true });                          // başka müşterinin yükü durur
+  // depo yük yüklemişse silinemez
+  const p3 = await page.context().newPage();
+  await openPortal(p3, '?m=tokC1', cfg('hazirlaniyor', { loaded_at: '2026-09-23T06:30:00Z', loaded_by: 'Ahmet' }));
+  await p3.locator('.veh', { hasText: 'PCS-26-0001' }).locator('[data-a="tdel"]').click();
+  await expect(p3.locator('.tdel')).toContainText('depo bu araca yük yüklemiş');
+  await expect(p3.locator('.tdel [data-a="tdel-go"]')).toHaveCount(0);
+  // yola çıkmış (kilitli) araçta düğme yok
+  const p4 = await page.context().newPage();
+  await openPortal(p4, '?m=tokC1', cfg('yolda'));
+  await expect(p4.locator('.veh.lk')).toBeVisible();
+  await expect(p4.locator('.veh [data-a="tdel"]')).toHaveCount(0);
 });
 
 // ================================================================================================ bağlantı ve giriş

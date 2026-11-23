@@ -377,3 +377,9 @@ dialog#m:has(.imp){width:min(1180px,calc(100% - 20px))}
 .cks .ck .btn.sm{margin-left:auto;align-self:center;flex:none}.cks .ck .ch{vertical-align:baseline}
 .lpc .lpr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;margin:6px 0}
 .lpc{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px}.lpc .lbl2{margin:0}
+
+/* Müşteri: aracı sil (onay kutusu) */
+.lnk.bad{color:var(--bad)}.lnk.bad:hover{text-decoration:underline}
+.tdel{margin:8px 0 2px;padding:12px 14px;border:1px solid var(--bad);background:var(--badbg);border-radius:12px}
+.tdel p{margin:0 0 10px;font-size:14px;line-height:1.4}
+.tdel .tdb{display:flex;gap:8px;flex-wrap:wrap}.tdel .tdb .btn{min-height:44px}.tdel .btn small{display:block;font-weight:600;font-size:11.5px;opacity:.8}

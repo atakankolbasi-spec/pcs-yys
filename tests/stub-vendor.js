@@ -313,7 +313,7 @@
       // Nakliye bağlantıları ve müşteri / depo sayfası (supabase/nakliye-kurulumu.sql'in sade karşılığı)
       // cfg.shpTokens: { anahtar: { kind: 'musteri', customer: 'c1', active: true } | { kind: 'depo', active: true } }
       // data.shp_users: [{ id, customer_id, username, display_name, active, pw }]; kullanıcısı olan müşterinin bağlantısı giriş ister
-      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|depot_message_send|depot_messages_read|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart|depot_load|depot_labels_claim)$/.test(name)) {
+      if (/^shp_(links|rotate_link|set_link|portal|portal_save|portal_delete|portal_assign|portal_unassign|portal_trip_update|depot|depot_mark|depot_save|depot_delete|depot_message_send|depot_messages_read|login|logout|stamp|users_list|user_save|user_delete|log_list|portal_notify_save|portal_message_send|portal_messages_read|portal_import|portal_report|portal_trip_docs|portal_photos|portal_photo|depot_photos|depot_photo|depot_photo_add|depot_photo_del|depot_receive|depot_depart|depot_load|depot_labels_claim|portal_trip_delete)$/.test(name)) {
         if ((cfg.missing || []).includes('shp-rpc')) return guardErr('PGRST202', 'Could not find the function public.' + name);
         if (name === 'shp_stamp' && (cfg.missing || []).includes('shp-stamp')) return guardErr('PGRST202', 'Could not find the function public.shp_stamp');
         if (cfg.offline && /^shp_(portal|depot|stamp|login)/.test(name)) return netError();
@@ -521,9 +521,26 @@
             return { data: tripJson(t), error: null };
           }
           if (name === 'shp_portal_delete') {
-            const i = db.shp_loads.findIndex(l => l.id === params.p_id && l.customer_id === k.customer && ['bekliyor', 'depoda'].includes(l.status) && !l.trip_id);
-            if (i < 0) return guardErr('22023', 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarın');
-            log(k.customer, actor, 'Yük silindi', lsum(db.shp_loads[i])); db.shp_loads.splice(i, 1); return { data: null, error: null };
+            const i = db.shp_loads.findIndex(l => l.id === params.p_id && l.customer_id === k.customer);
+            if (i < 0) return guardErr('22023', 'Yük bulunamadı');
+            const l = db.shp_loads[i], t = l.trip_id && db.shp_trips.find(x => x.id === l.trip_id);
+            if (t && t.status !== 'hazirlaniyor') return guardErr('22023', 'Araç yola çıkmış; bu yük silinemez, ofisle görüşün');
+            if (l.loaded_at) return guardErr('22023', 'Yük araca yüklenmiş (depo okutmuş); silinemez, önce depoyla görüşün');
+            log(k.customer, actor, 'Yük silindi', lsum(l)); db.shp_loads.splice(i, 1);
+            if (t && !db.shp_loads.some(x => x.trip_id === t.id)) { db.shp_trips = db.shp_trips.filter(x => x.id !== t.id); log(k.customer, actor, 'Sefer silindi', t.poz_no); }
+            return { data: null, error: null };
+          }
+          if (name === 'shp_portal_trip_delete') {
+            const t = db.shp_trips.find(x => x.id === params.p_trip && x.customer_id === k.customer);
+            if (!t) return guardErr('22023', 'Araç bulunamadı');
+            if (t.status !== 'hazirlaniyor') return guardErr('22023', 'Araç yola çıkmış; silinemez, ofisle görüşün');
+            const ls = db.shp_loads.filter(x => x.trip_id === t.id);
+            if (ls.some(x => x.loaded_at)) return guardErr('22023', 'Depo bu araca yük yüklemiş; silinemez, önce depoyla görüşün');
+            let n = 0;
+            if (params.p_with_loads) { n = ls.length; db.shp_loads = db.shp_loads.filter(x => x.trip_id !== t.id); ls.forEach(l => log(k.customer, actor, 'Yük silindi', lsum(l))); }
+            else ls.forEach(l => Object.assign(l, { status: l.arrived_at ? 'depoda' : 'bekliyor', trip_id: null, loaded_at: null, loaded_by: '', updated_at: now(), updated_by: actor }));
+            db.shp_trips = db.shp_trips.filter(x => x.id !== t.id); log(k.customer, actor, 'Sefer silindi', t.poz_no);
+            return { data: { loads_deleted: n }, error: null };
           }
           const p = params.p_load || {};
           if (!String(p.sender || '').trim() || !String(p.consignee || '').trim()) return guardErr('22023', 'Gönderici ve alıcı yazılmalı');

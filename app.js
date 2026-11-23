@@ -2476,7 +2476,7 @@ document.addEventListener('change',e=>{const t=e.target;if(t.id==='ncw-auto'){nc
    müşteri bazında kopyalanır / WhatsApp'ta paylaşılır. Yanlış basılan düğme 15 dk içinde geri alınabilir; işaretleme son 7 gün ile yarın arasında
    (sunucu da aynı kuralları uygular). Liste 10 sn'de bir yenilenir. */
 const GUARD_UNDO_MS=15*60000,GUARD_POLL_MS=10000;
-const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',why:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true,drv:null};
+const guard={rows:[],today:'',from:'',to:'',skew:0,loaded:false,error:'',fatal:'',why:'',busy:new Set(),q:'',tab:'wait',repSt:'',at:'',seq:0,canMark:true,drv:null,sel:new Set()};
 const gView=()=>GUARD_VIEW||!guard.canMark; // izleme linki: GİRİŞ / ÇIKIŞ yok
 const gIn=v=>!!(v.onsite||v.onsite_at),gOut=v=>!!v.exit_at,gNow=()=>Date.now()+guard.skew;
 const gToday=()=>guard.today||localToday();
@@ -2492,7 +2492,8 @@ async function guardLoad(){const params={p_token:GUARD_TOKEN||null};if(guard.fro
  try{const {data,error}=await guardRpc('guard_board',params,15000);if(error)throw error;if(seq!==guard.seq)return;
   const was=guard.loaded?new Map(guard.rows.map(v=>[v.id,!!v.done])):null;
   Object.assign(guard,{rows:Array.isArray(data?.visits)?data.visits:[],today:data?.today||localToday(),skew:data?.now?Date.parse(data.now)-Date.now():0,loaded:true,error:'',fatal:'',why:'',sqlOld:false,at:timeNowSec(),canMark:data?.can_mark!==false});
-  if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());}
+  if(was)for(const v of guard.rows)if(v.done&&was.get(v.id)===false)justChangedMap.set(v.id,Date.now());
+  for(const id of [...guard.sel])if(!guard.rows.some(v=>v.id===id&&gOut(v)))guard.sel.delete(id);}   // çıkışı geri alınan / listeden kalkan araç seçimden düşer
  catch(e){if(seq!==guard.seq)return;
   if(e?.code==='42501'){const off=GUARD_ACCT&&!GUARD_ACCT.active,msg=String(e?.message||'');
    /* hesap açıkken "linki geçersiz" yanıtı: veritabanında guard_board'un eski (yalnızca linkle çalışan) sürümü duruyor */
@@ -2560,13 +2561,13 @@ function guardCard(v,ctx){const board=ctx==='board',busy=guard.busy.has(v.id),in
   :`<div class="guard-btn out off" title="${can?'Önce GİRİŞ yapılmalı':''}"><span>Çıkış</span>${can?'<b>önce giriş</b>':''}</div>`;
  const undo=!can?'':out?(recent(v.exit_at)?'cikis_geri':''):inn&&recent(v.onsite_at)?'giris_geri':'',ready=!!v.done&&!out&&!board;
  const showDate=v.visit_date&&(v.visit_date<from||guard.from);
- return `<article class="saha-card guard-card${out&&guard.tab!=='out'?' is-done':''}${ready?' is-ready':''}${justChanged(v.id)?' just-changed':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate)}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
+ return `<article class="saha-card guard-card${out&&guard.tab!=='out'?' is-done':''}${ready?' is-ready':''}${justChanged(v.id)?' just-changed':''}${guard.sel.has(v.id)?' is-sel':''}" style="--bc:${custColor(v.customer)}"><div class="saha-card-top">${plateHTML(v.plate)}${showDate?`<span class="guard-old">${esc(fmt(v.visit_date,{day:'numeric',month:'long'}))}</span>`:v.visit_time?`<span class="saha-time">${icon('clock')}${esc(String(v.visit_time).slice(0,5))}</span>`:''}</div>
  <div class="guard-meta"><div class="saha-cust"><i></i>${esc(v.customer||'Müşterisiz')}</div>${kgText(v.registration)?`<span class="guard-reg" title="Ruhsat">${icon('doc')}Ruhsat <b>${esc(kgText(v.registration))}</b></span>`:''}</div>
  ${v.mrn||v.seal_no?`<div class="guard-ncts">${v.mrn?`<span>MRN <b>${esc(v.mrn)}</b></span>`:''}${v.seal_no?`<span>Mühür <b>${esc(v.seal_no)}</b></span>`:''}</div>`:''}
  ${!board&&(ready||inn&&!out)?`<div class="guard-state${v.done?' ok':''}">${v.done?`${icon('check')}İşlemleri bitti · çıkabilir`:`${icon('clock')}İşlemleri sürüyor`}</div>`:''}
  <div class="guard-pair">${inBtn}${outBtn}</div>
  ${gView()?(v.driver_name||v.driver_phone?`<div class="guard-driver"><span class="guard-drv-info">${esc([v.driver_name,v.driver_phone].filter(Boolean).join(' · '))}</span></div>`:''):`<div class="guard-driver">${v.driver_name||v.driver_phone?`<span class="guard-drv-info">${esc([v.driver_name,v.driver_phone].filter(Boolean).join(' · '))}</span>`:''}<button type="button" class="guard-drv-btn" data-action="guard-drv" data-id="${esc(v.id)}" aria-expanded="${guard.drv?.id===v.id}">${icon('wa')}<span>${v.driver_phone?'Sürücüye mesaj':'Sürücü · mesaj'}</span></button></div>${guard.drv?.id===v.id?drvForm(v):''}`}
- ${undo||out?`<div class="guard-foot">${out?`<button type="button" class="guard-wa" data-action="guard-card-wa" data-id="${esc(v.id)}" title="Giriş-çıkış bilgisini WhatsApp’ta paylaş">${icon('wa')}<span>WhatsApp</span></button>`:''}${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}"${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</div>`:''}</article>`;}
+ ${undo||out?`<div class="guard-foot">${out?`<button type="button" class="guard-sel${guard.sel.has(v.id)?' on':''}" data-action="guard-sel" data-id="${esc(v.id)}" aria-pressed="${guard.sel.has(v.id)}" title="Toplu paylaşmak için seç"><span class="gs-box">${guard.sel.has(v.id)?icon('check'):''}</span><span>Seç</span></button>`:''}${out?`<button type="button" class="guard-wa" data-action="guard-card-wa" data-id="${esc(v.id)}" title="Giriş-çıkış bilgisini WhatsApp’ta paylaş">${icon('wa')}<span>WhatsApp</span></button>`:''}${undo?`<button type="button" class="guard-undo" data-action="guard-mark" data-k="${undo}" data-id="${esc(v.id)}"${dis}>${icon('undo')}${undo==='cikis_geri'?'Çıkışı geri al':'Girişi geri al'}</button>`:''}</div>`:''}</article>`;}
 /* Rapor: seçilen aralığın araçları müşteri bazında; panodaki "Günlük giriş – çıkış" penceresiyle aynı biçim */
 function guardRepRows(st,cust){const {from,to}=guardRange(),q=norm(guard.q);
  return guard.rows.filter(v=>v.visit_date>=from&&v.visit_date<=to&&(cust==null||(v.customer||'')===cust)&&(!q||norm(v.plate).includes(q)||norm(v.customer).includes(q))&&(!st||(st==='out'?!!outAt(v):st==='in'?!!v.onsite_at&&!outAt(v):true)))
@@ -2578,6 +2579,16 @@ function guardReport(){const st=guard.repSt||'',all=guardRepRows(''),rows=guardR
  <table class="gd-table"><thead><tr><th>PLAKA</th><th>TESİS GİRİŞ</th><th>İŞLEM BİTTİ</th><th>TESİS ÇIKIŞ</th><th>KALMA</th></tr></thead><tbody>${list.map(v=>`<tr><td>${plateHTML(v.plate,'sm',v.carrier)}</td><td class="gate-ts">${tsText(v.onsite_at)}</td><td class="gate-ts">${tsText(v.done_at)}</td><td class="gate-ts">${exitCell(v)}</td><td class="gate-dur">${esc(stayText(v))}</td></tr>`).join('')}</tbody></table></section>`).join('')
   +(rows.some(v=>!v.exit_at&&v.done_at)?'<p class="help-note">* Güvenlik çıkışı işlenmemiş; işlemlerin bittiği saat gösteriliyor.</p>':'')
   :`<div class="saha-empty">${icon('check')}<b>Bu aralıkta ${st==='out'?'çıkış yapan ':st==='in'?'içeride ':''}araç yok</b></div>`}</div>`;}
+/* Toplu paylaşım: çıkış yapmış araçlar seçilir, hepsinin giriş-çıkış bilgisi tek WhatsApp mesajında gider */
+const gSelRows=()=>guard.rows.filter(v=>guard.sel.has(v.id)&&gOut(v)).sort((a,b)=>String(a.exit_at).localeCompare(String(b.exit_at)));
+function gSelAllBtn(list){const ids=list.filter(gOut).map(v=>v.id);if(ids.length<2)return '';const all=ids.every(id=>guard.sel.has(id));
+ return `<button type="button" class="guard-selall" data-action="guard-sel-all" data-ids="${ids.join(',')}">${all?'Seçimi kaldır':`Hepsini seç (${ids.length})`}</button>`;}
+function gSelBar(){const n=gSelRows().length;if(!n)return '';
+ return `<div class="guard-selbar" role="region" aria-label="Seçilen araçlar"><b>${n} araç seçildi</b><div class="guard-selacts"><button type="button" class="guard-selwa" data-action="guard-sel-wa">${icon('wa')}<span>WhatsApp’ta paylaş</span></button><button type="button" class="guard-selcp" data-action="guard-sel-copy">Kopyala</button><button type="button" class="guard-selno" data-action="guard-sel-clear">Temizle</button></div></div>`;}
+function guardSelShare(how){const rows=gSelRows();if(!rows.length)return;const text=rows.map(gateText).join('\n\n');
+ if(how==='wa'){waLaunch('',text);toast(`${rows.length} aracın bilgisi WhatsApp’a aktarıldı; kişiyi ya da grubu seçip gönderin.`);}
+ else copyOut(text,'',`${rows.length} aracın giriş-çıkış bilgisi kopyalandı.`);
+ guard.sel.clear();renderGuard();}
 function renderGuard(){const app=document.getElementById('app');document.title=gView()?'Güvenlik izleme · PCS TRANSİT':'Güvenlik · PCS TRANSİT';
  const out=GUARD_ACCT?`<button type="button" class="saha-icon guard-signout" data-action="guard-signout" aria-label="Çıkış yap" title="Çıkış yap">${icon('logout')}</button>`:'';
  if(guard.fatal){app.innerHTML=`<div class="saha guard"><div class="guard-fatal">${icon('info')}<b>${esc(guard.fatal)}</b>${GUARD_ACCT?`<p class="guard-fatal-help">${guard.sqlOld?'Ofiste: Supabase → <b>SQL Editor</b>’de <b>guvenlik-kurulumu.sql</b> dosyasının <b>tamamı</b> yeniden çalıştırılmalı; beş kontrol satırı “tamam” olmalı.':'Ofiste: <b>Ayarlar → Güvenlik hesapları</b> bölümünde bu e-posta listede olmalı ve durumu “Açık” olmalı; değilse “Erişimi aç”a basılır.'}${guard.why?`<small>Sunucu yanıtı: ${esc(guard.why)}</small>`:''}</p><button type="button" class="btn" data-action="guard-signout">${icon('logout')}Çıkış yap</button>`:''}</div></div>`;return;}
@@ -2600,9 +2611,9 @@ function renderGuard(){const app=document.getElementById('app');document.title=g
   body=q&&!coming.length&&!inside.length&&!ready.length&&!justOut.length?`<div class="saha-empty">${icon('search')}<b>Eşleşen araç yok</b><small>Araç listede yoksa ofise haber verin.</small></div>`
    :`<nav class="guard-jump" aria-label="Bloklara git">${cols.map(([k,t,,,l])=>`<button type="button" class="${k}" data-action="guard-jump" data-k="${k}">${esc(t)}<b>${l.length}</b></button>`).join('')}</nav>
    <div class="guard-board">${cols.map(([k,t,sub,ic,l])=>`<section class="guard-col ${k}" id="guard-col-${k}" aria-label="${esc(t)}"><header class="guard-col-head"><span class="guard-col-ic">${ic}</span><div><b>${esc(t)}</b><small>${esc(sub)}</small></div><span class="guard-col-n">${l.length}</span></header>
-    <div class="guard-col-list">${l.length?cards(l):`<p class="guard-col-empty">${k==='coming'?'Gelecek araç yok':k==='inside'?'Tesiste araç yok':'Çıkışa hazır araç yok'}</p>`}${k==='ready'&&justOut.length?`<p class="guard-col-sep">${gView()?'Az önce çıkanlar':'Az önce çıkanlar · 15 dk geri alınabilir'}</p>${cards(justOut)}`:''}</div></section>`).join('')}</div>`;}
+    <div class="guard-col-list">${l.length?cards(l):`<p class="guard-col-empty">${k==='coming'?'Gelecek araç yok':k==='inside'?'Tesiste araç yok':'Çıkışa hazır araç yok'}</p>`}${k==='ready'&&justOut.length?`<div class="guard-col-seprow"><p class="guard-col-sep">${gView()?'Az önce çıkanlar':'Az önce çıkanlar · 15 dk geri alınabilir'}</p>${gSelAllBtn(justOut)}</div>${cards(justOut)}`:''}</div></section>`).join('')}</div>`;}
  else{const l=(tab==='out'?list.filter(isOut).sort((a,b)=>String(b.exit_at).localeCompare(String(a.exit_at))):list.filter(isAll).sort(byTime));
-  body=l.length?`<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
+  body=l.length?`${tab==='out'||tab==='all'?`<div class="guard-selrow">${gSelAllBtn(l)}</div>`:''}<div class="saha-grid">${l.map(guardCard).join('')}</div>`:`<div class="saha-empty">${icon('check')}<b>${q?'Eşleşen araç yok':'Bu listede araç yok'}</b></div>`;}
  const title=from===to?`${fmt(from,{day:'numeric',month:'long'})} ${DAYS[weekday(from)-1]||'Pazar'}`:`${fmt(from,{day:'numeric',month:'short'})} – ${fmt(to,{day:'numeric',month:'short'})}`;
  const focus=document.activeElement?.id,sel=document.activeElement?.selectionStart;
  app.innerHTML=`<div class="saha guard"><div class="guard-head"><header class="saha-top"><div class="saha-brand"><img src="logo.svg" alt=""><div><b>PCS TRANSİT</b><small>${gView()?'Güvenlik · izleme':GUARD_ACCT?'Güvenlik · '+esc(GUARD_ACCT.name):'Güvenlik · giriş-çıkış'}</small></div></div><div class="saha-date"><b>${esc(title)}</b><small>${guard.error?'Bağlantı sorunu':guard.loaded?'Güncel · '+esc(guard.at):'Yükleniyor…'}</small>${gView()?'<span class="guard-view-pill">Yalnızca görüntüleme</span>':''}</div><div class="saha-top-btns"><button type="button" class="saha-icon guard-refresh${guard.loading?' spin':''}" data-action="guard-refresh" aria-label="Listeyi şimdi yenile" title="Şimdi yenile (liste 10 sn’de bir kendiliğinden yenilenir)">${icon('refresh')}</button><button type="button" class="saha-icon" data-action="theme-toggle" aria-label="${dark?'Gündüz moduna geç':'Gece moduna geç'}">${icon(dark?'sun':'moon')}</button>${out}</div></header>
@@ -2610,7 +2621,7 @@ function renderGuard(){const app=document.getElementById('app');document.title=g
  <div class="guard-presets" role="group" aria-label="Hızlı tarih seçimi">${[['guard-today','Bugün',from===today&&to===today],['guard-week','Bu hafta',from===week.from&&to===week.to]].map(([a,l,on])=>`<button type="button" class="${on?'active':''}" data-action="${a}" aria-pressed="${on}">${l}</button>`).join('')}</div>
  <label class="saha-input guard-search">${icon('search')}<input id="guard-q" placeholder="Plaka yazın" value="${esc(guard.q)}" aria-label="Plaka ara" autocapitalize="characters" autocomplete="off" enterkeyhint="search"></label></div>
  <div class="saha-tabs" role="group" aria-label="Liste">${tabs.map(([k,l,n])=>`<button type="button" class="saha-tab${tab===k?' active':''}" data-action="guard-tab" data-k="${k}" aria-pressed="${tab===k}">${l}<b>${n}</b></button>`).join('')}</div></div>
- ${guard.error?`<div class="guard-alert" role="alert">${icon('info')}<span>${esc(guard.error)}</span></div>`:''}${body}</div>`;
+ ${guard.error?`<div class="guard-alert" role="alert">${icon('info')}<span>${esc(guard.error)}</span></div>`:''}${body}${gSelBar()}</div>`;
  if(focus==='guard-q'||focus==='drv-name'||focus==='drv-phone'){const i=document.getElementById(focus);i?.focus();if(sel!=null)try{i?.setSelectionRange(sel,sel);}catch(_){}}}
 function setGuardRange(f,t){const today=gToday();if(!validDate(f)||!validDate(t))return;if(t<f)[f,t]=[t,f];
  if((dateObj(t)-dateObj(f))/DAY>30){toast('En fazla 31 günlük aralık seçilebilir.',true);t=addDays(f,30);}
@@ -2644,6 +2655,10 @@ document.addEventListener('click',e=>{if(!inGuard())return;const b=e.target.clos
  if(a==='guard-mark')return guardMark(b.dataset.id,b.dataset.k);
  if(a==='guard-drv'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(!v||gView())return;guard.drv=guard.drv?.id===v.id?null:{id:v.id,name:v.driver_name||'',phone:v.driver_phone||'',lang:'auto'};renderGuard();if(guard.drv)document.getElementById('drv-name')?.focus();return;}
  if(a==='guard-drv-save'||a==='guard-drv-send'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(!v||gView()||b.disabled)return;b.disabled=true;(a==='guard-drv-send'?drvSend(v):drvSave(v,false)).finally(()=>{b.disabled=false;});return;}
+ if(a==='guard-sel'){const id=b.dataset.id,v=guard.rows.find(x=>x.id===id);if(!v||!gOut(v))return;guard.sel.has(id)?guard.sel.delete(id):guard.sel.add(id);return renderGuard();}
+ if(a==='guard-sel-all'){const ids=String(b.dataset.ids||'').split(',').filter(Boolean),all=ids.every(id=>guard.sel.has(id));for(const id of ids)all?guard.sel.delete(id):guard.sel.add(id);return renderGuard();}
+ if(a==='guard-sel-clear'){guard.sel.clear();return renderGuard();}
+ if(a==='guard-sel-wa'||a==='guard-sel-copy')return guardSelShare(a==='guard-sel-wa'?'wa':'copy');
  if(a==='guard-card-wa'){const v=guard.rows.find(x=>x.id===b.dataset.id);if(v)waLaunch('',gateText(v));return;}
  if(a==='guard-rep-st'){guard.repSt=b.dataset.st;return renderGuard();}
  if(a==='guard-rep-copy'||a==='guard-rep-wa')return guardShare(a==='guard-rep-wa'?'wa':'copy','cust' in b.dataset?b.dataset.cust:null);

@@ -2323,6 +2323,76 @@ test('güvenlik linki: Bekleyenler üç blok; GİRİŞ aracı "Tesiste"ye geçir
   expect(problems).toEqual([]);
 });
 
+test('güvenlik: peş peşe çıkan araçlar toplu seçilir ve tek WhatsApp mesajında paylaşılır; Hepsini seç, Temizle, Kopyala; çıkışı geri alınan seçimden düşer', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  const ready = page.locator('#guard-col-ready .guard-card');
+  await expect(ready).toHaveCount(1);
+  await page.evaluate(() => Object.assign(window.__db.visits.find(v => v.id === 'v7'), { done: true, done_at: new Date().toISOString() }));   // ofis ikinci araç için "işlemleri bitti" der
+  await page.clock.runFor(10500);
+  await expect(ready).toHaveCount(2);
+  // iki araç peş peşe çıkış yapar
+  await ready.first().locator('button[data-k="cikis"]').click();
+  await expect(page.locator('#toast')).toContainText('çıkış yaptı');
+  await page.locator('#guard-col-ready .guard-card:not(.is-done)').first().locator('button[data-k="cikis"]').click();
+  await expect(page.locator('#guard-col-ready .guard-card.is-done')).toHaveCount(2);
+  // çıkmamış araçta seçim kutusu yok; çıkanlarda var
+  await expect(page.locator('.guard-card', { hasText: 'CB 1234 AB' }).locator('[data-action="guard-sel"]')).toHaveCount(0);
+  await expect(page.locator('.guard-selbar')).toHaveCount(0);
+  const cards = page.locator('#guard-col-ready .guard-card.is-done');
+  await cards.nth(0).locator('[data-action="guard-sel"]').click();
+  await expect(page.locator('.guard-selbar')).toContainText('1 araç seçildi');
+  await expect(cards.nth(0)).toHaveClass(/is-sel/);
+  await expect(cards.nth(0).locator('[data-action="guard-sel"]')).toHaveAttribute('aria-pressed', 'true');
+  // Hepsini seç / Seçimi kaldır
+  await page.locator('[data-action="guard-sel-all"]').click();
+  await expect(page.locator('.guard-selbar')).toContainText('2 araç seçildi');
+  await expect(page.locator('[data-action="guard-sel-all"]')).toHaveText('Seçimi kaldır');
+  await page.locator('[data-action="guard-sel-all"]').click();
+  await expect(page.locator('.guard-selbar')).toHaveCount(0);
+  await page.locator('[data-action="guard-sel-all"]').click();
+  // seçim 10 sn'lik yenilemede korunur
+  await page.clock.runFor(10500);
+  await expect(page.locator('.guard-selbar')).toContainText('2 araç seçildi');
+  // Kopyala: iki aracın bilgisi tek metinde, boş satırla ayrılmış; kopyalayınca seçim temizlenir
+  await page.evaluate(() => { window.__copied = ''; navigator.clipboard.writeText = async t => { window.__copied = t; }; });
+  await page.locator('[data-action="guard-sel-copy"]').click();
+  await expect(page.locator('#toast')).toContainText('2 aracın giriş-çıkış bilgisi kopyalandı');
+  const copied = await page.evaluate(() => window.__copied);
+  expect(copied.split('\n\n')).toHaveLength(2);
+  expect(copied).toContain('B123XYZ'); expect(copied).toContain('34ABC123');
+  await expect(page.locator('.guard-selbar')).toHaveCount(0);
+  // Temizle
+  await cards.nth(1).locator('[data-action="guard-sel"]').click();
+  await expect(page.locator('.guard-selbar')).toContainText('1 araç seçildi');
+  await page.locator('[data-action="guard-sel-clear"]').click();
+  await expect(page.locator('.guard-selbar')).toHaveCount(0);
+  // Çıkanlar sekmesinde de seçilir (yalnız seçilen günün araçları listelenir)
+  await page.locator('[data-action="guard-tab"][data-k="out"]').click();
+  await expect(page.locator('.guard-card')).toHaveCount(1);
+  await page.locator('.guard-card').first().locator('[data-action="guard-sel"]').click();
+  await expect(page.locator('.guard-selbar')).toContainText('1 araç seçildi');
+  await page.locator('[data-action="guard-sel-clear"]').click();
+  // çıkışı geri alınan araç seçimden düşer
+  await page.locator('[data-action="guard-tab"][data-k="wait"]').click();
+  await expect(cards).toHaveCount(2);
+  await cards.first().locator('[data-action="guard-sel"]').click();
+  await cards.first().locator('[data-k="cikis_geri"]').click();
+  await expect(page.locator('#toast')).toContainText('çıkışı geri alındı');
+  await expect(page.locator('.guard-selbar')).toHaveCount(0);
+  await expect(cards).toHaveCount(1);
+  // WhatsApp: tek mesajda araçların bilgisi
+  await page.locator('[data-action="guard-tab"][data-k="all"]').click();
+  await page.locator('[data-action="guard-sel"]').first().click();
+  const launched = page.waitForEvent('request', r => r.url().startsWith('whatsapp://send'));
+  await page.locator('[data-action="guard-sel-wa"]').click();
+  const text = new URL((await launched).url()).searchParams.get('text');
+  expect(text).toContain('TESİS ÇIKIŞ TARİH SAAT');
+  expect(text).toContain('MÜŞTERİ :');
+  await expect(page.locator('#toast')).toContainText('1 aracın bilgisi WhatsApp');
+  await expect(page.locator('.guard-selbar')).toHaveCount(0);                              // paylaşınca seçim temizlenir
+  expect(problems).toEqual([]);
+});
+
 test('güvenlik: ofisin "işlemleri bitti" dediği araç "Çıkışa hazır"da en üste gelir; çıkan aracın bilgisi WhatsApp’ta paylaşılır', async ({ page }) => {
   const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
   const ready = page.locator('#guard-col-ready .guard-card');
