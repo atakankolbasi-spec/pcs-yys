@@ -70,6 +70,17 @@ Panoda önceden yazılmış yükler ilk kurulumda rehbere aktarılır.
 Müşteri ve depo ekranları **5 saniyede bir** kendiliğinden yenilenir: önce çok hafif bir değişiklik sorgusu yapılır, bir şey değiştiyse liste çekilir.
 Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa kırmızı **Bağlantı yok** olur ve geri gelince kendiliğinden toparlanır. Yazı yazarken ekran yenilense de yazdığınız kaybolmaz.
 
+## Müşteri sayfasının düzeni (kurumsal tasarım)
+
+Müşteri sayfası solda lacivert **menü**, üstte ince **çubuk** (arama, canlı göstergesi, Yenile), ortada sayfa olarak açılır. Giriş yapınca **Genel bakış** gelir:
+- Sayı kutuları: araca konmamış yük, hazırlanan sefer, yolda, bu ay teslim edilen.
+- **Dikkat gerektirenler**: beklenen saati geçen yük (*Gecikti*, "Depoya yaz" ile sohbet açılır), depoda eksik/hasar/sayım farkı bildirilen yük (*İncele* Takip'e götürür),
+  depoda olup araca konmamış yükler (*Araca yerleştir*).
+- Seferler tablosu (araç, çıkış, yük sayısı, doluluk çubuğu, durum) ve son hareketler.
+
+Menüdeki **Yükler ve araçlar** sayfasında yük yazma, yük listesi (tablo), araca koyma ve belgeler (Lade Liste, CMR) eskisi gibi çalışır; **Excel'den ekle** ve **Yük ekle** düğmeleri sayfa başlığındadır.
+**Depo yazışması** menüden ya da sağ alttaki balondan açılır. Telefonda menü üstte kayan bir şerit olur, yük satırları kart gibi alt alta dizilir. Depo sayfası bu tasarımdan etkilenmez.
+
 ## Müşteri ve depo sayfaları: yük düzenleme, silme, getirecek kamyon
 
 - Her yükte **Yükü getirecek kamyon plakası** alanı vardır (müşteri yazar; depo ve siz görürsünüz, plakayla arama yapılır).

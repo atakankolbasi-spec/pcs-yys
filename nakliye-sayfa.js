@@ -19,12 +19,13 @@
   let TOKEN = MODE === 'd' ? DT : (getSess() || MT);
   const esc = B.esc;
   const root = document.getElementById('p');
+  if (MODE === 'm') document.body.classList.add('cpm');   // müşteri sayfası: kurumsal görünüm (nakliye-sayfa.css, body.cpm)
   const client = window.createPCSClient('https://ollrccfqiqilbflanuik.supabase.co', 'sb_publishable_BV4TQSJ5lCNyTdRZV-Ouvg_bDOzBNQk');
   const CAP = 24000;   // tır kapasitesi (kg): araç doluluk göstergesi için yaklaşık değer
   const POLL_MS = 5000;
   const P = { tdel: '', data: null, err: '', loading: false, polling: false, down: 0, at: '', stamp: '', noStamp: false, live: '', needLogin: MODE === 'm' && !TOKEN, tab: 'bekliyor', scope: 'free', q: '', cf: '',
     confirm: '', name: '', busy: '', sel: new Set(), target: '', nv: { tractor: '', trailer: '', date: '' }, open: new Set(), editTrip: '', te: { tractor: '', trailer: '', date: '', subject: '' },
-    qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, page: 'plan', login: { u: '', p: '', err: '', busy: false } };
+    qa: { sender: '', consignee: '', goods: '', pieces: '', weight: '', plate: '' }, docTrip: '', drawer: '', dr: {}, page: MODE === 'm' ? 'ozet' : 'plan', login: { u: '', p: '', err: '', busy: false } };
   try { P.name = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* kayıt yoksa boş kalır */ }
   // Ek ekranların (nakliye-musteri.js, nakliye-depo.js, nakliye-qr.js) bağlandığı yer
   const X = window.PCSNKP = { views: {}, act: {}, inp: [], submit: {}, after: [], onDraw: [], enter: {}, floats: [], headTools: [], sideHtml: null, closeSide: null };
@@ -37,7 +38,7 @@
     undo: '<path d="M9 7L4 12l5 5M4 12h9a6 6 0 010 12"/>', doc: '<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>', search: '<circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/>',
     box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>', clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>', close: '<path d="M6 6l12 12M6 18L18 6"/>', send: '<path d="M21 3L10 14M21 3l-7 18-4-8-8-4z"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>', out: '<path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/>', print: '<path d="M7 9V4h10v5M7 17H5v-6h14v6h-2M7 14h10v6H7z"/>',
-    bell: '<path d="M6 17v-6a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', qr: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6h-6"/>', upload: '<path d="M12 16V5M7 9l5-5 5 5M4 19h16"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>', warn: '<path d="M12 4l9 16H3zM12 10v5M12 18h.01"/>', sheet: '<path d="M5 4h14v16H5zM5 10h14M5 15h14M11 4v16"/>', wa: '<path d="M4 20l1.3-4.2A8 8 0 1 1 8.4 18.8z"/><path d="M9 9c.3 2.5 2.5 4.7 5.5 5.5l1.3-1.3-2-1-1 .7c-.8-.4-1.6-1.2-2-2l.7-1-1-2z"/>', download: '<path d="M12 4v11M7 11l5 5 5-5M4 19h16"/>', pin: '<path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>', down: '<path d="M6 9l6 6 6-6"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'
+    bell: '<path d="M6 17v-6a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', qr: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14v6h-6"/>', upload: '<path d="M12 16V5M7 9l5-5 5 5M4 19h16"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>', warn: '<path d="M12 4l9 16H3zM12 10v5M12 18h.01"/>', sheet: '<path d="M5 4h14v16H5zM5 10h14M5 15h14M11 4v16"/>', wa: '<path d="M4 20l1.3-4.2A8 8 0 1 1 8.4 18.8z"/><path d="M9 9c.3 2.5 2.5 4.7 5.5 5.5l1.3-1.3-2-1-1 .7c-.8-.4-1.6-1.2-2-2l.7-1-1-2z"/>', download: '<path d="M12 4v11M7 11l5 5 5-5M4 19h16"/>', pin: '<path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>', down: '<path d="M6 9l6 6 6-6"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>', grid: '<path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/>', chart: '<path d="M5 20V10M12 20V4M19 20v-7"/>'
   };
   const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${I[n] || ''}</svg>`;
   const tr = s => String(s || '').toLocaleUpperCase('tr-TR');
@@ -245,18 +246,29 @@
   }
 
   // ------------------------------------------------------------------ müşteri sayfası (adım adım)
-  const topCustomer = () => {
-    const d = P.data, c = d.customer, u = d.user;
-    return `<header class="top"><div class="in"><div class="brand">${brandMark}<div><b>${esc(c.name)}</b><small>Nakliye portalı</small></div></div><div class="who">${c.logo ? `<img class="clogo" src="${esc(c.logo)}" alt="">` : ''}${liveHtml()}${u ? `<span class="uchip">${ic('user')}<b>${esc(u.name)}</b></span>` : ''}</div></div></header>`;
-  };
   // Ofis Nakliye ekranıyla aynı tarz: renkli çerçeveli başlık kartı (üstte küçük yazı, büyük başlık, sağda düğmeler)
   const heading = (eyebrow, title, right) => `<section class="hd"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div><div class="hd-r">${right}</div></section>`;
-  const PAGE_TITLES = { plan: 'Yükler ve araçlar', takip: 'Yük takibi', rapor: 'Rapor ve arşiv' };
+  const PAGES = { ozet: ['Genel bakış', 'Hesabınızın bugünkü özeti: bekleyen işler, seferler ve son hareketler.'], plan: ['Yükler ve araçlar', 'Yükleri yazın, araca yerleştirin, belgelerinizi alın.'],
+    takip: ['Yüklerim nerede?', 'Her yükün hangi aşamada olduğunu adım adım izleyin.'], rapor: ['Rapor ve arşiv', 'Aylık özet, geçmiş seferler ve belgeler.'] };
+  const initials = s => String(s || '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toLocaleUpperCase('tr-TR');
+  const nowHM = () => new Date().toLocaleTimeString('sv-SE', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
+  const navBtn = (k, label, icon, badge, attrs, cls) => `<button type="button" class="cp-nv ${P.page === k ? 'on' : ''}" ${attrs || `data-a="page" data-v="${k}"`} ${P.page === k ? 'aria-current="page"' : ''}>${ic(icon)}<span>${label}</span>${badge ? `<b class="${cls || ''}">${badge}</b>` : ''}</button>`;
+  // Kurumsal düzen: solda lacivert menü, üstte ince çubuk (yol, arama, canlı göstergesi), ortada sayfa
+  function sidebar() {
+    const d = P.data, c = d.customer, u = d.user, free = (d.loads || []).filter(isFree).length;
+    const un = (d.messages || []).filter(m => m.from_role !== 'musteri' && !m.read_at).length, who = u ? u.name : c.name;
+    return `<nav class="cp-side" aria-label="Menü"><div class="cp-brand"><i>PCS</i><div><b>PCS TRANSİT</b><small>Müşteri portalı</small></div></div>
+<div class="cp-menu">${navBtn('ozet', 'Genel bakış', 'grid')}<div class="cp-nl">Operasyon</div>${navBtn('plan', 'Yükler ve araçlar', 'box', free || '')}${navBtn('takip', 'Takip', 'clock')}<div class="cp-nl">Belgeler ve iletişim</div>${navBtn('chat', 'Depo yazışması', 'chat', un || '', 'data-a="chat-toggle" id="nav-chat"', 'al')}${navBtn('rapor', 'Rapor ve arşiv', 'chart')}</div>
+<div class="cp-usr"><i>${esc(initials(who))}</i><div><b>${esc(who)}</b><small>${esc(c.name)}</small></div>${u ? `<button type="button" class="cp-out" data-a="logout" title="Çıkış yap" aria-label="Çıkış yap">${ic('out')}</button>` : ''}</div></nav>`;
+  }
+  function topbar() {
+    const c = P.data.customer;
+    return `<header class="cp-bar"><div class="cp-crumb">Müşteri portalı / <b>${esc(PAGES[P.page][0])}</b></div>${P.page === 'plan' ? searchBar('Gönderici, alıcı, mal, plaka ara…') : ''}<div class="cp-bar-r">${c.logo ? `<img class="clogo" src="${esc(c.logo)}" alt="">` : ''}${liveHtml()}<button type="button" class="btn sm" data-a="refresh">${ic('refresh')}Yenile</button></div></header>`;
+  }
+  const pageHead = right => `<div class="cp-ph"><div><h1>${esc(PAGES[P.page][0])}</h1><p>${esc(PAGES[P.page][1])}</p></div><div class="cp-acts">${right || ''}</div></div>`;
+  const addActs = () => `<button type="button" class="btn" data-a="import">${ic('sheet')}Excel'den ekle</button><button type="button" class="btn pri" data-a="add-full">${ic('plus')}Yük ekle</button>`;
+  const tripBadge = t => t.status === 'teslim' ? '<span class="ch g">Teslim edildi</span>' : t.status === 'yolda' ? '<span class="ch b">Yolda</span>' : '<span class="ch a">Hazırlanıyor</span>';
   const floats = () => X.floats.map(f => { try { return f(); } catch (_) { return ''; } }).join('');
-  const customerHead = () => {
-    const u = P.data.user;
-    return `${topCustomer()}<div class="sh">${heading('Müşteri portalı', PAGE_TITLES[P.page] || PAGE_TITLES.plan, `<button type="button" class="btn" data-a="refresh">${ic('refresh')}Yenile</button>${u ? `<button type="button" class="btn" data-a="logout">${ic('out')}Çıkış</button>` : ''}`)}${pageNav()}</div>`;
-  };
   function stepper(all, free, trips) {
     const s1 = all.length ? 'done' : 'cur', s2 = !all.length ? '' : free.length || !trips.length ? 'cur' : 'done', s3 = trips.length ? (free.length ? '' : 'cur') : '';
     const st = (cls, n, t, sub) => `<div class="st ${cls}"><i>${cls === 'done' ? '✓' : n}</i><div><b>${n} · ${t}</b><small>${sub}</small></div></div>`;
@@ -266,8 +278,9 @@
     const t = tripOf(l.trip_id), sel = P.sel.has(l.id), fr = isFree(l);
     const state = t ? `<span class="ch b">${esc(t.poz_no)} · ${esc(B.plates(t))}</span>` : '';
     return `<li class="lo ${sel ? 'sel' : ''}"><span class="cbx">${fr ? `<input type="checkbox" data-a="pick" data-id="${esc(l.id)}" ${sel ? 'checked' : ''} aria-label="Araca koymak için seç: ${esc(l.sender)}">` : ''}</span>
-<div class="lm"><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}${l.goods ? ` · ${esc(l.goods)}` : ''} · ${esc(l.pieces)} ${esc(l.packing)} · ${kg(l.weight)} kg</small>
-<div class="chs">${state}${t ? (l.arrived_at ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Depoya gelmedi</span>') : chip(l)}${l.inbound_plate ? plate(l.inbound_plate, 'in sm') : ''}${!l.arrived_at && l.expected_date ? `<span class="ch n">Beklenen ${esc(B.dmy(l.expected_date))}${l.expected_time ? ' ' + esc(l.expected_time) : ''}</span>` : ''}${condChip(l)}</div></div>
+<div class="lm"><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)}${l.goods ? ` · ${esc(l.goods)}` : ''} · ${esc(l.pieces)} ${esc(l.packing)}</small></div><div class="lw">${kg(l.weight)} kg</div>
+<div class="ls">${t ? (l.arrived_at ? '<span class="ch g">Depoda</span>' : '<span class="ch a">Depoya gelmedi</span>') : chip(l)}${!l.arrived_at && l.expected_date ? `<span class="ch n">Beklenen ${esc(B.dmy(l.expected_date).slice(0, 5))}${l.expected_time ? ' ' + esc(l.expected_time) : ''}</span>` : ''}${condChip(l)}</div>
+<div class="lv">${state}${l.inbound_plate ? plate(l.inbound_plate, 'in sm') : ''}</div>
 <span class="le"><button type="button" class="ib" data-a="label" data-id="${esc(l.id)}" title="Etiket yazdır" aria-label="Etiket yazdır: ${esc(l.sender)}">${ic('qr')}</button>${canEdit(l) ? `<button type="button" class="ib" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button>` : ''}${canDel(l) ? `<button type="button" class="ib bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Sil" aria-label="Sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</span></li>`;
   }
   function panel1(all, free) {
@@ -279,21 +292,20 @@
 <div class="r3"><input id="qa-goods" data-i="qa-goods" value="${esc(qa.goods)}" placeholder="Mal cinsi" aria-label="Mal cinsi" maxlength="200"><input id="qa-pieces" data-i="qa-pieces" value="${esc(qa.pieces)}" placeholder="Kap" aria-label="Kap adedi" inputmode="numeric" maxlength="8"><input id="qa-weight" data-i="qa-weight" value="${esc(qa.weight)}" placeholder="Kilo" aria-label="Brüt kilo (kg)" inputmode="decimal" maxlength="12"></div>
 <label class="qp">${ic('truck')}<input id="qa-plate" data-i="qa-plate" list="dl-plate" value="${esc(qa.plate)}" placeholder="Getirecek kamyon plakası" aria-label="Yükü getirecek kamyon plakası" maxlength="40" style="text-transform:uppercase"></label>
 <div id="qa-hint" class="qhint" ${hint ? '' : 'hidden'}>${hint}</div><div id="qa-err" class="ferr" hidden role="alert"></div>
-<div class="qb"><button type="submit" class="btn pri" ${P.busy === 'quick' ? 'disabled' : ''}>${ic('plus')}Hızlı ekle</button><button type="button" class="lnk" data-a="add-full">Tüm alanlarla ekle</button><button type="button" class="lnk" data-a="import">${ic('sheet')}Excel'den ekle</button></div></form>
-<div class="lbar"><div class="seg" role="tablist">${sc.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.scope === k}" class="${P.scope === k ? 'on' : ''}" data-a="scope" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div>${searchBar('Ara…')}</div>
-${rows.length ? `<ul class="lol">${rows.map(loadRow).join('')}</ul>` : `<div class="empty">${all.length ? 'Bu görünümde yük yok.' : 'Henüz yük yazmadınız. Yukarıdaki alanlara gönderici ve alıcıyı yazıp "Hızlı ekle" deyin.'}</div>`}</section>`;
+<div class="qb"><button type="submit" class="btn pri" ${P.busy === 'quick' ? 'disabled' : ''}>${ic('plus')}Hızlı ekle</button><small>Adres, ülke ve gümrük gibi diğer alanlar için sayfanın üstündeki "Yük ekle" düğmesini kullanın.</small></div></form>
+<div class="lbar"><div class="seg" role="tablist">${sc.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${P.scope === k}" class="${P.scope === k ? 'on' : ''}" data-a="scope" data-v="${k}">${l}<span>${n}</span></button>`).join('')}</div></div>
+${rows.length ? `<div class="lo-h" aria-hidden="true"><span></span><span>Gönderici → Alıcı</span><span class="r">Kilo</span><span>Durum</span><span>Araç / sefer</span><span></span></div><ul class="lol">${rows.map(loadRow).join('')}</ul>` : `<div class="empty">${all.length ? 'Bu görünümde yük yok.' : 'Henüz yük yazmadınız. Yukarıdaki alanlara gönderici ve alıcıyı yazıp "Hızlı ekle" deyin.'}</div>`}</section>`;
   }
   function quickHint() {
     const s = contactOf('sender', P.qa.sender), c = contactOf('consignee', P.qa.consignee);
     return s || c ? `${ic('check')}Kayıtlı ${s && c ? 'gönderici ve alıcı' : s ? 'gönderici' : 'alıcı'}: adres ve diğer bilgiler kendiliğinden eklenecek.` : '';
   }
-  function truckSvg() { return '<svg class="trk" viewBox="0 0 96 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h56v24H2zM58 14h18l10 9v7H58z"/><circle cx="16" cy="32" r="5" fill="#fff"/><circle cx="44" cy="32" r="5" fill="#fff"/><circle cx="74" cy="32" r="5" fill="#fff"/></svg>'; }
-  const ring = w => `<div class="ring ${pct(w) > 100 ? 'over' : ''}" style="--p:${Math.min(pct(w), 100)}%" role="img" aria-label="Doluluk %${pct(w)}"><span>%${pct(w)}</span></div>`;
+    const ring = w => `<div class="cp-cap ${pct(w) > 100 ? 'over' : ''}" role="img" aria-label="Doluluk %${pct(w)}"><div class="cp-bar2"><i style="width:${Math.min(pct(w), 100)}%"></i></div><b>%${pct(w)}</b></div>`;
   function truckCard(t, all) {
     const n = all.filter(l => l.trip_id === t.id), w = sum(n, 'weight'), lk = locked(t), on = P.target === t.id, open = P.open.has(t.id), editing = P.editTrip === t.id, te = P.te;
     const gel = n.filter(l => !l.arrived_at).length;
     const head = editing ? `<div class="grid"><label class="fld"><span>Çekici plaka</span><input id="te-tractor" data-i="te-tractor" list="dl-tractor" value="${esc(te.tractor)}" maxlength="30" autocomplete="off" style="text-transform:uppercase"></label><label class="fld"><span>Dorse plaka</span><input id="te-trailer" data-i="te-trailer" list="dl-trailer" value="${esc(te.trailer)}" maxlength="30" autocomplete="off" style="text-transform:uppercase"></label><label class="fld"><span>Çıkış tarihi</span><input id="te-date" data-i="te-date" type="date" value="${esc(te.date)}"></label><label class="fld"><span>Konu (isteğe bağlı)</span><input id="te-subject" data-i="te-subject" value="${esc(te.subject)}" maxlength="200" autocomplete="off"></label></div><div class="acts"><button type="button" class="btn pri sm" data-a="trip-save" data-id="${esc(t.id)}">${ic('check')}Kaydet</button><button type="button" class="btn sm" data-a="trip-cancel">Vazgeç</button></div>`
-      : `<div class="vh" ${lk ? '' : `data-a="target" data-id="${esc(t.id)}" role="button" tabindex="0" aria-pressed="${on}"`}>${truckSvg()}<div class="vi"><div class="vt"><b class="poz">${esc(t.poz_no)}</b>${on ? '<span class="ch g">Seçili</span>' : ''}${lk ? '<span class="ch b">Yolda · kilitli</span>' : ''}</div><div class="vp">${plate(t.tractor)}${plate(t.trailer, 'alt')}</div><small>${n.length} yük · ${ton(w)} t dolu${lk ? '' : ` · ${ton(Math.max(CAP - w, 0))} t boş yer`} · ${esc(B.dmy(t.depart_date))}${gel ? ` · <span class="warn">${gel} yük depoya gelmedi</span>` : ''}</small></div>${ring(w)}</div>`;
+      : `<div class="vh" ${lk ? '' : `data-a="target" data-id="${esc(t.id)}" role="button" tabindex="0" aria-pressed="${on}"`}><div class="vi"><div class="vt"><b class="poz">${esc(t.poz_no)}</b>${on ? '<span class="ch g">Seçili</span>' : ''}${lk ? '<span class="ch b">Yolda · kilitli</span>' : ''}</div><div class="vp">${plate(t.tractor)}${plate(t.trailer, 'alt')}</div><small>${n.length} yük · ${ton(w)} t dolu${lk ? '' : ` · ${ton(Math.max(CAP - w, 0))} t boş yer`} · ${esc(B.dmy(t.depart_date))}${gel ? ` · <span class="warn">${gel} yük depoya gelmedi</span>` : ''}</small></div>${ring(w)}</div>`;
     const lines = open ? `<ul class="vl">${B.order(n).map(l => `<li><span><b>${esc(l.sender)}</b><small>→ ${esc(l.consignee)} · ${kg(l.weight)} kg · ${l.arrived_at ? 'Depoda' : 'Depoya gelmedi'}</small></span>${lk ? '' : `<span class="le"><button type="button" class="ib" data-a="edit" data-id="${esc(l.id)}" title="Düzenle" aria-label="Düzenle: ${esc(l.sender)}">${ic('edit')}</button><button type="button" class="ib keep" data-a="unassign" data-id="${esc(l.id)}">${ic('undo')}<span>Araçtan çıkar</span></button>${canDel(l) ? `<button type="button" class="ib bad ${P.confirm === l.id ? 'ask' : ''}" data-a="del" data-id="${esc(l.id)}" title="Yükü sil" aria-label="Yükü sil: ${esc(l.sender)}">${ic('trash')}${P.confirm === l.id ? '<span>Evet, sil</span>' : ''}</button>` : ''}</span>`}</li>`).join('')}</ul>` : '';
     const loaded = n.some(l => l.loaded_at);
     const ask = P.tdel === t.id && !lk ? `<div class="tdel" role="alert">${loaded ? `<p><b>${esc(t.poz_no)}</b>: depo bu araca yük yüklemiş; silinemez. Önce depoyla görüşün.</p><div class="tdb"><button type="button" class="btn" data-a="tdel-no">Tamam</button></div>`
@@ -328,14 +340,38 @@ ${vs.length ? `<div class="sv"><small>Kayıtlı araçlarınız (dokunun)</small>
 <div class="tip">${ic('lock')}<div>${lk ? 'Bu araç yola çıktı ve kilitlendi. Değişiklik için ofisimizle görüşün.' : 'Araç yola çıkınca ofisimiz kilitler; sonrasında değişiklik için bizimle görüşün.'}</div></div>${logHtml}</section>`;
   }
   const unread = () => ((P.data && P.data.messages) || []).filter(m => m.from_role === 'ofis' && !m.read_at).length;
-  const pageNav = () => {
-    const pages = [['plan', 'Yükler ve araçlar', 'truck'], ['takip', 'Takip', 'clock'], ['rapor', 'Rapor ve arşiv', 'doc']];
-    return `<nav class="pnav" aria-label="Sayfalar">${pages.map(([k, l, i]) => `<button type="button" class="${P.page === k ? 'on' : ''}" aria-current="${P.page === k}" data-a="page" data-v="${k}">${ic(i)}${l}</button>`).join('')}</nav>`;
-  };
+  // Genel bakış: sayılar, dikkat gerektirenler, seferler, son hareketler
+  function ozetView(all, free, trips) {
+    const td = today(), hm = nowHM(), kpi = (label, n, sub) => `<div class="cp-card cp-kp"><small>${label}</small><b>${n}</b><span>${sub}</span></div>`;
+    const on = ts => all.filter(l => ts.some(t => t.id === l.trip_id));
+    const prep = trips.filter(t => t.status === 'hazirlaniyor'), road = trips.filter(t => t.status === 'yolda');
+    const ym = td.slice(0, 7), doneM = trips.filter(t => t.status === 'teslim' && String(t.delivered_at || '').slice(0, 7) === ym);
+    const month = new Date().toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', month: 'long', year: 'numeric' });
+    const late = all.filter(l => !l.arrived_at && (l.status === 'bekliyor' || l.status === 'aracta') && l.expected_date && (l.expected_date < td || (l.expected_date === td && l.expected_time && l.expected_time < hm)));
+    const sick = all.filter(l => condChip(l)), idle = free.filter(l => l.status === 'depoda');
+    const attn = [];
+    late.forEach(l => attn.push(`<div class="cp-attn"><span class="ch r">Gecikti</span><div class="t"><b>${esc(l.sender)} → ${esc(l.consignee)}</b><small>Beklenen ${esc(B.dmy(l.expected_date))}${l.expected_time ? ' ' + esc(l.expected_time) : ''}${l.inbound_plate ? ` · getirecek araç ${esc(l.inbound_plate)}` : ''}</small></div><button type="button" class="btn sm" data-a="chat-toggle">Depoya yaz</button></div>`));
+    sick.forEach(l => attn.push(`<div class="cp-attn"><span class="ch a">Depoda sorun</span><div class="t"><b>${esc(l.sender)} → ${esc(l.consignee)}</b><small>${l.condition === 'hasarli' ? 'Hasarlı bildirildi' : l.condition === 'eksik' ? 'Eksik var bildirildi' : 'Sayım farkı var'}${l.receive_note ? ` · ${esc(l.receive_note)}` : ''}</small></div><button type="button" class="btn sm" data-a="page" data-v="takip">İncele</button></div>`));
+    if (idle.length) attn.push(`<div class="cp-attn"><span class="ch b">Araç bekliyor</span><div class="t"><b>${idle.length} yük depoda, henüz araca konmadı</b><small>${esc(uniq(idle.map(l => l.sender)).slice(0, 3).join(', '))} · ${kg(sum(idle, 'weight'))} kg</small></div><button type="button" class="btn pri sm" data-a="page" data-v="plan">Araca yerleştir</button></div>`);
+    const rows = trips.slice(0, 6).map(t => {
+      const n = all.filter(l => l.trip_id === t.id), w = sum(n, 'weight');
+      return `<tr><td><b>${esc(t.poz_no)}</b></td><td>${plate(t.tractor)}${plate(t.trailer, 'alt')}</td><td>${esc(B.dmy(t.depart_date))}</td><td class="num">${n.length}</td><td><div class="cp-bar2 ${t.status === 'yolda' ? 'am' : t.status === 'teslim' ? 'gr' : ''}"><i style="width:${Math.min(pct(w), 100)}%"></i></div><small>${kg(w)} / ${kg(CAP)} kg</small></td><td>${tripBadge(t)}</td></tr>`;
+    }).join('');
+    const log = (P.data.log || []).slice(0, 6);
+    return `<div class="cp-kps">${kpi('Araca konmamış yük', free.length, `${kg(sum(free, 'weight'))} kg`)}${kpi('Hazırlanan sefer', prep.length, `${on(prep).length} yük · ${kg(sum(on(prep), 'weight'))} kg`)}${kpi('Yolda', road.length, `${on(road).length} yük · ${kg(sum(on(road), 'weight'))} kg`)}${kpi('Bu ay teslim edilen', on(doneM).length, esc(month))}</div>
+<div class="cp-cols2"><div class="cp-l">
+<section class="cp-card" aria-label="Dikkat gerektirenler"><div class="cp-ch"><h2>Dikkat gerektirenler</h2>${attn.length ? `<span class="ch r">${attn.length} kayıt</span>` : ''}</div>${attn.length ? attn.join('') : `<div class="cp-ok">${ic('check')}Şu an dikkat gerektiren bir şey yok.</div>`}</section>
+<section class="cp-card" aria-label="Seferler"><div class="cp-ch"><h2>Seferler</h2><button type="button" class="lnk" data-a="page" data-v="plan">Yükler ve araçlar</button></div>${rows ? `<div class="cp-sc"><table class="cp-tbl"><thead><tr><th>Sefer</th><th>Araç</th><th>Çıkış</th><th class="num">Yük</th><th>Doluluk</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">Henüz sefer yok. Yüklerinizi seçip bir araca yerleştirin.</div>'}</section>
+</div><aside class="cp-r"><section class="cp-card" aria-label="Son hareketler"><div class="cp-ch"><h2>Son hareketler</h2></div>${log.length ? `<div class="cp-feed">${log.map(x => `<div class="cp-fi"><i></i><div>${esc(x.action)}${x.summary ? ` · ${esc(x.summary)}` : ''}<small>${esc(x.actor)}</small></div><time>${esc(stamp(x.at))}</time></div>`).join('')}</div>` : '<div class="empty">Henüz hareket yok.</div>'}</section></aside></div>`;
+  }
   function customerView() {
+    if (!PAGES[P.page]) P.page = 'plan';
     const d = P.data, all = d.loads || [], free = all.filter(isFree), trips = sortedTrips();
-    if (P.page !== 'plan' && X.views[P.page]) return `${customerHead()}<main class="pg2">${X.views[P.page]()}</main>${datalists()}${floats()}`;
-    return `${customerHead()}${stepper(all, free, trips)}<main class="cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</main>${datalists()}${floats()}`;
+    let body, acts = '';
+    if (P.page === 'ozet') { body = ozetView(all, free, trips); acts = addActs(); }
+    else if (P.page !== 'plan' && X.views[P.page]) body = X.views[P.page]();
+    else { body = `${stepper(all, free, trips)}<div class="cp-cols">${panel1(all, free)}${panel2(all, trips)}${panel3(all, trips)}</div>`; acts = addActs(); }
+    return `<div class="cp">${sidebar()}<div class="cp-main">${topbar()}<main class="cp-page cp-p-${P.page}">${pageHead(acts)}${body}</main></div></div>${datalists()}${floats()}`;
   }
 
   // ------------------------------------------------------------------ depo sayfası (masa başı tablo)
@@ -611,6 +647,7 @@ ${fld('driver', 'Şoför adı ve telefonu')}
       else if (X.submit[f.dataset.f]) Promise.resolve(X.submit[f.dataset.f](f)).catch(() => toast('İşlem yapılamadı', true));
     });
     document.addEventListener('keydown', e => {
+      if (MODE === 'm' && (e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') { const q = document.getElementById('q'); if (q) { e.preventDefault(); q.focus(); q.select(); } return; }
       if (e.key === 'Escape' && (P.drawer || (X.sideHtml && X.sideHtml())) && !document.querySelector('dialog[open]')) { P.drawer = ''; if (X.closeSide) X.closeSide(); draw(); return; }
       if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.vh[data-a]')) { e.preventDefault(); e.target.click(); return; }
       if (e.key === 'Enter' && MODE === 'd' && P.sel.size && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); bulk().catch(() => toast('İşlem yapılamadı', true)); }

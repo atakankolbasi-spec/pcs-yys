@@ -54,7 +54,7 @@ async function open(page, query, extra = {}) {
   await page.goto('/nakliye.html' + query);
   return problems;
 }
-const customerPage = async (page, v, extra) => { const p = await open(page, '?m=tokC1', extra); await expect(page.locator('.pnav')).toBeVisible(); if (v) await page.locator(`[data-a="page"][data-v="${v}"]`).click(); return p; };
+const customerPage = async (page, v, extra) => { const p = await open(page, '?m=tokC1', extra); await expect(page.locator('.cp-side')).toBeVisible(); await page.locator(`.cp-side [data-a="page"][data-v="${v || 'plan'}"]`).click(); return p; };
 const depot = async (page, tab, extra) => { const p = await open(page, '?d=tokD', extra); await expect(page.locator('.dwrap')).toBeVisible(); if (tab) await page.locator(`[data-a="tab"][data-v="${tab}"]`).click(); return p; };
 const rpcs = (page, name) => page.evaluate(n => window.__calls.filter(c => c.rpc === n).map(c => c.params), name);
 
@@ -163,7 +163,7 @@ test('müşteri: arşivdeki eski seferin belgeleri sunucudan hazırlanır (ana l
 // ================================================================================================ müşteri: ofisle yazışma
 test('müşteri: sohbet balonu — depoyla yazışma; okunmamış cevap rozeti, açılınca okundu işareti, konu seçerek mesaj, 5 saniyede yeni cevap', async ({ page }) => {
   await customerPage(page);
-  await expect(page.locator('.pnav [data-v="yazisma"]')).toHaveCount(0);              // ayrı sekme yok
+  await expect(page.locator('.cp-side [data-v="yazisma"]')).toHaveCount(0);              // ayrı sekme yok
   await expect(page.locator('#chat-fab')).toHaveAttribute('aria-label', 'Depo ile yazışma');
   await expect(page.locator('#chat-fab .cdot')).toHaveText('1');                       // okunmamış cevap
   await expect(page.locator('#chat-panel')).toHaveCount(0);
@@ -493,14 +493,74 @@ test('depo: yükler seçilince alttaki "Etiket yazdır" düğmesi seçilenlerin 
   expect((html.match(/class="lb"/g) || []).length).toBe(1);
 });
 
-test('tarz: müşteri ve depo sayfalarında ofis ekranındaki gibi başlık kartı, sayı kutuları ve sayılı sekmeler var', async ({ page }) => {
-  const problems = await customerPage(page, null);
-  await expect(page.locator('.hd .eyebrow')).toHaveText('Müşteri portalı');
-  await expect(page.locator('.hd h1')).toHaveText('Yükler ve araçlar');
-  await expect(page.locator('.hd [data-a="refresh"]')).toHaveCount(1);
-  for (const [v, t] of [['takip', 'Yük takibi'], ['rapor', 'Rapor ve arşiv']]) {
-    await page.locator(`[data-a="page"][data-v="${v}"]`).click();
-    await expect(page.locator('.hd h1')).toHaveText(t);
+test('müşteri: Genel bakış — sayı kutuları, dikkat gerektirenler (geciken, depoda sorun), seferler tablosu; düğmeler ilgili yere götürür', async ({ page }) => {
+  const problems = await customerPage(page, 'ozet');
+  const k = page.locator('.cp-kp b');
+  await expect(k).toHaveText(['4', '1', '1', '1']);                                    // araca konmamış, hazırlanan sefer, yolda, bu ay teslim edilen
+  await expect(page.locator('.cp-kp').nth(0)).toContainText('11.947 kg');
+  await expect(page.locator('.cp-attn')).toHaveCount(2);
+  await expect(page.locator('.cp-attn').nth(0)).toContainText('Gecikti');              // beklenen 09:30, saat 10:00
+  await expect(page.locator('.cp-attn').nth(0)).toContainText('ÇELİK PLASTİK LTD. → DAKO SRL');
+  await expect(page.locator('.cp-attn').nth(1)).toContainText('Depoda sorun');
+  await expect(page.locator('.cp-attn').nth(1)).toContainText('Eksik var bildirildi');
+  const rows = page.locator('.cp-tbl tbody tr');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('PCS-26-0002');
+  await expect(rows.nth(0)).toContainText('Hazırlanıyor');
+  await expect(rows.nth(1)).toContainText('Yolda');
+  await expect(rows.nth(2)).toContainText('Teslim edildi');
+  await expect(page.locator('.cp-feed')).toHaveCount(0);                               // örnek veride hareket kaydı yok
+  await page.locator('.cp-attn').nth(1).locator('[data-a="page"][data-v="takip"]').click();
+  await expect(page.locator('.cp-ph h1')).toHaveText('Yüklerim nerede?');
+  await page.locator('.cp-side [data-v="ozet"]').click();
+  await page.locator('.cp-attn').nth(0).locator('[data-a="chat-toggle"]').click();     // Depoya yaz → sohbet açılır
+  await expect(page.locator('#chat-panel')).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('müşteri: Genel bakış — depoda araca konmamış yük "Araç bekliyor" der ve araca yerleştirmeye götürür; hiçbir şey yoksa sakin bir mesaj', async ({ page }) => {
+  const ls = [L('a1', 'c1', 'A FİRMASI', 'B SRL', { weight: 1000 }), L('a2', 'c1', 'C FİRMASI', 'D SRL', { weight: 2500 })];
+  await customerPage(page, 'ozet', { data: { shp_loads: ls, shp_trips: [], shp_messages: [] } });
+  await expect(page.locator('.cp-attn')).toHaveCount(1);
+  await expect(page.locator('.cp-attn')).toContainText('Araç bekliyor');
+  await expect(page.locator('.cp-attn')).toContainText('2 yük depoda');
+  await expect(page.locator('.cp-attn')).toContainText('3.500 kg');
+  await expect(page.locator('.cp-tbl')).toHaveCount(0);
+  await expect(page.locator('#p')).toContainText('Henüz sefer yok');
+  await page.locator('.cp-attn [data-v="plan"]').click();
+  await expect(page.locator('.steps')).toBeVisible();
+  await expect(page.locator('.cp-ph h1')).toHaveText('Yükler ve araçlar');
+  const p2 = await page.context().newPage();
+  await customerPage(p2, 'ozet', { data: { shp_loads: [], shp_trips: [], shp_messages: [] } });
+  await expect(p2.locator('.cp-ok')).toContainText('dikkat gerektiren bir şey yok');
+});
+
+test('müşteri: telefonda menü üstte kayan şerit olur, sayfa yana taşmaz; yük satırları kart gibi alt alta', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await customerPage(page, 'ozet');
+  for (const v of ['ozet', 'plan', 'takip', 'rapor']) {
+    await page.locator(`.cp-side [data-a="page"][data-v="${v}"]`).click();
+    await expect(page.locator('.cp-ph h1')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `${v}: yana taşma`).toBeLessThanOrEqual(0);
+  }
+  expect(await page.locator('.cp-menu').evaluate(e => getComputedStyle(e).flexDirection)).toBe('row');
+  await page.locator('.cp-side [data-v="plan"]').click();
+  const a = await page.locator('li.lo').first().locator('.lm').boundingBox(), b = await page.locator('li.lo').first().locator('.ls').boundingBox();
+  expect(b.y).toBeGreaterThan(a.y + a.height - 2);                                      // durum, ad satırının altında
+});
+
+test('tarz: müşteri sayfası kurumsal düzende (lacivert menü, üst çubuk, sayfa başlığı); depo sayfası ofis tarzı başlık kartıyla', async ({ page }) => {
+  const problems = await customerPage(page, 'ozet');
+  await expect(page.locator('.cp-side .cp-brand')).toContainText('PCS TRANSİT');
+  await expect(page.locator('.cp-bar .cp-crumb')).toContainText('Genel bakış');
+  await expect(page.locator('.cp-ph h1')).toHaveText('Genel bakış');
+  await expect(page.locator('.cp-bar [data-a="refresh"]')).toHaveCount(1);
+  expect(await page.locator('.cp-side').evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(15, 28, 46)');
+  for (const [v, t] of [['plan', 'Yükler ve araçlar'], ['takip', 'Yüklerim nerede?'], ['rapor', 'Rapor ve arşiv'], ['ozet', 'Genel bakış']]) {
+    await page.locator(`.cp-side [data-a="page"][data-v="${v}"]`).click();
+    await expect(page.locator('.cp-ph h1')).toHaveText(t);
+    await expect(page.locator('.cp-nv.on')).toHaveCount(1);
+    await expect(page.locator('.cp-nv.on')).toHaveAttribute('data-v', v);
   }
   await page.goto('/nakliye.html?d=tokD');
   await expect(page.locator('.dwrap .hd h1')).toHaveText('Depo ekranı');
