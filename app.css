@@ -2406,3 +2406,8 @@ html[data-theme="dark"] .guard-sel,html[data-theme="dark"] .guard-selall{backgro
 html[data-theme="dark"] .guard-sel .gs-box{background:#101827;border-color:#6f7f97}
 html[data-theme="dark"] .guard-sel.on{background:#123d2a;border-color:#22c55e;color:#bbf7d0}html[data-theme="dark"] .guard-sel.on .gs-box{background:#16a34a;border-color:#16a34a}
 @media (max-width:520px){.guard-selbar{flex-direction:column;align-items:stretch}.guard-selacts{display:grid;grid-template-columns:1fr auto auto}.guard-selbar>b{text-align:center}}
+.guard-tohint{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;padding:8px 12px;border:1.5px dashed #86efac;border-radius:12px;background:transparent;color:#166534;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;text-align:center}
+.guard-tohint svg{width:18px;height:18px;flex:none}
+.guard-selrow{align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.guard-selhint{color:#5b6b82;font-size:13px;font-weight:600}
+html[data-theme="dark"] .guard-tohint{color:#86efac;border-color:#166534}html[data-theme="dark"] .guard-selhint{color:#9aa6b8}
