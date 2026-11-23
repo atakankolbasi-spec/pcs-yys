@@ -73,8 +73,10 @@ Sayfanın üstünde yeşil **Canlı** göstergesi görünür; bağlantı koparsa
 ## Müşteri ve depo sayfaları: yük düzenleme, silme, getirecek kamyon
 
 - Her yükte **Yükü getirecek kamyon plakası** alanı vardır (müşteri yazar; depo ve siz görürsünüz, plakayla arama yapılır).
-- **Müşteri** yüklerini kendi sayfasında **Düzenle** ve **Sil** düğmeleriyle yönetir: araca konmamış yük (bekleyen ya da depoda) düzenlenir ve silinir;
-  araçtaki yük düzenlenir (silmek için önce "Araçtan çıkar"); sefer **Yola çıktı** diye kilitlenince hiçbiri değişmez.
+- **Müşteri** yüklerini kendi sayfasında **Düzenle** ve **Sil** düğmeleriyle yönetir: araca konmamış yük (bekleyen ya da depoda) ve **yola çıkmamış araçtaki yük** düzenlenir ve silinir
+  (araçtaki son yük silinirse boş kalan araç da kalkar). Depo yükü okutup **"yüklendi"** işaretlemişse silinmez (önce depoyla görüşülür); sefer **Yola çıktı** diye kilitlenince hiçbiri değişmez.
+- **Müşteri aracını da siler**: araç kartında **Aracı sil**. İki seçenek sorulur: *Yalnız aracı sil* (yükler "Araca konmamış" listesine döner) ya da *Aracı ve yükleri sil*.
+  Yola çıkmış araç ya da depo yük yüklemiş araç silinmez. Bu özellik için `nakliye-kurulumu.sql` yeniden çalıştırılmalıdır (kontrolde 14 satır "tamam").
 - **Depo** yük bilgisini (gerçek kap, kilo, plaka) **Düzenle** ile (sağdan açılan çekmecede) düzeltir; araca konmamış yükü **Sil** ile siler. Birden çok yükü kutucukla seçip **Seçilileri geldi işaretle** ile topluca işaretleyebilir.
 - Siz Nakliye sayfasında her yükü düzenleyebilirsiniz (araçtaki yük silinmez, önce araçtan çıkarılır).
 

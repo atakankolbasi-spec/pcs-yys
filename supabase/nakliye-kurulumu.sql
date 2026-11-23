@@ -442,13 +442,53 @@ begin
 end $$;
 
 -- Müşteri: yük siler (araca konmamış olmalı; araçtaki yükü önce araçtan çıkarır)
+-- Müşteri kendi yükünü siler: araca konmamış yük ya da yola çıkmamış araçtaki yük. Araca yüklendi işaretlenmiş (depo okutmuş) yük silinmez.
+-- Araçtaki son yük silinirse boş kalan araç da kalkar.
 create or replace function public.shp_portal_delete(p_token text, p_id uuid) returns void
 language plpgsql security definer set search_path = '' as $$
-declare k record;
+declare
+  k record;
+  l public.shp_loads;
+  t public.shp_trips;
 begin
   select * into k from private.shp_cust_auth(p_token);
-  delete from public.shp_loads where id = p_id and customer_id = k.customer_id and status in ('bekliyor', 'depoda') and trip_id is null;
-  if not found then raise exception 'Yük bulunamadı ya da araca konduğu için silinemez; önce araçtan çıkarın' using errcode = '22023'; end if;
+  select * into l from public.shp_loads x where x.id = p_id and x.customer_id = k.customer_id for update;
+  if not found then raise exception 'Yük bulunamadı' using errcode = '22023'; end if;
+  if l.trip_id is not null then
+    select * into t from public.shp_trips x where x.id = l.trip_id;
+    if t.status <> 'hazirlaniyor' then raise exception 'Araç yola çıkmış; bu yük silinemez, ofisle görüşün' using errcode = '22023'; end if;
+  end if;
+  if l.loaded_at is not null then raise exception 'Yük araca yüklenmiş (depo okutmuş); silinemez, önce depoyla görüşün' using errcode = '22023'; end if;
+  delete from public.shp_loads where id = p_id;
+  if l.trip_id is not null and not exists (select 1 from public.shp_loads x where x.trip_id = l.trip_id) then
+    delete from public.shp_trips where id = l.trip_id;
+  end if;
+end $$;
+
+-- Müşteri kendi aracını (seferini) siler; yola çıkmamış olmalı. p_with_loads = false: yükler boşta listesine döner; true: yükler de silinir.
+-- Depo araca yükleme işareti koymuş yük varsa silinmez.
+create or replace function public.shp_portal_trip_delete(p_token text, p_trip uuid, p_with_loads boolean default false) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k record;
+  t public.shp_trips;
+  n int := 0;
+begin
+  select * into k from private.shp_cust_auth(p_token);
+  select * into t from public.shp_trips x where x.id = p_trip and x.customer_id = k.customer_id for update;
+  if not found then raise exception 'Araç bulunamadı' using errcode = '22023'; end if;
+  if t.status <> 'hazirlaniyor' then raise exception 'Araç yola çıkmış; silinemez, ofisle görüşün' using errcode = '22023'; end if;
+  if exists (select 1 from public.shp_loads x where x.trip_id = p_trip and x.loaded_at is not null) then
+    raise exception 'Depo bu araca yük yüklemiş; silinemez, önce depoyla görüşün' using errcode = '22023';
+  end if;
+  if coalesce(p_with_loads, false) then
+    delete from public.shp_loads x where x.trip_id = p_trip and x.customer_id = k.customer_id;
+    get diagnostics n = row_count;
+  else
+    update public.shp_loads x set status = case when x.arrived_at is null then 'bekliyor' else 'depoda' end, trip_id = null where x.trip_id = p_trip;
+  end if;
+  delete from public.shp_trips where id = p_trip;
+  return jsonb_build_object('loads_deleted', n);
 end $$;
 
 -- ---------------------------------------------------------------- depo bağlantısı
@@ -1551,7 +1591,7 @@ revoke all on function public.shp_portal_notify_save(text, text, jsonb), public.
   public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text) from public;
 revoke all on function private.shp_load_times(), private.shp_trip_times(), private.shp_message_author(), private.shp_enqueue(uuid, text, text),
   private.shp_notify_load(), private.shp_notify_trip(), private.shp_notify_message() from public;
-do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text), public.shp_depot_message_send(text, text, uuid, text), public.shp_depot_messages_read(text, text, uuid), public.shp_depot_load(text, uuid, boolean, text), public.shp_depot_labels_claim(text, uuid[], text)'; begin
+do $$ declare fl text := 'public.shp_portal_notify_save(text, text, jsonb), public.shp_portal_message_send(text, text, uuid, uuid), public.shp_portal_messages_read(text), public.shp_portal_import(text, jsonb), public.shp_portal_report(text), public.shp_portal_trip_docs(text, uuid), public.shp_portal_photos(text, uuid), public.shp_portal_photo(text, uuid), public.shp_depot_photos(text, uuid), public.shp_depot_photo(text, uuid), public.shp_depot_photo_add(text, uuid, text, text, text), public.shp_depot_photo_del(text, uuid, text), public.shp_depot_receive(text, uuid, text, int, numeric, text, text, text), public.shp_depot_depart(text, uuid, text), public.shp_depot_message_send(text, text, uuid, text), public.shp_depot_messages_read(text, text, uuid), public.shp_depot_load(text, uuid, boolean, text), public.shp_depot_labels_claim(text, uuid[], text), public.shp_portal_trip_delete(text, uuid, boolean)'; begin
   if exists (select 1 from pg_roles where rolname = 'anon') then execute 'grant execute on function ' || fl || ' to anon'; end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then execute 'grant execute on function ' || fl || ' to authenticated'; end if;
 end $$;
@@ -1605,10 +1645,11 @@ select 'müşteri ve depo bağlantıları',
        case when to_regprocedure('public.shp_portal(text)') is not null and to_regprocedure('public.shp_depot(text)') is not null
                  and to_regprocedure('public.shp_links()') is not null then 'tamam' else 'EKSİK' end
 union all
-select 'müşteri araç planı',
+select 'müşteri araç planı ve araç silme',
        case when to_regprocedure('public.shp_portal_assign(text, uuid[], uuid, text, text, date, text)') is not null
                  and to_regprocedure('public.shp_portal_unassign(text, uuid)') is not null
-                 and to_regprocedure('public.shp_portal_trip_update(text, uuid, text, text, date, text)') is not null then 'tamam' else 'EKSİK' end
+                 and to_regprocedure('public.shp_portal_trip_update(text, uuid, text, text, date, text)') is not null
+                 and to_regprocedure('public.shp_portal_trip_delete(text, uuid, boolean)') is not null then 'tamam' else 'EKSİK' end
 union all
 select 'yük düzenleme, silme ve getirecek kamyon plakası',
        case when to_regprocedure('public.shp_depot_save(text, jsonb, text)') is not null and to_regprocedure('public.shp_depot_delete(text, uuid, text)') is not null

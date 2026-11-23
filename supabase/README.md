@@ -127,6 +127,12 @@ yalnızca seçilen aralığın araçlarını gösterir ve her kartta o aracın b
 vardır. "Rapor" sekmesinden giriş-çıkışlar müşteri bazında kopyalanıp WhatsApp'ta paylaşılabilir. Kurulmadıkça
 site bu özelliği kapalı tutar.
 
+**Toplu paylaşım:** peş peşe çıkan araçları tek tek paylaşmak gerekmez. Çıkış yapmış her aracın kartında **Seç** düğmesi vardır
+("Az önce çıkanlar", "Çıkanlar" ve "Tümü" listelerinde); araçlar seçilince altta yeşil bir çubuk çıkar: **WhatsApp'ta paylaş**
+seçilen bütün araçların giriş-çıkış bilgisini (çıkış sırasıyla, aralarında boş satır) **tek mesajda** WhatsApp'a aktarır, **Kopyala**
+panoya kopyalar, **Temizle** seçimi kaldırır. Listenin üstündeki **Hepsini seç** o listedeki çıkmış araçların hepsini seçer.
+Paylaşınca ya da kopyalayınca seçim temizlenir; çıkışı geri alınan araç seçimden düşer. Veritabanı değişikliği gerekmez.
+
 **Sürücüye mesaj:** her kartta **Sürücü · mesaj** düğmesi vardır. Güvenlik sürücünün **ad soyadını** ve **telefonunu** yazar;
 mesaj şu biçimde hazırlanır ve WhatsApp'ta o numaraya açılır (gönder düğmesine güvenlik basar):
 
