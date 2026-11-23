@@ -2393,6 +2393,29 @@ test('güvenlik: peş peşe çıkan araçlar toplu seçilir ve tek WhatsApp mesa
   expect(problems).toEqual([]);
 });
 
+test('güvenlik: 15 dakikadan eski çıkanlar Bekleyenler\'de görünmez; "Çıkan araçları seçip paylaş" düğmesi Çıkanlar sekmesine götürür ve Seç orada çıkar', async ({ page }) => {
+  const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
+  const ready = page.locator('#guard-col-ready .guard-card');
+  await expect(ready).toHaveCount(1);
+  await expect(page.locator('.guard-tohint')).toHaveCount(0);                              // henüz çıkan yok
+  await page.evaluate(() => Object.assign(window.__db.visits.find(v => v.id === 'v7'), { done: true, done_at: new Date().toISOString() }));   // bugünün aracı için "işlemleri bitti"
+  await page.clock.runFor(10500);
+  await expect(ready).toHaveCount(2);
+  await ready.filter({ hasText: 'B 123 XYZ' }).locator('button[data-k="cikis"]').click();
+  await expect(page.locator('#toast')).toContainText('B 123 XYZ çıkış yaptı');
+  await expect(page.locator('#guard-col-ready .guard-card.is-done [data-action="guard-sel"]')).toHaveCount(1);   // az önce çıkanda Seç var
+  await page.clock.runFor(16 * 60000);                                                     // 15 dakika geçti: Bekleyenler'den kalkar
+  await expect(page.locator('#guard-col-ready .guard-card.is-done')).toHaveCount(0);
+  await expect(ready).toHaveCount(1);                                                      // diğer araç hâlâ çıkışa hazır
+  const hint = page.locator('.guard-tohint');
+  await expect(hint).toContainText('Çıkan 1 aracı seçip tek mesajla paylaş');
+  await hint.click();
+  await expect(page.locator('[data-action="guard-tab"][data-k="out"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.guard-selhint')).toContainText('Seç');
+  await expect(page.locator('.guard-card').first().locator('[data-action="guard-sel"]')).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
 test('güvenlik: ofisin "işlemleri bitti" dediği araç "Çıkışa hazır"da en üste gelir; çıkan aracın bilgisi WhatsApp’ta paylaşılır', async ({ page }) => {
   const problems = await openApp(page, { session: false, guardToken: 'g1' }, '/?guvenlik=g1');
   const ready = page.locator('#guard-col-ready .guard-card');
