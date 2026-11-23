@@ -40,6 +40,9 @@ async function openPortal(page, query, cfg = {}, sess = '') {
   if (sess) await page.addInitScript(t => { try { localStorage.setItem('pcs-nakliye-oturum', t); } catch (e) {} }, sess);
   await page.clock.install({ time: NOW });
   await page.goto('/nakliye.html' + query);
+  // Müşteri ekranı Genel bakış ile açılır; testlerin çoğu çalışma sayfasında ("Yükler ve araçlar") ilerler. cfg.landing = 'ozet' ise açılış sayfasında kalınır.
+  await page.waitForSelector('.cp-side, .lgn, .dwrap, .note h1', { timeout: 8000 }).catch(() => {});
+  if (cfg.landing !== 'ozet' && await page.locator('.cp-side').count()) await page.locator('.cp-side [data-a="page"][data-v="plan"]').click();
   return problems;
 }
 const pick = (page, id) => page.locator(`[data-a="pick"][data-id="${id}"]`);
@@ -52,7 +55,7 @@ test.use({ serviceWorkers: 'block' });
 // ================================================================================================ müşteri: yükler (adım 1)
 test('müşteri sayfası: yalnızca kendi yüklerini görür; hızlı ekle (getirecek kamyon plakası dahil), düzenle, sil', async ({ page }) => {
   const problems = await openPortal(page, '?m=tokC1');
-  await expect(page.locator('.top .brand b')).toContainText('ÖRNEK NAKLİYAT');
+  await expect(page.locator('.cp-usr')).toContainText('ÖRNEK NAKLİYAT');
   await expect(page.locator('.steps')).toContainText('Yükleri yaz');
   await expect(page.locator('#p')).toContainText('BEKLEYEN GÖNDERİCİ');
   await expect(page.locator('#p')).not.toContainText('DENEME GÖNDERİCİ');            // başka müşteri
@@ -368,7 +371,10 @@ test('kullanıcısı olan müşterinin bağlantısı giriş ister; yanlış şif
   await expect(page.locator('#lg-err')).toContainText('hatalı');
   await page.locator('#lg-p').fill('sifre123');
   await page.locator('form[data-f="login"] button[type="submit"]').click();
-  await expect(page.locator('.uchip')).toContainText('Ali Yılmaz');
+  await expect(page.locator('.cp-usr')).toContainText('Ali Yılmaz');
+  await expect(page.locator('.cp-ph h1')).toHaveText('Genel bakış');                // giriş sonrası Genel bakış açılır
+  await expect(page.locator('.cp-feed')).toContainText('Giriş yaptı');
+  await page.locator('.cp-side [data-a="page"][data-v="plan"]').click();
   await expect(page.locator('#p')).toContainText('BEKLEYEN GÖNDERİCİ');
   expect(await page.evaluate(() => localStorage.getItem('pcs-nakliye-oturum'))).toMatch(/^oturum/);
   // yük ekler: kayıtta kullanıcının adı var, "Son işlemler"de görünür
@@ -391,7 +397,7 @@ test('kullanıcısı olan müşterinin bağlantısı giriş ister; yanlış şif
 
 test('giriş: kayıtlı oturumla doğrudan açılır; oturum sona erince giriş ekranı döner; 5 yanlış denemeden sonra kilitlenir', async ({ page }) => {
   await openPortal(page, '', { data: { shp_users: [user()] }, shpSessions: { oturumA: 'u1' } }, 'oturumA');
-  await expect(page.locator('.uchip')).toContainText('Ali Yılmaz');
+  await expect(page.locator('.cp-usr')).toContainText('Ali Yılmaz');
   await expect(page.locator('#lg-u')).toHaveCount(0);
   await page.evaluate(() => { window.__PCS_STUB.shpSessions = {}; });                 // ofis şifreyi değiştirdi / oturumu kapattı
   await page.clock.runFor(5100);
