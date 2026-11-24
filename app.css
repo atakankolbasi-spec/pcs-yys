@@ -2398,7 +2398,7 @@ html[data-theme="dark"] .guard-ncts{color:#c4cdd9}html[data-theme="dark"] .guard
 .guard-selall{border:1.5px solid #cfd7e3;background:#fff;color:#16233a;border-radius:9px;min-height:34px;padding:0 12px;font-family:inherit;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
 .guard:has(.guard-selbar){padding-bottom:110px}
 .guard-selbar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px max(14px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));background:#0f2a1c;color:#fff;box-shadow:0 -10px 30px #0b152540}
-.guard-selbar>b{font-size:15px;font-weight:900;letter-spacing:.02em}
+.guard .guard-selbar>b{font-size:15px;font-weight:900;letter-spacing:.02em;color:#fff}
 .guard-selacts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .guard-selwa{min-height:44px;padding:0 16px;border:0;border-radius:11px;background:#16a34a;color:#fff;font-family:inherit;font-size:14px;font-weight:900;letter-spacing:.03em;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.guard-selwa svg{width:20px;height:20px}
 .guard-selcp,.guard-selno{min-height:44px;padding:0 14px;border:1.5px solid #ffffff55;border-radius:11px;background:transparent;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer}

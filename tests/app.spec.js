@@ -2346,6 +2346,7 @@ test('güvenlik: peş peşe çıkan araçlar toplu seçilir ve tek WhatsApp mesa
   // Hepsini seç / Seçimi kaldır
   await page.locator('[data-action="guard-sel-all"]').click();
   await expect(page.locator('.guard-selbar')).toContainText('2 araç seçildi');
+  expect(await page.locator('.guard-selbar > b').evaluate(e => getComputedStyle(e).color)).toBe('rgb(255, 255, 255)');   // koyu yeşil çubukta yazı okunur olmalı
   await expect(page.locator('[data-action="guard-sel-all"]')).toHaveText('Seçimi kaldır');
   await page.locator('[data-action="guard-sel-all"]').click();
   await expect(page.locator('.guard-selbar')).toHaveCount(0);
